@@ -24,13 +24,13 @@
 | 영역 | 스택 |
 |---|---|
 | 언어 | Kotlin |
-| UI | Jetpack Compose *(또는 XML — 팀 합의)* |
+| UI | Jetpack Compose |
 | 아키텍처 | MVVM |
-| 네트워크 | Retrofit + OkHttp (KTO·카카오 REST API) |
+| 네트워크 | Retrofit + OkHttp — 자체 백엔드 API 경유 (KTO·카카오 REST는 백엔드에서만 호출) |
 | 로컬 저장 | Room · DataStore |
 | 지도 | 카카오맵 **Android SDK** |
 | 로그인 | 카카오 로그인 **Android SDK** |
-| 백엔드 | *(예정)* 인증·커뮤니티·보관함 — Supabase 또는 자체 서버 |
+| 백엔드 | **Spring Boot + PostgreSQL** — 인증·커뮤니티·보관함·외부 API 프록시 |
 | 데이터 생성 | Python 스크립트 (1회성·보관용) |
 
 > ⚠️ 지도·로그인은 웹 JS SDK가 아니라 **안드로이드 SDK**를 써야 한다. 웹 프로토타입의 카카오맵 JS 연동은 참고만 하고 재구현한다.
@@ -96,12 +96,11 @@ runninggu/
 `local.properties`는 기본적으로 `.gitignore`에 포함되어 커밋되지 않는다. 각자 로컬에 아래 키를 채운다.
 
 ```
-KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인)
-KAKAO_REST_API_KEY=      # 카카오 로컬 REST 키
-KTO_SERVICE_KEY=         # 한국관광공사 OpenAPI 키
+KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) — 앱에 포함되는 유일한 키
 ```
 
 > 키는 코드에 하드코딩하지 않고 `BuildConfig`로 주입한다.
+> **KTO·카카오 REST 키는 앱에 넣지 않는다** — 백엔드(Spring Boot) 환경변수로만 사용한다. (SPEC §9.4)
 
 ---
 
