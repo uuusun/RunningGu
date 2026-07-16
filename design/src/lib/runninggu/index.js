@@ -1,0 +1,11 @@
+// lib/runninggu barrel — UI 비종속 도메인 모듈.
+export * from './constants.js'
+export * from './events.js'
+export * from './dates.js'
+export * from './normalize.js'
+export * from './poi.js'
+export * from './tourapi.js'
+export * from './courses.js'
+export * from './engine.js'
+export * from './edits.js'
+export { RAW_RACES, PRESAMPLED, synthPOIs } from './sampleData.js'

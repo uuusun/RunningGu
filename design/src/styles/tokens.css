@@ -1,0 +1,73 @@
+/* ============================================================
+   RunTrip 디자인 토큰 — .dc.html STYLE A "활기찬 스포티"에서 추출
+   (원본 인라인 스타일의 색/간격/폰트/그림자를 단일 출처 변수로 정규화)
+   화면 컴포넌트는 직접 색을 쓰지 않고 이 토큰만 사용한다.
+   ============================================================ */
+:root {
+  /* ── 브랜드 컬러 ── */
+  --c-primary: #2B5CFF;        /* 주 액션 · 블루 */
+  --c-primary-ink: #1E40D8;
+  --c-primary-soft: #EEF2FF;   /* 블루 칩 배경 */
+  --c-primary-soft2: #F6F8FF;  /* 인포 박스 배경 */
+  --c-lime: #C9F23C;           /* 러닝 에너지 · 라임 */
+  --c-orange: #FF6A2B;         /* 회복 모드 · 오렌지 */
+
+  /* ── 잉크/텍스트 ── */
+  --c-ink: #15161B;            /* 본문/헤드라인 */
+  --c-ink-2: #54565E;          /* 보조 텍스트 */
+  --c-ink-3: #71747C;
+  --c-ink-4: #86878E;          /* 메타/라벨 */
+  --c-ink-5: #9A9CA2;          /* 약한 메타 */
+  --c-ink-6: #AEB0B6;
+  --c-ink-7: #B7B9BE;
+
+  /* ── 표면/라인 ── */
+  --c-surface: #ffffff;        /* 카드/시트 */
+  --c-page: #e7e5df;           /* 데스크톱 캔버스 배경 */
+  --c-fill: #F2F2F0;           /* 토글/칩 트랙 */
+  --c-fill-2: #E9EBEF;         /* 썸네일 플레이스홀더 */
+  --c-line: #E4E4E6;           /* 1.5px 보더 */
+  --c-line-2: #ECECEE;         /* 카드 보더 */
+  --c-line-3: #F0F0F0;         /* divider */
+  --c-line-4: #F2F2F2;
+
+  /* ── 카테고리 색 (색 + 텍스트 태그 병행: 접근성) ── */
+  --cat-food-bg: #FFF3CC;      --cat-food-fg: #A66A00;   /* 맛집 */
+  --cat-tour-bg: #EAF1FF;      --cat-tour-fg: #2B5CFF;   /* 관광 */
+  --cat-cafe-bg: #F1E9FF;      --cat-cafe-fg: #7A4FD0;   /* 카페 */
+  --cat-wellness-bg: #E6F7EE;  --cat-wellness-fg: #1B8A5A; /* 웰니스 */
+  --cat-nature-bg: #F0FAD8;    --cat-nature-fg: #5A8A0A; /* 자연·산책 */
+  --cat-history-bg: #EFEAFE;   --cat-history-fg: #6B4FBB;/* 역사·문화 */
+  --cat-lodging-bg: #EAEFF5;   --cat-lodging-fg: #3E5573;/* 숙소 */
+  --cat-race-bg: #EEF2FF;      --cat-race-fg: #2B5CFF;   /* 대회 */
+  --cat-recovery-bg: #FFF1E9;  --cat-recovery-fg: #C2410C; /* 회복 */
+  --cat-recovery-border: #FFD9C2;
+  --cat-recovery-body: #7C4A2E;
+
+  /* ── 상태칩 ── */
+  --chip-open-bg: #C9F23C;     --chip-open-fg: #15161B;  /* 접수중 */
+  --chip-closed-bg: #EFEFEF;   --chip-closed-fg: #9A9CA2;/* 마감 */
+
+  /* ── 타이포 ── */
+  --font-body: 'Pretendard Variable', Pretendard, system-ui, -apple-system, sans-serif;
+  --font-num: 'Archivo', 'Pretendard Variable', sans-serif; /* 숫자/eyebrow/라벨 */
+
+  /* ── 라운드 ── */
+  --r-phone: 30px;
+  --r-card: 20px;
+  --r-btn: 16px;
+  --r-md: 15px;
+  --r-chip: 13px;
+  --r-sm: 11px;
+  --r-xs: 8px;
+
+  /* ── 그림자 ── */
+  --sh-phone: 0 10px 34px rgba(0, 0, 0, .13);
+  --sh-float: 0 2px 8px rgba(0, 0, 0, .16);
+  --sh-pin: 0 2px 5px rgba(0, 0, 0, .25);
+  --sh-sheet: 0 -8px 30px rgba(0, 0, 0, .13);
+
+  /* ── 간격(앱 가로 패딩 기준) ── */
+  --pad-x: 22px;
+  --cta-h: 56px;
+}

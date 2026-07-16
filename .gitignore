@@ -1,0 +1,25 @@
+# secrets (API 키) — .env.example만 커밋
+.env
+.env.local
+
+# node
+node_modules/
+dist/
+
+# python
+__pycache__/
+*.pyc
+geocode_cache.json
+
+# crawler 산출물 (실행 시 ./output/ 에 생성)
+output/
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+*.tmp
+
+# agent workspaces
+.claude/
