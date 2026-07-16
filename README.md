@@ -43,7 +43,7 @@
 runninggu/
 ├── README.md            # 이 문서
 ├── CONVENTION.md        # Git 브랜치·커밋·PR 규칙 (팀 필독)
-├── SPEC.md              # 최종 통합 명세 (단일 기준, SSOT) — ※안드로이드 기준으로 갱신 필요
+├── SPEC.md              # 최종 통합 명세 (단일 기준, SSOT)
 ├── .gitignore
 │
 ├── app/                 # 안드로이드 앱 모듈
@@ -121,7 +121,7 @@ KTO_SERVICE_KEY=         # 한국관광공사 OpenAPI 키
 
 | 문서 | 내용 |
 |---|---|
-| [SPEC.md](./SPEC.md) | 서비스 최종 명세 (화면·기능·데이터 계약) — **작업 전 필독** ※안드로이드 기준 갱신 필요 |
+| [SPEC.md](./SPEC.md) | 서비스 최종 명세 (화면·기능·데이터 계약) — **작업 전 필독** |
 | [CONVENTION.md](./CONVENTION.md) | Git 브랜치·커밋·PR 규칙 |
 
 ---
