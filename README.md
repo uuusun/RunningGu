@@ -1,61 +1,131 @@
-# 런트립 (RunTrip)
+# 런닝구(區) 🏃
 
-전국 마라톤 일정 통합 + 대회 전후 여행 동선 자동 추천 + 위치 기반 러닝·산책 코스 + 러너 커뮤니티.
-2026 관광데이터 활용 공모전 (팀 런닝구) — 새 출발 저장소.
+> 전국 마라톤 일정 통합 + 대회 전후 **여행 동선 자동 추천** + 위치 기반 **러닝·산책 코스** + 러너 **커뮤니티**를 갖춘 러닝 관광 **안드로이드 앱**
+>
+> 2026 관광데이터 활용 공모전 (웹/앱 개발 · 예비심사 통과)
 
-> **모든 제품·데이터·API 질문의 기준은 [`SPEC.md`](./SPEC.md) (v2, 2026-07-16)** — 단일 기준 명세(SSOT).
-> 이 저장소는 구 저장소(Korea_Tour_Data)에서 **명세 + 재생성 불가/고비용 자산만** 추려 시작한다.
+---
 
-## 구조
+## 📌 프로젝트 개요
 
-| 경로 | 내용 |
+| 항목 | 내용 |
 |---|---|
-| `SPEC.md` | 최종 통합 명세서 v2 — 07-16 회의 결정 반영. **여기부터 읽기** |
-| `design/` | 참조 목업 (Vite+React). SPEC의 🧩목업 태그가 가리키는 참조 구현. `src/lib/runninggu/`는 UI 비종속 도메인 로직(엔진·코스 빌더·정규화·편집)이라 새 스택에 그대로 이식 가능 |
-| `design/src/data/durunubi_courses.json` | ⚠️ **두루누비 261코스 GPX 사전 파싱본 — 생성 스크립트 유실 상태. 소스 코드처럼 취급(삭제·재생성 금지), 재생성 스크립트 복원은 백로그** |
-| `design/public/data/races.json` | 병합 완료 대회 153건 (파이프라인 산출물) |
-| `backend/` | 데이터 파이프라인 — `build_races_json.py`(CSV→races.json), `geocode.py`(카카오 지오코딩+캐시) |
-| `crawler/` | 마라톤 크롤러 (구 저장소 밖에서 편입) — 산출물은 실행 위치의 `./output/` |
-| `data/races_sample.csv` | 크롤 원천 271행 (멀티라인 필드 — RFC 4180 파서 필수) |
-| `submissions/` | 공모전 제안서 (기능 약속 M1~M4·차별성의 원천) |
+| 서비스명 | 런닝구(區) |
+| 타깃 | 2030 러너 (5K·10K·하프 중심) |
+| 필수요건 | 한국관광공사 OpenAPI 활용 (국문관광정보·두루누비·웰니스) |
+| 형태 | **안드로이드 네이티브 앱** |
 
-## 빠른 시작 — 참조 목업 실행
+핵심 기능(M1~M4·C·B): 종목·상황별 맞춤 동선 추천 · 전국 마라톤 통합 캘린더 · 대회 인근 축제 · 러닝/산책 코스 · 러너 커뮤니티 · 보관함.
 
-```bash
-cd design
-npm install
-npm run dev        # http://localhost:5173 (strictPort — 카카오 콘솔 등록 도메인)
+---
+
+## 🛠 기술 스택
+
+| 영역 | 스택 |
+|---|---|
+| 언어 | Kotlin |
+| UI | Jetpack Compose *(또는 XML — 팀 합의)* |
+| 아키텍처 | MVVM |
+| 네트워크 | Retrofit + OkHttp (KTO·카카오 REST API) |
+| 로컬 저장 | Room · DataStore |
+| 지도 | 카카오맵 **Android SDK** |
+| 로그인 | 카카오 로그인 **Android SDK** |
+| 백엔드 | *(예정)* 인증·커뮤니티·보관함 — Supabase 또는 자체 서버 |
+| 데이터 생성 | Python 스크립트 (1회성·보관용) |
+
+> ⚠️ 지도·로그인은 웹 JS SDK가 아니라 **안드로이드 SDK**를 써야 한다. 웹 프로토타입의 카카오맵 JS 연동은 참고만 하고 재구현한다.
+
+---
+
+## 📂 폴더 구조
+
+```
+runninggu/
+├── README.md            # 이 문서
+├── CONVENTION.md        # Git 브랜치·커밋·PR 규칙 (팀 필독)
+├── SPEC.md              # 최종 통합 명세 (단일 기준, SSOT) — ※안드로이드 기준으로 갱신 필요
+├── .gitignore
+│
+├── app/                 # 안드로이드 앱 모듈
+│   └── src/main/
+│       ├── java/com/runninggu/app/
+│       │   ├── ui/          # 화면 (Compose)
+│       │   │   ├── auth/     # A1 로그인 · A2 회원가입 · A3 비번찾기
+│       │   │   ├── home/     # S1 홈
+│       │   │   ├── calendar/ # S2 캘린더
+│       │   │   ├── course/   # S8 러닝코스
+│       │   │   ├── community/# S9 커뮤니티
+│       │   │   ├── archive/  # S10 보관함
+│       │   │   └── wizard/   # S4~S7 동선 만들기
+│       │   ├── data/        # 리포지토리·API·모델
+│       │   │   ├── remote/  # Retrofit (KTO·카카오)·Supabase
+│       │   │   ├── local/   # Room·DataStore
+│       │   │   └── model/
+│       │   ├── domain/      # 추천 엔진·코스 빌더 로직 (웹 engine.js 재구현)
+│       │   └── util/
+│       ├── res/            # 레이아웃·문자열·아이콘·테마
+│       └── assets/         # races.json·durunubi_courses.json 번들
+│
+├── build.gradle.kts     # 프로젝트 빌드 설정
+├── settings.gradle.kts
+│
+├── docs/                # 기획·API 매뉴얼
+├── scripts/             # 데이터 생성 Python (1회성·보관용, 크롤 CSV→races.json)
+├── data/                # 원천 데이터 (CSV 등)
+└── reference-web/       # 구 design/ (React 목업 — UX 참조용, 빌드 대상 아님)
 ```
 
-키가 하나도 없어도 SVG 폴백 지도 + 샘플 데이터로 전체 플로우가 동작한다 (SPEC NFR-1).
+> 참고: 기존 repo의 `design/`(React 웹 프로토타입)은 안드로이드 앱으로 이관되지 않으며 `reference-web/`으로 옮겨 **UX·화면흐름·로직 설계 참조**로만 쓴다. 옛 `web/`(Next.js 데모)는 사용하지 않는다. 앱이 쓰는 데이터(`races.json` 등)는 `app/src/main/assets/`에 번들한다.
 
-## 키 설정
+---
 
-```bash
-cp .env.example .env                # 루트: 파이프라인·서버용
-cp design/.env.example design/.env  # 목업: 지도 + dev 프록시용
+## 🚀 시작하기
+
+### 사전 준비
+- Android Studio (최신 안정판)
+- JDK 17
+- 카카오 · 한국관광공사 API 키
+
+### 실행
+1. Android Studio에서 프로젝트 열기 → Gradle Sync
+2. `local.properties`에 API 키 입력 (아래) — **커밋 금지**
+3. 에뮬레이터 또는 실기기에서 Run ▶
+
+### API 키 (`local.properties`)
+
+`local.properties`는 기본적으로 `.gitignore`에 포함되어 커밋되지 않는다. 각자 로컬에 아래 키를 채운다.
+
+```
+KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인)
+KAKAO_REST_API_KEY=      # 카카오 로컬 REST 키
+KTO_SERVICE_KEY=         # 한국관광공사 OpenAPI 키
 ```
 
-| 파일 | 키 | 용도 |
-|---|---|---|
-| `.env` | `KTO_SERVICE_KEY`(디코딩) / `KTO_SERVICE_KEY_ENC`(인코딩) | TourAPI — data.go.kr 페어 키 (SPEC §7.2·§9.4) |
-| `.env` | `KAKAO_REST_KEY` | 지오코딩·로컬 검색·모빌리티 (서버 전용) |
-| `.env` | `KAKAO_JS_KEY` | 지도 SDK (아래 VITE 키와 동일 값) |
-| `design/.env` | `VITE_KAKAO_MAP_KEY` | 카카오맵 SDK (없으면 SVG 폴백) |
-| `design/.env` | `TOUR_API_KEY` = KTO_SERVICE_KEY 값 | vite dev 프록시가 `/api/kto/*`에 주입 — 인근 축제 |
-| `design/.env` | `KAKAO_REST_KEY` | vite dev 프록시가 `/api/kakao/*`에 주입 — 출발지 검색·걷기 스팟 |
+> 키는 코드에 하드코딩하지 않고 `BuildConfig`로 주입한다.
 
-`.env`는 gitignore 대상 — 절대 커밋하지 않는다. REST·KTO 키는 클라이언트 번들 포함 금지 (SPEC §9.4).
+---
 
-## 데이터 파이프라인
+## 🌱 협업 규칙 (요약)
 
-```bash
-pip install -r backend/requirements.txt        # requests
-python backend/build_races_json.py             # data/races_sample.csv → design/public/data/races.json
-python backend/geocode.py "수원화성"            # 지오코딩 단건 테스트 (KAKAO_REST_KEY 필요)
-python crawler/marathon_crawler.py             # 재크롤 → ./output/ (주 1회 — SPEC §8.2)
-```
+전체 규칙은 [`CONVENTION.md`](./CONVENTION.md) 참고. 핵심만:
 
-## 다음 작업
+- **브랜치 전략: GitHub Flow** — `main`에 직접 push 금지. `main`에서 브랜치를 따서 작업 후 PR.
+- **브랜치 이름**: `feat/home-screen`, `fix/calendar-filter` 처럼 `<종류>/<설명>`.
+- **커밋 메시지**: `feat(home): 홈 화면 구성` 처럼 `<종류>(<범위>): <설명>`.
+- **PR**: 기능 하나 = 브랜치 하나 = PR 하나. 최소 1명 리뷰 승인 후 머지, 머지된 브랜치는 삭제.
+- **금지**: `local.properties`·API 키·`/build`·`.gradle`·`.idea` 커밋.
 
-SPEC §11 백로그 P0부터: 백엔드 기반(N-01) → 인증 화면(N-02·03) → 탭 5개 개편(N-05) → 홈(N-08) → 필터 모달(N-04) → 산책 블록 제거·러닝코스 연계(N-06) → 보관함(N-07). 미결 9건은 SPEC §12 참조.
+---
+
+## 📖 주요 문서
+
+| 문서 | 내용 |
+|---|---|
+| [SPEC.md](./SPEC.md) | 서비스 최종 명세 (화면·기능·데이터 계약) — **작업 전 필독** ※안드로이드 기준 갱신 필요 |
+| [CONVENTION.md](./CONVENTION.md) | Git 브랜치·커밋·PR 규칙 |
+
+---
+
+## 👥 팀
+
+런닝구(區) — 3인 (역할 유동, GitHub Flow 기반 협업)

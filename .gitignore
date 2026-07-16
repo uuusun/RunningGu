@@ -1,25 +1,35 @@
-# secrets (API 키) — .env.example만 커밋
+# ── secrets (커밋 금지) ──
+local.properties
 .env
 .env.local
+*.jks
+*.keystore
 
-# node
-node_modules/
-dist/
+# ── Android / Gradle ──
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+.idea/
+*.apk
+*.aab
 
-# python
+# ── Python (scripts/) ──
 __pycache__/
 *.pyc
 geocode_cache.json
-
-# crawler 산출물 (실행 시 ./output/ 에 생성)
 output/
 
-# editors / OS
-.idea/
-.vscode/
+# ── Node (reference-web/) ──
+node_modules/
+dist/
+
+# ── OS / editor ──
 .DS_Store
 *.log
 *.tmp
 
-# agent workspaces
+# ── agent workspaces ──
 .claude/
