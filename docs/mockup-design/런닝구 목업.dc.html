@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300..700,0..1,0&display=swap" />
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#E9E9E5;font-family:'Pretendard Variable',Pretendard,system-ui,-apple-system,sans-serif;color:#15161B;-webkit-font-smoothing:antialiased;text-wrap:pretty}
+a{color:#2B5CFF;text-decoration:none}
+a:hover{color:#1E40D8}
+button{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes snackUp{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;padding:26px 20px 60px;display:flex;flex-direction:column;align-items:center;gap:18px">
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;max-width:900px">
+    <span style="font-size:12px;font-weight:700;letter-spacing:0.12em;color:#9A9CA2;text-transform:uppercase;font-family:Archivo,sans-serif">런닝구 · UI MOCKUP</span>
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="3">
+      <div onClick="{{ item.go }}" style="{{ item.style }}">{{ item.label }}</div>
+    </sc-for>
+  </div>
+
+  <div style="width:390px;height:844px;background:#FFFFFF;border-radius:42px;box-shadow:0 30px 70px rgba(20,22,30,.22),0 0 0 9px #1A1B20;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none">
+
+    <div style="height:46px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 30px;background:#FFFFFF">
+      <span style="font-family:Archivo,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.02em">9:41</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:11px">
+          <div style="width:3px;height:5px;background:#15161B;border-radius:1px"></div>
+          <div style="width:3px;height:7px;background:#15161B;border-radius:1px"></div>
+          <div style="width:3px;height:9px;background:#15161B;border-radius:1px"></div>
+          <div style="width:3px;height:11px;background:#15161B;border-radius:1px"></div>
+        </div>
+        <div style="width:22px;height:11px;border:1.5px solid #15161B;border-radius:3px;padding:1.5px;margin-left:3px"><div style="width:70%;height:100%;background:#15161B;border-radius:1px"></div></div>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative" onScroll="{{ onScroll }}">
+
+      <sc-if value="{{ isSheet }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="STEP0 디자인 시스템" style="padding:8px 22px 40px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#9A9CA2;font-family:Archivo,sans-serif;margin-bottom:6px">DESIGN SYSTEM</div>
+        <div style="font-size:26px;font-weight:800;letter-spacing:-0.03em;line-height:1.25">런닝구 디자인 시스템</div>
+        <div style="font-size:13.5px;color:#54565E;margin-top:6px;line-height:1.5">전국 마라톤 일정 + 여행 동선 + 러닝코스 앱의 공통 토큰과 컴포넌트</div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">컬러</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#2B5CFF"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">주 색상 블루</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#2B5CFF</div></div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#1E40D8"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">짙은 블루</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#1E40D8</div></div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#EEF2FF"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">연블루 배경</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#EEF2FF</div></div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#C9F23C"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">포인트 라임</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#C9F23C</div></div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#FF6A2B"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">포인트 오렌지</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#FF6A2B</div></div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:14px;overflow:hidden">
+            <div style="height:52px;background:#F2F2F0"></div>
+            <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">칩 트랙</div><div style="font-size:11.5px;color:#86878E;font-family:Archivo,sans-serif">#F2F2F0</div></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#54565E"><span style="width:14px;height:14px;border-radius:4px;background:#15161B;display:inline-block"></span>본문 #15161B</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#54565E"><span style="width:14px;height:14px;border-radius:4px;background:#54565E;display:inline-block"></span>보조 #54565E</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#54565E"><span style="width:14px;height:14px;border-radius:4px;background:#86878E;display:inline-block"></span>메타 #86878E</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#54565E"><span style="width:14px;height:14px;border-radius:4px;background:#9A9CA2;display:inline-block"></span>약메타 #9A9CA2</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#54565E"><span style="width:14px;height:14px;border-radius:4px;background:#FFFFFF;border:1px solid #E4E4E6;display:inline-block"></span>보더 #E4E4E6</div>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">타이포</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:26px;font-weight:800;letter-spacing:-0.03em">화면 타이틀</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">26 / 800</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:17px;font-weight:700">섹션 헤딩</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">17 / 700</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:15px;font-weight:600">카드 제목</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">15 / 600</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:13.5px;color:#54565E">본문 · 보조 설명 문구</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">13.5 / 400</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:12px;color:#86878E">메타 · 출처 · 확인일</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">12 / 400</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:34px;font-weight:700;font-family:Archivo,sans-serif;letter-spacing:-0.02em">D-21 · 5.21km</span><span style="font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif;flex:none">Archivo</span></div>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">카테고리 태그 9종</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px">
+          <span style="background:#EAF1FF;color:#2B5CFF;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">관광지</span>
+          <span style="background:#FFF3CC;color:#A66A00;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">맛집</span>
+          <span style="background:#F1E9FF;color:#7A4FD0;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">카페</span>
+          <span style="background:#E6F7EE;color:#1B8A5A;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">힐링웰니스</span>
+          <span style="background:#F0FAD8;color:#5A8A0A;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">자연트레킹</span>
+          <span style="background:#EFEAFE;color:#6B4FBB;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">역사문화</span>
+          <span style="background:#EAEFF5;color:#3E5573;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">숙소</span>
+          <span style="background:#EEF2FF;color:#2B5CFF;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">대회</span>
+          <span style="background:#FFF1E9;color:#C2410C;font-size:12px;font-weight:600;padding:5px 10px;border-radius:13px">회복</span>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">상태 칩 · 배지</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <span style="background:#C9F23C;color:#15161B;font-size:12px;font-weight:700;padding:5px 11px;border-radius:13px">접수중</span>
+          <span style="background:#EFEFEF;color:#9A9CA2;font-size:12px;font-weight:700;padding:5px 11px;border-radius:13px">마감</span>
+          <span style="background:#EEF2FF;color:#2B5CFF;font-size:11px;font-weight:700;padding:4px 8px;border-radius:7px;font-family:Archivo,sans-serif;letter-spacing:0.04em">LIVE</span>
+          <span style="background:#F2F2F0;color:#86878E;font-size:11px;font-weight:700;padding:4px 8px;border-radius:7px">샘플</span>
+        </div>
+        <div style="margin-top:12px;background:#FFF1E9;border-radius:16px;padding:13px 15px;display:flex;gap:10px;align-items:flex-start">
+          <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#FF6A2B;font-variation-settings:'FILL' 1;line-height:1">spa</span>
+          <div>
+            <div style="font-size:13.5px;font-weight:700;color:#C2410C">D+1 회복 모드</div>
+            <div style="font-size:12.5px;color:#C2410C;opacity:.82;margin-top:2px;line-height:1.45">고강도 일정을 빼고 온천·가벼운 산책 위주로 짭니다.</div>
+          </div>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">대회 카드</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="border:1px solid #E4E4E6;border-radius:20px;padding:15px;display:flex;gap:14px;background:#FFFFFF">
+            <div style="width:46px;flex:none;text-align:center">
+              <div style="font-family:Archivo,sans-serif;font-size:11.5px;font-weight:700;color:#2B5CFF;letter-spacing:0.06em">AUG</div>
+              <div style="font-family:Archivo,sans-serif;font-size:27px;font-weight:700;line-height:1.1;letter-spacing:-0.02em">22</div>
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">토</div>
+            </div>
+            <div style="width:1px;background:#F0F0F0;flex:none"></div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:flex-start;gap:8px">
+                <div style="flex:1;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-0.02em">2026 세종 호수공원 마라톤</div>
+                <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#FF6A2B;font-variation-settings:'FILL' 1;line-height:1;flex:none">favorite</span>
+              </div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:4px">세종 · 세종중앙공원</div>
+              <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+                <span style="background:#EEF2FF;color:#2B5CFF;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:9px">풀</span>
+                <span style="background:#F2F2F0;color:#54565E;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:9px">하프</span>
+                <span style="background:#F2F2F0;color:#54565E;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:9px">10K</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap">
+                <span style="background:#C9F23C;color:#15161B;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px">접수중 · ~08.10</span>
+                <span style="font-size:11.5px;color:#9A9CA2">마라톤GO · 확인 07.15</span>
+              </div>
+            </div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:20px;padding:15px;display:flex;gap:14px;background:#FFFFFF;opacity:.5">
+            <div style="width:46px;flex:none;text-align:center">
+              <div style="font-family:Archivo,sans-serif;font-size:11.5px;font-weight:700;color:#9A9CA2;letter-spacing:0.06em">AUG</div>
+              <div style="font-family:Archivo,sans-serif;font-size:27px;font-weight:700;line-height:1.1;letter-spacing:-0.02em">08</div>
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">토</div>
+            </div>
+            <div style="width:1px;background:#F0F0F0;flex:none"></div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:flex-start;gap:8px">
+                <div style="flex:1;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-0.02em">2026 전주 한옥 마라톤</div>
+                <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#C6C7CB;line-height:1;flex:none">favorite</span>
+              </div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:4px">전북 · 전주종합경기장</div>
+              <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+                <span style="background:#EEF2FF;color:#2B5CFF;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:9px">10K</span>
+                <span style="background:#F2F2F0;color:#54565E;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:9px">5K</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap">
+                <span style="background:#EFEFEF;color:#9A9CA2;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px">마감</span>
+                <span style="font-size:11.5px;color:#9A9CA2">런너스 · 확인 07.12</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">빈 상태 · 버튼</div>
+        <div style="border:1px dashed #E4E4E6;border-radius:20px;padding:34px 20px;text-align:center">
+          <div style="font-size:15px;font-weight:700">조건에 맞는 대회가 없어요.</div>
+          <div style="font-size:13px;color:#86878E;margin-top:6px">필터를 조금 넓혀 보세요.</div>
+          <div style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:14px;cursor:pointer">필터 초기화</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <div style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">주요 CTA · 56px</div>
+          <div style="height:56px;border-radius:16px;background:#FFFFFF;border:1px solid #E4E4E6;color:#15161B;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">보조 버튼</div>
+          <div style="height:56px;border-radius:16px;background:#F2F2F0;color:#9A9CA2;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">비활성</div>
+        </div>
+
+        <div style="height:1px;background:#F0F0F0;margin:22px 0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">하단 탭바</div>
+        <div style="border:1px solid #E4E4E6;border-radius:20px;overflow:hidden">
+          <div style="display:flex;background:#FFFFFF;padding:9px 0 12px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#2B5CFF;font-variation-settings:'FILL' 1;line-height:1">home</span>
+              <span style="font-size:11px;font-weight:700;color:#2B5CFF">홈</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#9A9CA2;line-height:1">calendar_month</span>
+              <span style="font-size:11px;font-weight:600;color:#9A9CA2">캘린더</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#9A9CA2;line-height:1">route</span>
+              <span style="font-size:11px;font-weight:600;color:#9A9CA2">러닝코스</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#9A9CA2;line-height:1">bookmark</span>
+              <span style="font-size:11px;font-weight:600;color:#9A9CA2">보관함</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="S1 홈" style="padding-bottom:26px">
+
+        <div style="padding:6px 22px 14px;display:flex;align-items:center;gap:9px">
+          <div style="width:34px;height:34px;border-radius:11px;background:#C9F23C;display:flex;align-items:center;justify-content:center;flex:none">
+            <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#15161B;font-variation-settings:'FILL' 1;line-height:1">sprint</span>
+          </div>
+          <div style="font-size:20px;font-weight:800;letter-spacing:-0.04em">런닝구</div>
+        </div>
+
+        <div style="padding:0 22px">
+          <div style="height:54px;border-radius:16px;background:#F2F2F0;display:flex;align-items:center;gap:10px;padding:0 16px">
+            <span onClick="{{ goSearch }}" style="font-family:'Material Symbols Rounded';font-size:22px;color:#86878E;line-height:1;cursor:pointer;flex:none">search</span>
+            <input value="{{ homeQ }}" onChange="{{ setHomeQ }}" onKeyDown="{{ homeSearchKey }}" placeholder="대회·지역 검색" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:inherit;font-size:15.5px;color:#15161B" />
+          </div>
+        </div>
+
+        <div style="padding:20px 22px 4px;display:flex;justify-content:space-between">
+          <div onClick="{{ goCalendar }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:68px">
+            <div style="width:58px;height:58px;border-radius:20px;background:#EEF2FF;display:flex;align-items:center;justify-content:center">
+              <span style="font-family:'Material Symbols Rounded';font-size:26px;color:#2B5CFF;line-height:1">calendar_month</span>
+            </div>
+            <span style="font-size:12.5px;font-weight:600;color:#54565E">달력</span>
+          </div>
+          <div onClick="{{ goCoursesMap }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:68px">
+            <div style="width:58px;height:58px;border-radius:20px;background:#EEF2FF;display:flex;align-items:center;justify-content:center">
+              <span style="font-family:'Material Symbols Rounded';font-size:26px;color:#2B5CFF;line-height:1">map</span>
+            </div>
+            <span style="font-size:12.5px;font-weight:600;color:#54565E">지도</span>
+          </div>
+          <div onClick="{{ goCourses }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:68px">
+            <div style="width:58px;height:58px;border-radius:20px;background:#EEF2FF;display:flex;align-items:center;justify-content:center">
+              <span style="font-family:'Material Symbols Rounded';font-size:26px;color:#2B5CFF;line-height:1">route</span>
+            </div>
+            <span style="font-size:12.5px;font-weight:600;color:#54565E">코스</span>
+          </div>
+          <div onClick="{{ scrollFestival }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:68px">
+            <div style="width:58px;height:58px;border-radius:20px;background:#EEF2FF;display:flex;align-items:center;justify-content:center">
+              <span style="font-family:'Material Symbols Rounded';font-size:26px;color:#2B5CFF;line-height:1">attractions</span>
+            </div>
+            <span style="font-size:12.5px;font-weight:600;color:#54565E">관광</span>
+          </div>
+        </div>
+
+        <div style="padding:24px 0 0">
+          <div style="padding:0 22px;display:flex;align-items:baseline;justify-content:space-between">
+            <div style="font-size:17px;font-weight:700;letter-spacing:-0.02em;white-space:nowrap">마감 임박 대회</div>
+            <div style="font-size:12px;color:#9A9CA2">접수 마감 순</div>
+          </div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px;scroll-snap-type:x mandatory">
+            <div onClick="{{ goDetailSeoul }}" style="width:212px;flex:none;border:1px solid #E4E4E6;border-radius:20px;padding:15px;background:#FFFFFF;cursor:pointer;scroll-snap-align:start">
+              <span style="background:#FFF1E9;color:#C2410C;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px;font-family:Archivo,sans-serif">마감 D-4</span>
+              <div style="font-size:15px;font-weight:700;margin-top:11px;line-height:1.35;letter-spacing:-0.02em">2026 서울 달빛<br />나이트런</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:6px">서울 · 08.15 토 20:00</div>
+            </div>
+            <div onClick="{{ goDetailSejong }}" style="width:212px;flex:none;border:1px solid #E4E4E6;border-radius:20px;padding:15px;background:#FFFFFF;cursor:pointer;scroll-snap-align:start">
+              <span style="background:#FFF1E9;color:#C2410C;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px;font-family:Archivo,sans-serif">마감 D-9</span>
+              <div style="font-size:15px;font-weight:700;margin-top:11px;line-height:1.35;letter-spacing:-0.02em">2026 세종 호수공원<br />마라톤</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:6px">세종 · 08.22 토 08:00</div>
+            </div>
+            <div onClick="{{ goDetailBusan }}" style="width:212px;flex:none;border:1px solid #E4E4E6;border-radius:20px;padding:15px;background:#FFFFFF;cursor:pointer;scroll-snap-align:start">
+              <span style="background:#F2F2F0;color:#54565E;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px;font-family:Archivo,sans-serif">마감 D-27</span>
+              <div style="font-size:15px;font-weight:700;margin-top:11px;line-height:1.35;letter-spacing:-0.02em">2026 부산 바다<br />하프마라톤</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:6px">부산 · 09.05 토 07:30</div>
+            </div>
+            <div onClick="{{ goDetailJeju }}" style="width:212px;flex:none;border:1px solid #E4E4E6;border-radius:20px;padding:15px;background:#FFFFFF;cursor:pointer;scroll-snap-align:start">
+              <span style="background:#F2F2F0;color:#54565E;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:13px;font-family:Archivo,sans-serif">마감 D-62</span>
+              <div style="font-size:15px;font-weight:700;margin-top:11px;line-height:1.35;letter-spacing:-0.02em">2026 제주 감귤<br />트레일런</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:6px">제주 · 10.17 토 09:00</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="home-festival" style="padding:26px 0 0">
+          <div style="padding:0 22px;display:flex;align-items:baseline;justify-content:space-between">
+            <div style="font-size:17px;font-weight:700;letter-spacing:-0.02em;white-space:nowrap">축제·지역 관광 추천</div>
+            <div style="font-size:12px;color:#9A9CA2">8월</div>
+          </div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px">
+            <div style="width:180px;flex:none">
+              <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);position:relative;display:flex;align-items:center;justify-content:center">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+                <span style="position:absolute;top:9px;left:9px;background:#C9F23C;color:#15161B;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:10px">진행 중</span>
+              </div>
+              <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">부산 바다축제</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.01~08.09 · 부산</div>
+            </div>
+            <div style="width:180px;flex:none">
+              <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);position:relative;display:flex;align-items:center;justify-content:center">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+                <span style="position:absolute;top:9px;left:9px;background:#C9F23C;color:#15161B;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:10px">진행 중</span>
+              </div>
+              <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">봉화 은어축제</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.01~08.10 · 경북</div>
+            </div>
+            <div style="width:180px;flex:none">
+              <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);display:flex;align-items:center;justify-content:center">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+              </div>
+              <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">세종 호수공원 물빛축제</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.20~08.24 · 세종</div>
+            </div>
+            <div style="width:180px;flex:none">
+              <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);display:flex;align-items:center;justify-content:center">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+              </div>
+              <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">평창 백일홍축제</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.28~09.13 · 강원</div>
+            </div>
+          </div>
+          <div style="padding:10px 22px 0;font-size:11.5px;color:#9A9CA2">출처 · 한국관광공사</div>
+        </div>
+
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S2 캘린더" style="padding-bottom:26px">
+
+        <div style="position:sticky;top:0;background:#FFFFFF;z-index:5;padding:6px 22px 12px">
+          <div style="height:48px;border-radius:16px;background:#F2F2F0;display:flex;align-items:center;gap:9px;padding:0 14px">
+            <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#86878E;line-height:1;flex:none">search</span>
+            <input value="{{ q }}" onChange="{{ setQ }}" placeholder="대회·지역 검색" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:inherit;font-size:15px;color:#15161B" />
+            <sc-if value="{{ hasQ }}" hint-placeholder-val="{{ false }}">
+              <span onClick="{{ clearQ }}" style="font-family:'Material Symbols Rounded';font-size:19px;color:#9A9CA2;line-height:1;cursor:pointer;flex:none">cancel</span>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;background:#F2F2F0;border-radius:14px;padding:3px;margin-top:11px">
+            <div onClick="{{ setListView }}" style="{{ segListStyle }}">리스트</div>
+            <div onClick="{{ setCalView }}" style="{{ segCalStyle }}">캘린더</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:7px;margin-top:11px;overflow-x:auto;padding-bottom:2px">
+            <div onClick="{{ openFilter }}" style="{{ filterBtnStyle }}">
+              <span style="font-family:'Material Symbols Rounded';font-size:17px;line-height:1">tune</span>
+              <span>필터</span>
+              <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}"><span style="font-family:Archivo,sans-serif;font-weight:700">{{ filterCount }}</span></sc-if>
+            </div>
+            <sc-for list="{{ activeChips }}" as="chip" hint-placeholder-count="0">
+              <div onClick="{{ chip.remove }}" style="display:flex;align-items:center;gap:4px;flex:none;background:#EEF2FF;color:#2B5CFF;font-size:12.5px;font-weight:600;padding:7px 10px 7px 12px;border-radius:13px;cursor:pointer;white-space:nowrap">
+                <span>{{ chip.label }}</span>
+                <span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1;opacity:.7">close</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:4px 22px 10px;font-size:13.5px;font-weight:600;color:#54565E">대회 <span style="color:#2B5CFF;font-family:Archivo,sans-serif;font-weight:700">{{ resultCount }}</span></div>
+        </sc-if>
+
+        <sc-if value="{{ isCalView }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:0 22px 14px">
+          <div style="display:flex;align-items:center;justify-content:center;gap:18px;padding:4px 0 12px">
+            <span onClick="{{ prevMonth }}" style="font-family:'Material Symbols Rounded';font-size:24px;color:#54565E;cursor:pointer;line-height:1">chevron_left</span>
+            <span style="font-family:Archivo,sans-serif;font-size:19px;font-weight:700;letter-spacing:-0.01em;min-width:88px;text-align:center">{{ monthLabel }}</span>
+            <span onClick="{{ nextMonth }}" style="font-family:'Material Symbols Rounded';font-size:24px;color:#54565E;cursor:pointer;line-height:1">chevron_right</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px">
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#E5484D">일</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#86878E">월</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#86878E">화</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#86878E">수</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#86878E">목</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#86878E">금</div>
+            <div style="text-align:center;font-size:11.5px;font-weight:700;color:#2B5CFF">토</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+            <sc-for list="{{ calCells }}" as="c" hint-placeholder-count="35">
+              <div onClick="{{ c.go }}" style="{{ c.cellStyle }}">
+                <div style="{{ c.numStyle }}">{{ c.day }}</div>
+                <sc-if value="{{ c.hasDot }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ c.dotStyle }}">{{ c.dotLabel }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:12.5px;color:#54565E;font-weight:600;margin-top:14px">{{ calListLabel }}</div>
+        </div>
+        </sc-if>
+
+        <div style="padding:0 22px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+            <div onClick="{{ c.open }}" style="{{ c.cardStyle }}">
+              <div style="width:46px;flex:none;text-align:center">
+                <div style="{{ c.monStyle }}">{{ c.mon }}</div>
+                <div style="font-family:Archivo,sans-serif;font-size:27px;font-weight:700;line-height:1.1;letter-spacing:-0.02em">{{ c.day }}</div>
+                <div style="font-size:11.5px;color:#86878E;font-weight:600">{{ c.dow }}</div>
+              </div>
+              <div style="width:1px;background:#F0F0F0;flex:none"></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <div style="flex:1;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-0.02em">{{ c.name }}</div>
+                  <span onClick="{{ c.fav }}" style="{{ c.heartStyle }}">favorite</span>
+                </div>
+                <div style="font-size:12.5px;color:#86878E;margin-top:4px">{{ c.where }}</div>
+                <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+                  <sc-for list="{{ c.tags }}" as="t" hint-placeholder-count="2">
+                    <span style="{{ t.style }}">{{ t.label }}</span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap">
+                  <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
+                  <span style="font-size:11.5px;color:#9A9CA2;white-space:nowrap">{{ c.source }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:56px 34px;text-align:center">
+            <div style="font-size:15.5px;font-weight:700">{{ emptyTitle }}</div>
+            <sc-if value="{{ showEmptyReset }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ resetFilters }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:14px;cursor:pointer">필터 초기화</div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S3 대회 상세" style="min-height:100%;display:flex;flex-direction:column">
+
+        <div style="position:sticky;top:0;z-index:5;background:#FFFFFF;display:flex;align-items:center;justify-content:space-between;padding:4px 18px 10px">
+          <span onClick="{{ back }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#54565E;line-height:1">ios_share</span>
+            <span onClick="{{ detailFav }}" style="{{ detailHeartStyle }}">favorite</span>
+          </div>
+        </div>
+
+        <div style="padding:8px 22px 0">
+          <div style="font-size:12.5px;font-weight:700;color:#2B5CFF">{{ d_eyebrow }}</div>
+          <div style="font-size:25px;font-weight:800;letter-spacing:-0.035em;line-height:1.28;margin-top:7px">{{ d_name }}</div>
+          <div style="display:flex;align-items:flex-end;gap:11px;margin-top:16px">
+            <div style="font-family:Archivo,sans-serif;font-size:46px;font-weight:700;letter-spacing:-0.03em;line-height:.95;color:#2B5CFF">{{ d_dday }}</div>
+            <div style="padding-bottom:3px">
+              <div style="font-size:15.5px;font-weight:700">{{ d_dateLong }}</div>
+              <div style="font-size:13px;color:#54565E;margin-top:2px;white-space:nowrap">{{ d_startLine }}</div>
+            </div>
+          </div>
+          <div style="margin-top:15px"><span style="{{ d_statusStyle }}">{{ d_statusLabel }}</span></div>
+        </div>
+
+        <div style="margin:22px 22px 0;border:1px solid #E4E4E6;border-radius:20px;padding:4px 16px">
+          <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #F0F0F0">
+            <div style="width:66px;flex:none;font-size:13px;color:#86878E">종목</div>
+            <div style="flex:1;font-size:13.5px;font-weight:600">{{ d_events }}</div>
+          </div>
+          <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #F0F0F0">
+            <div style="width:66px;flex:none;font-size:13px;color:#86878E">접수 기간</div>
+            <div style="flex:1;font-size:13.5px;font-weight:600">{{ d_apply }}</div>
+          </div>
+          <div style="display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #F0F0F0">
+            <div style="width:66px;flex:none;font-size:13px;color:#86878E">주최</div>
+            <div style="flex:1;font-size:13.5px;font-weight:600">{{ d_host }}</div>
+          </div>
+          <div style="display:flex;gap:14px;padding:13px 0;align-items:center">
+            <div style="width:66px;flex:none;font-size:13px;color:#86878E">출처</div>
+            <div style="flex:1;font-size:13px;color:#54565E">{{ d_source }}</div>
+          </div>
+          <div style="padding:0 0 14px">
+            <div style="height:42px;border-radius:14px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;gap:5px;font-size:13.5px;font-weight:700;cursor:pointer">
+              <span style="white-space:nowrap">공식 페이지</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:17px;line-height:1;color:#54565E">open_in_new</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:26px 0 0">
+          <div style="padding:0 22px;font-size:17px;font-weight:700;letter-spacing:-0.02em">인근 축제</div>
+          <sc-if value="{{ festOk }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px">
+              <div style="width:200px;flex:none">
+                <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);display:flex;align-items:center;justify-content:center">
+                  <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+                </div>
+                <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">세종 호수공원 물빛축제</div>
+                <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.20~08.24 · 대회장 0.8km</div>
+              </div>
+              <div style="width:200px;flex:none">
+                <div style="height:112px;border-radius:16px;background:repeating-linear-gradient(45deg,#F2F2F0 0 9px,#E9E9E5 9px 18px);display:flex;align-items:center;justify-content:center">
+                  <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#9A9CA2">festival photo</span>
+                </div>
+                <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-0.02em">조치원 복숭아축제</div>
+                <div style="font-size:12.5px;color:#86878E;margin-top:3px">08.21~08.23 · 대회장 12.4km</div>
+              </div>
+            </div>
+            <div style="padding:10px 22px 0;font-size:11.5px;color:#9A9CA2">출처 · 한국관광공사</div>
+          </sc-if>
+          <sc-if value="{{ festLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:34px 22px;display:flex;align-items:center;gap:9px;color:#86878E;font-size:13.5px">
+              <span style="width:15px;height:15px;border-radius:50%;border:2px solid #E4E4E6;border-top-color:#2B5CFF;display:inline-block;animation:spin .8s linear infinite"></span>
+              축제를 찾는 중…
+            </div>
+          </sc-if>
+          <sc-if value="{{ festEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:30px 22px 0;text-align:center">
+              <div style="font-size:14.5px;font-weight:700">대회 기간에 열리는 인근 축제가 없어요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">대회 전후 여행 동선은 그대로 짜드릴 수 있어요.</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="flex:1;min-height:26px"></div>
+        <div style="position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,#FFFFFF 22%);padding:16px 22px 18px">
+          <div onClick="{{ startWizard }}" style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(43,92,255,.24)">이 대회로 동선 만들기</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S10 보관함" style="padding-bottom:26px">
+        <div style="padding:6px 22px 0">
+          <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">보관함</div>
+          <div style="display:flex;background:#F2F2F0;border-radius:14px;padding:3px;margin-top:14px">
+            <div onClick="{{ libRoute }}" style="{{ libSeg1 }}">동선</div>
+            <div onClick="{{ libCourse }}" style="{{ libSeg2 }}">러닝코스</div>
+            <div onClick="{{ libFav }}" style="{{ libSeg3 }}">찜한 대회</div>
+          </div>
+        </div>
+
+        <sc-if value="{{ libIsRoute }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ libHasRoute }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ openSavedRoute }}" style="margin:16px 22px 0;border:1px solid #E4E4E6;border-radius:20px;padding:17px;background:#FFFFFF;cursor:pointer">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:19px;font-weight:800;letter-spacing:-0.03em">세종 2박 3일</div>
+                  <div style="font-size:12.5px;color:#86878E;margin-top:5px">2026 세종 호수공원 마라톤 · 하프</div>
+                </div>
+                <span style="background:#FFF1E9;color:#C2410C;font-size:11px;font-weight:700;padding:5px 9px;border-radius:11px;white-space:nowrap;flex:none">D+1 회복 모드</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:13px;border-top:1px solid #F0F0F0">
+                <div style="font-size:13px;font-weight:600;color:#54565E;white-space:nowrap">08.21~08.23 · 10곳</div>
+                <span onClick="{{ deleteSavedRoute }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#9A9CA2;line-height:1;cursor:pointer">delete</span>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ libNoRoute }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:70px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">아직 저장한 동선이 없어요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">대회를 골라 첫 동선을 만들어 보세요.</div>
+              <div onClick="{{ goCalendar }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:16px;cursor:pointer">대회 둘러보기</div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ libIsCourse }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ libHasCourse }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ libCourses }}" as="c" hint-placeholder-count="2">
+                <div onClick="{{ c.go }}" style="border:1px solid #E4E4E6;border-radius:20px;padding:16px;background:#FFFFFF;cursor:pointer">
+                  <sc-if value="{{ c.ran }}" hint-placeholder-val="{{ false }}">
+                    <span style="background:#C9F23C;color:#15161B;font-size:11px;font-weight:700;padding:4px 9px;border-radius:11px">완료</span>
+                  </sc-if>
+                  <div style="font-size:15.5px;font-weight:700;letter-spacing:-0.025em;margin-top:8px">{{ c.name }}</div>
+                  <div style="font-size:12.5px;color:#86878E;margin-top:5px">{{ c.meta }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ libNoCourse }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:70px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">저장한 코스가 없어요.</div>
+              <div onClick="{{ goCourses }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:16px;cursor:pointer">러닝코스 둘러보기</div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ libIsFav }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ libHasFav }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ favCards }}" as="c" hint-placeholder-count="3">
+                <div onClick="{{ c.open }}" style="{{ c.cardStyle }}">
+                  <div style="width:46px;flex:none;text-align:center">
+                    <div style="{{ c.monStyle }}">{{ c.mon }}</div>
+                    <div style="font-family:Archivo,sans-serif;font-size:27px;font-weight:700;line-height:1.1;letter-spacing:-0.02em">{{ c.day }}</div>
+                    <div style="font-size:11.5px;color:#86878E;font-weight:600">{{ c.dow }}</div>
+                  </div>
+                  <div style="width:1px;background:#F0F0F0;flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:flex-start;gap:8px">
+                      <div style="flex:1;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-0.02em">{{ c.name }}</div>
+                      <span onClick="{{ c.fav }}" style="{{ c.heartStyle }}">favorite</span>
+                    </div>
+                    <div style="font-size:12.5px;color:#86878E;margin-top:4px">{{ c.where }}</div>
+                    <div style="display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap">
+                      <span style="{{ c.statusStyle }}">{{ c.statusLabel }}</span>
+                      <span style="font-size:11.5px;color:#9A9CA2;white-space:nowrap">{{ c.source }}</span>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ libNoFav }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:70px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">찜한 대회가 없어요.</div>
+              <div onClick="{{ goCalendar }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:16px;cursor:pointer">대회 둘러보기</div>
+            </div>
+          </sc-if>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCourseDetail }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="보관함 코스 상세" style="min-height:100%">
+        <div style="padding:4px 18px 0">
+          <span onClick="{{ goLibrary }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+        </div>
+        <div style="padding:10px 22px 0">
+          <div style="font-size:21px;font-weight:800;letter-spacing:-0.03em">{{ cdName }}</div>
+          <div style="font-size:13px;color:#86878E;margin-top:5px">{{ cdMeta }}</div>
+          <div style="position:relative;height:230px;border-radius:20px;overflow:hidden;background:#EDEEE9;margin-top:16px">
+            <div style="position:absolute;left:-30px;top:70px;width:460px;height:20px;background:#E3E4DE;transform:rotate(-7deg)"></div>
+            <div style="position:absolute;left:140px;top:-40px;width:14px;height:330px;background:#E3E4DE;transform:rotate(11deg)"></div>
+            <div style="position:absolute;left:-60px;top:140px;width:520px;height:110px;background:#DDE7EF;transform:rotate(-6deg)"></div>
+            <svg viewBox="0 0 346 230" style="position:absolute;inset:0;width:100%;height:100%">
+              <polyline points="50,180 88,128 132,100 186,110 232,72 296,94" style="{{ cdLineStyle }}"></polyline>
+            </svg>
+          </div>
+          <sc-if value="{{ cdRan }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;margin-top:18px;border:1px solid #E4E4E6;border-radius:20px;padding:18px 8px">
+              <div style="flex:1;text-align:center">
+                <div style="font-size:11.5px;color:#86878E;font-weight:600">거리</div>
+                <div style="font-family:Archivo,sans-serif;font-size:22px;font-weight:700;margin-top:4px">5.21 km</div>
+              </div>
+              <div style="width:1px;background:#F0F0F0"></div>
+              <div style="flex:1;text-align:center">
+                <div style="font-size:11.5px;color:#86878E;font-weight:600">시간</div>
+                <div style="font-family:Archivo,sans-serif;font-size:22px;font-weight:700;margin-top:4px">32:10</div>
+              </div>
+              <div style="width:1px;background:#F0F0F0"></div>
+              <div style="flex:1;text-align:center">
+                <div style="font-size:11.5px;color:#86878E;font-weight:600">페이스</div>
+                <div style="font-family:Archivo,sans-serif;font-size:22px;font-weight:700;margin-top:4px">6'11"</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="A1 로그인" style="min-height:100%;display:flex;flex-direction:column;padding:0 22px 22px">
+        <div style="padding-top:56px;display:flex;flex-direction:column;align-items:center">
+          <div style="width:62px;height:62px;border-radius:20px;background:#C9F23C;display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:36px;color:#15161B;font-variation-settings:'FILL' 1;line-height:1">sprint</span>
+          </div>
+          <div style="font-size:27px;font-weight:800;letter-spacing:-0.04em;margin-top:14px">런닝구</div>
+          <div style="font-size:13.5px;color:#54565E;margin-top:6px;white-space:nowrap">내가 뛸 동네를 가장 잘 아는 친구</div>
+        </div>
+
+        <div style="margin-top:42px;display:flex;flex-direction:column;gap:9px">
+          <input placeholder="이메일" style="{{ loginInput }}" />
+          <input type="password" placeholder="비밀번호" style="{{ loginInput }}" />
+          <sc-if value="{{ loginError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:12.5px;color:#E5484D;font-weight:600;padding-left:4px">이메일 또는 비밀번호를 확인해 주세요</div>
+          </sc-if>
+          <div onClick="{{ doLogin }}" style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;margin-top:5px;box-shadow:0 8px 20px rgba(43,92,255,.24)">로그인</div>
+          <div onClick="{{ doLogin }}" style="height:56px;border-radius:16px;background:#FEE500;color:#15161B;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15.5px;font-weight:700;cursor:pointer">
+            <span style="font-family:'Material Symbols Rounded';font-size:21px;line-height:1;font-variation-settings:'FILL' 1">chat_bubble</span>
+            카카오로 시작하기
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:24px"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px">
+          <div onClick="{{ goSignup }}" style="font-size:13.5px;font-weight:600;color:#54565E;cursor:pointer">회원가입</div>
+          <div style="width:1px;height:12px;background:#E4E4E6"></div>
+          <div onClick="{{ goFindPw }}" style="font-size:13.5px;font-weight:600;color:#54565E;cursor:pointer">비밀번호 찾기</div>
+          <div style="width:1px;height:12px;background:#E4E4E6"></div>
+          <div onClick="{{ doGuest }}" style="font-size:13.5px;font-weight:700;color:#2B5CFF;cursor:pointer">둘러보기</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSignup }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="A2 회원가입" style="min-height:100%;display:flex;flex-direction:column">
+        <div style="padding:4px 18px 0">
+          <span onClick="{{ signupBack }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:12px 22px 0">
+          <sc-for list="{{ suSteps }}" as="s" hint-placeholder-count="4">
+            <div style="{{ s.wrapStyle }}">
+              <div style="{{ s.dotStyle }}">{{ s.n }}</div>
+              <div style="{{ s.labelStyle }}">{{ s.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ su1 }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:26px 22px 0">
+            <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">약관에 동의해 주세요</div>
+            <div onClick="{{ toggleAll }}" style="{{ agreeAllStyle }}">
+              <span style="{{ agreeAllIcon }}">check_circle</span>
+              <span style="font-size:15px;font-weight:700">전체 동의</span>
+            </div>
+            <div style="display:flex;flex-direction:column;margin-top:6px">
+              <sc-for list="{{ agreeItems }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;padding:13px 4px">
+                  <span onClick="{{ a.go }}" style="{{ a.iconStyle }}">check_circle</span>
+                  <div style="flex:1;font-size:13.5px;color:#15161B">{{ a.label }}</div>
+                  <div style="font-size:12.5px;color:#9A9CA2;text-decoration:underline;cursor:pointer">보기</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ su2 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px 22px 0">
+            <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">정보를 입력해 주세요</div>
+            <div style="display:flex;gap:8px;margin-top:20px">
+              <input placeholder="이메일" style="{{ rowInput }}" />
+              <div style="flex:none;height:52px;padding:0 15px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap">중복 확인</div>
+            </div>
+            <div style="margin-top:10px">
+              <input type="password" placeholder="비밀번호" style="{{ loginInput }}" />
+              <div style="font-size:12px;color:#86878E;margin-top:6px;padding-left:4px">8자 이상 영문+숫자</div>
+            </div>
+            <div style="margin-top:10px">
+              <input type="password" placeholder="비밀번호 확인" style="{{ loginInput }}" />
+            </div>
+            <div style="margin-top:10px">
+              <input placeholder="닉네임" style="{{ loginInput }}" />
+              <div style="font-size:12px;color:#86878E;margin-top:6px;padding-left:4px">2~12자</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ su3 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px 22px 0">
+            <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">이메일 인증</div>
+            <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">입력한 이메일로 인증 코드를 보냈어요</div>
+            <div style="position:relative;margin-top:22px">
+              <div style="display:flex;gap:7px">
+                <sc-for list="{{ codeBoxes }}" as="b" hint-placeholder-count="6">
+                  <div style="{{ b.style }}">{{ b.ch }}</div>
+                </sc-for>
+              </div>
+              <input value="{{ code }}" onChange="{{ setCode }}" maxLength="6" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;outline:none;font-size:16px" />
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+              <div style="font-family:Archivo,sans-serif;font-size:14px;font-weight:700;color:#2B5CFF">9:41</div>
+              <div onClick="{{ resend }}" style="{{ resendStyle }}">{{ resendLabel }}</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ su4 }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:70px 22px 0;text-align:center">
+            <div style="width:78px;height:78px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;margin:0 auto">
+              <span style="font-family:'Material Symbols Rounded';font-size:44px;color:#2B5CFF;line-height:1;font-variation-settings:'FILL' 1">check_circle</span>
+            </div>
+            <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em;margin-top:20px">가입이 완료됐어요</div>
+            <div style="font-size:13.5px;color:#54565E;margin-top:8px">이제 대회를 찜하고 동선을 저장할 수 있어요</div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1;min-height:26px"></div>
+        <div style="position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,#FFFFFF 22%);padding:16px 22px 18px">
+          <div onClick="{{ suNext }}" style="{{ suCtaStyle }}">{{ suCtaLabel }}</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isFindPw }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="A3 비밀번호 찾기" style="min-height:100%;display:flex;flex-direction:column">
+        <div style="padding:4px 18px 0">
+          <span onClick="{{ goLogin }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+        </div>
+        <div style="padding:20px 22px 0">
+          <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">비밀번호 찾기</div>
+          <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">가입한 이메일로 재설정 링크를 보내드려요.</div>
+          <div style="margin-top:22px"><input placeholder="이메일" style="{{ loginInput }}" /></div>
+          <div onClick="{{ sendReset }}" style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px;box-shadow:0 8px 20px rgba(43,92,255,.24)">재설정 메일 발송</div>
+          <sc-if value="{{ resetSent }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;background:#EEF2FF;color:#2B5CFF;font-size:13px;font-weight:600;padding:13px 15px;border-radius:16px;line-height:1.45">가입된 이메일이면 재설정 링크를 보냈어요</div>
+            <div onClick="{{ goNewPw }}" style="text-align:center;font-size:13px;font-weight:700;color:#9A9CA2;margin-top:14px;cursor:pointer">메일의 링크 열기 (데모)</div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isNewPw }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="A3 새 비밀번호(웹)" style="min-height:100%;background:#F4F5F7;padding:30px 20px">
+        <div style="max-width:340px;margin:0 auto;background:#FFFFFF;border:1px solid #E4E4E6;border-radius:14px;padding:26px 22px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:26px;height:26px;border-radius:8px;background:#C9F23C;display:flex;align-items:center;justify-content:center">
+              <span style="font-family:'Material Symbols Rounded';font-size:16px;color:#15161B;font-variation-settings:'FILL' 1;line-height:1">sprint</span>
+            </div>
+            <div style="font-size:15px;font-weight:800;letter-spacing:-0.03em">런닝구</div>
+          </div>
+          <sc-if value="{{ pwChanged }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:18px;font-weight:700;margin-top:22px;letter-spacing:-0.02em">비밀번호가 변경됐어요.</div>
+            <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">다시 로그인해 주세요.</div>
+            <div onClick="{{ goLogin }}" style="height:46px;border-radius:10px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;cursor:pointer;margin-top:20px">앱으로 돌아가기</div>
+          </sc-if>
+          <sc-if value="{{ pwForm }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:18px;font-weight:700;margin-top:22px;letter-spacing:-0.02em">새 비밀번호 설정</div>
+            <div style="display:flex;flex-direction:column;gap:9px;margin-top:16px">
+              <input type="password" placeholder="새 비밀번호" style="{{ webInput }}" />
+              <input type="password" placeholder="새 비밀번호 확인" style="{{ webInput }}" />
+            </div>
+            <div onClick="{{ changePw }}" style="height:46px;border-radius:10px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;cursor:pointer;margin-top:16px">변경하기</div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isCourses }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S8 러닝코스" style="padding-bottom:26px">
+        <div style="padding:6px 22px 0">
+          <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">러닝·산책 코스</div>
+          <div style="display:flex;background:#F2F2F0;border-radius:14px;padding:3px;margin-top:14px">
+            <div onClick="{{ setNearby }}" style="{{ segNearStyle }}">내 주변</div>
+            <div onClick="{{ setByRegion }}" style="{{ segRegionStyle }}">지역별</div>
+          </div>
+        </div>
+
+        <sc-if value="{{ isNearby }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:16px 22px 0">
+            <div style="display:flex;gap:8px">
+              <div onClick="{{ useMyLocation }}" style="flex:none;height:44px;padding:0 13px;border-radius:14px;border:1px solid #E4E4E6;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
+                <span style="font-family:'Material Symbols Rounded';font-size:19px;color:#2B5CFF;line-height:1">my_location</span>
+                <span style="font-size:13px;font-weight:700">내 위치</span>
+              </div>
+              <div style="flex:1;height:44px;border-radius:14px;background:#F2F2F0;display:flex;align-items:center;gap:8px;padding:0 13px;min-width:0">
+                <span style="font-family:'Material Symbols Rounded';font-size:19px;color:#86878E;line-height:1;flex:none">search</span>
+                <input value="{{ startQ }}" onChange="{{ setStartQ }}" placeholder="출발지 검색" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:inherit;font-size:14px;color:#15161B" />
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;overflow-x:auto;margin-top:9px;padding-bottom:2px">
+              <sc-for list="{{ presets }}" as="p" hint-placeholder-count="5">
+                <div onClick="{{ p.go }}" style="{{ p.style }}">{{ p.label }}</div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:22px">
+              <div style="font-size:13.5px;font-weight:700;white-space:nowrap">목표 거리</div>
+              <div style="font-family:Archivo,sans-serif;font-size:26px;font-weight:700;color:#2B5CFF;letter-spacing:-0.02em;line-height:1">{{ distLabel }}</div>
+            </div>
+            <input type="range" min="1" max="21" step="0.5" value="{{ dist }}" onChange="{{ setDist }}" style="width:100%;margin-top:10px;accent-color:#2B5CFF" />
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#9A9CA2;font-family:Archivo,sans-serif">
+              <span>1km</span><span>21km</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ cLocating }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:60px 22px;display:flex;align-items:center;justify-content:center;gap:9px;color:#86878E;font-size:13.5px">
+              <span style="width:15px;height:15px;border-radius:50%;border:2px solid #E4E4E6;border-top-color:#2B5CFF;display:inline-block;animation:spin .8s linear infinite"></span>
+              위치를 확인하는 중…
+            </div>
+          </sc-if>
+          <sc-if value="{{ cNoStart }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:60px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">출발지를 정해주세요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">내 위치를 켜거나 위 프리셋에서 골라주세요.</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ cNoAll }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:60px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">이 근처엔 걸을 곳을 못 찾았어요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">위 프리셋 지역으로 바꿔서 찾아보세요.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cHasMap }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;height:230px;margin-top:18px;overflow:hidden;background:#EDEEE9">
+            <div style="position:absolute;left:-30px;top:70px;width:460px;height:22px;background:#E3E4DE;transform:rotate(-7deg)"></div>
+            <div style="position:absolute;left:150px;top:-40px;width:16px;height:330px;background:#E3E4DE;transform:rotate(10deg)"></div>
+            <div style="position:absolute;left:-60px;top:132px;width:520px;height:120px;background:#DDE7EF;transform:rotate(-6deg)"></div>
+            <div style="position:absolute;left:230px;top:16px;width:130px;height:80px;background:#E2ECE0;border-radius:40px 26px 46px 22px"></div>
+            <sc-if value="{{ cHasCourse }}" hint-placeholder-val="{{ true }}">
+              <svg viewBox="0 0 390 230" style="position:absolute;inset:0;width:100%;height:100%">
+                <polyline points="60,180 96,120 150,96 214,104 268,74 322,96" style="fill:none;stroke:#2B5CFF;stroke-width:4;stroke-linecap:round;stroke-linejoin:round"></polyline>
+              </svg>
+            </sc-if>
+            <sc-for list="{{ spotPins }}" as="p" hint-placeholder-count="5">
+              <div style="{{ p.style }}">{{ p.n }}</div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ cHasCourse }}" hint-placeholder-val="{{ true }}">
+            <div style="margin:16px 22px 0;border:1.5px solid #2B5CFF;border-radius:20px;padding:16px;background:#FFFFFF">
+              <div style="font-size:16px;font-weight:800;letter-spacing:-0.025em">{{ courseName }}</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:5px">{{ courseWhere }}</div>
+              <div style="font-size:13.5px;font-weight:700;color:#2B5CFF;margin-top:9px">{{ courseSpec }}</div>
+              <sc-if value="{{ courseShort }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:10px;background:#FFF1E9;color:#C2410C;font-size:12px;font-weight:600;padding:9px 11px;border-radius:12px;line-height:1.4">{{ courseShortText }}</div>
+              </sc-if>
+            </div>
+
+            <div style="padding:22px 0 0">
+              <div style="padding:0 22px;font-size:14px;font-weight:700">다른 코스 3개</div>
+              <div style="display:flex;gap:9px;overflow-x:auto;padding:11px 22px 4px">
+                <sc-for list="{{ altCourses }}" as="a" hint-placeholder-count="3">
+                  <div onClick="{{ a.go }}" style="{{ a.style }}">
+                    <div style="font-size:14px;font-weight:700;letter-spacing:-0.02em">{{ a.name }}</div>
+                    <div style="font-size:12px;color:#86878E;margin-top:4px">{{ a.meta }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cNoCourse }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:16px 22px 0;background:#F7F7F5;border-radius:18px;padding:16px;text-align:center">
+              <div style="font-size:14px;font-weight:700;line-height:1.45">이 근처엔 두루누비 코스가 없어요.</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:5px;line-height:1.45">대신 걸을 만한 공원·하천을 모았어요.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cHasSpots }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:24px 22px 0">
+            <div style="font-size:14px;font-weight:700">걷기 좋은 곳</div>
+            <div style="display:flex;flex-direction:column;margin-top:8px">
+              <sc-for list="{{ spots }}" as="s" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F0F0F0">
+                  <div style="width:24px;height:24px;border-radius:50%;background:#EEF2FF;color:#2B5CFF;font-family:Archivo,sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">{{ s.n }}</div>
+                  <div style="flex:1;min-width:0;font-size:14px;font-weight:600">{{ s.name }}</div>
+                  <div style="font-size:12px;color:#86878E;white-space:nowrap">{{ s.meta }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ cHasCourse }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:9px;padding:22px 22px 0">
+              <div onClick="{{ saveCourse }}" style="flex:1;height:56px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap">코스 저장</div>
+              <div onClick="{{ startRun }}" style="flex:1.3;height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 8px 20px rgba(43,92,255,.24)">이 코스 뛰기</div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ isByRegion }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:7px;overflow-x:auto;padding:16px 22px 2px">
+            <sc-for list="{{ regionChips }}" as="r" hint-placeholder-count="6">
+              <div onClick="{{ r.go }}" style="{{ r.style }}">{{ r.label }}</div>
+            </sc-for>
+          </div>
+          <div style="padding:14px 22px 0;font-size:13.5px;font-weight:600;color:#54565E">{{ regionCountLine }}</div>
+          <div style="padding:12px 22px 0;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ regionCourses }}" as="c" hint-placeholder-count="5">
+              <div style="border:1px solid #E4E4E6;border-radius:20px;padding:15px;background:#FFFFFF">
+                <div style="font-size:15px;font-weight:700;letter-spacing:-0.02em">{{ c.name }}</div>
+                <div style="font-size:12.5px;color:#86878E;margin-top:5px">{{ c.meta }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ regionEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:60px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">이 지역엔 코스가 없어요.</div>
+            </div>
+          </sc-if>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isRun }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="R1 러닝 기록 중" style="height:100%;position:relative;background:#EDEEE9;display:flex;flex-direction:column">
+        <div style="position:absolute;inset:0;overflow:hidden">
+          <div style="position:absolute;left:-30px;top:180px;width:520px;height:24px;background:#E3E4DE;transform:rotate(-8deg)"></div>
+          <div style="position:absolute;left:120px;top:-40px;width:18px;height:900px;background:#E3E4DE;transform:rotate(9deg)"></div>
+          <div style="position:absolute;left:-60px;top:430px;width:560px;height:150px;background:#DDE7EF;transform:rotate(-7deg)"></div>
+          <div style="position:absolute;left:210px;top:520px;width:170px;height:120px;background:#E2ECE0;border-radius:50px 30px 56px 26px"></div>
+          <svg viewBox="0 0 390 740" style="position:absolute;inset:0;width:100%;height:100%">
+            <polyline points="70,600 110,520 150,470 210,440 268,400 300,330 330,250" style="fill:none;stroke:#C6C7CB;stroke-width:5;stroke-linecap:round;stroke-linejoin:round"></polyline>
+            <polyline points="70,600 110,520 150,470 210,440" style="fill:none;stroke:#2B5CFF;stroke-width:5;stroke-linecap:round;stroke-linejoin:round"></polyline>
+          </svg>
+          <div style="position:absolute;left:198px;top:428px;width:22px;height:22px;border-radius:50%;background:#2B5CFF;border:4px solid #FFFFFF;box-shadow:0 3px 10px rgba(21,22,27,.28)"></div>
+        </div>
+
+        <div style="position:relative;margin:14px 14px 0;background:rgba(255,255,255,.96);border-radius:24px;padding:20px;box-shadow:0 10px 30px rgba(21,22,27,.12)">
+          <div style="font-size:12px;font-weight:700;color:#86878E;letter-spacing:0.02em">경과 시간</div>
+          <div style="font-family:Archivo,sans-serif;font-size:58px;font-weight:700;letter-spacing:-0.03em;line-height:1.05;font-variant-numeric:tabular-nums">23:41</div>
+          <div style="display:flex;gap:26px;margin-top:12px">
+            <div>
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">거리</div>
+              <div style="font-family:Archivo,sans-serif;font-size:22px;font-weight:700;margin-top:2px">3.82 km</div>
+            </div>
+            <div style="width:1px;background:#F0F0F0"></div>
+            <div>
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">평균 페이스</div>
+              <div style="font-family:Archivo,sans-serif;font-size:22px;font-weight:700;margin-top:2px">6'12"/km</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:relative;margin:10px auto 0;background:rgba(21,22,27,.82);color:#FFFFFF;font-size:11.5px;font-weight:600;padding:7px 13px;border-radius:12px">기록 중 · 화면을 꺼도 계속 기록돼요</div>
+
+        <div style="flex:1"></div>
+        <div style="position:relative;padding:0 22px 22px">
+          <div onClick="{{ endRun }}" style="height:60px;border-radius:18px;background:#15161B;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 10px 26px rgba(21,22,27,.28)">종료</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isRunSum }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="R1 러닝 종료 요약" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
+        <div style="padding:4px 18px 0">
+          <span onClick="{{ back }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+        </div>
+        <div style="padding:10px 22px 0">
+          <div style="font-size:25px;font-weight:800;letter-spacing:-0.035em">오늘의 러닝</div>
+          <div style="font-size:13.5px;color:#86878E;margin-top:5px">08.01 (토)</div>
+
+          <div style="position:relative;height:200px;border-radius:20px;overflow:hidden;background:#EDEEE9;margin-top:16px">
+            <div style="position:absolute;left:-30px;top:60px;width:460px;height:20px;background:#E3E4DE;transform:rotate(-7deg)"></div>
+            <div style="position:absolute;left:140px;top:-40px;width:14px;height:300px;background:#E3E4DE;transform:rotate(11deg)"></div>
+            <div style="position:absolute;left:-60px;top:120px;width:520px;height:96px;background:#DDE7EF;transform:rotate(-6deg)"></div>
+            <svg viewBox="0 0 346 200" style="position:absolute;inset:0;width:100%;height:100%">
+              <polyline points="50,158 88,112 132,88 186,96 232,62 296,82" style="fill:none;stroke:#2B5CFF;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round"></polyline>
+            </svg>
+            <div style="position:absolute;left:40px;top:148px;width:20px;height:20px;border-radius:50%;background:#C9F23C;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
+            <div style="position:absolute;left:286px;top:72px;width:20px;height:20px;border-radius:50%;background:#15161B;border:3px solid #FFFFFF;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div>
+          </div>
+
+          <div style="display:flex;margin-top:20px;border:1px solid #E4E4E6;border-radius:20px;padding:18px 8px">
+            <div style="flex:1;text-align:center">
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">거리</div>
+              <div style="font-family:Archivo,sans-serif;font-size:23px;font-weight:700;margin-top:4px">5.21 km</div>
+            </div>
+            <div style="width:1px;background:#F0F0F0"></div>
+            <div style="flex:1;text-align:center">
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">시간</div>
+              <div style="font-family:Archivo,sans-serif;font-size:23px;font-weight:700;margin-top:4px">32:10</div>
+            </div>
+            <div style="width:1px;background:#F0F0F0"></div>
+            <div style="flex:1;text-align:center">
+              <div style="font-size:11.5px;color:#86878E;font-weight:600">평균 페이스</div>
+              <div style="font-family:Archivo,sans-serif;font-size:23px;font-weight:700;margin-top:4px">6'11"</div>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:#54565E;margin-top:12px">해파랑길 1코스 왕복 기준</div>
+        </div>
+
+        <div style="flex:1;min-height:20px"></div>
+        <div style="padding:0 22px 18px">
+          <div onClick="{{ saveRun }}" style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(43,92,255,.24)">기록 저장하기</div>
+          <div onClick="{{ goCourses }}" style="text-align:center;font-size:13.5px;font-weight:700;color:#9A9CA2;margin-top:14px;cursor:pointer">삭제</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isResult }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S7 추천 동선 결과" style="min-height:100%;display:flex;flex-direction:column">
+
+        <sc-if value="{{ resultEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:120px 34px;text-align:center">
+            <div style="font-size:16px;font-weight:700">동선이 아직 없어요.</div>
+            <div onClick="{{ back }}" style="margin-top:16px;height:48px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#2B5CFF;cursor:pointer">다시 추천받기</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ resultOk }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative;height:300px;flex:none;overflow:hidden;background:#EDEEE9">
+          <div style="position:absolute;left:-30px;top:96px;width:460px;height:26px;background:#E3E4DE;transform:rotate(-9deg)"></div>
+          <div style="position:absolute;left:-30px;top:214px;width:460px;height:18px;background:#E3E4DE;transform:rotate(5deg)"></div>
+          <div style="position:absolute;left:118px;top:-40px;width:20px;height:420px;background:#E3E4DE;transform:rotate(12deg)"></div>
+          <div style="position:absolute;left:264px;top:-40px;width:14px;height:420px;background:#E7E8E2;transform:rotate(-7deg)"></div>
+          <div style="position:absolute;left:-60px;top:150px;width:520px;height:74px;background:#DDE7EF;transform:rotate(-13deg)"></div>
+          <div style="position:absolute;left:196px;top:24px;width:150px;height:96px;background:#E2ECE0;border-radius:44px 30px 50px 26px"></div>
+          <svg viewBox="0 0 390 300" style="position:absolute;inset:0;width:100%;height:100%">
+            <polyline points="{{ mapLine }}" style="{{ mapLineStyle }}"></polyline>
+          </svg>
+          <sc-for list="{{ mapPins }}" as="p" hint-placeholder-count="4">
+            <div onClick="{{ p.go }}" style="{{ p.style }}">{{ p.n }}</div>
+          </sc-for>
+          <div onClick="{{ back }}" style="position:absolute;left:14px;top:14px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.14)">
+            <span style="font-family:'Material Symbols Rounded';font-size:22px;line-height:1">arrow_back</span>
+          </div>
+          <div onClick="{{ shareRoute }}" style="position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.14)">
+            <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1">ios_share</span>
+          </div>
+          <div style="position:absolute;left:14px;bottom:14px;background:rgba(255,255,255,.94);border-radius:11px;padding:7px 10px;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.10)">
+            <span style="{{ legendDot }}"></span>
+            <span style="font-size:11px;font-weight:600;color:#54565E">{{ legendText }}</span>
+          </div>
+        </div>
+
+        <div style="padding:16px 22px 0">
+          <div style="background:#FFF1E9;border-radius:16px;padding:12px 14px;display:flex;gap:10px;align-items:center">
+            <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#FF6A2B;font-variation-settings:'FILL' 1;line-height:1;flex:none">spa</span>
+            <div style="font-size:12.5px;font-weight:600;color:#C2410C;line-height:1.4">D+1 회복 모드 · 온천+짧은 산책(고강도 제외)</div>
+          </div>
+
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:18px">
+            <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em;white-space:nowrap">세종 2박 3일</div>
+            <div style="font-size:14px;font-weight:700;color:#54565E;white-space:nowrap">{{ placeCount }}</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:7px;overflow-x:auto;padding:14px 22px 2px">
+          <sc-for list="{{ dayTabs }}" as="t" hint-placeholder-count="3">
+            <div onClick="{{ t.go }}" style="{{ t.style }}">{{ t.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="padding:14px 22px 0;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:14px;font-weight:700;letter-spacing:-0.02em">{{ dayLabel }}</div>
+          <div onClick="{{ toggleEdit }}" style="font-size:13.5px;font-weight:700;color:#2B5CFF;cursor:pointer;padding:4px 2px">{{ editLabel }}</div>
+        </div>
+
+        <sc-if value="{{ hasDayNote }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:9px 22px 0;background:#F7F7F5;border-radius:14px;padding:10px 13px;font-size:12.5px;color:#54565E;font-weight:500">{{ dayNote }}</div>
+        </sc-if>
+
+        <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="4">
+              <div onClick="{{ b.go }}" data-block="{{ b.idx }}" style="display:flex;gap:12px;align-items:stretch">
+                <div style="width:26px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px">
+                  <div style="{{ b.numStyle }}">{{ b.n }}</div>
+                  <div style="{{ b.railStyle }}"></div>
+                </div>
+                <div style="{{ b.cardStyle }}">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="{{ b.timeStyle }}">{{ b.time }}</span>
+                    <span style="font-size:14.5px;font-weight:700;letter-spacing:-0.02em">{{ b.title }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap">
+                    <span style="{{ b.tagStyle }}">{{ b.cat }}</span>
+                    <span style="font-size:13px;font-weight:600;color:#15161B;white-space:nowrap">{{ b.place }}</span>
+                  </div>
+                  <div style="font-size:12.5px;color:#86878E;margin-top:5px;line-height:1.45">{{ b.desc }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin:22px 22px 0;border:1px solid #E4E4E6;border-radius:20px;padding:16px;display:flex;align-items:center;gap:12px">
+            <div style="width:44px;height:44px;border-radius:14px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex:none">
+              <span style="font-family:'Material Symbols Rounded';font-size:23px;color:#2B5CFF;line-height:1">directions_walk</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14.5px;font-weight:700;letter-spacing:-0.02em">숙소 주변에서 뛰기·걷기</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">호텔 세종 가온 출발</div>
+            </div>
+            <div onClick="{{ goCoursesFromHotel }}" style="font-size:13px;font-weight:700;color:#2B5CFF;cursor:pointer;white-space:nowrap;flex:none">러닝코스에서 보기 →</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:14px 22px 0;background:#EEF2FF;border-radius:14px;padding:10px 13px;font-size:12.5px;color:#2B5CFF;font-weight:600">드래그로 순서 변경 · ↺ 교체 · ✕ 삭제</div>
+          <div style="padding:12px 22px 0;display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ editRows }}" as="r" hint-placeholder-count="4">
+              <div draggable="true" onDragStart="{{ r.dragStart }}" onDragOver="{{ r.dragOver }}" onDrop="{{ r.drop }}" style="{{ r.rowStyle }}">
+                <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#9A9CA2;line-height:1;cursor:grab;flex:none">drag_indicator</span>
+                <div style="{{ r.numStyle }}">{{ r.n }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14px;font-weight:700;letter-spacing:-0.02em">{{ r.title }}</div>
+                  <div style="font-size:12px;color:#86878E;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.meta }}</div>
+                </div>
+                <sc-if value="{{ r.canSwap }}" hint-placeholder-val="{{ true }}">
+                  <span onClick="{{ r.swap }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#54565E;line-height:1;cursor:pointer;flex:none">refresh</span>
+                </sc-if>
+                <span onClick="{{ r.remove }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#9A9CA2;line-height:1;cursor:pointer;flex:none">close</span>
+              </div>
+            </sc-for>
+            <div onClick="{{ openAdd }}" style="height:50px;border-radius:16px;border:1.5px dashed #C9CAD0;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:700;color:#2B5CFF;cursor:pointer">
+              <span style="font-family:'Material Symbols Rounded';font-size:19px;line-height:1">add</span>
+              장소 추가
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1;min-height:26px"></div>
+        <div style="position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,#FFFFFF 22%);padding:16px 22px 18px">
+          <div onClick="{{ saveRoute }}" style="height:56px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(43,92,255,.24)">이 동선 저장하기</div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isWizard }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="S4~S6 위저드" style="min-height:100%;display:flex;flex-direction:column">
+
+        <div style="position:sticky;top:0;z-index:5;background:#FFFFFF;padding:4px 22px 12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span onClick="{{ back }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+            <span style="font-family:Archivo,sans-serif;font-size:13px;font-weight:700;color:#86878E">{{ wStepLabel }}</span>
+          </div>
+          <div style="display:flex;gap:4px;margin-top:10px">
+            <div style="{{ wBar1 }}"></div>
+            <div style="{{ wBar2 }}"></div>
+            <div style="{{ wBar3 }}"></div>
+          </div>
+        </div>
+
+        <sc-if value="{{ isW1 }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:14px 22px 0">
+          <div style="font-size:24px;font-weight:800;letter-spacing:-0.035em">언제 다녀올까요?</div>
+          <div style="font-size:13.5px;color:#54565E;margin-top:7px;line-height:1.5">{{ w1Sub }}</div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
+            <sc-for list="{{ patterns }}" as="p" hint-placeholder-count="5">
+              <div onClick="{{ p.go }}" style="{{ p.style }}">
+                <div style="flex:1">
+                  <div style="{{ p.titleStyle }}">{{ p.label }}</div>
+                  <div style="font-size:12.5px;color:#86878E;margin-top:3px">{{ p.sub }}</div>
+                </div>
+                <span style="{{ p.radioStyle }}">radio_button_checked</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:20px;border:1px solid #E4E4E6;border-radius:20px;padding:16px 14px">
+            <div style="text-align:center;font-family:Archivo,sans-serif;font-size:15px;font-weight:700;margin-bottom:10px">2026.8</div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px">
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#E5484D">일</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#86878E">월</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#86878E">화</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#86878E">수</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#86878E">목</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#86878E">금</div>
+              <div style="text-align:center;font-size:11px;font-weight:700;color:#2B5CFF">토</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px 0">
+              <sc-for list="{{ wizCells }}" as="c" hint-placeholder-count="35">
+                <div onClick="{{ c.go }}" style="{{ c.cellStyle }}"><div style="{{ c.numStyle }}">{{ c.day }}</div></div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ w1CustomHint }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:12px;background:#EEF2FF;color:#2B5CFF;font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:12px;text-align:center">종료일을 눌러주세요</div>
+            </sc-if>
+            <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px">
+              <div style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#54565E"><span style="width:11px;height:11px;border-radius:50%;background:#2B5CFF;display:inline-block"></span>대회일</div>
+              <div style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:#54565E"><span style="width:11px;height:11px;border-radius:3px;background:#EEF2FF;display:inline-block"></span>여행 기간</div>
+            </div>
+            <div style="text-align:center;font-size:14px;font-weight:700;margin-top:10px">{{ w1RangeLabel }}</div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isW2 }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:14px 22px 0">
+          <div style="font-size:24px;font-weight:800;letter-spacing:-0.035em">어떻게 뛰고, 뭘 좋아하세요?</div>
+
+          <div style="display:flex;align-items:center;gap:7px;margin-top:22px">
+            <div style="font-size:13.5px;font-weight:700">종목</div>
+            <div style="font-size:12.5px;color:#86878E">· 회복강도 {{ w2Intensity }}</div>
+          </div>
+          <div style="display:flex;background:#F2F2F0;border-radius:14px;padding:3px;margin-top:9px">
+            <sc-for list="{{ eventSeg }}" as="o" hint-placeholder-count="4">
+              <div onClick="{{ o.go }}" style="{{ o.style }}">{{ o.label }}</div>
+            </sc-for>
+          </div>
+          <div style="font-size:12px;color:#86878E;margin-top:8px">{{ w2Hint }}</div>
+
+          <div style="font-size:13.5px;font-weight:700;margin-top:24px">여행 취향</div>
+          <div style="font-size:12px;color:#86878E;margin-top:3px">복수 선택할 수 있어요</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:11px">
+            <sc-for list="{{ prefChips }}" as="p" hint-placeholder-count="6">
+              <div onClick="{{ p.go }}" style="{{ p.style }}">{{ p.label }}</div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ w2ShowRecovery }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top:24px;background:#FFF1E9;border-radius:18px;padding:15px 16px;display:flex;gap:11px;align-items:flex-start">
+              <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#FF6A2B;font-variation-settings:'FILL' 1;line-height:1;flex:none">spa</span>
+              <div style="font-size:13px;color:#C2410C;line-height:1.55;font-weight:500">{{ w2RecoveryText }}</div>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isW3 }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:14px 22px 0">
+          <div style="font-size:24px;font-weight:800;letter-spacing:-0.035em">어디서 묵을까요?</div>
+          <div style="font-size:13.5px;color:#54565E;margin-top:7px">건너뛰면 대회장 주변으로 잡아드려요.</div>
+
+          <div style="height:48px;border-radius:16px;background:#F2F2F0;display:flex;align-items:center;gap:9px;padding:0 14px;margin-top:16px">
+            <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#86878E;line-height:1;flex:none">search</span>
+            <input value="{{ hotelQ }}" onChange="{{ setHotelQ }}" placeholder="숙소 검색 · 카카오 로컬" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:inherit;font-size:15px;color:#15161B" />
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-top:20px">
+            <div style="font-size:13.5px;font-weight:700;white-space:nowrap">대회장 주변 숙소</div>
+            <span style="background:#EEF2FF;color:#2B5CFF;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;font-family:Archivo,sans-serif;letter-spacing:0.04em">LIVE</span>
+          </div>
+
+          <sc-if value="{{ hotelLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:40px 0;display:flex;align-items:center;justify-content:center;gap:9px;color:#86878E;font-size:13.5px">
+              <span style="width:15px;height:15px;border-radius:50%;border:2px solid #E4E4E6;border-top-color:#2B5CFF;display:inline-block;animation:spin .8s linear infinite"></span>
+              숙소를 찾는 중…
+            </div>
+          </sc-if>
+          <sc-if value="{{ hotelOk }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:11px">
+              <sc-for list="{{ hotels }}" as="h" hint-placeholder-count="4">
+                <div style="{{ h.rowStyle }}">
+                  <div style="width:52px;height:52px;border-radius:14px;background:repeating-linear-gradient(45deg,#F2F2F0 0 7px,#E9E9E5 7px 14px);flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:14.5px;font-weight:700;letter-spacing:-0.02em">{{ h.name }}</div>
+                    <div style="font-size:12.5px;color:#86878E;margin-top:3px">{{ h.meta }}</div>
+                  </div>
+                  <div onClick="{{ h.go }}" style="{{ h.btnStyle }}">{{ h.btnLabel }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <div style="flex:1;min-height:26px"></div>
+        <div style="position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,#FFFFFF 22%);padding:16px 22px 18px">
+          <div onClick="{{ wNext }}" style="{{ wCtaStyle }}">{{ wCtaLabel }}</div>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+
+    <sc-if value="{{ showDebug }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:calc(100% + 18px);top:70px;z-index:40;display:flex;flex-direction:column;gap:4px;background:rgba(21,22,27,.86);padding:8px;border-radius:12px">
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;color:#9A9CA2;font-family:Archivo,sans-serif;padding:0 2px 2px">STATE</div>
+        <sc-for list="{{ debugOptions }}" as="o" hint-placeholder-count="3">
+          <div onClick="{{ o.go }}" style="{{ o.style }}">{{ o.label }}</div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ filterOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ cancelFilter }}" style="position:absolute;inset:0;background:rgba(15,16,20,.42);z-index:70;animation:fadeIn .16s ease"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;background:#FFFFFF;border-radius:26px 26px 0 0;z-index:71;padding:8px 22px 22px;max-height:86%;overflow-y:auto;animation:sheetUp .22s cubic-bezier(.2,.8,.3,1)">
+        <div style="width:38px;height:4px;border-radius:2px;background:#E4E4E6;margin:0 auto 16px"></div>
+        <div style="font-size:18px;font-weight:800;letter-spacing:-0.02em">필터</div>
+
+        <div style="font-size:13.5px;font-weight:700;margin:18px 0 9px">종목</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <sc-for list="{{ eventOptions }}" as="o" hint-placeholder-count="4">
+            <div onClick="{{ o.toggle }}" style="{{ o.style }}">{{ o.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
+          <div>
+            <div style="font-size:13.5px;font-weight:700">접수 가능만</div>
+            <div style="font-size:12px;color:#86878E;margin-top:2px">마감·접수전 대회를 숨겨요</div>
+          </div>
+          <div onClick="{{ toggleOpenOnly }}" style="{{ switchTrack }}"><div style="{{ switchKnob }}"></div></div>
+        </div>
+
+        <div style="font-size:13.5px;font-weight:700;margin:20px 0 9px">지역</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <sc-for list="{{ regionOptions }}" as="o" hint-placeholder-count="17">
+            <div onClick="{{ o.toggle }}" style="{{ o.style }}">{{ o.label }}</div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:24px;align-items:center">
+          <div onClick="{{ resetDraft }}" style="height:52px;padding:0 18px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#54565E;cursor:pointer;flex:none">초기화</div>
+          <div onClick="{{ cancelFilter }}" style="flex:1;height:52px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#15161B;cursor:pointer">취소</div>
+          <div onClick="{{ applyFilter }}" style="flex:1.4;height:52px;border-radius:16px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;cursor:pointer">완료</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ guestOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeGuest }}" style="position:absolute;inset:0;background:rgba(15,16,20,.42);z-index:80;animation:fadeIn .16s ease"></div>
+      <div style="position:absolute;left:26px;right:26px;top:50%;transform:translateY(-50%);background:#FFFFFF;border-radius:22px;padding:24px 22px 18px;z-index:81;box-shadow:0 20px 50px rgba(21,22,27,.28)">
+        <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em">로그인이 필요해요</div>
+        <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">찜과 보관함은 로그인하면 쓸 수 있어요</div>
+        <div style="display:flex;gap:8px;margin-top:20px">
+          <div onClick="{{ closeGuest }}" style="flex:1;height:50px;border-radius:14px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#54565E;cursor:pointer">닫기</div>
+          <div onClick="{{ goLoginFromGuest }}" style="flex:1.3;height:50px;border-radius:14px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;cursor:pointer">로그인하기</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ poiOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closePoi }}" style="position:absolute;inset:0;background:rgba(15,16,20,.42);z-index:70;animation:fadeIn .16s ease"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;background:#FFFFFF;border-radius:26px 26px 0 0;z-index:71;padding:8px 0 18px;max-height:80%;display:flex;flex-direction:column;animation:sheetUp .22s cubic-bezier(.2,.8,.3,1)">
+        <div style="width:38px;height:4px;border-radius:2px;background:#E4E4E6;margin:0 auto 14px;flex:none"></div>
+        <div style="padding:0 22px;display:flex;align-items:center;gap:8px;flex:none">
+          <div style="font-size:17px;font-weight:800;letter-spacing:-0.02em;white-space:nowrap">{{ poiTitle }}</div>
+          <span style="background:#EEF2FF;color:#2B5CFF;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;font-family:Archivo,sans-serif;letter-spacing:0.04em">LIVE</span>
+        </div>
+        <sc-if value="{{ poiAddMode }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:6px;overflow-x:auto;padding:12px 22px 2px;flex:none">
+            <sc-for list="{{ poiCats }}" as="c" hint-placeholder-count="7">
+              <div onClick="{{ c.go }}" style="{{ c.style }}">{{ c.label }}</div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <div style="overflow-y:auto;padding:12px 22px 0;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ poiList }}" as="p" hint-placeholder-count="8">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #E4E4E6;border-radius:18px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14.5px;font-weight:700;letter-spacing:-0.02em">{{ p.name }}</div>
+                <div style="font-size:12.5px;color:#54565E;margin-top:3px">{{ p.desc }}</div>
+                <div style="font-size:11.5px;color:#9A9CA2;margin-top:3px">{{ p.addr }}</div>
+              </div>
+              <div onClick="{{ p.go }}" style="flex:none;height:34px;padding:0 14px;border-radius:12px;background:#F2F2F0;color:#54565E;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">선택</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none;display:flex;background:#FFFFFF;border-top:1px solid #F0F0F0;padding:9px 0 14px">
+      <div onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <span style="{{ tabHomeIcon }}">home</span>
+        <span style="{{ tabHomeLabel }}">홈</span>
+      </div>
+      <div onClick="{{ goCalendar }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <span style="{{ tabCalIcon }}">calendar_month</span>
+        <span style="{{ tabCalLabel }}">캘린더</span>
+      </div>
+      <div onClick="{{ goCourses }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <span style="{{ tabCourseIcon }}">route</span>
+        <span style="{{ tabCourseLabel }}">러닝코스</span>
+      </div>
+      <div onClick="{{ goLibrary }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
+        <span style="{{ tabLibIcon }}">bookmark</span>
+        <span style="{{ tabLibLabel }}">보관함</span>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ snackShow }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;bottom:96px;transform:translateX(-50%);background:#1F2026;color:#FFFFFF;font-size:13.5px;font-weight:600;padding:12px 18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.22);white-space:nowrap;animation:snackUp .2s ease;z-index:60">{{ snackText }}</div>
+    </sc-if>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sheet&quot;,&quot;home&quot;,&quot;calendar&quot;,&quot;detail&quot;,&quot;w1&quot;,&quot;result&quot;,&quot;courses&quot;,&quot;run&quot;,&quot;library&quot;,&quot;login&quot;],&quot;default&quot;:&quot;sheet&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;showNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;guestMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'sheet', snack: '', detailId: 'sejong',
+    q: '', view: 'list', f: { events: [], openOnly: false, regions: [] }, draft: null, filterOpen: false,
+    calY: 2026, calM: 7, selDate: null, fav: { busan: true, seoul: true, jeonju: true }, festState: 'ok', backTo: 'calendar',
+    wPattern: 'both', wStart: 21, wEnd: 23, wEvent: '하프', wPrefs: ['관광지', '맛집'],
+    hotelQ: '', hotel: null, generating: false, dbg: { w3: 'ok', courses: 'ok', result: 'ok', lib: 'ok', login: 'ok' },
+    itin: null, activeDay: 1, activeBlock: 0, editMode: false, poi: null, saved: true, courseStart: '부산 해운대',
+    cTab: 'near', startQ: '', dist: 5, course: '해파랑길 1코스', cRegion: null, ranSaved: true, libTab: 'route',
+    cdRan: false, resultFrom: 'w3', guest: false, guestOpen: false, suStep: 1, agree: { tos: false, privacy: false, mkt: false },
+    code: '', resendLeft: 0, resetSent: false, pwChanged: false, homeQ: ''
+  };
+
+  componentDidMount() {
+    this.setState({ itin: this.ITIN.map((d) => ({ ...d, blocks: d.blocks.map((b) => ({ ...b })) })) });
+    const s = this.props.startScreen;
+    if (s && s !== this.state.screen) this.setState({ screen: s });
+    if (this.props.guestMode) this.setState({ guest: true });
+  }
+
+  go = (k) => { this.setState({ screen: k }); const el = document.querySelector('[data-screen-label]'); if (el && el.parentElement) el.parentElement.scrollTop = 0; };
+
+  toast = (msg) => {
+    this.setState({ snack: msg });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ snack: '' }), 2000);
+  };
+
+  navStyle(active) {
+    return {
+      fontSize: '12.5px', fontWeight: 700, padding: '6px 13px', borderRadius: '13px', cursor: 'pointer', whiteSpace: 'nowrap',
+      background: active ? '#15161B' : '#FFFFFF', color: active ? '#FFFFFF' : '#54565E',
+      border: '1px solid ' + (active ? '#15161B' : '#DEDEDA')
+    };
+  }
+
+  tabIcon(active) {
+    return { fontFamily: "'Material Symbols Rounded'", fontSize: '24px', lineHeight: 1, color: active ? '#2B5CFF' : '#9A9CA2', fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0" };
+  }
+  tabLabel(active) {
+    return { fontSize: '11px', fontWeight: active ? 700 : 600, color: active ? '#2B5CFF' : '#9A9CA2' };
+  }
+
+  TODAY = '2026-08-01';
+  MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  DOW = ['일', '월', '화', '수', '목', '금', '토'];
+  REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+  EVENTS = ['5K', '10K', '하프', '풀'];
+
+  contests = [
+    { id: 'sejong', name: '2026 세종 호수공원 마라톤', region: '세종', place: '세종중앙공원', date: '2026-08-22', time: '08:00', events: ['풀', '하프', '10K'], status: 'open', deadline: '~08.10', source: '마라톤GO · 확인 07.15' },
+    { id: 'seoul', name: '2026 서울 달빛 나이트런', region: '서울', place: '여의도한강공원', date: '2026-08-15', time: '20:00', events: ['10K', '5K'], status: 'open', deadline: '~08.05', source: '마라톤GO · 확인 07.15' },
+    { id: 'busan', name: '2026 부산 바다 하프마라톤', region: '부산', place: '해운대해수욕장', date: '2026-09-05', time: '07:30', events: ['하프', '10K', '5K'], status: 'open', deadline: '~08.28', source: '런너스 · 확인 07.12' },
+    { id: 'chuncheon', name: '2026 춘천 호반 마라톤', region: '강원', place: '송암스포츠타운', date: '2026-09-20', time: '08:00', events: ['풀', '하프'], status: 'before', deadline: '08.10~', source: '마라톤GO · 확인 07.15' },
+    { id: 'jeonju', name: '2026 전주 한옥 마라톤', region: '전북', place: '전주종합경기장', date: '2026-08-08', time: '08:00', events: ['10K', '5K'], status: 'closed', deadline: '', source: '런너스 · 확인 07.12' },
+    { id: 'jeju', name: '2026 제주 감귤 트레일런', region: '제주', place: '사려니숲길', date: '2026-10-17', time: '09:00', events: ['트레일'], noEvent: true, status: 'open', deadline: '~10.02', source: '마라톤GO · 확인 07.15' }
+  ];
+
+  filtered() {
+    const s = this.state, f = s.f, q = s.q.trim();
+    return this.contests.filter((c) => {
+      if (c.date < this.TODAY) return false;
+      if (q && (c.name + c.place + c.region).indexOf(q) < 0) return false;
+      if (f.events.length && !c.events.some((e) => f.events.indexOf(e) >= 0)) return false;
+      if (f.openOnly && c.status !== 'open') return false;
+      if (f.regions.length && f.regions.indexOf(c.region) < 0) return false;
+      return true;
+    }).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }
+
+  statusLabel(c) {
+    if (c.status === 'open') return '접수중 · ' + c.deadline;
+    if (c.status === 'before') return '접수전 · ' + c.deadline;
+    return '마감';
+  }
+
+  cardVM(c, featured) {
+    const d = new Date(c.date + 'T00:00:00');
+    const closed = c.status === 'closed';
+    const on = !!this.state.fav[c.id];
+    const tags = c.events.map((e, i) => ({
+      label: e,
+      style: { background: i === 0 ? '#EEF2FF' : '#F2F2F0', color: i === 0 ? '#2B5CFF' : '#54565E', fontSize: '11.5px', fontWeight: i === 0 ? 700 : 600, padding: '3px 8px', borderRadius: '9px', whiteSpace: 'nowrap' }
+    }));
+    if (c.noEvent) tags.push({ label: '종목 미표기', style: { background: '#FFFFFF', color: '#9A9CA2', border: '1px solid #E4E4E6', fontSize: '11.5px', fontWeight: 600, padding: '2px 7px', borderRadius: '9px', whiteSpace: 'nowrap' } });
+    return {
+      id: c.id,
+      mon: this.MON[d.getMonth()], day: String(d.getDate()).padStart(2, '0'), dow: this.DOW[d.getDay()],
+      name: c.name, where: c.region + ' · ' + c.place, source: c.source, tags: tags,
+      statusLabel: this.statusLabel(c),
+      monStyle: { fontFamily: 'Archivo,sans-serif', fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.06em', color: closed ? '#9A9CA2' : '#2B5CFF' },
+      statusStyle: {
+        background: c.status === 'open' ? '#C9F23C' : c.status === 'before' ? '#EEF2FF' : '#EFEFEF',
+        color: c.status === 'open' ? '#15161B' : c.status === 'before' ? '#2B5CFF' : '#9A9CA2',
+        fontSize: '11.5px', fontWeight: 700, padding: '4px 9px', borderRadius: '13px', whiteSpace: 'nowrap'
+      },
+      heartStyle: { fontFamily: "'Material Symbols Rounded'", fontSize: '21px', lineHeight: 1, flex: 'none', cursor: 'pointer', color: on ? '#FF6A2B' : '#C6C7CB', fontVariationSettings: on ? "'FILL' 1" : "'FILL' 0" },
+      cardStyle: {
+        border: featured ? '1.5px solid #2B5CFF' : '1px solid #E4E4E6', borderRadius: '20px', padding: featured ? '14.5px' : '15px',
+        display: 'flex', gap: '14px', background: '#FFFFFF', cursor: 'pointer', opacity: closed ? 0.5 : 1,
+        boxShadow: featured ? '0 8px 20px rgba(43,92,255,.10)' : 'none'
+      },
+      fav: (e) => { e.stopPropagation(); this.toggleFav(c.id); },
+      open: () => this.openDetail(c.id)
+    };
+  }
+
+  toggleFav = (id) => {
+    if (this.guard()) return;
+    const fav = Object.assign({}, this.state.fav);
+    if (fav[id]) { delete fav[id]; this.toast('찜을 해제했어요'); } else { fav[id] = true; this.toast('찜했어요'); }
+    this.setState({ fav: fav });
+  };
+
+  openDetail = (id) => { const from = this.state.screen; this.setState({ detailId: id, backTo: (from === 'library' || from === 'home') ? from : 'calendar' }); this.go('detail'); };
+
+  dbgStyle(active) {
+    return { fontSize: '11px', fontWeight: 700, padding: '5px 9px', borderRadius: '7px', cursor: 'pointer', textAlign: 'center', color: active ? '#15161B' : '#FFFFFF', background: active ? '#FFFFFF' : 'rgba(255,255,255,.12)' };
+  }
+  chipStyle(sel) {
+    return { padding: '8px 13px', borderRadius: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', background: sel ? '#2B5CFF' : '#F2F2F0', color: sel ? '#FFFFFF' : '#54565E' };
+  }
+  segStyle(active) {
+    return { flex: 1, height: '38px', borderRadius: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13.5px', fontWeight: 700, cursor: 'pointer', color: active ? '#15161B' : '#86878E', background: active ? '#FFFFFF' : 'transparent', boxShadow: active ? '0 1px 3px rgba(21,22,27,.10)' : 'none' };
+  }
+  toggleDraft(key, val) {
+    const d = Object.assign({}, this.state.draft);
+    const arr = d[key].slice();
+    const i = arr.indexOf(val);
+    if (i >= 0) arr.splice(i, 1); else arr.push(val);
+    d[key] = arr;
+    this.setState({ draft: d });
+  }
+
+  calData() {
+    const s = this.state, list = this.filtered();
+    const first = new Date(s.calY, s.calM, 1);
+    const days = new Date(s.calY, s.calM + 1, 0).getDate();
+    const pad = first.getDay();
+    const counts = {};
+    list.forEach((c) => { counts[c.date] = (counts[c.date] || 0) + 1; });
+    const cells = [];
+    for (let i = 0; i < pad; i++) cells.push({ key: 'p' + i, day: '', cellStyle: { height: '46px' }, numStyle: {}, hasDot: false, go: () => {} });
+    for (let d = 1; d <= days; d++) {
+      const ds = s.calY + '-' + String(s.calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const dow = new Date(s.calY, s.calM, d).getDay();
+      const sel = s.selDate === ds, today = ds === this.TODAY, n = counts[ds] || 0;
+      cells.push({
+        key: ds, day: String(d), hasDot: n > 0, dotLabel: n > 1 ? String(n) : '',
+        cellStyle: { height: '46px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', borderRadius: '13px', cursor: 'pointer', background: sel ? '#EEF2FF' : 'transparent' },
+        numStyle: {
+          width: '27px', height: '27px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'Archivo,sans-serif', fontSize: '13.5px', fontWeight: sel ? 700 : 500,
+          color: sel ? '#FFFFFF' : dow === 0 ? '#E5484D' : dow === 6 ? '#2B5CFF' : '#15161B',
+          background: sel ? '#2B5CFF' : 'transparent', border: today && !sel ? '1.5px solid #2B5CFF' : '1.5px solid transparent'
+        },
+        dotStyle: n > 1
+          ? { height: '13px', minWidth: '13px', padding: '0 4px', borderRadius: '7px', background: '#2B5CFF', color: '#FFFFFF', fontSize: '9px', fontWeight: 700, fontFamily: 'Archivo,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+          : { width: '5px', height: '5px', borderRadius: '50%', background: '#2B5CFF' },
+        go: () => this.setState({ selDate: sel ? null : ds })
+      });
+    }
+    return { cells: cells, list: list };
+  }
+
+  PREV = { detail: 'calendar', w1: 'detail', w2: 'w1', w3: 'w2', result: 'w3', run: 'courses', runsum: 'run' };
+  CATS = {
+    '관광지': { bg: '#EAF1FF', fg: '#2B5CFF' }, '맛집': { bg: '#FFF3CC', fg: '#A66A00' }, '카페': { bg: '#F1E9FF', fg: '#7A4FD0' },
+    '힐링웰니스': { bg: '#E6F7EE', fg: '#1B8A5A' }, '자연트레킹': { bg: '#F0FAD8', fg: '#5A8A0A' }, '역사문화': { bg: '#EFEAFE', fg: '#6B4FBB' },
+    '숙소': { bg: '#EAEFF5', fg: '#3E5573' }, '대회': { bg: '#EEF2FF', fg: '#2B5CFF' }, '회복': { bg: '#FFF1E9', fg: '#C2410C' }
+  };
+  PINS = [
+    [[112, 188], [252, 108]],
+    [[78, 226], [166, 168], [252, 118], [312, 204]],
+    [[96, 104], [172, 196], [256, 142], [322, 232]]
+  ];
+  POIS = [
+    { name: '세종호수공원', desc: '도심 속 인공호수 · 산책로', addr: '세종 연기면 세종리' },
+    { name: '베어트리파크', desc: '동물·수목 테마파크', addr: '세종 전동면 신송로' },
+    { name: '국립세종수목원', desc: '사계절 전시온실', addr: '세종 연기면 수목원로' },
+    { name: '밀마루전망대', desc: '시내 전경 전망대', addr: '세종 어진동 도움3로' },
+    { name: '조치원 문화정원', desc: '옛 정수장을 고친 정원', addr: '세종 조치원읍 로터리길' },
+    { name: '고복저수지', desc: '수변 데크길 · 노을', addr: '세종 연서면 용암리' },
+    { name: '비암사', desc: '천년 고찰 · 조용한 산책', addr: '세종 전의면 다방길' },
+    { name: '금강자연휴양림', desc: '숲길·출렁다리', addr: '세종 금남면 산림박물관길' }
+  ];
+  ITIN = [
+    { key: 'd-1', tab: 'D-1 · 08.21 금', label: '08.21 금 · D-1', note: '내일 완주 · 가볍게 먹고 푹 쉬기', recovery: false, blocks: [
+      { time: '15:00', title: '숙소 체크인', cat: '숙소', place: '호텔 세종 가온', desc: '짐 풀고 컨디션 정리' },
+      { time: '18:30', title: '카보로딩 저녁', cat: '맛집', place: '도담동 파스타집', desc: '탄수화물 위주로 든든하게' }
+    ] },
+    { key: 'dday', tab: 'D-DAY · 08.22 토', label: '08.22 토 · D-DAY', note: '', recovery: false, blocks: [
+      { time: '08:00', title: '🏁 하프 스타트', cat: '대회', place: '세종중앙공원', desc: '출발 08:00 · 짐 보관 07:20까지', race: true },
+      { time: '11:00', title: '온천·회복', cat: '힐링웰니스', place: '세종 스파온천', desc: '완주 직후 다리 풀기' },
+      { time: '14:30', title: '가벼운 관광', cat: '관광지', place: '금강보행교 이응다리', desc: '평지 위주 짧은 코스' },
+      { time: '18:00', title: '회복 저녁', cat: '맛집', place: '청벽가든', desc: '단백질 중심 한식' }
+    ] },
+    { key: 'd1', tab: 'D+1 · 08.23 일', label: '08.23 일 · 회복', note: '고강도 일정 없이 천천히', recovery: true, blocks: [
+      { time: '10:00', title: '온천·족욕', cat: '힐링웰니스', place: '금강 스파랜드', desc: '근육 이완 위주' },
+      { time: '12:30', title: '로컬 점심', cat: '맛집', place: '조치원 왕만두', desc: '가볍게 먹기' },
+      { time: '14:30', title: '오후 관광', cat: '관광지', place: '국립세종수목원', desc: '평지 산책 코스' },
+      { time: '17:00', title: '체크아웃·귀가', cat: '숙소', place: '호텔 세종 가온', desc: '짐 찾고 이동' }
+    ] }
+  ];
+
+  SPOTS = [
+    { name: '해운대해수욕장', cat: '해변', dist: '320m', x: 56, y: 150 },
+    { name: '동백섬 산책로', cat: '공원', dist: '650m', x: 128, y: 62 },
+    { name: '미포 블루라인파크', cat: '명소', dist: '1.1km', x: 214, y: 158 },
+    { name: '장산 등산로 입구', cat: '등산로', dist: '2.3km', x: 286, y: 44 },
+    { name: '송정해수욕장', cat: '해변', dist: '4.8km', x: 330, y: 168 }
+  ];
+  COURSE_REGIONS = [
+    { name: '경남', n: 43 }, { name: '부산', n: 38 }, { name: '강원', n: 31 }, { name: '전남', n: 28 },
+    { name: '경북', n: 24 }, { name: '제주', n: 21 }, { name: '충남', n: 17 }, { name: '경기', n: 12 }
+  ];
+  REGION_COURSES = [
+    { name: '이기대 해안산책로', meta: '부산 남구 · 4.8km · 난이도 중 · 약 120분' },
+    { name: '갈매길 3-1코스', meta: '부산 사하구 · 11.2km · 난이도 하 · 약 260분' },
+    { name: '남파랑길 3코스', meta: '부산 영도구 · 14.0km · 난이도 중 · 약 330분' },
+    { name: '해파랑길 1코스', meta: '부산 해운대구 · 16.9km · 난이도 중 · 약 400분' },
+    { name: '남파랑길 2코스', meta: '부산 중구 · 19.0km · 난이도 중 · 약 450분' }
+  ];
+
+  tickResend = () => {
+    clearInterval(this._r);
+    this._r = setInterval(() => {
+      const n = this.state.resendLeft - 1;
+      if (n <= 0) { clearInterval(this._r); this.setState({ resendLeft: 0 }); } else this.setState({ resendLeft: n });
+    }, 1000);
+  };
+  guard(action) {
+    if (this.state.guest) { this.setState({ guestOpen: true }); return true; }
+    return false;
+  }
+
+  dayColor() { const it = this.state.itin || this.ITIN; return it[this.state.activeDay].recovery ? '#FF6A2B' : '#2B5CFF'; }
+  setDay = (i) => this.setState({ activeDay: i, activeBlock: 0 });
+  toggleEdit = () => this.setState({ editMode: !this.state.editMode });
+  mutate(fn) {
+    const itin = (this.state.itin || this.ITIN).map((d) => ({ ...d, blocks: d.blocks.slice() }));
+    fn(itin[this.state.activeDay]);
+    this.setState({ itin: itin });
+  }
+  removeBlock = (i) => this.mutate((d) => { d.blocks.splice(i, 1); });
+  reorder = (from, to) => this.mutate((d) => { const [x] = d.blocks.splice(from, 1); d.blocks.splice(to, 0, x); });
+  pickPoi = (poi) => {
+    const s = this.state;
+    if (s.poi.mode === 'replace') this.mutate((d) => { d.blocks[s.poi.idx] = { ...d.blocks[s.poi.idx], place: poi.name, desc: poi.desc }; });
+    else this.mutate((d) => { d.blocks.push({ time: '13:00', title: '추가 일정', cat: s.poi.cat, place: poi.name, desc: poi.desc }); });
+    this.setState({ poi: null });
+  };
+  onResultScroll = (e) => {
+    const s = this.state;
+    if (s.screen !== 'result' || s.editMode) return;
+    const box = e.target.getBoundingClientRect(), mid = box.top + box.height * 0.45;
+    let best = null, bd = 1e9;
+    document.querySelectorAll('[data-block]').forEach((el) => {
+      const r = el.getBoundingClientRect(), d = Math.abs(r.top + r.height / 2 - mid);
+      if (d < bd) { bd = d; best = parseInt(el.getAttribute('data-block'), 10); }
+    });
+    if (best !== null && best !== s.activeBlock) this.setState({ activeBlock: best });
+  };
+  INTENSITY = { '5K': '거의 정상', '10K': '낮은 피로', '하프': '중등도 피로', '풀': '고강도 회복 필요' };
+  PATTERNS = [
+    { key: 'pre', label: '전날부터 · 1박2일', sub: '08.21~08.22', s: 21, e: 22 },
+    { key: 'post', label: '대회+다음날 · 1박2일', sub: '08.22~08.23', s: 22, e: 23 },
+    { key: 'both', label: '전후로 · 2박3일', sub: '08.21~08.23', s: 21, e: 23 },
+    { key: 'day', label: '당일치기', sub: '08.22', s: 22, e: 22 },
+    { key: 'custom', label: '직접 선택', sub: '달력에서 직접 고르기', s: null, e: null }
+  ];
+  PREFS = [
+    { label: '관광지', bg: '#EAF1FF', fg: '#2B5CFF' }, { label: '맛집', bg: '#FFF3CC', fg: '#A66A00' },
+    { label: '카페', bg: '#F1E9FF', fg: '#7A4FD0' }, { label: '힐링웰니스', bg: '#E6F7EE', fg: '#1B8A5A' },
+    { label: '자연트레킹', bg: '#F0FAD8', fg: '#5A8A0A' }, { label: '역사문화', bg: '#EFEAFE', fg: '#6B4FBB' }
+  ];
+  HOTELS = [
+    { name: '호텔 세종 가온', meta: '어진동 · 대회장 1.2km' },
+    { name: '어반스테이 세종', meta: '나성동 · 레이트 체크아웃' },
+    { name: '세종 시티호텔', meta: '도담동 · 조식 포함' },
+    { name: '한옥스테이 연기향', meta: '연기면 · 온돌 객실' },
+    { name: '레이크뷰 레지던스', meta: '어진동 · 주방 있는 객실' },
+    { name: '스테이 금강', meta: '나성동 · 대회장 2.4km' },
+    { name: '코업시티호텔 세종', meta: '보람동 · 무료 주차' },
+    { name: '게스트하우스 달빛', meta: '조치원읍 · 1인실 저렴' }
+  ];
+
+  wBar(active) { return { flex: 1, height: '4px', borderRadius: '2px', background: active ? '#2B5CFF' : '#EDEDEF' }; }
+  ctaStyle(on) {
+    return { height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, cursor: on ? 'pointer' : 'default', background: on ? '#2B5CFF' : '#F2F2F0', color: on ? '#FFFFFF' : '#9A9CA2', boxShadow: on ? '0 8px 20px rgba(43,92,255,.24)' : 'none' };
+  }
+  pickPattern = (key) => {
+    const p = this.PATTERNS.filter((x) => x.key === key)[0];
+    if (key === 'custom') this.setState({ wPattern: key, wStart: null, wEnd: null });
+    else this.setState({ wPattern: key, wStart: p.s, wEnd: p.e });
+  };
+  togglePref = (label) => {
+    const a = this.state.wPrefs.slice(), i = a.indexOf(label);
+    if (i >= 0) a.splice(i, 1); else a.push(label);
+    this.setState({ wPrefs: a });
+  };
+  tapWizDay = (d) => {
+    const s = this.state;
+    if (s.wPattern !== 'custom') return;
+    if (!s.wStart || (s.wStart && s.wEnd)) this.setState({ wStart: d, wEnd: null });
+    else if (d < s.wStart) this.setState({ wStart: d, wEnd: s.wStart });
+    else this.setState({ wEnd: d });
+  };
+  rangeLabel() {
+    const s = this.state;
+    if (!s.wStart) return '여행 기간을 골라주세요';
+    if (!s.wEnd) return '08.' + String(s.wStart).padStart(2, '0') + ' ~ 종료일 선택';
+    return '08.' + String(s.wStart).padStart(2, '0') + ' ~ 08.' + String(s.wEnd).padStart(2, '0') + ' · ' + (s.wEnd - s.wStart + 1) + '일';
+  }
+  wizCells() {
+    const s = this.state, pad = new Date(2026, 7, 1).getDay(), days = 31, cells = [];
+    for (let i = 0; i < pad; i++) cells.push({ key: 'wp' + i, day: '', cellStyle: { height: '38px' }, numStyle: {}, go: () => {} });
+    for (let d = 1; d <= days; d++) {
+      const inR = s.wStart && s.wEnd && d >= s.wStart && d <= s.wEnd;
+      const isStart = d === s.wStart, isEnd = d === s.wEnd, race = d === 22;
+      const dow = new Date(2026, 7, d).getDay();
+      const radius = inR ? ((isStart && isEnd) ? '11px' : isStart ? '11px 0 0 11px' : isEnd ? '0 11px 11px 0' : '0') : '11px';
+      cells.push({
+        key: 'w' + d, day: String(d),
+        cellStyle: { height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: s.wPattern === 'custom' ? 'pointer' : 'default', background: inR ? '#EEF2FF' : (isStart ? '#EEF2FF' : 'transparent'), borderRadius: radius },
+        numStyle: {
+          width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'Archivo,sans-serif', fontSize: '13px', fontWeight: race ? 700 : 500,
+          background: race ? '#2B5CFF' : 'transparent',
+          color: race ? '#FFFFFF' : dow === 0 ? '#E5484D' : dow === 6 ? '#2B5CFF' : '#15161B',
+          border: (isStart || isEnd) && !race ? '1.5px solid #2B5CFF' : '1.5px solid transparent'
+        },
+        go: () => this.tapWizDay(d)
+      });
+    }
+    return cells;
+  }
+  wizardNext = () => {
+    const s = this.state;
+    if (s.screen === 'w1') this.go('w2');
+    else if (s.screen === 'w2') { if (s.wPrefs.length) this.go('w3'); }
+    else if (s.screen === 'w3') {
+      if (s.generating) return;
+      this.setState({ generating: true });
+      setTimeout(() => { this.setState({ generating: false, resultFrom: 'w3', activeDay: 1, activeBlock: 0 }); this.go('result'); }, 900);
+    }
+  };
+  dbgFor(s) {
+    if (s.screen === 'detail') return { opts: [['ok', '기본'], ['loading', '로딩'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.festState === k), go: () => this.setState({ festState: k }) })) };
+    if (s.screen === 'w3') return { opts: [['ok', '기본'], ['loading', '로딩']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.w3 === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { w3: k }) }) })) };
+    if (s.screen === 'result') return { opts: [['ok', '기본'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.result === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { result: k }) }) })) };
+    if (s.screen === 'courses') return { opts: [['ok', '기본'], ['locating', '위치'], ['nostart', '출발지'], ['nocourse', '코스0'], ['none', '0건']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.courses === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { courses: k }) }) })) };
+    if (s.screen === 'library') return { opts: [['ok', '기본'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.lib === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { lib: k }) }) })) };
+    if (s.screen === 'login') return { opts: [['ok', '기본'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle((s.dbg.login || 'ok') === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { login: k }) }) })) };
+    return { opts: [] };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const dbg = this.dbgFor(s);
+    const nav = [['sheet', '디자인 시스템'], ['home', '홈'], ['calendar', '캘린더'], ['detail', '대회 상세'], ['w1', '위저드'], ['result', '동선 결과'], ['courses', '러닝코스'], ['run', 'GPS 기록'], ['library', '보관함'], ['login', '로그인']];
+    const f = s.f, dr = s.draft || f;
+    const all = this.filtered();
+    const cal = this.calData();
+    const det = this.contests.filter((c) => c.id === s.detailId)[0] || this.contests[0];
+    const detD = new Date(det.date + 'T00:00:00');
+    const itin = s.itin || this.ITIN;
+    const day = itin[s.activeDay];
+    const dayC = day.recovery ? '#FF6A2B' : '#2B5CFF';
+    const pins = day.blocks.map((b, i) => (this.PINS[s.activeDay] && this.PINS[s.activeDay][i]) || [70 + ((i * 97) % 260), 70 + ((i * 61) % 180)]);
+    const cd = s.dbg.courses;
+    const favList = this.contests.filter((c) => s.fav[c.id]);
+    const monthPrefix = s.calY + '-' + String(s.calM + 1).padStart(2, '0');
+    const monthList = all.filter((c) => c.date.indexOf(monthPrefix) === 0);
+    const dayList = s.selDate ? all.filter((c) => c.date === s.selDate) : monthList;
+    const shown = s.view === 'list' ? all : dayList;
+    let firstOpen = -1;
+    shown.forEach((c, i) => { if (firstOpen < 0 && c.status === 'open') firstOpen = i; });
+    const chips = [];
+    f.events.forEach((e) => chips.push({ key: 'e' + e, label: e, remove: () => this.setState({ f: Object.assign({}, f, { events: f.events.filter((x) => x !== e) }) }) }));
+    if (f.openOnly) chips.push({ key: 'o', label: '접수 가능만', remove: () => this.setState({ f: Object.assign({}, f, { openOnly: false }) }) });
+    f.regions.forEach((r) => chips.push({ key: 'r' + r, label: r, remove: () => this.setState({ f: Object.assign({}, f, { regions: f.regions.filter((x) => x !== r) }) }) }));
+    const selD = s.selDate ? new Date(s.selDate + 'T00:00:00') : null;
+    return {
+      showNav: this.props.showNav ?? true,
+      navItems: nav.map(([k, l]) => ({ key: k, label: l, style: this.navStyle(s.screen === k), go: () => this.go(k) })),
+      isSheet: s.screen === 'sheet',
+      isHome: s.screen === 'home',
+      isCalendar: s.screen === 'calendar',
+      q: s.q, hasQ: !!s.q, setQ: (e) => this.setState({ q: e.target.value }), clearQ: () => this.setState({ q: '' }),
+      isListView: s.view === 'list', isCalView: s.view === 'cal',
+      segListStyle: this.segStyle(s.view === 'list'), segCalStyle: this.segStyle(s.view === 'cal'),
+      setListView: () => this.setState({ view: 'list' }), setCalView: () => this.setState({ view: 'cal' }),
+      hasFilters: chips.length > 0, filterCount: String(chips.length), activeChips: chips,
+      filterBtnStyle: {
+        display: 'flex', alignItems: 'center', gap: '5px', flex: 'none', height: '34px', padding: '0 13px', borderRadius: '13px', cursor: 'pointer',
+        fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap',
+        background: chips.length ? '#2B5CFF' : '#FFFFFF', color: chips.length ? '#FFFFFF' : '#15161B', border: '1px solid ' + (chips.length ? '#2B5CFF' : '#E4E4E6')
+      },
+      filterOpen: s.filterOpen,
+      openFilter: () => this.setState({ filterOpen: true, draft: { events: f.events.slice(), openOnly: f.openOnly, regions: f.regions.slice() } }),
+      cancelFilter: () => this.setState({ filterOpen: false, draft: null }),
+      applyFilter: () => this.setState({ f: s.draft || f, filterOpen: false, draft: null, selDate: null }),
+      resetDraft: () => this.setState({ draft: { events: [], openOnly: false, regions: [] } }),
+      resetFilters: () => this.setState({ f: { events: [], openOnly: false, regions: [] }, q: '' }),
+      eventOptions: this.EVENTS.map((e) => ({ key: e, label: e, style: this.chipStyle(dr.events.indexOf(e) >= 0), toggle: () => this.toggleDraft('events', e) })),
+      regionOptions: this.REGIONS.map((r) => ({ key: r, label: r, style: this.chipStyle(dr.regions.indexOf(r) >= 0), toggle: () => this.toggleDraft('regions', r) })),
+      toggleOpenOnly: () => this.setState({ draft: Object.assign({}, dr, { openOnly: !dr.openOnly }) }),
+      switchTrack: { width: '48px', height: '28px', borderRadius: '14px', padding: '3px', display: 'flex', cursor: 'pointer', justifyContent: dr.openOnly ? 'flex-end' : 'flex-start', background: dr.openOnly ? '#2B5CFF' : '#E4E4E6', transition: 'background .15s' },
+      switchKnob: { width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,.2)' },
+      resultCount: String(all.length),
+      monthLabel: s.calY + '.' + (s.calM + 1),
+      prevMonth: () => this.setState({ calM: s.calM === 0 ? 11 : s.calM - 1, calY: s.calM === 0 ? s.calY - 1 : s.calY, selDate: null }),
+      nextMonth: () => this.setState({ calM: s.calM === 11 ? 0 : s.calM + 1, calY: s.calM === 11 ? s.calY + 1 : s.calY, selDate: null }),
+      calCells: cal.cells,
+      calListLabel: selD ? (String(selD.getMonth() + 1).padStart(2, '0') + '.' + String(selD.getDate()).padStart(2, '0') + ' (' + this.DOW[selD.getDay()] + ') 대회 ' + dayList.length) : (s.calY + '.' + (s.calM + 1) + ' 대회 ' + monthList.length),
+      cards: shown.map((c, i) => this.cardVM(c, s.view === 'list' && i === firstOpen)),
+      isDetail: s.screen === 'detail',
+      back: () => this.go(s.screen === 'detail' ? (s.backTo || 'calendar') : s.screen === 'result' ? (s.resultFrom || 'w3') : (this.PREV[s.screen] || 'home')),
+      startWizard: () => this.go('w1'),
+      detailFav: () => this.toggleFav(det.id),
+      detailHeartStyle: { fontFamily: "'Material Symbols Rounded'", fontSize: '24px', lineHeight: 1, cursor: 'pointer', color: s.fav[det.id] ? '#FF6A2B' : '#C6C7CB', fontVariationSettings: s.fav[det.id] ? "'FILL' 1" : "'FILL' 0" },
+      d_eyebrow: det.region + ' · 마라톤',
+      d_name: det.name,
+      d_dday: 'D-' + Math.round((new Date(det.date + 'T00:00:00') - new Date(this.TODAY + 'T00:00:00')) / 86400000),
+      d_dateLong: String(detD.getMonth() + 1).padStart(2, '0') + '.' + String(detD.getDate()).padStart(2, '0') + ' ' + this.DOW[detD.getDay()] + '요일',
+      d_startLine: '출발 ' + det.time + ' · ' + det.place,
+      d_statusLabel: this.statusLabel(det),
+      d_statusStyle: { background: det.status === 'open' ? '#C9F23C' : det.status === 'before' ? '#EEF2FF' : '#EFEFEF', color: det.status === 'open' ? '#15161B' : det.status === 'before' ? '#2B5CFF' : '#9A9CA2', fontSize: '13px', fontWeight: 700, padding: '7px 13px', borderRadius: '13px' },
+      d_events: det.events.join(' · '),
+      d_apply: det.status === 'closed' ? '07.01 ~ 07.25 (마감)' : det.status === 'before' ? '08.10 ~ 09.10' : '07.01 ~ ' + det.deadline.replace('~', ''),
+      d_host: det.host || (det.region + '시체육회'),
+      d_source: det.source,
+      festOk: s.festState === 'ok', festLoading: s.festState === 'loading', festEmpty: s.festState === 'empty',
+      showDebug: dbg.opts.length > 0,
+      debugOptions: dbg.opts,
+      isWizard: s.screen === 'w1' || s.screen === 'w2' || s.screen === 'w3',
+      isW1: s.screen === 'w1', isW2: s.screen === 'w2', isW3: s.screen === 'w3',
+      wStepLabel: s.screen === 'w1' ? '1/3' : s.screen === 'w2' ? '2/3' : '3/3',
+      wBar1: this.wBar(true), wBar2: this.wBar(s.screen !== 'w1'), wBar3: this.wBar(s.screen === 'w3'),
+      w1Sub: det.name + ' (' + String(detD.getMonth() + 1).padStart(2, '0') + '.' + String(detD.getDate()).padStart(2, '0') + ') 기준으로 짜드릴게요.',
+      patterns: this.PATTERNS.map((p) => {
+        const on = s.wPattern === p.key;
+        return {
+          key: p.key, label: p.label, sub: p.sub,
+          style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '15px 16px', borderRadius: '18px', cursor: 'pointer', background: on ? '#EEF2FF' : '#FFFFFF', border: '1.5px solid ' + (on ? '#2B5CFF' : '#E4E4E6') },
+          titleStyle: { fontSize: '14.5px', fontWeight: 700, color: on ? '#2B5CFF' : '#15161B', letterSpacing: '-0.02em' },
+          radioStyle: { fontFamily: "'Material Symbols Rounded'", fontSize: '21px', lineHeight: 1, flex: 'none', color: on ? '#2B5CFF' : '#D6D6DA', fontVariationSettings: on ? "'FILL' 1" : "'FILL' 0" },
+          go: () => this.pickPattern(p.key)
+        };
+      }),
+      wizCells: this.wizCells(),
+      w1CustomHint: s.wPattern === 'custom' && !!s.wStart && !s.wEnd,
+      w1RangeLabel: this.rangeLabel(),
+      w2Intensity: this.INTENSITY[s.wEvent],
+      eventSeg: this.EVENTS.map((e) => ({ key: e, label: e, style: this.segStyle(s.wEvent === e), go: () => this.setState({ wEvent: e }) })),
+      w2Hint: det.events.indexOf(s.wEvent) >= 0 ? '대회에서 가져왔어요 · 바꿀 수 있어요' : '이 대회 종목엔 없지만 선택할 수 있어요',
+      prefChips: this.PREFS.map((p) => {
+        const on = s.wPrefs.indexOf(p.label) >= 0;
+        return { key: p.label, label: p.label, go: () => this.togglePref(p.label), style: { fontSize: '13px', fontWeight: 600, padding: '9px 14px', borderRadius: '13px', cursor: 'pointer', whiteSpace: 'nowrap', background: on ? p.bg : '#FFFFFF', color: on ? p.fg : '#86878E', border: '1px solid ' + (on ? p.fg : '#E4E4E6') } };
+      }),
+      w2ShowRecovery: s.wEvent === '하프' || s.wEvent === '풀',
+      w2RecoveryText: s.wEvent + '는 완주 다음날 회복이 중요해요. D+1은 고강도 일정을 빼고 온천·가벼운 산책 위주로 동선을 짭니다.',
+      hotelQ: s.hotelQ, setHotelQ: (e) => this.setState({ hotelQ: e.target.value }),
+      hotelLoading: s.dbg.w3 === 'loading', hotelOk: s.dbg.w3 !== 'loading',
+      hotels: this.HOTELS.filter((h) => !s.hotelQ.trim() || (h.name + h.meta).indexOf(s.hotelQ.trim()) >= 0).map((h) => {
+        const on = s.hotel === h.name;
+        return {
+          key: h.name, name: h.name, meta: h.meta,
+          rowStyle: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '18px', background: '#FFFFFF', border: '1.5px solid ' + (on ? '#2B5CFF' : '#E4E4E6') },
+          btnStyle: { flex: 'none', height: '34px', padding: '0 14px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', background: on ? '#2B5CFF' : '#F2F2F0', color: on ? '#FFFFFF' : '#54565E' },
+          btnLabel: on ? '선택됨' : '선택',
+          go: () => this.setState({ hotel: on ? null : h.name })
+        };
+      }),
+      wCtaLabel: s.screen === 'w3' ? (s.generating ? '동선 짜는 중…' : s.hotel ? '이 숙소로 동선 추천받기' : '숙소 없이 추천받기') : '다음',
+      wCtaStyle: this.ctaStyle(!(s.screen === 'w2' && s.wPrefs.length === 0) && !s.generating),
+      wNext: () => this.wizardNext(),
+      onScroll: this.onResultScroll,
+      isResult: s.screen === 'result',
+      resultOk: s.dbg.result !== 'empty', resultEmpty: s.dbg.result === 'empty',
+      mapLine: pins.map((p) => p[0] + ',' + p[1]).join(' '),
+      mapLineStyle: { fill: 'none', stroke: dayC, strokeWidth: 3.5, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.9 },
+      mapPins: pins.map((p, i) => {
+        const on = i === s.activeBlock, sz = on ? 34 : 26;
+        return {
+          key: 'pin' + i, n: String(i + 1),
+          style: { position: 'absolute', left: (p[0] - sz / 2) + 'px', top: (p[1] - sz / 2) + 'px', width: sz + 'px', height: sz + 'px', borderRadius: '50%', background: dayC, color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Archivo,sans-serif', fontSize: on ? '15px' : '12.5px', fontWeight: 700, border: '2.5px solid #FFFFFF', boxShadow: on ? '0 6px 16px rgba(21,22,27,.30)' : '0 2px 6px rgba(21,22,27,.20)', cursor: 'pointer', zIndex: on ? 3 : 2 },
+          go: () => this.setState({ activeBlock: i })
+        };
+      }),
+      legendDot: { width: '9px', height: '9px', borderRadius: '50%', background: dayC, display: 'inline-block' },
+      legendText: day.recovery ? '회복일 동선' : '일자 동선',
+      placeCount: itin.reduce((n, d) => n + d.blocks.length, 0) + '곳',
+      dayTabs: itin.map((d, i) => {
+        const on = i === s.activeDay;
+        return { key: d.key, label: d.tab, go: () => this.setDay(i), style: { flex: 'none', padding: '9px 14px', borderRadius: '13px', fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', background: on ? (d.recovery ? '#FF6A2B' : '#2B5CFF') : (d.recovery ? '#FFF1E9' : '#F2F2F0'), color: on ? '#FFFFFF' : (d.recovery ? '#C2410C' : '#54565E') } };
+      }),
+      dayLabel: day.label,
+      editLabel: s.editMode ? '완료' : '편집',
+      toggleEdit: this.toggleEdit,
+      hasDayNote: !!day.note && !s.editMode, dayNote: day.note,
+      viewMode: !s.editMode, editMode: s.editMode,
+      blocks: day.blocks.map((b, i) => {
+        const on = i === s.activeBlock, cat = this.CATS[b.cat] || this.CATS['관광지'], last = i === day.blocks.length - 1;
+        return {
+          key: 'b' + i, idx: i, n: String(i + 1), time: b.time, title: b.title, cat: b.cat, place: b.place, desc: b.desc,
+          numStyle: { width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', fontFamily: 'Archivo,sans-serif', fontSize: '12px', fontWeight: 700, background: on ? dayC : '#FFFFFF', color: on ? '#FFFFFF' : '#86878E', border: '1.5px solid ' + (on ? dayC : '#E4E4E6') },
+          railStyle: { width: '2px', flex: 1, background: last ? 'transparent' : '#EDEDEF', borderRadius: '1px' },
+          cardStyle: { flex: 1, minWidth: 0, borderRadius: '18px', padding: '14px', background: '#FFFFFF', cursor: 'pointer', border: '1.5px solid ' + (on ? dayC : '#E4E4E6'), boxShadow: on ? '0 8px 20px rgba(21,22,27,.07)' : 'none' },
+          timeStyle: { fontFamily: 'Archivo,sans-serif', fontSize: '12.5px', fontWeight: 700, color: on ? dayC : '#86878E', flex: 'none' },
+          tagStyle: { background: cat.bg, color: cat.fg, fontSize: '11.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '9px', whiteSpace: 'nowrap' },
+          go: () => this.setState({ activeBlock: i })
+        };
+      }),
+      editRows: day.blocks.map((b, i) => ({
+        key: 'e' + i, n: String(i + 1), title: b.title, meta: b.time + ' · ' + b.place + ' · ' + b.cat, canSwap: !b.race,
+        rowStyle: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '16px', border: '1px solid #E4E4E6', background: '#FFFFFF' },
+        numStyle: { width: '22px', height: '22px', borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F2F2F0', color: '#54565E', fontFamily: 'Archivo,sans-serif', fontSize: '11.5px', fontWeight: 700 },
+        swap: () => this.setState({ poi: { mode: 'replace', idx: i, cat: b.cat } }),
+        remove: () => this.removeBlock(i),
+        dragStart: () => { this._drag = i; },
+        dragOver: (e) => e.preventDefault(),
+        drop: () => { if (this._drag !== null && this._drag !== i) this.reorder(this._drag, i); this._drag = null; }
+      })),
+      openAdd: () => this.setState({ poi: { mode: 'add', idx: -1, cat: '관광지' } }),
+      shareRoute: () => this.toast('동선을 공유했어요'),
+      saveRoute: () => { if (this.guard()) return; this.setState({ saved: true, libTab: 'route' }); this.toast('보관함에 저장했어요'); setTimeout(() => this.go('library'), 700); },
+      goCoursesFromHotel: () => { this.setState({ courseStart: '호텔 세종 가온' }); this.go('courses'); },
+      poiOpen: !!s.poi, closePoi: () => this.setState({ poi: null }),
+      poiAddMode: !!s.poi && s.poi.mode === 'add',
+      poiTitle: (s.poi ? s.poi.cat : '') + (s.poi && s.poi.mode === 'add' ? ' 추가 · 인근' : ' 교체 · 인근'),
+      poiCats: ['관광지', '맛집', '카페', '힐링웰니스', '자연트레킹', '역사문화', '숙소'].map((c) => ({
+        key: c, label: c, go: () => this.setState({ poi: Object.assign({}, s.poi, { cat: c }) }),
+        style: { flex: 'none', padding: '8px 13px', borderRadius: '13px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: s.poi && s.poi.cat === c ? '#2B5CFF' : '#F2F2F0', color: s.poi && s.poi.cat === c ? '#FFFFFF' : '#54565E' }
+      })),
+      poiList: this.POIS.map((p) => ({ key: p.name, name: p.name, desc: p.desc, addr: p.addr, go: () => this.pickPoi(p) })),
+      isCourses: s.screen === 'courses',
+      isNearby: s.cTab === 'near', isByRegion: s.cTab === 'region',
+      segNearStyle: this.segStyle(s.cTab === 'near'), segRegionStyle: this.segStyle(s.cTab === 'region'),
+      setNearby: () => this.setState({ cTab: 'near' }), setByRegion: () => this.setState({ cTab: 'region' }),
+      startQ: s.startQ, setStartQ: (e) => this.setState({ startQ: e.target.value }),
+      useMyLocation: () => { this.setState({ dbg: Object.assign({}, s.dbg, { courses: 'locating' }) }); setTimeout(() => this.setState({ dbg: Object.assign({}, this.state.dbg, { courses: 'ok' }), courseStart: '내 위치' }), 900); },
+      presets: ['부산 해운대', '여수', '강릉', '인천 강화', '서울시청'].map((p) => ({
+        key: p, label: p, go: () => this.setState({ courseStart: p }),
+        style: { flex: 'none', padding: '8px 13px', borderRadius: '13px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: s.courseStart === p ? '#EEF2FF' : '#F2F2F0', color: s.courseStart === p ? '#2B5CFF' : '#54565E', border: '1px solid ' + (s.courseStart === p ? '#2B5CFF' : 'transparent') }
+      })),
+      dist: s.dist, distLabel: s.dist.toFixed(1) + 'km', setDist: (e) => this.setState({ dist: parseFloat(e.target.value) }),
+      cLocating: cd === 'locating', cNoStart: cd === 'nostart', cNoAll: cd === 'none',
+      cHasMap: cd === 'ok' || cd === 'nocourse', cHasCourse: cd === 'ok', cNoCourse: cd === 'nocourse', cHasSpots: cd === 'ok' || cd === 'nocourse',
+      courseName: s.course + ' 왕복',
+      courseWhere: (s.courseStart === '부산 해운대' ? '부산 해운대구' : s.courseStart) + ' · 출발지→진입점 420m',
+      courseSpec: '왕복 ' + s.dist.toFixed(1) + 'km · 약 ' + Math.round(s.dist * 9) + '분 · 난이도 중',
+      courseShort: s.dist > 12, courseShortText: '이 코스가 짧아 목표(' + s.dist.toFixed(1) + 'km)보다 짧게 짜였어요.',
+      altCourses: ['해파랑길 2코스', '남파랑길 2코스', '남파랑길 3코스'].filter((c) => c !== s.course).concat(s.course === '해파랑길 1코스' ? [] : ['해파랑길 1코스']).slice(0, 3).map((c) => ({
+        key: c, name: c + ' 왕복', meta: '부산 · 난이도 중',
+        style: { width: '178px', flex: 'none', border: '1px solid #E4E4E6', borderRadius: '18px', padding: '14px', background: '#FFFFFF', cursor: 'pointer' },
+        go: () => this.setState({ course: c })
+      })),
+      spots: this.SPOTS.map((sp, i) => ({ key: sp.name, n: String(i + 1), name: sp.name, meta: sp.cat + ' · ' + sp.dist })),
+      spotPins: this.SPOTS.map((sp, i) => ({
+        key: sp.name, n: String(i + 1),
+        style: { position: 'absolute', left: sp.x + 'px', top: sp.y + 'px', width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF', color: '#15161B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Archivo,sans-serif', fontSize: '11.5px', fontWeight: 700, border: '2px solid #15161B', boxShadow: '0 2px 6px rgba(21,22,27,.18)' }
+      })),
+      saveCourse: () => { if (this.guard()) return; this.setState({ libTab: 'course' }); this.toast('보관함에 저장했어요'); },
+      startRun: () => this.go('run'),
+      regionChips: this.COURSE_REGIONS.map((r) => ({
+        key: r.name, label: r.name + ' ' + r.n, go: () => this.setState({ cRegion: s.cRegion === r.name ? null : r.name }),
+        style: { flex: 'none', padding: '9px 13px', borderRadius: '13px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', background: s.cRegion === r.name ? '#2B5CFF' : '#F2F2F0', color: s.cRegion === r.name ? '#FFFFFF' : '#54565E' }
+      })),
+      regionCountLine: s.cRegion ? (s.cRegion + ' 코스 ' + (this.COURSE_REGIONS.filter((r) => r.name === s.cRegion)[0] || {}).n + ' · 두루누비 걷기길') : '전국 코스 261 · 두루누비 걷기길',
+      regionCourses: (!s.cRegion || s.cRegion === '부산') ? this.REGION_COURSES : [],
+      regionEmpty: !!s.cRegion && s.cRegion !== '부산',
+      isRun: s.screen === 'run', isRunSum: s.screen === 'runsum',
+      endRun: () => this.go('runsum'),
+      saveRun: () => { if (this.guard()) return; this.setState({ ranSaved: true, libTab: 'course' }); this.toast('러닝 기록을 저장했어요'); setTimeout(() => this.go('library'), 700); },
+      isLibrary: s.screen === 'library',
+      libSeg1: this.segStyle(s.libTab === 'route'), libSeg2: this.segStyle(s.libTab === 'course'), libSeg3: this.segStyle(s.libTab === 'fav'),
+      libRoute: () => this.setState({ libTab: 'route' }), libCourse: () => this.setState({ libTab: 'course' }), libFav: () => this.setState({ libTab: 'fav' }),
+      libIsRoute: s.libTab === 'route', libIsCourse: s.libTab === 'course', libIsFav: s.libTab === 'fav',
+      libHasRoute: s.saved && s.dbg.lib !== 'empty', libNoRoute: !s.saved || s.dbg.lib === 'empty',
+      libHasCourse: s.dbg.lib !== 'empty', libNoCourse: s.dbg.lib === 'empty',
+      libCourses: (s.ranSaved ? [{ ran: true, name: '해파랑길 1코스 왕복', meta: '07.28 (화) · 실제 5.21km · 32:10 · 6\'11"/km' }] : []).concat([{ ran: false, name: '해파랑길 1코스 왕복', meta: '부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }]).map((c, i) => ({
+        key: 'lc' + i, ran: c.ran, name: c.name, meta: c.meta, go: () => this.setState({ cdRan: c.ran, screen: 'coursedetail' })
+      })),
+      libHasFav: favList.length > 0 && s.dbg.lib !== 'empty', libNoFav: favList.length === 0 || s.dbg.lib === 'empty',
+      favCards: favList.map((c) => this.cardVM(c, false)),
+      openSavedRoute: () => { this.setState({ activeDay: 0, activeBlock: 0, editMode: false, resultFrom: 'library' }); this.go('result'); },
+      deleteSavedRoute: (e) => { e.stopPropagation(); this.setState({ saved: false }); },
+      isCourseDetail: s.screen === 'coursedetail',
+      cdName: s.cdRan ? '해파랑길 1코스 왕복 · 뛴 기록' : '해파랑길 1코스 왕복',
+      cdMeta: s.cdRan ? '07.28 (화) · 부산 해운대구' : '부산 해운대구 · 5.0km · 약 45분 · 난이도 중',
+      cdRan: s.cdRan,
+      cdLineStyle: { fill: 'none', stroke: '#2B5CFF', strokeWidth: 4.5, strokeLinecap: 'round', strokeLinejoin: 'round', strokeDasharray: s.cdRan ? 'none' : '10 8' },
+      goLibrary: () => { if (this.guard()) return; this.go('library'); },
+      isLogin: s.screen === 'login', isSignup: s.screen === 'signup', isFindPw: s.screen === 'findpw', isNewPw: s.screen === 'newpw',
+      loginInput: { flex: 'none', width: '100%', height: '52px', borderRadius: '16px', border: '1px solid #E4E4E6', padding: '0 15px', fontFamily: 'inherit', fontSize: '14.5px', color: '#15161B', outline: 'none', background: '#FFFFFF' },
+      rowInput: { flex: 1, minWidth: 0, height: '52px', borderRadius: '16px', border: '1px solid #E4E4E6', padding: '0 15px', fontFamily: 'inherit', fontSize: '14.5px', color: '#15161B', outline: 'none', background: '#FFFFFF' },
+      webInput: { width: '100%', height: '44px', borderRadius: '10px', border: '1px solid #E4E4E6', padding: '0 13px', fontFamily: 'inherit', fontSize: '14px', color: '#15161B', outline: 'none', background: '#FFFFFF' },
+      loginError: s.dbg.login === 'error',
+      doLogin: () => { this.setState({ guest: false }); this.go('home'); },
+      doGuest: () => { this.setState({ guest: true }); this.go('home'); },
+      goSignup: () => { this.setState({ suStep: 1 }); this.go('signup'); },
+      goFindPw: () => { this.setState({ resetSent: false }); this.go('findpw'); },
+      goLogin: () => { this.setState({ pwChanged: false }); this.go('login'); },
+      goNewPw: () => { this.setState({ pwChanged: false }); this.go('newpw'); },
+      sendReset: () => { this.setState({ resetSent: true }); this.toast('재설정 링크를 이메일로 보냈어요'); },
+      changePw: () => this.setState({ pwChanged: true }),
+      pwChanged: s.pwChanged, pwForm: !s.pwChanged, resetSent: s.resetSent,
+      su1: s.suStep === 1, su2: s.suStep === 2, su3: s.suStep === 3, su4: s.suStep === 4,
+      signupBack: () => { if (s.suStep > 1) this.setState({ suStep: s.suStep - 1 }); else this.go('login'); },
+      suSteps: ['동의', '정보 입력', '이메일 인증', '완료'].map((l, i) => {
+        const n = i + 1, on = s.suStep >= n, cur = s.suStep === n;
+        return {
+          key: l, n: String(n), label: l,
+          wrapStyle: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
+          dotStyle: { width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Archivo,sans-serif', fontSize: '12px', fontWeight: 700, background: on ? '#2B5CFF' : '#F2F2F0', color: on ? '#FFFFFF' : '#9A9CA2' },
+          labelStyle: { fontSize: '11px', fontWeight: cur ? 700 : 600, color: cur ? '#15161B' : '#9A9CA2', whiteSpace: 'nowrap' }
+        };
+      }),
+      toggleAll: () => { const all = !(s.agree.tos && s.agree.privacy && s.agree.mkt); this.setState({ agree: { tos: all, privacy: all, mkt: all } }); },
+      agreeAllStyle: { display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 14px', borderRadius: '16px', background: '#F7F7F5', marginTop: '20px', cursor: 'pointer' },
+      agreeAllIcon: { fontFamily: "'Material Symbols Rounded'", fontSize: '24px', lineHeight: 1, color: (s.agree.tos && s.agree.privacy && s.agree.mkt) ? '#2B5CFF' : '#C6C7CB', fontVariationSettings: "'FILL' 1" },
+      agreeItems: [['tos', '[필수] 이용약관 동의'], ['privacy', '[필수] 개인정보 수집·이용 동의'], ['mkt', '[선택] 마케팅 정보 수신 동의']].map(([k, l]) => ({
+        key: k, label: l, go: () => this.setState({ agree: Object.assign({}, s.agree, { [k]: !s.agree[k] }) }),
+        iconStyle: { fontFamily: "'Material Symbols Rounded'", fontSize: '22px', lineHeight: 1, cursor: 'pointer', color: s.agree[k] ? '#2B5CFF' : '#D6D6DA', fontVariationSettings: "'FILL' 1" }
+      })),
+      code: s.code, setCode: (e) => this.setState({ code: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }),
+      codeBoxes: [0, 1, 2, 3, 4, 5].map((i) => ({
+        key: 'cb' + i, ch: s.code[i] || '',
+        style: { flex: 1, height: '54px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Archivo,sans-serif', fontSize: '20px', fontWeight: 700, background: '#F7F7F5', border: '1.5px solid ' + (s.code.length === i ? '#2B5CFF' : '#E4E4E6') }
+      })),
+      resend: () => { if (s.resendLeft > 0) return; this.setState({ resendLeft: 60 }); this.toast('인증 메일을 보냈어요'); this.tickResend(); },
+      resendLabel: s.resendLeft > 0 ? '재발송 ' + s.resendLeft + '초' : '재발송',
+      resendStyle: { fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', color: s.resendLeft > 0 ? '#9A9CA2' : '#2B5CFF', cursor: s.resendLeft > 0 ? 'default' : 'pointer' },
+      suCtaLabel: s.suStep === 4 ? '시작하기' : s.suStep === 3 ? '인증 확인' : '다음',
+      suCtaStyle: this.ctaStyle(!(s.suStep === 1 && !(s.agree.tos && s.agree.privacy)) && !(s.suStep === 3 && s.code.length < 6)),
+      suNext: () => {
+        if (s.suStep === 1 && !(s.agree.tos && s.agree.privacy)) return;
+        if (s.suStep === 3 && s.code.length < 6) return;
+        if (s.suStep === 4) { this.setState({ guest: false }); this.toast('가입이 완료됐어요'); this.go('home'); return; }
+        this.setState({ suStep: s.suStep + 1 });
+      },
+      guestOpen: s.guestOpen, closeGuest: () => this.setState({ guestOpen: false }),
+      goLoginFromGuest: () => { this.setState({ guestOpen: false }); this.go('login'); },
+      showEmpty: shown.length === 0,
+      showEmptyReset: s.view === 'list',
+      emptyTitle: s.view === 'list' ? '조건에 맞는 대회가 없어요.' : s.selDate ? '이 날엔 대회가 없어요.' : '이 달엔 대회가 없어요.',
+      showTabs: ['home', 'calendar', 'courses', 'library'].indexOf(s.screen) >= 0,
+      tabHomeIcon: this.tabIcon(s.screen === 'home'), tabHomeLabel: this.tabLabel(s.screen === 'home'),
+      tabCalIcon: this.tabIcon(s.screen === 'calendar'), tabCalLabel: this.tabLabel(s.screen === 'calendar'),
+      tabCourseIcon: this.tabIcon(s.screen === 'courses'), tabCourseLabel: this.tabLabel(s.screen === 'courses'),
+      tabLibIcon: this.tabIcon(s.screen === 'library'), tabLibLabel: this.tabLabel(s.screen === 'library'),
+      snackShow: !!s.snack, snackText: s.snack,
+      goHome: () => this.go('home'),
+      goCalendar: () => this.go('calendar'),
+      goCourses: () => this.go('courses'),
+      goCoursesMap: () => this.go('courses'),
+      goSearch: () => { this.setState({ q: s.homeQ }); this.go('calendar'); },
+      homeQ: s.homeQ, setHomeQ: (e) => this.setState({ homeQ: e.target.value }),
+      homeSearchKey: (e) => { if (e.key === 'Enter') { this.setState({ q: s.homeQ }); this.go('calendar'); } },
+      goDetail: () => this.go('detail'),
+      goDetailSeoul: () => { this.setState({ detailId: 'seoul', backTo: 'home' }); this.go('detail'); },
+      goDetailSejong: () => { this.setState({ detailId: 'sejong', backTo: 'home' }); this.go('detail'); },
+      goDetailBusan: () => { this.setState({ detailId: 'busan', backTo: 'home' }); this.go('detail'); },
+      goDetailJeju: () => { this.setState({ detailId: 'jeju', backTo: 'home' }); this.go('detail'); },
+      scrollFestival: () => { const el = document.getElementById('home-festival'); if (el && el.parentElement && el.parentElement.parentElement) { el.parentElement.parentElement.scrollTo({ top: el.offsetTop - 60, behavior: 'smooth' }); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+erDiagram
+    USER ||--|| USER_AGREEMENT : "약관 동의"
+    USER ||--o{ REFRESH_TOKEN : "세션 (무효화용)"
+    USER ||--o{ FAVORITE : "찜"
+    CONTEST ||--o{ FAVORITE : "찜 대상"
+    CONTEST ||--o{ CONTEST_EVENT : "종목"
+    USER ||--o{ ITINERARY : "저장 동선"
+    CONTEST ||--o{ ITINERARY : "대상 대회"
+    ITINERARY ||--o{ ITINERARY_DAY : "일자"
+    ITINERARY_DAY ||--o{ ITINERARY_BLOCK : "일정 블록"
+    USER ||--o{ SAVED_COURSE : "저장 코스"
+    USER ||--o{ RUN_RECORD : "러닝 기록"
+    RUN_RECORD ||--o| RUN_TRACK : "궤적 1:1"
+
+    USER {
+        bigint id PK
+        varchar email UK "로그인 ID"
+        varchar provider "EMAIL / KAKAO — SPEC U1 P0"
+        varchar kakao_id UK "카카오 회원번호, nullable"
+        varchar password "BCrypt 해시, 소셜 가입은 null"
+        varchar nickname UK "2~12자, 중복 불가"
+        boolean email_verified
+        datetime created_at
+    }
+
+    USER_AGREEMENT {
+        bigint id PK
+        bigint user_id FK "유니크 (1:1)"
+        boolean tos "필수"
+        boolean privacy "필수"
+        boolean marketing "선택"
+        datetime agreed_at "필수 2종 동의 시각"
+        datetime marketing_agreed_at "nullable, 이후 토글 이력"
+    }
+
+    EMAIL_VERIFICATION {
+        bigint id PK
+        varchar email "가입 전이라 FK 없음"
+        varchar purpose "SIGNUP / RESET"
+        varchar code "6자리 — SIGNUP용, nullable"
+        varchar token_hash "재설정 링크 토큰 해시 — RESET용, nullable"
+        int attempts "5회 실패 시 재발송 (NFR-10)"
+        datetime expires_at "SIGNUP 10분 / RESET 30분, 재발송 쿨다운 60초"
+        boolean verified "사용(1회) 시 만료"
+    }
+
+    REFRESH_TOKEN {
+        bigint id PK
+        bigint user_id FK
+        varchar token_hash UK "해시로만 저장 (NFR-9)"
+        datetime expires_at
+        boolean revoked "로그아웃·비번 재설정 시 전체 revoke (NFR-11)"
+        datetime created_at
+    }
+
+    CONTEST {
+        bigint id PK
+        varchar source "MARATHON_ONLINE / MARATHON_GO"
+        varchar external_id "(source+external_id) 유니크 = upsert 키"
+        varchar name
+        varchar region "17개 시도"
+        varchar place "대회장 텍스트"
+        decimal lat "카카오 지오코딩 DECIMAL(10,7)"
+        decimal lng
+        date contest_date "커서 정렬 (date, id)"
+        time start_time
+        varchar status "크롤 원본 — 응답은 오늘 기준 재계산, 날짜 없을 때만 폴백"
+        date apply_start "크롤 원천 reg_start 확보 확인, nullable"
+        date apply_end "마감 임박 정렬 키, nullable"
+        varchar host "크롤 원천 organizer 확보 확인, nullable"
+        varchar official_url
+        varchar image_url "크롤 원천 image_url — P1 썸네일·히어로, nullable"
+        varchar detail_url "크롤 출처 상세, nullable"
+        datetime checked_at "출처 확인일 표기용"
+    }
+
+    CONTEST_EVENT {
+        bigint id PK
+        bigint contest_id FK "(contest_id+event_type) 유니크 — upsert 중복 방지"
+        varchar event_type "K5 / K10 / HALF / FULL / TRAIL"
+    }
+
+    FAVORITE {
+        bigint id PK
+        bigint user_id FK
+        bigint contest_id FK "(user_id+contest_id) 유니크"
+        datetime created_at
+    }
+
+    ITINERARY {
+        bigint id PK
+        bigint user_id FK
+        bigint contest_id FK
+        varchar title "세종 2박 3일"
+        varchar event "K5/K10/HALF/FULL — 보관함 카드·회복 배지·S8 연계 파생"
+        varchar themes "취향 스냅샷, 콤마 구분 (TOUR,FOOD)"
+        date start_date
+        date end_date
+        varchar hotel_name "외부 API 스냅샷, nullable — 숙소 생략 가능"
+        decimal hotel_lat "nullable"
+        decimal hotel_lng "nullable"
+        datetime created_at
+    }
+
+    ITINERARY_DAY {
+        bigint id PK
+        bigint itinerary_id FK
+        int day_index "0..N"
+        date day_date
+        boolean recovery "회복일 여부"
+        varchar note "고강도 일정 없이 천천히"
+    }
+
+    ITINERARY_BLOCK {
+        bigint id PK
+        bigint day_id FK
+        int order_no "구멍 허용, PUT 교체 시 1..N 재부여"
+        time start_time
+        varchar title
+        varchar category "Enum 9종"
+        varchar place_name "외부 API 스냅샷"
+        varchar address "외부 API 스냅샷"
+        decimal lat "지도 핀"
+        decimal lng
+        varchar description
+        boolean race "교체 금지 서버 강제, 삭제는 허용 (SPEC §4.10)"
+    }
+
+    SAVED_COURSE {
+        bigint id PK
+        bigint user_id FK
+        varchar course_name "코스 API 스냅샷"
+        varchar region "표시용 — 부산 중구"
+        decimal distance_km
+        int duration_min
+        varchar difficulty "하 / 중 / 상"
+        decimal entry_lat "진입점"
+        decimal entry_lng
+        text path_polyline "코스 상세 점선 렌더링"
+        datetime saved_at
+    }
+
+    RUN_RECORD {
+        bigint id PK
+        bigint user_id FK
+        varchar course_name "스냅샷, 자유 러닝은 null"
+        datetime ran_at
+        decimal distance_km
+        int duration_sec
+        int avg_pace_sec "초 단위 페이스"
+    }
+
+    RUN_TRACK {
+        bigint run_record_id PK "FK 겸용 공유 PK, 1:1"
+        text encoded_polyline "5m 필터 후 압축"
+        int point_count
+    }

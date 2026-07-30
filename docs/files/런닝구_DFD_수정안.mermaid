@@ -1,0 +1,82 @@
+flowchart TD
+
+U(["📱 사용자 앱"])
+
+subgraph SRV["Spring Boot 백엔드"]
+  direction TB
+  AUTH["인증 API<br/>가입 · 로그인(이메일/카카오) · 이메일 인증<br/>재설정 링크 · 토큰 재발급/무효화"]
+  CONTEST["대회 API<br/>목록(커서 페이징) · 상세 · 검색/필터<br/>날짜별 집계(GROUP BY)<br/>접수 상태는 오늘 기준 재계산"]
+  FAV["찜 · 보관함 API"]
+  GEN["동선 생성 API (무상태)<br/>규칙엔진: 골격→고정블록→피로도→회복→슬롯"]
+  ITIN["동선 저장/편집 API<br/>순서변경 = 하루단위 PUT 전체교체<br/>race 블록 서버 보호"]
+  COURSE["러닝코스 API<br/>내 주변(왕복 빌더) · 지역별<br/>두루누비 GPX 파싱본 서버 적재"]
+  RUN["러닝 기록 API<br/>궤적 5m 필터 → polyline 압축"]
+  POIP["외부 POI 프록시 (KTO+카카오 하이브리드)<br/>축제 · POI · 숙소(AD5) · 걷기 스팟 · 지오코딩"]
+  BATCH["크롤링 배치 (1일 1회)<br/>파싱 → 지오코딩 → upsert"]
+end
+
+subgraph EXT["외부 시스템 — 실시간 호출, 저장 안 함"]
+  MARA["마라톤 온라인 · 마라톤GO"]
+  TOUR["한국관광공사 TourAPI<br/>searchFestival2 · locationBasedList2 · 웰니스"]
+  DURU["두루누비<br/>courseList ✅실측 — 좌표 없음<br/>→ GPX 파싱본 261코스(유일본) 서버 적재"]
+  KAKAO["카카오 로컬 REST<br/>지오코딩 · 숙소 AD5 · FD6/CE7 · 키워드"]
+  SMTP["메일 발송 (SMTP)"]
+  KAKAOAUTH["카카오 인증 서버<br/>SDK 토큰 검증"]
+end
+
+subgraph DBX["PostgreSQL — 자체 데이터만 저장 (SPEC 결정-3)"]
+  TU[("USER · USER_AGREEMENT<br/>EMAIL_VERIFICATION · REFRESH_TOKEN")]
+  TC[("CONTEST<br/>CONTEST_EVENT")]
+  TF[("FAVORITE")]
+  TI[("ITINERARY<br/>ITINERARY_DAY<br/>ITINERARY_BLOCK<br/>장소 스냅샷")]
+  TS[("SAVED_COURSE<br/>스냅샷")]
+  TR[("RUN_RECORD<br/>RUN_TRACK 1:1")]
+end
+
+%% 사용자 → 서버
+U -->|"이메일 · 비밀번호 / 카카오 토큰"| AUTH
+U -->|"검색 · 필터 · 커서"| CONTEST
+U -->|"홈 축제 · 인근 축제 · POI 요청"| POIP
+U -->|"찜 · 저장 목록"| FAV
+U -->|"기간 · 종목 · 취향 · 숙소 스냅샷"| GEN
+U -->|"저장하기 · 편집"| ITIN
+U -->|"출발지 · 목표거리"| COURSE
+U -->|"GPS 궤적 + 요약"| RUN
+
+%% 서버 → DB
+AUTH --> TU
+CONTEST --> TC
+FAV --> TF
+FAV --> TS
+ITIN --> TI
+RUN --> TR
+
+%% 보관함 조회 (읽기)
+TI -.->|"동선 목록"| FAV
+TR -.->|"뛴 기록"| FAV
+TC -.->|"찜한 대회 조인"| FAV
+
+%% 서버 내부 · 무상태 반환
+CONTEST -->|"대회장 좌표"| POIP
+GEN -->|"숙소·대회장 좌표 반경 × 취향 카테고리"| POIP
+GEN -.->|"동선 DTO만 반환 (DB 저장 없음)"| U
+
+%% 외부 → 서버 (데이터 유입)
+TOUR -->|"축제(searchFestival2 ±14일 → Haversine 40km)<br/>관광지·웰니스 JSON"| POIP
+KAKAO -->|"숙소 AD5 · 맛집/카페 · 키워드 POI<br/>걷기 스팟 · 지오코딩"| POIP
+DURU -->|"걷기길 코스 (파싱본)"| COURSE
+KAKAOAUTH -->|"토큰 검증 · 프로필"| AUTH
+AUTH -->|"6자리 코드 · 재설정 링크"| SMTP
+MARA -->|"대회 일정 HTML"| BATCH
+BATCH -->|"장소명"| KAKAO
+KAKAO -->|"좌표"| BATCH
+BATCH -->|"upsert — (source, external_id) 유니크"| TC
+
+classDef store fill:#EEF2FF,stroke:#2B5CFF,color:#15161B
+classDef ext fill:#FFF3CC,stroke:#A66A00,color:#15161B
+classDef proc fill:#FFFFFF,stroke:#15161B,color:#15161B
+classDef user fill:#C9F23C,stroke:#15161B,color:#15161B
+class TU,TC,TF,TI,TS,TR store
+class MARA,TOUR,DURU,KAKAO,SMTP,KAKAOAUTH ext
+class AUTH,CONTEST,FAV,GEN,ITIN,COURSE,RUN,POIP,BATCH proc
+class U user
