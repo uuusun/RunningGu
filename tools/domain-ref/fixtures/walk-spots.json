@@ -1,0 +1,114 @@
+{
+  "spec": "§5.9 — 포함 WALK_CAT · 제외 NON_WALK · 이름+주소 중복 제거 · 거리순 12곳",
+  "input": [
+    {
+      "place_name": "해운대해수욕장",
+      "category_name": "여행 > 관광,명소 > 해수욕장",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "부산 해운대구 해운대해변로",
+      "x": "129.1603",
+      "y": "35.1587",
+      "distance": "120",
+      "place_url": "http://place.map.kakao.com/1"
+    },
+    {
+      "place_name": "해운대해수욕장 공영주차장",
+      "category_name": "교통,수송 > 주차장",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "",
+      "x": "129.1610",
+      "y": "35.1590",
+      "distance": "150",
+      "place_url": ""
+    },
+    {
+      "place_name": "동백섬 산책로",
+      "category_name": "여행 > 관광,명소 > 산책로",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "부산 해운대구 동백로",
+      "x": "129.1520",
+      "y": "35.1530",
+      "distance": "900",
+      "place_url": "http://place.map.kakao.com/2"
+    },
+    {
+      "place_name": "해운대 공중화장실",
+      "category_name": "여행 > 관광,명소 > 해수욕장",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "",
+      "x": "129.1605",
+      "y": "35.1585",
+      "distance": "130",
+      "place_url": ""
+    },
+    {
+      "place_name": "동백섬 산책로",
+      "category_name": "여행 > 관광,명소 > 산책로",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "부산 해운대구 동백로",
+      "x": "129.1520",
+      "y": "35.1530",
+      "distance": "900",
+      "place_url": ""
+    },
+    {
+      "place_name": "스타벅스 해운대",
+      "category_name": "음식점 > 카페 > 커피전문점 > 스타벅스",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "",
+      "x": "129.1600",
+      "y": "35.1600",
+      "distance": "200",
+      "place_url": ""
+    },
+    {
+      "place_name": "민락수변공원",
+      "category_name": "여행 > 관광,명소 > 공원",
+      "address_name": "부산 수영구 민락동",
+      "road_address_name": "부산 수영구 민락로",
+      "x": "129.1290",
+      "y": "35.1530",
+      "distance": "2800",
+      "place_url": ""
+    },
+    {
+      "place_name": "해운대 테니스장",
+      "category_name": "스포츠,레저 > 테니스장",
+      "address_name": "부산 해운대구 우동",
+      "road_address_name": "",
+      "x": "129.1570",
+      "y": "35.1650",
+      "distance": "700",
+      "place_url": ""
+    }
+  ],
+  "expected": [
+    {
+      "name": "해운대해수욕장",
+      "category": "해수욕장",
+      "addr": "부산 해운대구 해운대해변로",
+      "lat": 35.1587,
+      "lng": 129.1603,
+      "distM": 120,
+      "url": "http://place.map.kakao.com/1"
+    },
+    {
+      "name": "동백섬 산책로",
+      "category": "산책로",
+      "addr": "부산 해운대구 동백로",
+      "lat": 35.153,
+      "lng": 129.152,
+      "distM": 900,
+      "url": "http://place.map.kakao.com/2"
+    },
+    {
+      "name": "민락수변공원",
+      "category": "공원",
+      "addr": "부산 수영구 민락로",
+      "lat": 35.153,
+      "lng": 129.129,
+      "distM": 2800,
+      "url": ""
+    }
+  ]
+}

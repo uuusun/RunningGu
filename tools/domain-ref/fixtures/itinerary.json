@@ -1,0 +1,2512 @@
+{
+  "spec": "§5.6 v2 — 산책 블록 제거(부록 C-8). engine.js 원본과 다름.",
+  "recoveryRules": {
+    "5K": {
+      "walk": 8,
+      "noHard": false,
+      "intensity": "거의 정상",
+      "dday": "완주 후 오후부터 자유 관광",
+      "dplus": "일반 관광 자유"
+    },
+    "10K": {
+      "walk": 8,
+      "noHard": false,
+      "intensity": "낮은 피로",
+      "dday": "완주 후 가벼운 관광·축제",
+      "dplus": "일반 관광"
+    },
+    "하프": {
+      "walk": 5,
+      "noHard": true,
+      "intensity": "중등도 피로",
+      "dday": "완주 후 온천·휴식 권장",
+      "dplus": "온천+짧은 산책(고강도 제외)"
+    },
+    "풀": {
+      "walk": 3,
+      "noHard": true,
+      "intensity": "고강도 회복 필요",
+      "dday": "완주 후 회복 집중, 도보 최소",
+      "dplus": "스파·온천 중심, 도보 최소"
+    }
+  },
+  "poiSource": "synth (결정적)",
+  "cases": [
+    {
+      "caseId": "5K-pre",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "5K",
+        "pattern": "pre",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 6,
+        "distinctPlaceNames": 6,
+        "placeSlots": 6,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 오후부터 자유 관광",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "5K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "5K-post",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "5K",
+        "pattern": "post",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 8,
+        "distinctPlaceNames": 8,
+        "placeSlots": 8,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 오후부터 자유 관광",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "5K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "일반 관광 자유",
+            "blocks": [
+              {
+                "id": "blk_5",
+                "time": "10:00",
+                "title": "오전 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "랜드마크 광장 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_7",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "명소 거리 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "5K-around",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "5K",
+        "pattern": "around",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 3,
+        "blockCount": 10,
+        "distinctPlaceNames": 9,
+        "placeSlots": 10,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 오후부터 자유 관광",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "5K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "일반 관광 자유",
+            "blocks": [
+              {
+                "id": "blk_7",
+                "time": "10:00",
+                "title": "오전 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "랜드마크 광장 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "제철 밥상 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_9",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "명소 거리 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_10",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "5K-day",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "5K",
+        "pattern": "day",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 1,
+        "blockCount": 4,
+        "distinctPlaceNames": 4,
+        "placeSlots": 4,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 오후부터 자유 관광",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "5K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "10K-pre",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "10K",
+        "pattern": "pre",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 6,
+        "distinctPlaceNames": 6,
+        "placeSlots": 6,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 가벼운 관광·축제",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "10K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "10K-post",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "10K",
+        "pattern": "post",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 8,
+        "distinctPlaceNames": 8,
+        "placeSlots": 8,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 가벼운 관광·축제",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "10K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "일반 관광",
+            "blocks": [
+              {
+                "id": "blk_5",
+                "time": "10:00",
+                "title": "오전 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "랜드마크 광장 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_7",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "명소 거리 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "10K-around",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "10K",
+        "pattern": "around",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 3,
+        "blockCount": 10,
+        "distinctPlaceNames": 9,
+        "placeSlots": 10,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 가벼운 관광·축제",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "10K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "일반 관광",
+            "blocks": [
+              {
+                "id": "blk_7",
+                "time": "10:00",
+                "title": "오전 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "랜드마크 광장 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "제철 밥상 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_9",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "명소 거리 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_10",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "10K-day",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "10K",
+        "pattern": "day",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "cafe": "synth"
+        },
+        "recovery": null,
+        "s8TargetKm": 5,
+        "dayCount": 1,
+        "blockCount": 4,
+        "distinctPlaceNames": 4,
+        "placeSlots": 4,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 가벼운 관광·축제",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "10K 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "13:00",
+                "title": "오후 자유 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "15:30",
+                "title": "카페 한 잔",
+                "catKey": "cafe",
+                "desc": "완주 후 휴식",
+                "place": {
+                  "name": "로스터리 카페 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:30",
+                "title": "맛집 저녁",
+                "catKey": "food",
+                "desc": "오늘은 잘 먹는 날",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "하프-pre",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "하프",
+        "pattern": "pre",
+        "themes": [
+          "history",
+          "wellness"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "history": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D-day 회복 모드",
+          "text": "완주 후 온천·휴식 권장",
+          "intensity": "중등도 피로"
+        },
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 6,
+        "distinctPlaceNames": 6,
+        "placeSlots": 6,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 온천·휴식 권장",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "하프 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "14:30",
+                "title": "가벼운 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "하프-post",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "하프",
+        "pattern": "post",
+        "themes": [
+          "history",
+          "wellness"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "history": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D+1 회복 모드",
+          "text": "온천+짧은 산책(고강도 제외)",
+          "intensity": "중등도 피로"
+        },
+        "s8TargetKm": 5,
+        "dayCount": 2,
+        "blockCount": 8,
+        "distinctPlaceNames": 8,
+        "placeSlots": 8,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 온천·휴식 권장",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "하프 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "14:30",
+                "title": "가벼운 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "온천+짧은 산책(고강도 제외)",
+            "blocks": [
+              {
+                "id": "blk_5",
+                "time": "10:00",
+                "title": "온천·족욕",
+                "catKey": "wellness",
+                "desc": "고강도 제외 · 회복 위주",
+                "place": {
+                  "name": "찜질방 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_7",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "history",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "향토 박물관 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "하프-around",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "하프",
+        "pattern": "around",
+        "themes": [
+          "history",
+          "wellness"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "history": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D+1 회복 모드",
+          "text": "온천+짧은 산책(고강도 제외)",
+          "intensity": "중등도 피로"
+        },
+        "s8TargetKm": 5,
+        "dayCount": 3,
+        "blockCount": 10,
+        "distinctPlaceNames": 9,
+        "placeSlots": 10,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 온천·휴식 권장",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "하프 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "14:30",
+                "title": "가벼운 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "온천+짧은 산책(고강도 제외)",
+            "blocks": [
+              {
+                "id": "blk_7",
+                "time": "10:00",
+                "title": "온천·족욕",
+                "catKey": "wellness",
+                "desc": "고강도 제외 · 회복 위주",
+                "place": {
+                  "name": "찜질방 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "제철 밥상 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_9",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "history",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "향토 박물관 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_10",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "하프-day",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "하프",
+        "pattern": "day",
+        "themes": [
+          "history",
+          "wellness"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "history": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D-day 회복 모드",
+          "text": "완주 후 온천·휴식 권장",
+          "intensity": "중등도 피로"
+        },
+        "s8TargetKm": 5,
+        "dayCount": 1,
+        "blockCount": 4,
+        "distinctPlaceNames": 4,
+        "placeSlots": 4,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 온천·휴식 권장",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "하프 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "14:30",
+                "title": "가벼운 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "풀-pre",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "풀",
+        "pattern": "pre",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D-day 회복 모드",
+          "text": "완주 후 회복 집중, 도보 최소",
+          "intensity": "고강도 회복 필요"
+        },
+        "s8TargetKm": 3,
+        "dayCount": 2,
+        "blockCount": 5,
+        "distinctPlaceNames": 5,
+        "placeSlots": 5,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 회복 집중, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "풀 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "풀-post",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "풀",
+        "pattern": "post",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D+1 회복 모드",
+          "text": "스파·온천 중심, 도보 최소",
+          "intensity": "고강도 회복 필요"
+        },
+        "s8TargetKm": 3,
+        "dayCount": 2,
+        "blockCount": 7,
+        "distinctPlaceNames": 7,
+        "placeSlots": 7,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 회복 집중, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "풀 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "스파·온천 중심, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_4",
+                "time": "10:00",
+                "title": "온천·족욕",
+                "catKey": "wellness",
+                "desc": "고강도 제외 · 회복 위주",
+                "place": {
+                  "name": "찜질방 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_6",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_7",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "풀-around",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "풀",
+        "pattern": "around",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-10",
+        "end": "2026-10-12",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D+1 회복 모드",
+          "text": "스파·온천 중심, 도보 최소",
+          "intensity": "고강도 회복 필요"
+        },
+        "s8TargetKm": 3,
+        "dayCount": 3,
+        "blockCount": 9,
+        "distinctPlaceNames": 8,
+        "placeSlots": 9,
+        "days": [
+          {
+            "date": "2026-10-10",
+            "off": -1,
+            "label": "D-1",
+            "dateLabel": "10.10 토",
+            "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "15:00",
+                "title": "숙소 체크인",
+                "catKey": "lodging",
+                "desc": "세종특별자치시 한누리대로 2000",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "18:30",
+                "title": "카보로딩 저녁",
+                "catKey": "food",
+                "desc": "탄수화물 보충 · 무리 없는 메뉴",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 회복 집중, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_3",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "풀 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_4",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_5",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "향토 식당 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          },
+          {
+            "date": "2026-10-12",
+            "off": 1,
+            "label": "D+1",
+            "dateLabel": "10.12 월",
+            "note": "스파·온천 중심, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_6",
+                "time": "10:00",
+                "title": "온천·족욕",
+                "catKey": "wellness",
+                "desc": "고강도 제외 · 회복 위주",
+                "place": {
+                  "name": "찜질방 2",
+                  "lat": 37.485689,
+                  "lng": 127.11931,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_7",
+                "time": "12:30",
+                "title": "로컬 점심",
+                "catKey": "food",
+                "desc": "그 지역 별미",
+                "place": {
+                  "name": "제철 밥상 3",
+                  "lat": 37.491725,
+                  "lng": 127.10462,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_8",
+                "time": "14:30",
+                "title": "오후 관광",
+                "catKey": "tour",
+                "desc": "추천 장소(샘플)",
+                "place": {
+                  "name": "전망대 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_9",
+                "time": "17:00",
+                "title": "체크아웃·귀가",
+                "catKey": "lodging",
+                "desc": "여행 마무리",
+                "place": {
+                  "name": "테스트 호텔",
+                  "lat": 36.48,
+                  "lng": 127.29,
+                  "addr": "세종특별자치시 한누리대로 2000",
+                  "desc": "숙소"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "풀-day",
+      "input": {
+        "raceId": "10th-autumn-wildfire-prevention-marathon-2026",
+        "raceName": "제10회 가을철 산불조심마라톤",
+        "raceDate": "2026-10-11",
+        "startTime": "08:00",
+        "raceLat": 37.49085,
+        "raceLng": 127.114582,
+        "event": "풀",
+        "pattern": "day",
+        "themes": [
+          "tour",
+          "food"
+        ],
+        "start": "2026-10-11",
+        "end": "2026-10-11",
+        "stay": {
+          "name": "테스트 호텔",
+          "lat": 36.48,
+          "lng": 127.29,
+          "addr": "세종특별자치시 한누리대로 2000"
+        }
+      },
+      "expected": {
+        "sources": {
+          "food": "synth",
+          "tour": "synth",
+          "wellness": "synth"
+        },
+        "recovery": {
+          "label": "D-day 회복 모드",
+          "text": "완주 후 회복 집중, 도보 최소",
+          "intensity": "고강도 회복 필요"
+        },
+        "s8TargetKm": 3,
+        "dayCount": 1,
+        "blockCount": 3,
+        "distinctPlaceNames": 3,
+        "placeSlots": 3,
+        "days": [
+          {
+            "date": "2026-10-11",
+            "off": 0,
+            "label": "D-day",
+            "dateLabel": "10.11 일",
+            "note": "완주 후 회복 집중, 도보 최소",
+            "blocks": [
+              {
+                "id": "blk_1",
+                "time": "08:00",
+                "title": "🏁 제10회 가을철 산불조심마라톤 스타트",
+                "catKey": "race",
+                "desc": "풀 완주 · 결승 후 샤워",
+                "place": {
+                  "name": "광평교운동장",
+                  "lat": 37.49085,
+                  "lng": 127.114582,
+                  "addr": "서울",
+                  "desc": "대회장"
+                }
+              },
+              {
+                "id": "blk_2",
+                "time": "11:00",
+                "title": "온천·회복",
+                "catKey": "wellness",
+                "desc": "완주 근육 회복",
+                "place": {
+                  "name": "온천 스파 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              },
+              {
+                "id": "blk_3",
+                "time": "18:00",
+                "title": "회복 저녁",
+                "catKey": "food",
+                "desc": "소화 잘 되는 회복식",
+                "place": {
+                  "name": "로컬 맛집 1",
+                  "lat": 37.49485,
+                  "lng": 127.114582,
+                  "addr": "",
+                  "desc": "추천 장소(샘플)"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

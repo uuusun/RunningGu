@@ -1,0 +1,90 @@
+{
+  "total": 261,
+  "regions": [
+    "전남",
+    "강원",
+    "경남",
+    "충남",
+    "경기",
+    "경북",
+    "전북",
+    "인천",
+    "부산",
+    "울산",
+    "서울"
+  ],
+  "levelHistogram": {
+    "보통": 114,
+    "쉬움": 101,
+    "어려움": 46
+  },
+  "filters": [
+    {
+      "filter": {
+        "region": "부산",
+        "minKm": 0,
+        "maxKm": 999
+      },
+      "count": 6,
+      "firstIds": [
+        {
+          "id": "T_CRS_MNG0000005118",
+          "name": "남파랑길 3코스",
+          "distKm": 14,
+          "levelLabel": "보통"
+        },
+        {
+          "id": "T_CRS_MNG0000004378",
+          "name": "해파랑길 2코스",
+          "distKm": 14,
+          "levelLabel": "쉬움"
+        },
+        {
+          "id": "T_CRS_MNG0000004239",
+          "name": "해파랑길 1코스",
+          "distKm": 17,
+          "levelLabel": "보통"
+        },
+        {
+          "id": "T_CRS_MNG0000005117",
+          "name": "남파랑길 2코스",
+          "distKm": 19,
+          "levelLabel": "보통"
+        },
+        {
+          "id": "T_CRS_MNG0000005119",
+          "name": "남파랑길 4코스",
+          "distKm": 22,
+          "levelLabel": "보통"
+        }
+      ]
+    },
+    {
+      "filter": {
+        "region": "서울",
+        "minKm": 0,
+        "maxKm": 5
+      },
+      "count": 0,
+      "firstIds": []
+    },
+    {
+      "filter": {
+        "minKm": 0,
+        "maxKm": 3,
+        "level": "쉬움"
+      },
+      "count": 0,
+      "firstIds": []
+    },
+    {
+      "filter": {
+        "region": "제주",
+        "minKm": 10,
+        "maxKm": 999
+      },
+      "count": 0,
+      "firstIds": []
+    }
+  ]
+}

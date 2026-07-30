@@ -1,0 +1,356 @@
+{
+  "spec": "§5.8 — 왕복 경로. minutes = routeM/110, shortfall = routeM < targetKm*1000-300",
+  "cases": [
+    {
+      "caseId": "부산 해운대-3km",
+      "input": {
+        "lat": 35.1587,
+        "lng": 129.1604,
+        "targetKm": 3,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 2,
+        "accessOrder": [
+          32,
+          33
+        ],
+        "results": [
+          {
+            "id": "T_CRS_MNG0000004378",
+            "parentName": "해파랑길 2코스",
+            "sido": "부산",
+            "sigun": "부산 해운대구",
+            "levelLabel": "쉬움",
+            "fullDistKm": 14,
+            "accessM": 32,
+            "routeKm": 3.2,
+            "minutes": 29,
+            "shortfall": false,
+            "start": [
+              35.15897,
+              129.16027
+            ],
+            "pointCount": 29,
+            "closesLoop": true,
+            "routeHash": "034b5a3b"
+          },
+          {
+            "id": "T_CRS_MNG0000004239",
+            "parentName": "해파랑길 1코스",
+            "sido": "부산",
+            "sigun": "부산 남구",
+            "levelLabel": "보통",
+            "fullDistKm": 17,
+            "accessM": 33,
+            "routeKm": 3,
+            "minutes": 28,
+            "shortfall": false,
+            "start": [
+              35.15898,
+              129.16027
+            ],
+            "pointCount": 29,
+            "closesLoop": true,
+            "routeHash": "35518a30"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "부산 해운대-5km",
+      "input": {
+        "lat": 35.1587,
+        "lng": 129.1604,
+        "targetKm": 5,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 2,
+        "accessOrder": [
+          32,
+          33
+        ],
+        "results": [
+          {
+            "id": "T_CRS_MNG0000004378",
+            "parentName": "해파랑길 2코스",
+            "sido": "부산",
+            "sigun": "부산 해운대구",
+            "levelLabel": "쉬움",
+            "fullDistKm": 14,
+            "accessM": 32,
+            "routeKm": 5.1,
+            "minutes": 46,
+            "shortfall": false,
+            "start": [
+              35.15897,
+              129.16027
+            ],
+            "pointCount": 47,
+            "closesLoop": true,
+            "routeHash": "9e44a9e3"
+          },
+          {
+            "id": "T_CRS_MNG0000004239",
+            "parentName": "해파랑길 1코스",
+            "sido": "부산",
+            "sigun": "부산 남구",
+            "levelLabel": "보통",
+            "fullDistKm": 17,
+            "accessM": 33,
+            "routeKm": 5.2,
+            "minutes": 47,
+            "shortfall": false,
+            "start": [
+              35.15898,
+              129.16027
+            ],
+            "pointCount": 49,
+            "closesLoop": true,
+            "routeHash": "7987f3bc"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "부산 해운대-10km",
+      "input": {
+        "lat": 35.1587,
+        "lng": 129.1604,
+        "targetKm": 10,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 2,
+        "accessOrder": [
+          32,
+          33
+        ],
+        "results": [
+          {
+            "id": "T_CRS_MNG0000004378",
+            "parentName": "해파랑길 2코스",
+            "sido": "부산",
+            "sigun": "부산 해운대구",
+            "levelLabel": "쉬움",
+            "fullDistKm": 14,
+            "accessM": 32,
+            "routeKm": 10.2,
+            "minutes": 93,
+            "shortfall": false,
+            "start": [
+              35.15897,
+              129.16027
+            ],
+            "pointCount": 91,
+            "closesLoop": true,
+            "routeHash": "88c13b2a"
+          },
+          {
+            "id": "T_CRS_MNG0000004239",
+            "parentName": "해파랑길 1코스",
+            "sido": "부산",
+            "sigun": "부산 남구",
+            "levelLabel": "보통",
+            "fullDistKm": 17,
+            "accessM": 33,
+            "routeKm": 10.2,
+            "minutes": 93,
+            "shortfall": false,
+            "start": [
+              35.15898,
+              129.16027
+            ],
+            "pointCount": 93,
+            "closesLoop": true,
+            "routeHash": "8f89aa45"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "서울 여의도-3km",
+      "input": {
+        "lat": 37.5265,
+        "lng": 126.934,
+        "targetKm": 3,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "서울 여의도-5km",
+      "input": {
+        "lat": 37.5265,
+        "lng": 126.934,
+        "targetKm": 5,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "서울 여의도-10km",
+      "input": {
+        "lat": 37.5265,
+        "lng": 126.934,
+        "targetKm": 10,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "경주 첨성대-3km",
+      "input": {
+        "lat": 35.8347,
+        "lng": 129.2191,
+        "targetKm": 3,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "경주 첨성대-5km",
+      "input": {
+        "lat": 35.8347,
+        "lng": 129.2191,
+        "targetKm": 5,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "경주 첨성대-10km",
+      "input": {
+        "lat": 35.8347,
+        "lng": 129.2191,
+        "targetKm": 10,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "제주 용두암-3km",
+      "input": {
+        "lat": 33.5153,
+        "lng": 126.5122,
+        "targetKm": 3,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "제주 용두암-5km",
+      "input": {
+        "lat": 33.5153,
+        "lng": 126.5122,
+        "targetKm": 5,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "제주 용두암-10km",
+      "input": {
+        "lat": 33.5153,
+        "lng": 126.5122,
+        "targetKm": 10,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "좌표 없음-3km",
+      "input": {
+        "lat": null,
+        "lng": null,
+        "targetKm": 3,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "좌표 없음-5km",
+      "input": {
+        "lat": null,
+        "lng": null,
+        "targetKm": 5,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    },
+    {
+      "caseId": "좌표 없음-10km",
+      "input": {
+        "lat": null,
+        "lng": null,
+        "targetKm": 10,
+        "radiusKm": 8,
+        "limit": 12
+      },
+      "expected": {
+        "count": 0,
+        "accessOrder": [],
+        "results": []
+      }
+    }
+  ]
+}
