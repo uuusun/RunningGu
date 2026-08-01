@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""races_sample.csv → design/public/data/races.json
+"""races_sample.csv → reference-web/public/data/races.json
 
-SPEC.md §4.2 Race 계약(camelCase)으로 출력한다. (G-01)
+SPEC.md §6.2 대회 초기 데이터 계약(camelCase)으로 출력한다.
 - RFC 4180 파싱 (description 멀티라인 대응)
 - 종목 표준화: has_* 플래그 우선 + event_types 토큰 보강 → ['풀','하프','10K','5K'] 순서
 - region: CSV region(17개 단축명) 사용, 비표준 값은 sido/venue/주소에서 보정
 - 중복 병합: (정규화 이름, 날짜) 그룹 → 최근 확인일 우선, 빈 필드는 상대 레코드로 보충,
   source는 병기("마라톤GO·마라톤온라인"), checked는 최신값
 
-사용: python3 backend/build_races_json.py [--out 경로]
+사용: python scripts/build_races_json.py [--out 경로]
 """
 import csv
 import json
@@ -17,9 +17,13 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "data" / "races_sample.csv"
-OUT = ROOT / "design" / "public" / "data" / "races.json"
+OUT = ROOT / "reference-web" / "public" / "data" / "races.json"
 
 REGIONS = [
     "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",

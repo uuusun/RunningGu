@@ -1,82 +1,111 @@
 flowchart TD
 
 U(["📱 사용자 앱"])
+A(["🛠 관리자·배치"])
 
-subgraph SRV["Spring Boot 백엔드"]
+subgraph SRV["Spring Boot 백엔드 — 온라인 SSOT"]
   direction TB
-  AUTH["인증 API<br/>가입 · 로그인(이메일/카카오) · 이메일 인증<br/>재설정 링크 · 토큰 재발급/무효화"]
-  CONTEST["대회 API<br/>목록(커서 페이징) · 상세 · 검색/필터<br/>날짜별 집계(GROUP BY)<br/>접수 상태는 오늘 기준 재계산"]
-  FAV["찜 · 보관함 API"]
-  GEN["동선 생성 API (무상태)<br/>규칙엔진: 골격→고정블록→피로도→회복→슬롯"]
-  ITIN["동선 저장/편집 API<br/>순서변경 = 하루단위 PUT 전체교체<br/>race 블록 서버 보호"]
-  COURSE["러닝코스 API<br/>내 주변(왕복 빌더) · 지역별<br/>두루누비 GPX 파싱본 서버 적재"]
-  RUN["러닝 기록 API<br/>궤적 5m 필터 → polyline 압축"]
-  POIP["외부 POI 프록시 (KTO+카카오 하이브리드)<br/>축제 · POI · 숙소(AD5) · 걷기 스팟 · 지오코딩"]
-  BATCH["크롤링 배치 (1일 1회)<br/>파싱 → 지오코딩 → upsert"]
+  AUTH["인증 API<br/>EMAIL·KAKAO 로그인 수단<br/>명시적 연결·해제 · 토큰 회전"]
+  PROFILE["마이·회원 API<br/>프로필 · 약관 · 비밀번호 · 탈퇴"]
+  CONTEST["대회 API<br/>canonical 153건 · 검색/필터/커서<br/>날짜별 집계 · 파생 접수상태"]
+  MY["마이 API<br/>동선 · 저장 코스 · 러닝 기록 · 찜"]
+  GEN["동선 생성 API (무상태)<br/>날짜→고정 RACE→피로도→회복→POI 슬롯"]
+  ITIN["동선 저장·편집 API<br/>RACE 블록 시스템 관리<br/>사용자 교체·삭제·순서변경 금지"]
+  COURSE["코스 API<br/>두루누비 메타 + GPX 경로 결합<br/>장애 시 GPX 메타데이터 폴백"]
+  RUN["러닝 기록 API<br/>5m 재필터 → polyline 압축"]
+  POIP["외부 POI 프록시<br/>축제(searchFestival2) · 숙소(AD5)<br/>POI · 걷기 스팟 · 지오코딩"]
+  RACEBATCH["대회 canonical 병합 배치<br/>271 원천 → 153 대회<br/>지오코딩 → upsert"]
+  COURSESYNC["두루누비 동기화<br/>서버 시작 시 + 하루 1회<br/>courseId 매칭 · fail-open"]
 end
 
-subgraph EXT["외부 시스템 — 실시간 호출, 저장 안 함"]
-  MARA["마라톤 온라인 · 마라톤GO"]
-  TOUR["한국관광공사 TourAPI<br/>searchFestival2 · locationBasedList2 · 웰니스"]
-  DURU["두루누비<br/>courseList ✅실측 — 좌표 없음<br/>→ GPX 파싱본 261코스(유일본) 서버 적재"]
-  KAKAO["카카오 로컬 REST<br/>지오코딩 · 숙소 AD5 · FD6/CE7 · 키워드"]
-  SMTP["메일 발송 (SMTP)"]
+subgraph CACHE["단기 캐시 — 외부 API 영구 마스터 저장 금지"]
+  LIVE[("Caffeine/Redis TTL<br/>숙소·POI 5분<br/>인근 축제 1일<br/>두루누비 메타 24시간")]
+end
+
+subgraph DBX["PostgreSQL — 자체·사용자·대회 canonical 데이터"]
+  TU[("USER · LOGIN_IDENTITY<br/>USER_AGREEMENT<br/>EMAIL_VERIFICATION · REFRESH_TOKEN")]
+  TC[("CONTEST · CONTEST_SOURCE<br/>CONTEST_EVENT")]
+  TF[("FAVORITE")]
+  TI[("ITINERARY · DAY · BLOCK<br/>RACE=system_managed")]
+  TS[("SAVED_COURSE")]
+  TR[("RUN_RECORD · RUN_TRACK 1:1")]
+end
+
+subgraph RES["버전 관리 정적 리소스"]
+  GPX[("두루누비 GPX 파싱본 261코스<br/>courseId · 경로 좌표 · fallback 메타")]
+  APP[("앱 오프라인 번들<br/>대회 초기본 · GPX 축약본")]
+end
+
+subgraph LIVEEXT["실시간 외부 시스템"]
+  TOUR["한국관광공사 TourAPI<br/>searchFestival2 · 관광지 · 웰니스"]
+  KAKAO["카카오 로컬 REST<br/>숙소 AD5 · FD6/CE7 · 키워드 · 지오코딩"]
+  DURU["두루누비 API<br/>courseList 메타데이터"]
+  SMTP["메일 발송 SMTP"]
   KAKAOAUTH["카카오 인증 서버<br/>SDK 토큰 검증"]
 end
 
-subgraph DBX["PostgreSQL — 자체 데이터만 저장 (SPEC 결정-3)"]
-  TU[("USER · USER_AGREEMENT<br/>EMAIL_VERIFICATION · REFRESH_TOKEN")]
-  TC[("CONTEST<br/>CONTEST_EVENT")]
-  TF[("FAVORITE")]
-  TI[("ITINERARY<br/>ITINERARY_DAY<br/>ITINERARY_BLOCK<br/>장소 스냅샷")]
-  TS[("SAVED_COURSE<br/>스냅샷")]
-  TR[("RUN_RECORD<br/>RUN_TRACK 1:1")]
+subgraph INGEST["허가 확인 대상 원천"]
+  MARA["마라톤온라인 · 마라톤GO HTML"]
 end
 
-%% 사용자 → 서버
-U -->|"이메일 · 비밀번호 / 카카오 토큰"| AUTH
-U -->|"검색 · 필터 · 커서"| CONTEST
-U -->|"홈 축제 · 인근 축제 · POI 요청"| POIP
-U -->|"찜 · 저장 목록"| FAV
-U -->|"기간 · 종목 · 취향 · 숙소 스냅샷"| GEN
-U -->|"저장하기 · 편집"| ITIN
-U -->|"출발지 · 목표거리"| COURSE
+%% 사용자 요청
+U -->|"이메일/비밀번호 · 카카오 토큰"| AUTH
+U -->|"프로필·동의·로그인 수단"| PROFILE
+U -->|"검색·필터·불투명 커서"| CONTEST
+U -->|"찜·마이 조회·저장"| MY
+U -->|"기간·종목·themes·숙소 스냅샷"| GEN
+U -->|"동선 저장·USER 블록 편집"| ITIN
+U -->|"출발지·목표거리"| COURSE
 U -->|"GPS 궤적 + 요약"| RUN
+U -->|"축제·숙소·POI"| POIP
 
-%% 서버 → DB
+%% 자체 DB
 AUTH --> TU
+PROFILE --> TU
 CONTEST --> TC
-FAV --> TF
-FAV --> TS
+MY --> TF
+MY --> TI
+MY --> TS
+MY --> TR
 ITIN --> TI
 RUN --> TR
 
-%% 보관함 조회 (읽기)
-TI -.->|"동선 목록"| FAV
-TR -.->|"뛴 기록"| FAV
-TC -.->|"찜한 대회 조인"| FAV
+%% 생성·대회 보호
+CONTEST -->|"대회·좌표·고정 RACE 정보"| GEN
+GEN -->|"취향·숙소/대회장 반경"| POIP
+GEN -.->|"동선 DTO만 반환"| U
+ITIN -->|"RACE 필드는 CONTEST 최신값으로 조합"| CONTEST
+A -->|"대회 수정은 관리자·배치만"| CONTEST
 
-%% 서버 내부 · 무상태 반환
-CONTEST -->|"대회장 좌표"| POIP
-GEN -->|"숙소·대회장 좌표 반경 × 취향 카테고리"| POIP
-GEN -.->|"동선 DTO만 반환 (DB 저장 없음)"| U
+%% 외부 실시간 프록시와 캐시
+TOUR -->|"축제·관광지·웰니스"| POIP
+KAKAO -->|"숙소·상권·걷기 스팟·지오코딩"| POIP
+POIP <--> LIVE
+POIP -->|"가공 응답, 영구 마스터 저장 없음"| U
+KAKAOAUTH -->|"회원번호 검증"| AUTH
+AUTH -->|"인증 코드·재설정 링크"| SMTP
 
-%% 외부 → 서버 (데이터 유입)
-TOUR -->|"축제(searchFestival2 ±14일 → Haversine 40km)<br/>관광지·웰니스 JSON"| POIP
-KAKAO -->|"숙소 AD5 · 맛집/카페 · 키워드 POI<br/>걷기 스팟 · 지오코딩"| POIP
-DURU -->|"걷기길 코스 (파싱본)"| COURSE
-KAKAOAUTH -->|"토큰 검증 · 프로필"| AUTH
-AUTH -->|"6자리 코드 · 재설정 링크"| SMTP
-MARA -->|"대회 일정 HTML"| BATCH
-BATCH -->|"장소명"| KAKAO
-KAKAO -->|"좌표"| BATCH
-BATCH -->|"upsert — (source, external_id) 유니크"| TC
+%% 대회 수집
+MARA -->|"원천 HTML"| RACEBATCH
+RACEBATCH -->|"장소명"| KAKAO
+RACEBATCH -->|"CONTEST + CONTEST_SOURCE upsert"| TC
+
+%% 두루누비 API + GPX 결합
+DURU -->|"메타데이터"| COURSESYNC
+COURSESYNC <--> LIVE
+GPX -->|"경로 좌표·진입점·fallback"| COURSE
+LIVE -->|"최신 메타데이터"| COURSE
+COURSE -->|"courseId 결합 결과"| U
+GPX --> APP
+APP -.->|"네트워크 불가 시 읽기 폴백"| U
 
 classDef store fill:#EEF2FF,stroke:#2B5CFF,color:#15161B
 classDef ext fill:#FFF3CC,stroke:#A66A00,color:#15161B
 classDef proc fill:#FFFFFF,stroke:#15161B,color:#15161B
 classDef user fill:#C9F23C,stroke:#15161B,color:#15161B
-class TU,TC,TF,TI,TS,TR store
+classDef resource fill:#E6F7EE,stroke:#1B8A5A,color:#15161B
+class TU,TC,TF,TI,TS,TR,LIVE store
 class MARA,TOUR,DURU,KAKAO,SMTP,KAKAOAUTH ext
-class AUTH,CONTEST,FAV,GEN,ITIN,COURSE,RUN,POIP,BATCH proc
-class U user
+class AUTH,PROFILE,CONTEST,MY,GEN,ITIN,COURSE,RUN,POIP,RACEBATCH,COURSESYNC proc
+class U,A user
+class GPX,APP resource

@@ -218,7 +218,7 @@ button{font-family:inherit}
             </div>
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
               <span style="font-family:'Material Symbols Rounded';font-size:24px;color:#9A9CA2;line-height:1">bookmark</span>
-              <span style="font-size:11px;font-weight:600;color:#9A9CA2">보관함</span>
+              <span style="font-size:11px;font-weight:600;color:#9A9CA2">마이</span>
             </div>
           </div>
         </div>
@@ -530,6 +530,13 @@ button{font-family:inherit}
               <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">대회 전후 여행 동선은 그대로 짜드릴 수 있어요.</div>
             </div>
           </sc-if>
+          <sc-if value="{{ festError }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:30px 22px 0;text-align:center">
+              <div style="font-size:14.5px;font-weight:700">축제를 불러오지 못했어요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px">잠시 후 다시 시도해 주세요.</div>
+              <div onClick="{{ retryFestival }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:14px;cursor:pointer">다시 시도</div>
+            </div>
+          </sc-if>
         </div>
 
         <div style="flex:1;min-height:26px"></div>
@@ -540,15 +547,39 @@ button{font-family:inherit}
       </sc-if>
 
       <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="S10 보관함" style="padding-bottom:26px">
+      <div data-screen-label="S10 마이" style="padding-bottom:26px">
         <div style="padding:6px 22px 0">
-          <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">보관함</div>
+          <div style="font-size:23px;font-weight:800;letter-spacing:-0.035em">마이</div>
+          <div style="margin-top:14px;border:1px solid #E4E4E6;border-radius:20px;padding:16px;background:#FFFFFF;display:flex;align-items:center;gap:12px">
+            <div style="width:48px;height:48px;border-radius:16px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex:none">
+              <span style="font-family:'Material Symbols Rounded';font-size:27px;color:#2B5CFF;font-variation-settings:'FILL' 1;line-height:1">person</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:16px;font-weight:800">{{ profileNickname }}</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:3px">{{ profileEmail }}</div>
+              <div style="display:flex;gap:5px;margin-top:7px">
+                <span style="background:#EEF2FF;color:#2B5CFF;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:8px">이메일</span>
+                <sc-if value="{{ kakaoLinked }}" hint-placeholder-val="{{ true }}">
+                  <span style="background:#FFF7B8;color:#5C4B00;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:8px">카카오</span>
+                </sc-if>
+              </div>
+            </div>
+            <div onClick="{{ openProfile }}" style="font-size:13px;font-weight:700;color:#2B5CFF;cursor:pointer;white-space:nowrap">정보 수정</div>
+          </div>
           <div style="display:flex;background:#F2F2F0;border-radius:14px;padding:3px;margin-top:14px">
             <div onClick="{{ libRoute }}" style="{{ libSeg1 }}">동선</div>
             <div onClick="{{ libCourse }}" style="{{ libSeg2 }}">러닝코스</div>
             <div onClick="{{ libFav }}" style="{{ libSeg3 }}">찜한 대회</div>
           </div>
         </div>
+
+        <sc-if value="{{ libError }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:64px 34px 26px;text-align:center">
+            <div style="font-size:15.5px;font-weight:700">마이 정보를 불러오지 못했어요.</div>
+            <div style="font-size:13px;color:#86878E;margin-top:6px">네트워크 연결을 확인해 주세요.</div>
+            <div onClick="{{ retryLibrary }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:16px;cursor:pointer">다시 시도</div>
+          </div>
+        </sc-if>
 
         <sc-if value="{{ libIsRoute }}" hint-placeholder-val="{{ true }}">
           <sc-if value="{{ libHasRoute }}" hint-placeholder-val="{{ true }}">
@@ -633,8 +664,49 @@ button{font-family:inherit}
       </div>
       </sc-if>
 
+      <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="마이 정보 수정" style="min-height:100%;padding-bottom:28px">
+        <div style="padding:4px 18px 0;display:flex;align-items:center;gap:12px">
+          <span onClick="{{ goLibrary }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-0.03em">정보 수정</div>
+        </div>
+        <div style="padding:22px 22px 0">
+          <div style="font-size:13px;font-weight:700;color:#54565E;margin-bottom:8px">닉네임</div>
+          <input value="{{ profileNickname }}" onChange="{{ setProfileNickname }}" style="{{ loginInput }}" />
+          <div onClick="{{ saveProfile }}" style="height:48px;border-radius:15px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-top:10px;cursor:pointer">닉네임 저장</div>
+
+          <div style="height:1px;background:#F0F0F0;margin:24px 0"></div>
+          <div style="font-size:15px;font-weight:800">동의 설정</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px">
+            <div><div style="font-size:14px;font-weight:700">마케팅 정보 수신</div><div style="font-size:12px;color:#86878E;margin-top:3px">선택 동의는 언제든 바꿀 수 있어요.</div></div>
+            <div onClick="{{ toggleProfileMarketing }}" style="{{ profileMarketingTrack }}"><div style="{{ profileMarketingKnob }}"></div></div>
+          </div>
+
+          <div style="height:1px;background:#F0F0F0;margin:24px 0"></div>
+          <div style="font-size:15px;font-weight:800">로그인 수단</div>
+          <div style="border:1px solid #E4E4E6;border-radius:17px;padding:14px;margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><div style="font-size:14px;font-weight:700">이메일</div><div style="font-size:12px;color:#86878E;margin-top:3px">{{ profileEmail }}</div></div>
+              <span style="font-size:11px;font-weight:700;color:#1B8A5A">연결됨</span>
+            </div>
+            <div onClick="{{ changeProfilePassword }}" style="font-size:13px;font-weight:700;color:#2B5CFF;margin-top:13px;cursor:pointer">비밀번호 변경</div>
+          </div>
+          <div style="border:1px solid #E4E4E6;border-radius:17px;padding:14px;margin-top:9px;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-size:14px;font-weight:700">카카오</div><div style="font-size:12px;color:#86878E;margin-top:3px">{{ kakaoIdentityLabel }}</div></div>
+            <div onClick="{{ toggleKakaoIdentity }}" style="{{ kakaoIdentityActionStyle }}">{{ kakaoIdentityAction }}</div>
+          </div>
+          <div style="font-size:11.5px;color:#86878E;line-height:1.5;margin-top:9px">로그인 수단은 최소 1개를 유지해야 해요. 같은 이메일만으로 계정을 자동 연결하지 않아요.</div>
+
+          <div style="height:1px;background:#F0F0F0;margin:24px 0"></div>
+          <div onClick="{{ logoutProfile }}" style="height:48px;border-radius:15px;background:#F2F2F0;color:#54565E;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer">로그아웃</div>
+          <div onClick="{{ withdrawProfile }}" style="font-size:13px;color:#E5484D;text-align:center;margin-top:18px;cursor:pointer">회원 탈퇴</div>
+          <div style="font-size:11.5px;color:#9A9CA2;text-align:center;margin-top:8px">이메일 주소 변경은 MVP에서 지원하지 않아요.</div>
+        </div>
+      </div>
+      </sc-if>
+
       <sc-if value="{{ isCourseDetail }}" hint-placeholder-val="{{ false }}">
-      <div data-screen-label="보관함 코스 상세" style="min-height:100%">
+      <div data-screen-label="마이 코스 상세" style="min-height:100%">
         <div style="padding:4px 18px 0">
           <span onClick="{{ goLibrary }}" style="font-family:'Material Symbols Rounded';font-size:26px;color:#15161B;cursor:pointer;line-height:1">arrow_back</span>
         </div>
@@ -895,6 +967,13 @@ button{font-family:inherit}
               <div style="font-size:13px;color:#86878E;margin-top:6px;line-height:1.5">위 프리셋 지역으로 바꿔서 찾아보세요.</div>
             </div>
           </sc-if>
+          <sc-if value="{{ cError }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:60px 34px;text-align:center">
+              <div style="font-size:15.5px;font-weight:700">코스를 불러오지 못했어요.</div>
+              <div style="font-size:13px;color:#86878E;margin-top:6px">네트워크 연결을 확인해 주세요.</div>
+              <div onClick="{{ retryCourses }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:16px;cursor:pointer">다시 시도</div>
+            </div>
+          </sc-if>
 
           <sc-if value="{{ cHasMap }}" hint-placeholder-val="{{ true }}">
           <div style="position:relative;height:230px;margin-top:18px;overflow:hidden;background:#EDEEE9">
@@ -1085,6 +1164,13 @@ button{font-family:inherit}
             <div onClick="{{ back }}" style="margin-top:16px;height:48px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#2B5CFF;cursor:pointer">다시 추천받기</div>
           </div>
         </sc-if>
+        <sc-if value="{{ resultError }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:120px 34px;text-align:center">
+            <div style="font-size:16px;font-weight:700">동선을 만들지 못했어요.</div>
+            <div style="font-size:13px;color:#86878E;margin-top:7px">네트워크 연결을 확인하고 다시 시도해 주세요.</div>
+            <div onClick="{{ retryResult }}" style="margin-top:16px;height:48px;border-radius:16px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#2B5CFF;cursor:pointer">다시 시도</div>
+          </div>
+        </sc-if>
 
         <sc-if value="{{ resultOk }}" hint-placeholder-val="{{ true }}">
         <div style="position:relative;height:300px;flex:none;overflow:hidden;background:#EDEEE9">
@@ -1175,20 +1261,28 @@ button{font-family:inherit}
         </sc-if>
 
         <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
-          <div style="margin:14px 22px 0;background:#EEF2FF;border-radius:14px;padding:10px 13px;font-size:12.5px;color:#2B5CFF;font-weight:600">드래그로 순서 변경 · ↺ 교체 · ✕ 삭제</div>
+          <div style="margin:14px 22px 0;background:#EEF2FF;border-radius:14px;padding:10px 13px;font-size:12.5px;color:#2B5CFF;font-weight:600;line-height:1.45">일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요.<br/>대회 일정은 변경할 수 없어요.</div>
           <div style="padding:12px 22px 0;display:flex;flex-direction:column;gap:8px">
             <sc-for list="{{ editRows }}" as="r" hint-placeholder-count="4">
-              <div draggable="true" onDragStart="{{ r.dragStart }}" onDragOver="{{ r.dragOver }}" onDrop="{{ r.drop }}" style="{{ r.rowStyle }}">
-                <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#9A9CA2;line-height:1;cursor:grab;flex:none">drag_indicator</span>
+              <div draggable="{{ r.draggable }}" onDragStart="{{ r.dragStart }}" onDragOver="{{ r.dragOver }}" onDrop="{{ r.drop }}" style="{{ r.rowStyle }}">
+                <sc-if value="{{ r.unlocked }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:'Material Symbols Rounded';font-size:21px;color:#9A9CA2;line-height:1;cursor:grab;flex:none">drag_indicator</span>
+                </sc-if>
+                <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#2B5CFF;line-height:1;flex:none">lock</span>
+                </sc-if>
                 <div style="{{ r.numStyle }}">{{ r.n }}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:14px;font-weight:700;letter-spacing:-0.02em">{{ r.title }}</div>
                   <div style="font-size:12px;color:#86878E;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.meta }}</div>
+                  <sc-if value="{{ r.locked }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:#2B5CFF;font-weight:700;margin-top:4px">관리자 업데이트</div>
+                  </sc-if>
                 </div>
-                <sc-if value="{{ r.canSwap }}" hint-placeholder-val="{{ true }}">
+                <sc-if value="{{ r.unlocked }}" hint-placeholder-val="{{ true }}">
                   <span onClick="{{ r.swap }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#54565E;line-height:1;cursor:pointer;flex:none">refresh</span>
+                  <span onClick="{{ r.remove }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#9A9CA2;line-height:1;cursor:pointer;flex:none">close</span>
                 </sc-if>
-                <span onClick="{{ r.remove }}" style="font-family:'Material Symbols Rounded';font-size:20px;color:#9A9CA2;line-height:1;cursor:pointer;flex:none">close</span>
               </div>
             </sc-for>
             <div onClick="{{ openAdd }}" style="height:50px;border-radius:16px;border:1.5px dashed #C9CAD0;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:700;color:#2B5CFF;cursor:pointer">
@@ -1319,6 +1413,13 @@ button{font-family:inherit}
               숙소를 찾는 중…
             </div>
           </sc-if>
+          <sc-if value="{{ hotelError }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:40px 0;text-align:center">
+              <div style="font-size:14.5px;font-weight:700">숙소를 불러오지 못했어요.</div>
+              <div style="font-size:12.5px;color:#86878E;margin-top:5px">숙소 없이 계속하거나 다시 시도할 수 있어요.</div>
+              <div onClick="{{ retryHotels }}" style="font-size:14px;font-weight:700;color:#2B5CFF;margin-top:13px;cursor:pointer">다시 시도</div>
+            </div>
+          </sc-if>
           <sc-if value="{{ hotelOk }}" hint-placeholder-val="{{ true }}">
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:11px">
               <sc-for list="{{ hotels }}" as="h" hint-placeholder-count="4">
@@ -1394,7 +1495,7 @@ button{font-family:inherit}
       <div onClick="{{ closeGuest }}" style="position:absolute;inset:0;background:rgba(15,16,20,.42);z-index:80;animation:fadeIn .16s ease"></div>
       <div style="position:absolute;left:26px;right:26px;top:50%;transform:translateY(-50%);background:#FFFFFF;border-radius:22px;padding:24px 22px 18px;z-index:81;box-shadow:0 20px 50px rgba(21,22,27,.28)">
         <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em">로그인이 필요해요</div>
-        <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">찜과 보관함은 로그인하면 쓸 수 있어요</div>
+        <div style="font-size:13.5px;color:#54565E;margin-top:8px;line-height:1.5">찜과 마이는 로그인하면 쓸 수 있어요</div>
         <div style="display:flex;gap:8px;margin-top:20px">
           <div onClick="{{ closeGuest }}" style="flex:1;height:50px;border-radius:14px;border:1px solid #E4E4E6;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;color:#54565E;cursor:pointer">닫기</div>
           <div onClick="{{ goLoginFromGuest }}" style="flex:1.3;height:50px;border-radius:14px;background:#2B5CFF;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;cursor:pointer">로그인하기</div>
@@ -1448,7 +1549,7 @@ button{font-family:inherit}
       </div>
       <div onClick="{{ goLibrary }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer">
         <span style="{{ tabLibIcon }}">bookmark</span>
-        <span style="{{ tabLibLabel }}">보관함</span>
+        <span style="{{ tabLibLabel }}">마이</span>
       </div>
     </div>
     </sc-if>
@@ -1461,7 +1562,7 @@ button{font-family:inherit}
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sheet&quot;,&quot;home&quot;,&quot;calendar&quot;,&quot;detail&quot;,&quot;w1&quot;,&quot;result&quot;,&quot;courses&quot;,&quot;run&quot;,&quot;library&quot;,&quot;login&quot;],&quot;default&quot;:&quot;sheet&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;showNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;guestMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sheet&quot;,&quot;home&quot;,&quot;calendar&quot;,&quot;detail&quot;,&quot;w1&quot;,&quot;result&quot;,&quot;courses&quot;,&quot;run&quot;,&quot;library&quot;,&quot;profile&quot;,&quot;login&quot;],&quot;default&quot;:&quot;sheet&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;showNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;},&quot;guestMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;목업&quot;}}">
 class Component extends DCLogic {
   state = {
     screen: 'sheet', snack: '', detailId: 'sejong',
@@ -1472,7 +1573,8 @@ class Component extends DCLogic {
     itin: null, activeDay: 1, activeBlock: 0, editMode: false, poi: null, saved: true, courseStart: '부산 해운대',
     cTab: 'near', startQ: '', dist: 5, course: '해파랑길 1코스', cRegion: null, ranSaved: true, libTab: 'route',
     cdRan: false, resultFrom: 'w3', guest: false, guestOpen: false, suStep: 1, agree: { tos: false, privacy: false, mkt: false },
-    code: '', resendLeft: 0, resetSent: false, pwChanged: false, homeQ: ''
+    code: '', resendLeft: 0, resetSent: false, pwChanged: false, homeQ: '',
+    profileNickname: '김러너', profileMarketing: false, kakaoLinked: true
   };
 
   componentDidMount() {
@@ -1706,11 +1808,26 @@ class Component extends DCLogic {
     fn(itin[this.state.activeDay]);
     this.setState({ itin: itin });
   }
-  removeBlock = (i) => this.mutate((d) => { d.blocks.splice(i, 1); });
-  reorder = (from, to) => this.mutate((d) => { const [x] = d.blocks.splice(from, 1); d.blocks.splice(to, 0, x); });
+  removeBlock = (i) => {
+    const day = (this.state.itin || this.ITIN)[this.state.activeDay];
+    if (day.blocks[i] && day.blocks[i].race) { this.toast('대회 일정은 변경할 수 없어요'); return; }
+    this.mutate((d) => { d.blocks.splice(i, 1); });
+  };
+  reorder = (from, to) => {
+    const day = (this.state.itin || this.ITIN)[this.state.activeDay];
+    if ((day.blocks[from] && day.blocks[from].race) || (day.blocks[to] && day.blocks[to].race)) {
+      this.toast('대회 일정은 변경할 수 없어요');
+      return;
+    }
+    this.mutate((d) => { const [x] = d.blocks.splice(from, 1); d.blocks.splice(to, 0, x); });
+  };
   pickPoi = (poi) => {
     const s = this.state;
-    if (s.poi.mode === 'replace') this.mutate((d) => { d.blocks[s.poi.idx] = { ...d.blocks[s.poi.idx], place: poi.name, desc: poi.desc }; });
+    if (s.poi.mode === 'replace') {
+      const day = (s.itin || this.ITIN)[s.activeDay];
+      if (day.blocks[s.poi.idx] && day.blocks[s.poi.idx].race) { this.setState({ poi: null }); this.toast('대회 일정은 변경할 수 없어요'); return; }
+      this.mutate((d) => { d.blocks[s.poi.idx] = { ...d.blocks[s.poi.idx], place: poi.name, desc: poi.desc }; });
+    }
     else this.mutate((d) => { d.blocks.push({ time: '13:00', title: '추가 일정', cat: s.poi.cat, place: poi.name, desc: poi.desc }); });
     this.setState({ poi: null });
   };
@@ -1810,11 +1927,11 @@ class Component extends DCLogic {
     }
   };
   dbgFor(s) {
-    if (s.screen === 'detail') return { opts: [['ok', '기본'], ['loading', '로딩'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.festState === k), go: () => this.setState({ festState: k }) })) };
-    if (s.screen === 'w3') return { opts: [['ok', '기본'], ['loading', '로딩']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.w3 === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { w3: k }) }) })) };
-    if (s.screen === 'result') return { opts: [['ok', '기본'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.result === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { result: k }) }) })) };
-    if (s.screen === 'courses') return { opts: [['ok', '기본'], ['locating', '위치'], ['nostart', '출발지'], ['nocourse', '코스0'], ['none', '0건']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.courses === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { courses: k }) }) })) };
-    if (s.screen === 'library') return { opts: [['ok', '기본'], ['empty', '빈']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.lib === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { lib: k }) }) })) };
+    if (s.screen === 'detail') return { opts: [['ok', '기본'], ['loading', '로딩'], ['empty', '빈'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.festState === k), go: () => this.setState({ festState: k }) })) };
+    if (s.screen === 'w3') return { opts: [['ok', '기본'], ['loading', '로딩'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.w3 === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { w3: k }) }) })) };
+    if (s.screen === 'result') return { opts: [['ok', '기본'], ['empty', '빈'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.result === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { result: k }) }) })) };
+    if (s.screen === 'courses') return { opts: [['ok', '기본'], ['locating', '위치'], ['nostart', '출발지'], ['nocourse', '코스0'], ['none', '0건'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.courses === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { courses: k }) }) })) };
+    if (s.screen === 'library') return { opts: [['ok', '기본'], ['empty', '빈'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle(s.dbg.lib === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { lib: k }) }) })) };
     if (s.screen === 'login') return { opts: [['ok', '기본'], ['error', '오류']].map(([k, l]) => ({ key: k, label: l, style: this.dbgStyle((s.dbg.login || 'ok') === k), go: () => this.setState({ dbg: Object.assign({}, s.dbg, { login: k }) }) })) };
     return { opts: [] };
   }
@@ -1822,7 +1939,7 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state;
     const dbg = this.dbgFor(s);
-    const nav = [['sheet', '디자인 시스템'], ['home', '홈'], ['calendar', '캘린더'], ['detail', '대회 상세'], ['w1', '위저드'], ['result', '동선 결과'], ['courses', '러닝코스'], ['run', 'GPS 기록'], ['library', '보관함'], ['login', '로그인']];
+    const nav = [['sheet', '디자인 시스템'], ['home', '홈'], ['calendar', '캘린더'], ['detail', '대회 상세'], ['w1', '위저드'], ['result', '동선 결과'], ['courses', '러닝코스'], ['run', 'GPS 기록'], ['library', '마이'], ['login', '로그인']];
     const f = s.f, dr = s.draft || f;
     const all = this.filtered();
     const cal = this.calData();
@@ -1895,7 +2012,8 @@ class Component extends DCLogic {
       d_apply: det.status === 'closed' ? '07.01 ~ 07.25 (마감)' : det.status === 'before' ? '08.10 ~ 09.10' : '07.01 ~ ' + det.deadline.replace('~', ''),
       d_host: det.host || (det.region + '시체육회'),
       d_source: det.source,
-      festOk: s.festState === 'ok', festLoading: s.festState === 'loading', festEmpty: s.festState === 'empty',
+      festOk: s.festState === 'ok', festLoading: s.festState === 'loading', festEmpty: s.festState === 'empty', festError: s.festState === 'error',
+      retryFestival: () => this.setState({ festState: 'loading' }, () => setTimeout(() => this.setState({ festState: 'ok' }), 700)),
       showDebug: dbg.opts.length > 0,
       debugOptions: dbg.opts,
       isWizard: s.screen === 'w1' || s.screen === 'w2' || s.screen === 'w3',
@@ -1926,7 +2044,8 @@ class Component extends DCLogic {
       w2ShowRecovery: s.wEvent === '하프' || s.wEvent === '풀',
       w2RecoveryText: s.wEvent + '는 완주 다음날 회복이 중요해요. D+1은 고강도 일정을 빼고 온천·가벼운 산책 위주로 동선을 짭니다.',
       hotelQ: s.hotelQ, setHotelQ: (e) => this.setState({ hotelQ: e.target.value }),
-      hotelLoading: s.dbg.w3 === 'loading', hotelOk: s.dbg.w3 !== 'loading',
+      hotelLoading: s.dbg.w3 === 'loading', hotelOk: s.dbg.w3 === 'ok', hotelError: s.dbg.w3 === 'error',
+      retryHotels: () => this.setState({ dbg: Object.assign({}, s.dbg, { w3: 'loading' }) }, () => setTimeout(() => this.setState({ dbg: Object.assign({}, this.state.dbg, { w3: 'ok' }) }), 700)),
       hotels: this.HOTELS.filter((h) => !s.hotelQ.trim() || (h.name + h.meta).indexOf(s.hotelQ.trim()) >= 0).map((h) => {
         const on = s.hotel === h.name;
         return {
@@ -1942,7 +2061,8 @@ class Component extends DCLogic {
       wNext: () => this.wizardNext(),
       onScroll: this.onResultScroll,
       isResult: s.screen === 'result',
-      resultOk: s.dbg.result !== 'empty', resultEmpty: s.dbg.result === 'empty',
+      resultOk: s.dbg.result === 'ok', resultEmpty: s.dbg.result === 'empty', resultError: s.dbg.result === 'error',
+      retryResult: () => this.setState({ dbg: Object.assign({}, s.dbg, { result: 'ok' }) }),
       mapLine: pins.map((p) => p[0] + ',' + p[1]).join(' '),
       mapLineStyle: { fill: 'none', stroke: dayC, strokeWidth: 3.5, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.9 },
       mapPins: pins.map((p, i) => {
@@ -1978,18 +2098,19 @@ class Component extends DCLogic {
         };
       }),
       editRows: day.blocks.map((b, i) => ({
-        key: 'e' + i, n: String(i + 1), title: b.title, meta: b.time + ' · ' + b.place + ' · ' + b.cat, canSwap: !b.race,
-        rowStyle: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '16px', border: '1px solid #E4E4E6', background: '#FFFFFF' },
+        key: 'e' + i, n: String(i + 1), title: b.title, meta: b.time + ' · ' + b.place + ' · ' + b.cat,
+        locked: !!b.race, unlocked: !b.race, draggable: !b.race,
+        rowStyle: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '16px', border: '1px solid ' + (b.race ? '#B9C7FF' : '#E4E4E6'), background: b.race ? '#F7F9FF' : '#FFFFFF' },
         numStyle: { width: '22px', height: '22px', borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F2F2F0', color: '#54565E', fontFamily: 'Archivo,sans-serif', fontSize: '11.5px', fontWeight: 700 },
         swap: () => this.setState({ poi: { mode: 'replace', idx: i, cat: b.cat } }),
         remove: () => this.removeBlock(i),
-        dragStart: () => { this._drag = i; },
-        dragOver: (e) => e.preventDefault(),
-        drop: () => { if (this._drag !== null && this._drag !== i) this.reorder(this._drag, i); this._drag = null; }
+        dragStart: () => { if (!b.race) this._drag = i; },
+        dragOver: (e) => { if (!b.race) e.preventDefault(); },
+        drop: () => { if (!b.race && this._drag !== null && this._drag !== i) this.reorder(this._drag, i); this._drag = null; }
       })),
       openAdd: () => this.setState({ poi: { mode: 'add', idx: -1, cat: '관광지' } }),
       shareRoute: () => this.toast('동선을 공유했어요'),
-      saveRoute: () => { if (this.guard()) return; this.setState({ saved: true, libTab: 'route' }); this.toast('보관함에 저장했어요'); setTimeout(() => this.go('library'), 700); },
+      saveRoute: () => { if (this.guard()) return; this.setState({ saved: true, libTab: 'route' }); this.toast('마이에 저장했어요'); setTimeout(() => this.go('library'), 700); },
       goCoursesFromHotel: () => { this.setState({ courseStart: '호텔 세종 가온' }); this.go('courses'); },
       poiOpen: !!s.poi, closePoi: () => this.setState({ poi: null }),
       poiAddMode: !!s.poi && s.poi.mode === 'add',
@@ -2010,7 +2131,8 @@ class Component extends DCLogic {
         style: { flex: 'none', padding: '8px 13px', borderRadius: '13px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', background: s.courseStart === p ? '#EEF2FF' : '#F2F2F0', color: s.courseStart === p ? '#2B5CFF' : '#54565E', border: '1px solid ' + (s.courseStart === p ? '#2B5CFF' : 'transparent') }
       })),
       dist: s.dist, distLabel: s.dist.toFixed(1) + 'km', setDist: (e) => this.setState({ dist: parseFloat(e.target.value) }),
-      cLocating: cd === 'locating', cNoStart: cd === 'nostart', cNoAll: cd === 'none',
+      cLocating: cd === 'locating', cNoStart: cd === 'nostart', cNoAll: cd === 'none', cError: cd === 'error',
+      retryCourses: () => this.setState({ dbg: Object.assign({}, s.dbg, { courses: 'ok' }) }),
       cHasMap: cd === 'ok' || cd === 'nocourse', cHasCourse: cd === 'ok', cNoCourse: cd === 'nocourse', cHasSpots: cd === 'ok' || cd === 'nocourse',
       courseName: s.course + ' 왕복',
       courseWhere: (s.courseStart === '부산 해운대' ? '부산 해운대구' : s.courseStart) + ' · 출발지→진입점 420m',
@@ -2026,7 +2148,7 @@ class Component extends DCLogic {
         key: sp.name, n: String(i + 1),
         style: { position: 'absolute', left: sp.x + 'px', top: sp.y + 'px', width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF', color: '#15161B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Archivo,sans-serif', fontSize: '11.5px', fontWeight: 700, border: '2px solid #15161B', boxShadow: '0 2px 6px rgba(21,22,27,.18)' }
       })),
-      saveCourse: () => { if (this.guard()) return; this.setState({ libTab: 'course' }); this.toast('보관함에 저장했어요'); },
+      saveCourse: () => { if (this.guard()) return; this.setState({ libTab: 'course' }); this.toast('마이에 저장했어요'); },
       startRun: () => this.go('run'),
       regionChips: this.COURSE_REGIONS.map((r) => ({
         key: r.name, label: r.name + ' ' + r.n, go: () => this.setState({ cRegion: s.cRegion === r.name ? null : r.name }),
@@ -2039,18 +2161,37 @@ class Component extends DCLogic {
       endRun: () => this.go('runsum'),
       saveRun: () => { if (this.guard()) return; this.setState({ ranSaved: true, libTab: 'course' }); this.toast('러닝 기록을 저장했어요'); setTimeout(() => this.go('library'), 700); },
       isLibrary: s.screen === 'library',
+      profileNickname: s.profileNickname,
+      profileEmail: 'runner@test.com',
+      kakaoLinked: s.kakaoLinked,
+      openProfile: () => this.go('profile'),
       libSeg1: this.segStyle(s.libTab === 'route'), libSeg2: this.segStyle(s.libTab === 'course'), libSeg3: this.segStyle(s.libTab === 'fav'),
       libRoute: () => this.setState({ libTab: 'route' }), libCourse: () => this.setState({ libTab: 'course' }), libFav: () => this.setState({ libTab: 'fav' }),
       libIsRoute: s.libTab === 'route', libIsCourse: s.libTab === 'course', libIsFav: s.libTab === 'fav',
-      libHasRoute: s.saved && s.dbg.lib !== 'empty', libNoRoute: !s.saved || s.dbg.lib === 'empty',
-      libHasCourse: s.dbg.lib !== 'empty', libNoCourse: s.dbg.lib === 'empty',
+      libError: s.dbg.lib === 'error',
+      retryLibrary: () => this.setState({ dbg: Object.assign({}, s.dbg, { lib: 'ok' }) }),
+      libHasRoute: s.saved && s.dbg.lib === 'ok', libNoRoute: (!s.saved || s.dbg.lib === 'empty') && s.dbg.lib !== 'error',
+      libHasCourse: s.dbg.lib === 'ok', libNoCourse: s.dbg.lib === 'empty',
       libCourses: (s.ranSaved ? [{ ran: true, name: '해파랑길 1코스 왕복', meta: '07.28 (화) · 실제 5.21km · 32:10 · 6\'11"/km' }] : []).concat([{ ran: false, name: '해파랑길 1코스 왕복', meta: '부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }]).map((c, i) => ({
         key: 'lc' + i, ran: c.ran, name: c.name, meta: c.meta, go: () => this.setState({ cdRan: c.ran, screen: 'coursedetail' })
       })),
-      libHasFav: favList.length > 0 && s.dbg.lib !== 'empty', libNoFav: favList.length === 0 || s.dbg.lib === 'empty',
+      libHasFav: favList.length > 0 && s.dbg.lib === 'ok', libNoFav: (favList.length === 0 || s.dbg.lib === 'empty') && s.dbg.lib !== 'error',
       favCards: favList.map((c) => this.cardVM(c, false)),
       openSavedRoute: () => { this.setState({ activeDay: 0, activeBlock: 0, editMode: false, resultFrom: 'library' }); this.go('result'); },
       deleteSavedRoute: (e) => { e.stopPropagation(); this.setState({ saved: false }); },
+      isProfile: s.screen === 'profile',
+      setProfileNickname: (e) => this.setState({ profileNickname: e.target.value }),
+      saveProfile: () => this.toast('정보를 수정했어요'),
+      profileMarketingTrack: { width: '48px', height: '28px', borderRadius: '14px', padding: '3px', display: 'flex', cursor: 'pointer', justifyContent: s.profileMarketing ? 'flex-end' : 'flex-start', background: s.profileMarketing ? '#2B5CFF' : '#E4E4E6' },
+      profileMarketingKnob: { width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,.2)' },
+      toggleProfileMarketing: () => this.setState({ profileMarketing: !s.profileMarketing }),
+      kakaoIdentityLabel: s.kakaoLinked ? '카카오 계정이 연결되어 있어요.' : '로그인 후 명시적으로 연결해요.',
+      kakaoIdentityAction: s.kakaoLinked ? '연결 해제' : '연결',
+      kakaoIdentityActionStyle: { fontSize: '13px', fontWeight: 700, color: s.kakaoLinked ? '#E5484D' : '#2B5CFF', cursor: 'pointer' },
+      toggleKakaoIdentity: () => { this.setState({ kakaoLinked: !s.kakaoLinked }); this.toast(s.kakaoLinked ? '카카오 연결을 해제했어요' : '카카오 계정을 연결했어요'); },
+      changeProfilePassword: () => this.toast('비밀번호 변경을 시작해요'),
+      logoutProfile: () => { this.setState({ guest: false }); this.go('login'); },
+      withdrawProfile: () => this.toast('회원 탈퇴 확인이 필요해요'),
       isCourseDetail: s.screen === 'coursedetail',
       cdName: s.cdRan ? '해파랑길 1코스 왕복 · 뛴 기록' : '해파랑길 1코스 왕복',
       cdMeta: s.cdRan ? '07.28 (화) · 부산 해운대구' : '부산 해운대구 · 5.0km · 약 45분 · 난이도 중',
