@@ -1,9 +1,9 @@
-# 런닝구 백엔드 API 명세서 v1.0
+# 런닝구 백엔드 API 명세서 v2.0
 
-> **기준 문서**: SPEC v3(SSOT) + 화면별 데이터정리 v2 + ERD·DFD 수정안(2026-07-30 검증리포트 반영)
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v3 + ERD·DFD 수정안
 > **스택**: Spring Boot 3.x (Java 17) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
-> **표기**: 🔒 SPEC 확정 반영 · 🔧 본 명세가 정한 기본값(구현 중 조정 가능) · P1 항목은 부록 F
+> **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · EMAIL/KAKAO 다중 로그인 수단 · 시스템 관리 RACE 블록 · 두루누비 API+GPX 결합
 
 ---
 
@@ -15,56 +15,62 @@
 |---|---|
 | Base URL | `/api` (호스트는 빌드 타입별 `BASE_URL` — SPEC §9.4) |
 | 포맷 | 요청·응답 `application/json; charset=UTF-8` |
-| 날짜/시간 | 날짜 `YYYY-MM-DD`, 시간 `HH:mm` — 전부 **Asia/Seoul 고정** 🔒(§6.6). 서버 판정(오늘·D-day·접수상태)도 KST |
+| 날짜/시간 | 비즈니스 날짜 `YYYY-MM-DD`와 오늘·D-day·접수상태 판정은 `Asia/Seoul`. timestamp는 PostgreSQL `timestamptz` UTC 저장, JSON ISO-8601 `Z` |
 | 좌표 | `lat`/`lng` Double(WGS84, DECIMAL(10,7)) — 외부 API의 x/y·mapx/mapy 변환은 서버 리모트 매퍼에서만 🔒(NFR-8) |
 | 명명 | JSON 필드 camelCase / DB snake_case |
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
 - 인증 방식: `Authorization: Bearer {accessToken}` (JWT). **액세스 30분 · 리프레시 14일** 🔧, 리프레시는 회전(rotate) + 서버 저장(해시) — 로그아웃·비밀번호 재설정 시 전체 무효화(NFR-11).
-- 게스트: **조회는 전부 공개, 저장·기록만 인증.** 인증 필요 API에 토큰이 없거나 만료면 `401` → 클라이언트가 "로그인이 필요해요" 모달로 매핑.
+- 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
 |---|---|
 | 인증(`/auth/**`) · 대회(`/contests/**`) · 축제(`/festivals`) · POI(`/pois`, `/walk-spots`, `/geocode`) · 러닝코스(`/courses/**`) · **동선 생성**(`/itineraries/generate` — 무상태) | 회원(`/me`) · 동선 저장/조회/편집(`/itineraries/**`) · 저장 코스(`/me/courses/**`) · 러닝 기록(`/runs/**`) · 찜(`/me/favorites/**`) |
 
-### 0-3. 에러 응답 (공통 포맷)
+### 0-3. 에러 응답 — RFC 9457 Problem Details 확장
 
 ```json
 {
-  "status": 400,
-  "code": "RACE_BLOCK_LOCKED",
-  "message": "대회 블록은 교체할 수 없어요.",
-  "path": "/api/itineraries/3/days/9/blocks/21",
-  "timestamp": "2026-07-30T21:10:00+09:00"
+  "type": "/errors/system-block-immutable",
+  "title": "변경할 수 없는 일정입니다.",
+  "status": 409,
+  "detail": "대회 일정은 사용자가 변경할 수 없습니다.",
+  "instance": "/api/itineraries/3/days/9/blocks/21",
+  "code": "SYSTEM_BLOCK_IMMUTABLE",
+  "traceId": "7f3d8c..."
 }
 ```
 
+Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`에 `{field, reason}`을 추가한다.
+
 | HTTP | 의미 |
 |---|---|
-| 400 | 요청 값 검증 실패 · 도메인 규칙 위반 |
+| 400 | 요청 값 검증 실패 |
 | 401 | 미인증·토큰 만료 (게스트의 쓰기 시도 포함) |
 | 403 | 권한 없음 (남의 리소스 접근 — 소유자 검증) 🔧 |
 | 404 | 리소스 없음 |
-| 409 | 중복 (이메일·닉네임·찜 등 유니크 충돌) |
+| 409 | 유니크 충돌·로그인 수단 충돌·시스템 블록 변경 시도 |
 | 429 | 쿨다운·시도 횟수 초과 (인증 메일 60초, 코드 5회) |
-| 502 | 외부 API 실패 (`EXTERNAL_API_ERROR`) — 클라는 로딩/빈 상태 UI로 매핑 |
+| 502 | 외부 API가 오류/비정상 응답 반환 |
+| 504 | 외부 API 응답 시간 초과 |
 
-전체 에러 코드 → **부록 D**.
+클라이언트는 `Loading / Content / Empty / Error`를 구분한다. 정상 빈 결과는 `200`의 빈 배열이며, 502/504를 Empty나 Loading으로 강등하지 않는다. 전체 에러 코드 → **부록 D**.
 
 ### 0-4. 페이징 🔒(정리본 확정 7)
 
-- **대회 목록만 커서 페이징** — 배치 삽입이 일어나는 무한스크롤 목록. `(contestDate, id)` 복합 커서, 보조 정렬 `id`로 동일 날짜 순서 안정화.
-- **나머지 목록은 Spring Pageable** — `?page=0&size=20`, 응답은 `content[] + page{number, size, totalElements, hasNext}` 🔧.
+- **대회 목록만 불투명 커서 페이징** — 서버 내부 `(contestDate, id)`를 URL-safe Base64 `nextCursor`로 인코딩하고 클라이언트는 해석하지 않는다. 기본 20·최대 50.
+- **개인 목록은 Spring Pageable** — `?page=0&size=20`, `createdAt DESC, id DESC`, 최대 50. 응답은 `content[] + page{number, size, totalElements, hasNext}`.
+- 집계·Enum·지역 목록은 페이징하지 않는다.
 
 ### 0-5. 외부 API 프록시 방어 정책 🔒(정리본 공통 방어 + SPEC NFR-3~5)
 
 | 정책 | 값 |
 |---|---|
-| 타임아웃 | 연결 1초 · 응답 2.5초 🔧 → 초과 시 502 |
+| 타임아웃 | 연결 1초 · 응답 2.5초 🔧 → 초과 시 504 |
 | 카카오 429 | 1회 재시도 후 실패 처리 (NFR-5) |
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
-| 캐시 | 대회별 인근 축제 1일 🔒(§8.3) · 기타 프록시 5분 단기 캐시(주최측 허용 확인 후) |
+| 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
 | 예외 | **동선 생성만은 502를 내지 않는다** — POI 조회 실패 시 해당 블록 `place=null` 강등, 생성은 성공(NFR-3) |
 
 ---
@@ -120,7 +126,7 @@
 }
 ```
 `201` — 응답은 1-6 로그인과 동일(가입 완료 → "시작하기 → 홈" 목업 플로우에 맞춰 **자동 로그인** 🔧).
-검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt 단방향 해시(NFR-9). 동의는 항목·시각과 함께 저장(NFR-12).
+검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt 단방향 해시(NFR-9). 서버가 활성 약관 버전을 결정하고 항목별 `{type, version, agreed, changedAt}` 이력을 append-only로 저장한다(NFR-12).
 
 ### 1-6 `POST /auth/login`
 
@@ -131,7 +137,12 @@
 {
   "accessToken": "eyJhbGciOi...",
   "refreshToken": "eyJhbGciOi...",
-  "user": { "id": 1, "email": "runner@test.com", "nickname": "김러너", "provider": "EMAIL" }
+  "user": {
+    "id": 1,
+    "email": "runner@test.com",
+    "nickname": "김러너",
+    "identities": ["EMAIL", "KAKAO"]
+  }
 }
 ```
 오류: `401 LOGIN_FAILED` — 메시지 "이메일 또는 비밀번호를 확인해 주세요" 🔒(§4.1, 계정 존재 여부 비노출)
@@ -141,9 +152,11 @@
 ```json
 { "kakaoAccessToken": "카카오 SDK가 발급한 액세스 토큰" }
 ```
-서버가 카카오 API(`/v2/user/me`)로 토큰 검증 → 회원번호(`kakao_id`)로 조회.
+서버가 카카오 API(`/v2/user/me`)로 토큰 검증 → `(provider=KAKAO, providerSubject=카카오 회원번호)`로 `LOGIN_IDENTITY`를 조회한다.
 - 기존 연동 계정: `200` — 1-6과 동일 응답
-- 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명"}}` → 앱은 약관 동의 화면으로 → 1-8 호출
+- 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명", "email": null}}` → 앱은 약관 동의 화면으로 → 1-8 호출
+
+카카오 이메일은 동의 항목에 따라 없을 수 있는 **nullable 프로필 스냅샷**일 뿐 로그인 식별자가 아니다. 동일 이메일의 EMAIL 계정이 있어도 자동 병합하지 않고, 로그인 후 회원 API의 명시적 연결 절차만 허용한다.
 
 오류: `401 INVALID_KAKAO_TOKEN`
 
@@ -156,7 +169,8 @@
   "agreements": { "tos": true, "privacy": true, "marketing": false }
 }
 ```
-`201` — 1-6과 동일 응답. **이메일 인증 생략** 🔒(§4.2 카카오 가입), `provider=KAKAO`, `password=null`.
+`201` — 1-6과 동일 응답. **이메일 인증 생략** 🔒(§4.2 카카오 가입). KAKAO 로그인 수단에는 비밀번호를 저장하지 않는다.
+구현은 `USER`와 `LOGIN_IDENTITY(provider=KAKAO)`를 한 트랜잭션에서 생성한다. 비밀번호는 USER가 아니라 EMAIL 로그인 수단에만 존재한다.
 
 ### 1-9 ~ 1-10 토큰 관리
 
@@ -184,9 +198,22 @@
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/me` | 내 정보 — `{id, email, nickname, provider, createdAt}` (앱 시작 세션 검증 겸용) |
+| GET | `/me` | 내 정보 — `{id, email, nickname, identities[], agreements, createdAt}` (앱 시작 세션 검증 겸용) |
 | PATCH | `/me` | 닉네임 변경 `{"nickname": "..."}` — `409 NICKNAME_DUPLICATED` |
+| PATCH | `/me/agreements` | 선택 약관 변경 `{"marketing": true}`. 필수 약관 철회는 탈퇴 절차로 안내 |
+| PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경 `{"currentPassword":"...","newPassword":"..."}`. 변경 후 다른 리프레시 토큰 revoke |
+| GET | `/me/identities` | 연결된 로그인 수단 조회 — `{items:[{provider, linkedAt}]}` |
+| POST | `/me/identities/kakao` | 로그인된 계정에 카카오 수단 연결 `{"kakaoAccessToken":"..."}` |
+| DELETE | `/me/identities/kakao` | 카카오 연결 해제. 마지막 로그인 수단이면 `409 LAST_IDENTITY_REQUIRED` |
 | DELETE | `/me` | 탈퇴 — 동의·찜·동선·코스·기록 연쇄 삭제 🔒(NFR-12 최소 수집·탈퇴 시 삭제), `204` |
+
+연결 정책:
+
+- 한 `USER`가 EMAIL과 KAKAO를 동시에 보유할 수 있다.
+- 카카오 회원번호가 다른 USER에 연결돼 있으면 `409 IDENTITY_ALREADY_LINKED`.
+- 동일 이메일만으로 자동 연결하지 않는다. 반드시 로그인된 세션에서 사용자가 직접 연결한다.
+- EMAIL 추가 연결은 이메일 인증·비밀번호 설정 UX까지 필요하므로 MVP에서는 기존 EMAIL 계정의 카카오 연결만 제공한다.
+- 이메일 주소 변경은 MVP 범위 밖이다.
 
 ---
 
@@ -201,10 +228,10 @@
 | `openOnly` | boolean | 접수 가능만 (오늘 기준 **파생** 접수상태 = OPEN) |
 | `regions` | string[] | 17개 시도 복수 선택 (부록 C) |
 | `date` | date | 월간 뷰에서 선택한 날짜 — 해당 일자만 |
-| `cursorDate` `cursorId` | date, long | 이전 응답 `nextCursor` 그대로 |
+| `cursor` | string | 이전 응답의 불투명 `nextCursor` 그대로. 클라이언트 해석 금지 |
 | `size` | int | 기본 20 · 최대 50 🔧 |
 
-규칙: `contest_date >= 오늘(KST)` 고정 🔒 · 정렬 `(contest_date, id) ASC` · 필터는 AND 결합(events 내부만 OR) · `WHERE (contest_date, id) > (:cursorDate, :cursorId)`.
+규칙: `contest_date >= 오늘(KST)` 고정 🔒 · 정렬 `(contest_date, id) ASC` · 필터는 AND 결합(events 내부만 OR) · 서버는 cursor를 검증·복호화한 뒤 내부 `(contestDate, id)` 튜플에 keyset 조건을 적용한다.
 
 ```json
 {
@@ -216,23 +243,25 @@
       "contestDate": "2026-08-22", "startTime": "08:00",
       "events": ["FULL", "HALF", "K10"],
       "regStatus": "OPEN", "applyEnd": "2026-08-10",
-      "source": "마라톤GO", "checkedAt": "2026-07-15",
+      "sources": ["MARATHON_ONLINE", "MARATHON_GO"],
+      "checkedAt": "2026-07-15T04:30:00Z",
       "favorite": false
     }
   ],
-  "nextCursor": { "date": "2026-08-22", "id": 153 },
+  "nextCursor": "MjAyNi0wOC0yMnwxNTM",
   "hasNext": true
 }
 ```
 
-- `regStatus`는 **저장값이 아니라 조회 시점 파생** 🔒(§5.5): `applyEnd < 오늘 → CLOSED` / `오늘 < applyStart → BEFORE` / 그 사이 → `OPEN` / 날짜 정보 없으면 크롤 원본값, 그것도 없으면 `UNKNOWN`(미정).
+- 대회는 관리 배치가 `CONTEST_SOURCE` 원본을 정규화·중복 제거해 `CONTEST` canonical 레코드로 만든다. 공개 API는 canonical만 읽고 사용자는 생성·수정·삭제할 수 없다.
+- `regStatus`는 **저장값이 아니라 공통 함수로 조회 시점 파생** 🔒: `applyEnd != null && applyEnd < 오늘 → CLOSED` / `applyStart != null && 오늘 < applyStart → BEFORE` / 시작일을 지났거나 종료일이 아직 남은 등 **하나 이상의 날짜로 현재 접수 가능함을 판단할 수 있으면 `OPEN`** / 날짜만으로 판단할 수 없으면 최신 원본 상태 / 그것도 없으면 `UNKNOWN`.
 - `events`가 빈 배열이면 클라가 "종목 미표기" 배지 표시.
 - `favorite`: 로그인 시 실제 찜 여부, 게스트는 항상 `false`.
 
 ### 3-2 `GET /api/contests/daily-counts` — 월간 뷰 점 집계 🔒(정리본 확정 6)
 
 `?year=2026&month=8` + 3-1과 **동일한 필터 파라미터**(`q, events, openOnly, regions`) → `200 {"counts": [{"date": "2026-08-22", "count": 2}]}`
-구현 규약: 목록 API와 **QueryDSL Predicate를 공유**해 점 표시와 목록 불일치를 방지한다(부록 G-1).
+구현 규약: 목록 API와 **검색 Predicate 및 regStatus 파생 함수를 공유**해 점 표시와 목록 불일치를 방지한다(부록 G-1).
 
 ### 3-3 `GET /api/contests/closing-soon` — 홈 마감 임박
 
@@ -305,7 +334,7 @@
 }
 ```
 - **숙소(LODGING) = 카카오 로컬 AD5 1순위, KTO 32 폴백** 🔒(회의 결정 7·검증리포트 D2 — TourAPI 단독이면 실측상 4건뿐).
-- `source`는 항상 `LIVE`(서버 프록시) — 앱이 자체 폴백(sample/synth)을 쓴 경우만 클라가 배지를 바꾼다(NFR-2).
+- 운영 응답의 `source`는 항상 `LIVE`다. `SAMPLE/SYNTH`는 목업·데모 빌드 전용이며, 운영에서 502/504를 샘플 데이터로 숨기지 않는다(NFR-2).
 
 ### 4-3 `GET /api/walk-spots` — 러닝코스 "걷기 좋은 곳"
 
@@ -350,10 +379,11 @@
       "blocks": [
         { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
           "placeName": "호텔 세종 가온", "address": "세종특별자치시 어진동 123",
-          "lat": 36.4901, "lng": 127.2688, "description": "짐 풀고 휴식", "race": false },
+          "lat": 36.4901, "lng": 127.2688, "description": "짐 풀고 휴식",
+          "blockType": "USER", "systemManaged": false },
         { "startTime": "18:30", "title": "카보로딩 저녁", "category": "FOOD",
           "placeName": "도담동 파스타집", "address": "...", "lat": 36.5, "lng": 127.26,
-          "description": "탄수화물 보충", "race": false }
+          "description": "탄수화물 보충", "blockType": "USER", "systemManaged": false }
       ]
     }
   ]
@@ -367,11 +397,11 @@
 
 요청 = 5-1 응답 구조 그대로(클라 편집 반영본). `201 {"id": 42}`.
 같은 `(user, contestId, startDate, endDate)`가 이미 있으면 **교체** 후 `200 {"id": 42, "replaced": true}` 🔒(SPEC §4.10 trip id `{대회id}-{시작일}-{종료일}` "동일 id 교체" 계약 승계).
-검증: 대회 블록(`race=true`)은 서버가 대회 정보로 재구성해 **강제 주입**(클라 값 신뢰 금지 🔒).
+검증: `RACE` 블록은 서버가 canonical 대회 정보로 재구성해 **강제 주입**한다. 클라이언트가 보낸 RACE 제목·시간·장소·순서는 신뢰하지 않는다.
 
 ### 5-3 `GET /api/itineraries` — 내 동선 목록 (인증, Pageable)
 
-`content[]`: `{id, title, contestName, event, recovery, startDate, endDate, placeCount, createdAt}` — 보관함 [동선] 카드 "{지역} n박 n일 · {대회명} · {종목} · 회복 배지 · 기간 · {장소 수}곳".
+`content[]`: `{id, title, contestName, event, recovery, startDate, endDate, placeCount, createdAt}` — 마이 [동선] 카드 "{지역} n박 n일 · {대회명} · {종목} · 회복 배지 · 기간 · {장소 수}곳".
 
 ### 5-4 `GET /api/itineraries/{id}` — 상세 (인증·소유자)
 
@@ -385,15 +415,15 @@
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
 | 5-6 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-7 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | 장소 교체·수정 — 보낸 필드만 반영(블록 id·시간 유지 🔒 §4.10). **`race=true`면 `400 RACE_BLOCK_LOCKED`** 🔒(서버 강제 — 클라 검증 신뢰 금지) |
-| 5-8 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | 삭제 `204` — race 블록도 삭제는 허용(SPEC §4.10은 교체만 금지 — 검증리포트 결론). order_no 재부여 없음(구멍 무해 🔒) |
-| 5-9 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | 순서 변경 — body `{"blockIds": [21, 19, 23]}`. **해당 day의 전체 블록 집합과 정확히 일치해야** 함(`400 BLOCK_SET_MISMATCH`) → order_no 1..N 재부여. **멱등** 🔒 |
+| 5-7 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-8 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-9 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 시 USER 블록 순서만 멱등 갱신 |
 
 ---
 
 ## 6. 러닝코스 API `/api/courses` (공개)
 
-> 원천: 두루누비 GPX 파싱본 261코스(유일본)를 **서버 리소스로 적재** — courseList 실측상 좌표 미제공이라 실시간 호출로 대체 불가(검증리포트 §1-4). 빌더 규칙은 SPEC §5.8 서버 이식.
+> 원천: 두루누비 API `courseList`의 최신 메타데이터와 GPX 파싱본 261코스의 경로 좌표를 **동시에 사용**한다. 서버 시작 시와 하루 1회 메타데이터를 동기화하고 `courseId`로 GPX와 결합한다. API 장애·미매칭 때는 마지막 성공 캐시 또는 GPX fallback 메타로 fail-open하며, GPX 경로가 없는 `API_ONLY` 항목은 지도·추천·뛰기 응답에서 제외한다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 (왕복 코스 빌더)
 
@@ -405,32 +435,35 @@
     {
       "courseId": "T_CRS_MNG0000005117",
       "courseName": "남파랑길 2코스", "sido": "부산", "sigun": "부산 중구",
-      "difficulty": "중", "fullDistanceKm": 19.0,
+      "difficulty": "NORMAL", "fullDistanceKm": 19.0,
       "accessM": 420, "routeKm": 5.1, "durationMin": 47, "shortfall": false,
       "entry": { "lat": 35.11454, "lng": 129.04076 },
-      "pathPolyline": "인코딩된 왕복 경로"
+      "pathPolyline": "인코딩된 왕복 경로",
+      "dataSource": "API_GPX",
+      "syncedAt": "2026-07-30T01:00:00Z"
     }
   ]
 }
 ```
 규칙 🔒(§5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로 · 분당 110m로 `durationMin` · `accessM` 오름차순 · `shortfall` = 왕복이 목표−300m 미만(짧은 코스 경고 배너). 첫 항목 = 추천 코스, 나머지 = "다른 코스 N개".
+`dataSource`는 `API_GPX` 또는 `GPX_ONLY`이며 내부 동기화 작업은 매칭 통계(`API_GPX`, `GPX_ONLY`, `API_ONLY`)와 실패 원인을 기록한다.
 빈 배열 → 걷기 스팟만 보강(4-3)하는 목업 상태 매핑.
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=&size=` → `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, durationMin}` — 거리 오름차순 🔒(§4.11-b).
+`?region=부산&page=&size=` → `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b).
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
 
 ---
 
-## 7. 보관함 API (인증)
+## 7. 마이 API (인증)
 
 ### 7-A 저장 코스 `/api/me/courses`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/me/courses` | 코스 저장(스냅샷) — body `{courseName, region, distanceKm, durationMin, difficulty, entryLat, entryLng, pathPolyline}` → `201 {id}` |
+| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId, courseName, region, distanceKm, durationMin, difficulty, entryLat, entryLng, pathPolyline}` → `201 {id}` |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
@@ -442,7 +475,7 @@
 ```json
 {
   "courseName": "남파랑길 2코스",
-  "ranAt": "2026-07-28T07:12:00",
+  "ranAt": "2026-07-27T22:12:00Z",
   "distanceKm": 5.21,
   "durationSec": 1930,
   "points": [[35.11454, 129.04076], [35.11347, 129.04087]]
@@ -455,7 +488,7 @@
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/runs` | 목록(Pageable) — 요약만, RUN_TRACK 미조회(분리 설계 이유) — 보관함 "07.28 (화) · 실제 5.21km · 32:10 · 6'11"/km" |
+| GET | `/runs` | 목록(Pageable) — 요약만, RUN_TRACK 미조회(분리 설계 이유) — 마이 "07.28 (화) · 실제 5.21km · 32:10 · 6'11"/km" |
 | GET | `/runs/{id}` | 상세 — `encodedPolyline, pointCount` 포함 (코스 상세 **실선** 렌더링 🔒) |
 | DELETE | `/runs/{id}` | `204` |
 
@@ -490,9 +523,11 @@
 | 7 러닝코스 지역별 | 지역 칩 / 목록 | 6-3 / 6-2 |
 | 7 코스 저장·뛰기 | 저장 / 뛰기 | 7-A POST / (GPS 기록 클라 → 종료 시 7-B) |
 | 8 GPS 기록/요약 | 저장 / 삭제 | 7-B POST / 7-B DELETE |
-| 9 보관함 동선 | 목록 / 열기 / 삭제 | 5-3 / 5-4 / 5-5 |
-| 9 보관함 코스 | saved / ran | 7-A GET / 7-B GET |
-| 9 보관함 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
+| 9 마이 동선 | 목록 / 열기 / 삭제 | 5-3 / 5-4 / 5-5 |
+| 9 마이 코스 | saved / ran | 7-A GET / 7-B GET |
+| 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
+| 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
+| 9 마이 계정 | 카카오 연결·해제 / 로그아웃 / 탈퇴 | 2-POST·DELETE `/identities/kakao` / 1-10 / 2-DELETE |
 | 10 코스 상세 | 점선(예정) / 실선(뛴 기록) | 7-A GET {id} / 7-B GET {id} |
 | 공통 | 앱 시작 세션 확인 / 재발급 / 로그아웃 | 2-GET / 1-9 / 1-10 |
 
@@ -523,6 +558,9 @@
 | Provider | `EMAIL, KAKAO` | (구글·네이버 P2) |
 | ContestSource | `MARATHON_ONLINE, MARATHON_GO` | 마라톤 온라인 · 마라톤GO |
 | Difficulty | `EASY, NORMAL, HARD` | 하·중·상 (두루누비 crsLevel 1·2·3) |
+| PoiSource | `LIVE, SAMPLE, SYNTH` | 서버 라이브 · 데모/캐시 샘플 · 합성 |
+| CourseDataSource | `API_GPX, GPX_ONLY` | API 메타+GPX 경로 · GPX fallback |
+| BlockType | `USER, RACE` | 사용자 편집 가능 · 시스템 관리 |
 
 ## 부록 D. 에러 코드 총람
 
@@ -533,7 +571,6 @@
 | `AGREEMENT_REQUIRED` | 400 | 필수 약관 미동의 |
 | `INVALID_CODE` / `CODE_EXPIRED` | 400 | 인증 코드 불일치 / 만료(10분) |
 | `INVALID_RESET_TOKEN` | 400 | 재설정 토큰 만료·사용됨 |
-| `RACE_BLOCK_LOCKED` | 400 | 대회 블록 교체 시도 |
 | `BLOCK_SET_MISMATCH` | 400 | 순서 PUT의 blockIds가 day 전체 집합과 불일치 |
 | `INVALID_TRACK` | 400 | 궤적 좌표 2개 미만·한국 영역 밖 |
 | `LOGIN_FAILED` | 401 | 이메일/비밀번호 불일치 (존재 비노출) |
@@ -543,8 +580,12 @@
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
+| `IDENTITY_ALREADY_LINKED` | 409 | 카카오 로그인 수단이 다른 계정에 연결됨 |
+| `LAST_IDENTITY_REQUIRED` | 409 | 마지막 로그인 수단 해제 시도 |
+| `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
-| `EXTERNAL_API_ERROR` | 502 | 외부 API 실패·타임아웃 (동선 생성 제외 — NFR-3) |
+| `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
+| `EXTERNAL_API_TIMEOUT` | 504 | 외부 API 제한시간 초과(동선 생성 제외 — NFR-3) |
 
 ## 부록 E. 외부 API 함정 체크리스트 (백엔드 구현 시 — SPEC §7.4 발췌·실측 근거)
 
@@ -569,13 +610,14 @@
 
 ## 부록 G. 구현 노트 (Java · Spring)
 
-**G-1. 대회 목록·집계 Predicate 공유 + 커서 (QueryDSL)** — 점 표시와 목록 불일치 방지의 핵심.
+**G-1. 대회 목록·집계 Predicate 공유 + 불투명 커서 (QueryDSL)** — 점 표시와 목록 불일치 방지의 핵심.
 
 ```java
 // ContestQueryRepository.java
 private BooleanBuilder filterPredicate(ContestSearchCond cond) {
     BooleanBuilder builder = new BooleanBuilder();
-    builder.and(contest.contestDate.goe(LocalDate.now(KST)));           // 오늘 이후 고정
+    LocalDate today = LocalDate.now(clock.withZone(KST));
+    builder.and(contest.contestDate.goe(today));                        // 오늘 이후 고정
     if (StringUtils.hasText(cond.q())) {
         builder.and(contest.name.contains(cond.q())
                 .or(contest.place.contains(cond.q()))
@@ -587,19 +629,19 @@ private BooleanBuilder filterPredicate(ContestSearchCond cond) {
                         .where(contestEvent.eventType.in(cond.events()))));
     }
     if (Boolean.TRUE.equals(cond.openOnly())) {                         // 접수상태 '파생' 조건
-        LocalDate today = LocalDate.now(KST);
-        builder.and(contest.applyEnd.goe(today))
-               .and(contest.applyStart.isNull().or(contest.applyStart.loe(today)));
+        builder.and(regStatusPredicate(today, RegStatus.OPEN));         // 응답 파생 함수와 동일 규칙
     }
     if (!CollectionUtils.isEmpty(cond.regions())) builder.and(contest.region.in(cond.regions()));
+    if (cond.date() != null) builder.and(contest.contestDate.eq(cond.date()));
     return builder;
 }
 
-public List<Contest> findPage(ContestSearchCond cond, LocalDate cursorDate, Long cursorId, int size) {
+public List<Contest> findPage(ContestSearchCond cond, String cursor, int size) {
     BooleanBuilder where = filterPredicate(cond);                       // ← daily-counts와 동일 Predicate
-    if (cursorDate != null && cursorId != null) {                       // (date, id) 복합 커서
-        where.and(contest.contestDate.gt(cursorDate)
-                .or(contest.contestDate.eq(cursorDate).and(contest.id.gt(cursorId))));
+    if (StringUtils.hasText(cursor)) {
+        ContestCursor decoded = cursorCodec.decodeAndValidate(cursor);  // URL-safe Base64는 전송 형식일 뿐
+        where.and(contest.contestDate.gt(decoded.date())
+                .or(contest.contestDate.eq(decoded.date()).and(contest.id.gt(decoded.id()))));
     }
     return queryFactory.selectFrom(contest).where(where)
             .orderBy(contest.contestDate.asc(), contest.id.asc())
@@ -608,7 +650,9 @@ public List<Contest> findPage(ContestSearchCond cond, LocalDate cursorDate, Long
 }
 ```
 
-**G-2. 순서 변경 PUT — 집합 일치 검증 후 1..N 재부여 (멱등)**
+`regStatusPredicate()`와 응답 DTO의 `deriveRegStatus()`는 하나의 도메인 정책 테스트를 공유한다. 특히 시작일·종료일 일부만 있는 경우와 원본 상태 폴백을 같은 테스트 벡터로 검증한다.
+
+**G-2. 순서 변경 PUT — USER 집합 검증 + RACE 고정 (멱등)**
 
 ```java
 // ItineraryBlockService.java
@@ -618,14 +662,14 @@ public void reorder(Long userId, Long dayId, List<Long> blockIds) {
             .orElseThrow(() -> new NotFoundException("DAY_NOT_FOUND"));
     day.validateOwner(userId);                                          // 403 FORBIDDEN
 
-    Map<Long, ItineraryBlock> blocks = day.getBlocks().stream()
+    Map<Long, ItineraryBlock> userBlocks = day.getBlocks().stream()
+            .filter(block -> block.getBlockType() == BlockType.USER)
             .collect(Collectors.toMap(ItineraryBlock::getId, Function.identity()));
-    if (blocks.size() != blockIds.size() || !blocks.keySet().equals(Set.copyOf(blockIds))) {
-        throw new BadRequestException("BLOCK_SET_MISMATCH");            // 전체 교체 계약 강제
+    if (userBlocks.size() != blockIds.size() || !userBlocks.keySet().equals(Set.copyOf(blockIds))) {
+        throw new BadRequestException("BLOCK_SET_MISMATCH");            // USER 블록 전체 집합 강제
     }
-    for (int i = 0; i < blockIds.size(); i++) {
-        blocks.get(blockIds.get(i)).changeOrder(i + 1);                 // order_no 1..N — 멱등
-    }
+    day.reorderUserBlocksWithoutMovingRace(blockIds)
+            .orElseThrow(() -> new ConflictException("SYSTEM_BLOCK_IMMUTABLE"));
 }
 ```
 

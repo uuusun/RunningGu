@@ -1,132 +1,102 @@
-# 런닝구 — ERD·DFD 검증 리포트
+# 런닝구 — ERD·DFD·API 교차 검증 리포트 v2
 
-> **검증 대상**: `런닝구_ERD.mermaid` · `런닝구_DFD.mermaid` · `화면별 데이터정리 v2`
-> **검증 기준**: `SPEC.md` v3 (2026-07-16, SSOT) + 목업(`러닝 앱 디자인 완성`, ui-mockup-prompts.md 기준 제작) + 저장소 실데이터(`races.json` 271행 · `durunubi_courses.json` 261코스)
-> **판정 원칙**: SPEC v3가 단일 기준 명세(SSOT)다. 단, v2 정리본의 "실시간 프록시 + 스냅샷" 재설계는 공모전 규정 대응으로 **의도된 변경**으로 보고 → 오류가 아니라 **[SPEC 갱신 필요]** 로 분류했다.
-> 표기: 🔴 수정 필요(기능 구멍·명세 충돌) / 🟡 보완 권장 / 🔵 SPEC 갱신 필요(팀 합의 후 12.1 결정표에 추가) / ✅ 정합 확인
-
----
-
-## 총평
-
-ERD·DFD의 **뼈대는 맞다.** 12개 엔티티 구성, 스냅샷 원칙, 동선 3단 구조(1:N:N), RUN_TRACK 1:1 분리, (source, external_id) upsert 키, 커서 페이징, 무상태 생성/영속 저장 분리 — 전부 SPEC·목업과 정합하고 설계 근거도 타당하다.
-
-다만 **인증 도메인에 구멍이 크다.** 목업에는 "카카오로 시작하기"(SPEC P0·U1)와 재설정 링크 플로우(결정-6)가 들어가 있는데, ERD가 이를 담지 못한다(provider 없음, 재설정 토큰 저장소 없음, 리프레시 토큰 저장소 없음). 그리고 **숙소 데이터 소스(TourAPI 32번)와 인근 축제 조회 방식(위치기반조회)** 은 SPEC의 확정 결정·실측 결과와 정면으로 어긋나므로 반드시 고쳐야 한다.
-
-수정 반영본: `런닝구_ERD_수정안.mermaid` · `런닝구_DFD_수정안.mermaid` 첨부.
+> **검증일**: 2026-07-30
+> **검증 기준**: SPEC v4 · 화면별 데이터정리 v3 · API 명세 v2.0 · 수정 ERD/DFD · HTML 목업
+> **결론**: 기존 검증에서 발견한 구조 충돌을 권장안으로 해소했다. 아래 항목은 구현 시 수용 테스트로 유지한다.
 
 ---
 
-## 1. ERD 검증
+## 1. 채택한 결정과 이유
 
-### 1-1. ✅ 정합 확인 (그대로 가면 되는 것)
-
-| # | 항목 | 근거 |
+| 영역 | 권장 결정(채택) | 이유 |
 |---|---|---|
-| A1 | 엔티티 12개 구성 = 정리본 v2 확정 목록과 일치 | 정리본 §확정 엔티티 |
-| A2 | `CONTEST (source, external_id)` 유니크 = upsert 키 | SPEC §6.2 · 실데이터 `source`+`race_id` 확인 |
-| A3 | `FAVORITE (user_id, contest_id)` 유니크 | SPEC §6.4 `favoriteRace` · 결정-16 |
-| A4 | 동선 3단 `ITINERARY → DAY → BLOCK` + 장소는 FK가 아닌 스냅샷 컬럼 | SPEC §6.3 trip/day/block 계약 대응 |
-| A5 | `ITINERARY_BLOCK.race` 서버 보호 플래그 (교체 금지) | SPEC §4.10 "대회 블록 교체 불가" |
-| A6 | `RUN_RECORD`(요약) + `RUN_TRACK`(1:1 공유 PK, polyline LOB 분리) | SPEC §6.4 run 계약 — 목록 조회가 LOB를 안 건드리는 분리는 개선점으로 인정 |
-| A7 | 좌표 전부 `DECIMAL(10,7)` lat/lng, WGS84 내부 표준 | SPEC §6.6 · NFR-8 |
-| A8 | `EMAIL_VERIFICATION.email`에 FK 없음 (가입 전 인증) | 가입 확정 전 단계라 구조적으로 옳음 |
-| A9 | `CONTEST_EVENT` 분리 테이블 (종목 다중) | SPEC §6.2 eventTypes[] |
-| A10 | `USER_AGREEMENT` 1:1 + 필수/선택 분리 | SPEC §4.2 · NFR-12 |
-| A11 | 블록 카테고리 Enum 9종 (가벼운 산책 없음) | SPEC §3-7 (🆕회의 산책 제거 반영 확인) |
+| 서버 구조 | 서버 중심 온라인 SSOT + 제한적 오프라인 폴백 | 계정·찜·동선의 충돌을 피하고 MVP 동기화 복잡도를 줄인다. |
+| 숙소 | 카카오 Local AD5 실시간 프록시, KTO 32 폴백, 저장 시 스냅샷 | 숙소 커버리지는 카카오가 우선이며 API 키를 앱에서 격리할 수 있다. 영구 숙소 마스터 DB는 만들지 않는다. |
+| 축제 | KTO `searchFestival2` 실시간 프록시 + 대회별 1일 TTL | 행사 기간을 기준으로 찾고 위치는 서버 Haversine으로 후처리한다. 영구 축제 마스터 DB는 만들지 않는다. |
+| 코스 | 두루누비 API 메타 동기화 + GPX 경로 결합 | API는 최신 메타, GPX는 실제 경로 좌표를 제공한다. 어느 한쪽만으로는 요구사항을 완성하기 어렵다. |
+| 대회 | `CONTEST` canonical + `CONTEST_SOURCE` 원본 분리 | 중복 병합된 서비스 레코드와 원천 추적·감사를 동시에 만족한다. |
+| 계정 | `USER` + `LOGIN_IDENTITY(EMAIL/KAKAO)`, 명시적 연결 | 카카오 이메일은 없거나 바뀔 수 있으므로 자동 병합 키로 안전하지 않다. |
+| 대회 블록 | RACE는 시스템 관리, 사용자 수정·삭제·이동 금지 | 대회 원본과 저장 동선의 정합성을 유지한다. |
+| API 계약 | ProblemDetail·대문자 Enum·불투명 cursor·Pageable·KST/UTC | 앱/서버의 오류·상태·페이징 해석 차이를 사전에 제거한다. |
+| 문자 인코딩 | 스크립트 UTF-8 강제 + CI 검증 | Windows 콘솔 설정에 의존하지 않고 재현 가능한 데이터 산출물을 만든다. |
 
-### 1-2. 🔴 수정 필요
+---
 
-| # | 문제 | 근거 | 수정안 |
-|---|---|---|---|
-| E1 | **카카오 로그인 미지원** — USER에 provider·소셜 식별자가 없고 password가 필수다. 목업에 "카카오로 시작하기" 버튼이 실제로 있고, SPEC은 U1(이메일+카카오)을 **P0**로 확정했다. | SPEC §4.1 · §6.5 `user.provider: email\|kakao, passwordHash?` · 목업 STEP 9 | USER에 `provider`(EMAIL/KAKAO) · `kakao_id`(UK, nullable) 추가, `password`를 nullable로 (소셜 가입은 null) |
-| E2 | **비밀번호 재설정 토큰 저장소 없음** — 정리본 1-3에 `resetToken`이 등장하고 목업에 웹 재설정 페이지까지 있는데, EMAIL_VERIFICATION은 6자리 code 전용이라 재설정 링크(1회용·30분·해시 저장)를 담을 곳이 없다. | SPEC 결정-6 · §6.5 `emailAuth.purpose: signup\|reset` · NFR-9 "재설정 토큰도 해시로만 저장" | EMAIL_VERIFICATION에 `purpose`(SIGNUP/RESET) + `token_hash`(nullable) 추가 — 가입 인증은 code, 재설정은 token_hash 사용 |
-| E3 | **리프레시 토큰 저장소 없음** — 로그인 응답에 refreshToken을 주기로 했고, NFR-11이 "로그아웃·만료·비밀번호 재설정 시 **전체 세션 무효화** 필수"인데, 서버가 토큰 상태를 저장하지 않으면 무효화가 불가능하다. | 정리본 §1-1 · SPEC NFR-11 · §4.3-4 | `REFRESH_TOKEN` 테이블 신설 (user_id FK, token_hash UK, expires_at, revoked) — 재설정 시 해당 user 전부 revoke |
-| E4 | **ITINERARY에 종목(event)·취향(themes) 누락** — 보관함 동선 카드가 "{대회명} · {종목}"과 회복 배지를 표시하고, S7 복원·S8 연계(목표거리 = min(walk, 5)km)도 종목에서 파생된다. 저장 트리만으로는 종목을 알 수 없다. | SPEC §4.13 · §6.3 `trip{event, themes}` · §5.1 walk 상한 | ITINERARY에 `event`(K5/K10/HALF/FULL) + `themes`(스냅샷, 콤마 구분) 추가. 회복 배지는 event로 파생 |
-| E5 | **인증코드 시도 횟수(attempts) 누락** — "5회 실패 시 재발송" 정책을 강제할 컬럼이 없다. | SPEC §4.2-3 · NFR-10 | EMAIL_VERIFICATION에 `attempts int` 추가 |
-| E6 | **nickname 유니크 누락** — 닉네임 2~12자 **중복 불가**가 확정 정책. | SPEC §4.2-2 | `nickname` UK 추가 (가입 시 중복 확인 API 필요 — 명세 반영) |
+## 2. ERD 검증 결과
 
-### 1-3. 🟡 보완 권장
+### 2.1 반영 완료
 
-| # | 항목 | 이유 |
-|---|---|---|
-| W1 | `hotel_name/lat/lng` **nullable 명시** | "숙소 없이 추천받기"가 정식 플로우 (SPEC §4.9) |
-| W2 | `CONTEST_EVENT (contest_id, event_type)` 유니크 | 매일 도는 upsert 배치가 재실행될 때 종목 중복 삽입 방지 |
-| W3 | `CONTEST.status`는 "크롤 원본 스냅샷"으로 취급 | SPEC §5.5: 접수 상태는 **조회 시점에 Asia/Seoul 오늘 기준 재계산**(apply_start/apply_end 파생), 날짜 정보가 없을 때만 저장값 폴백('미정'). openOnly 필터·마감임박 정렬도 파생값 기준이어야 함 — 저장 status로 필터하면 크롤 사이 기간에 틀린다 |
-| W4 | `CONTEST`에 `image_url`·`detail_url` 추가 | 크롤 원천에 이미 있음(실데이터 확인, image_url 133건). AP-19(P1)가 카드 썸네일·상세 히어로에 쓸 예정 — 지금 컬럼을 안 만들면 나중에 재크롤 필요 |
-| W5 | `USER_AGREEMENT.marketing_agreed_at` 분리 | 마케팅 동의는 이후 토글될 수 있어 항목별 시각이 안전 (SPEC §6.5는 항목별 at, NFR-12 이력) |
-| W6 | `CONTEST.category`(로드/트레일/걷기/야간) 추가 검토 | 크롤 원천·SPEC §6.2에 있는 필드. 현재는 TRAIL을 event_type에 넣어 흡수했는데(목업과 정합), 필터 4버킷(결정-12)에 트레일이 없으므로 원천 보존용으로 category 컬럼이 있으면 깔끔 — 선택 |
+- `USER 1:N LOGIN_IDENTITY`: 한 회원이 EMAIL과 KAKAO를 동시에 사용할 수 있다.
+- `(provider, provider_subject)` 전역 유일, 마지막 로그인 수단 해제 금지.
+- 약관은 `USER_AGREEMENT`에서 종류·버전·동의 여부·변경 시각을 보존한다.
+- `CONTEST 1:N CONTEST_SOURCE`, `CONTEST 1:N CONTEST_EVENT`로 canonical과 원천/종목을 분리한다.
+- `ITINERARY → ITINERARY_DAY → ITINERARY_BLOCK` 구조와 장소 스냅샷을 유지한다.
+- `ITINERARY_BLOCK.block_type=RACE`는 시스템 관리이며 `contest_id`를 참조한다.
+- `RUN_RECORD 1:1 RUN_TRACK`으로 목록 요약과 큰 경로 데이터를 분리한다.
+- `FAVORITE(user_id, contest_id)`와 저장 동선 자연키에 복합 UNIQUE를 적용한다.
+- PostgreSQL `timestamptz`, `numeric(10,7)`, `jsonb` 사용을 명시했다.
 
-### 1-4. 체크리스트 항목 중 이번 검증으로 닫힌 것
+### 2.2 구현 수용 테스트
 
-| 정리본 체크리스트 | 결론 |
+- 다른 USER에 연결된 카카오 회원번호 연결 → `409 IDENTITY_ALREADY_LINKED`.
+- 마지막 로그인 수단 해제 → `409 LAST_IDENTITY_REQUIRED`.
+- RACE 블록 PATCH/DELETE/이동 → `409 SYSTEM_BLOCK_IMMUTABLE`.
+- 같은 대회를 여러 원천에서 수집해도 canonical은 1개, source는 복수로 유지.
+- RUN_RECORD 생성 시 RUN_TRACK이 반드시 함께 생성되고 삭제 시 함께 제거.
+
+---
+
+## 3. DFD 검증 결과
+
+### 3.1 반영 완료
+
+- 앱은 백엔드 API를 온라인 SSOT로 사용하고 Room/assets는 제한적 폴백으로만 사용한다.
+- 숙소·일반 POI·걷기 스팟은 카카오/KTO 프록시, 축제는 `searchFestival2` 프록시로 분리했다.
+- 대회 수집은 원본 저장 → 정규화/병합 → canonical 갱신 흐름이다.
+- 코스는 두루누비 메타 동기화와 GPX 리소스를 `courseId`로 결합한다.
+- 두루누비 장애 시 마지막 성공 캐시/GPX로 fail-open한다.
+- 인증은 SMTP, EMAIL_VERIFICATION, REFRESH_TOKEN까지 포함한다.
+- 대회 RACE 블록은 canonical에서 서버가 생성·갱신하며 앱 입력을 신뢰하지 않는다.
+
+### 3.2 오프라인 경계
+
+| 가능 | 불가 |
 |---|---|
-| apply_start·host 크롤링 확보 가능? | **확보됨.** `races.json` 실데이터에 `reg_start`·`organizer` 필드 존재 (결측 가능 → nullable 유지) |
-| 이메일 인증 코드: DB vs Redis | **DB 권장.** 쿨다운·만료·시도 횟수 전부 컬럼으로 해결되고 이 규모에 Redis는 과설계. 만료 데이터는 배치 정리. (면접 확장 멘트로 "트래픽 증가 시 Redis TTL 이전" 정도만) |
-| 대회(race) 블록 삭제 허용? | **허용이 SPEC·목업 정합.** SPEC §4.10 편집 모드는 "교체 불가"만 명시하고 삭제(✕ 즉시)는 제한하지 않음. → 서버는 교체만 400, 삭제는 허용 (API 명세 반영) |
-| 두루누비 API 제공 여부 | **이미 실측 완료 (SPEC 부록 A-10).** `courseList`는 정상 응답하지만 **좌표 파라미터·필드가 없다** → 좌표는 GPX 파싱으로만 확보 가능하고, 그 파싱본(261코스)이 저장소에 유일본으로 존재. 서버 중심 구조에서는 이 파싱본을 **서버 리소스로 적재**해 코스 API로 제공하는 것이 현실해 — "실시간 규정" 대응이 필요하면 목록 메타는 courseList 실시간 호출 + 좌표만 파싱본 매칭하는 절충안을 주최측 질문에 포함 |
-| 카테고리 9종 ↔ 외부 API 매핑표 | **SPEC §5.3 + §8.1에 이미 확정돼 있음** (카카오 AT4/FD6/CE7/AD5/키워드 + KTO 12/32/웰니스 하이브리드). API 명세서 부록 B로 이식했으니 그것을 기준으로 사용 |
+| 마지막 성공 대회/마이 목록 읽기 | 로그인·토큰 갱신 |
+| 앱 GPX 축약본으로 코스 탐색 | 숙소·축제·POI 새 조회 |
+| GPS 기록의 전송 전 임시 저장 | 새 동선 생성·찜·저장 변경 |
 
 ---
 
-## 2. DFD 검증
+## 4. API 계약 오류와 권장 해결안
 
-### 2-1. ✅ 정합 확인
-
-| # | 항목 | 근거 |
+| 오류 가능성 | 해결안 | 이유 |
 |---|---|---|
-| A1 | 프로세스 분리(인증/대회/찜·보관함/생성/편집/코스/기록/프록시/배치) — 화면 액션 전부 커버 | 정리본 전 화면 대조 |
-| A2 | 동선 생성 무상태(DTO만 반환, DB 저장 없음) + 저장 API 분리 | 결정 5 — 고아 데이터 방지 논리 타당 |
-| A3 | 크롤 배치: 파싱 → 카카오 지오코딩 → (source, external_id) upsert | SPEC §8.2 파이프라인 대응 |
-| A4 | "외부 시스템 — 실시간 호출, 저장 안 함" 원칙 명시 | 공모전 규정 대응 |
-| A5 | 순서변경 = 하루 단위 PUT 전체 교체, race 블록 서버 보호 | 확정 결정 8 |
-
-### 2-2. 🔴 수정 필요
-
-| # | 문제 | 근거 | 수정안 |
-|---|---|---|---|
-| D1 | **DB 표기 MySQL ≠ SPEC 확정 PostgreSQL** — 결정-3(🔒확정)이 Spring Boot + **PostgreSQL**. MySQL로 바꿀 거면 그건 오탈자가 아니라 **결정 변경**이라 SPEC 12.1에 새 결정으로 올려야 한다. | SPEC 결정-3 · §9.2 | DFD 표기를 PostgreSQL로 수정 (본 리포트·API 명세는 PostgreSQL 기준. 정리본의 QueryDSL·batch fetch 결정은 어느 쪽이든 동일하게 유효) |
-| D2 | **숙소 소스가 TourAPI(32번)로 표기** — 회의 결정 7 + SPEC §4.9는 **카카오 로컬 AD5**로 확정했고, 목업 검색창 문구도 "숙소 검색 · **카카오 로컬**"이다. 실측(부록 A-4)상 KTO 숙박은 대회장 10km에 **4건**뿐이라 W3 목록 8건을 못 채운다. | SPEC §4.9 · §8.1 · 부록 A-4 · 목업 STEP 4 | 숙소 = **카카오 AD5 1순위, KTO 32 폴백** (거리순 8건 + 키워드 검색 병행) |
-| D3 | **인근 축제를 '위치기반조회'로 표기** — 실측(부록 A-3)상 `locationBasedList2(contentTypeId=15)`에는 **날짜 필드가 없다.** 카드에 "MM.DD~MM.DD" 기간을 못 찍고 "대회일 ±14일" 필터도 불가능. 또 `searchFestival2`에 구 `areaCode`를 주면 에러 없이 0건이 나오는 함정(부록 A-6)도 있다. | SPEC §8.3 · §7.4-2·6 | **`searchFestival2`(eventStartDate = 대회일−14일) → 서버 Haversine 반경 40km 필터 → 거리순 6건**. 지역 필터가 필요하면 `lDongRegnCd`만 사용 |
-| D4 | **카카오 로컬이 배치 지오코딩에만 연결** — 런타임에도 카카오가 필요하다: ① 숙소 AD5(D2) ② POI 하이브리드(맛집 FD6·카페 CE7·자연/역사 키워드는 카카오 1순위 — SPEC §8.1) ③ 러닝코스 출발지 검색(키워드 지오코딩) ④ 걷기 스팟(키워드 4종 × 3km — SPEC §5.9). | SPEC §5.3 · §5.9 · §8.1 | KAKAO → 프록시(POI·지오코딩·걷기 스팟) 흐름 추가. 프록시 라벨을 "KTO 전용"이 아닌 "외부 POI 프록시(KTO+카카오 하이브리드)"로 |
-| D5 | **메일 발송(SMTP) 외부 시스템 누락** — 가입 인증 코드·재설정 링크가 전부 메일인데 DFD에 메일 흐름이 없다. | SPEC §7.1 "이메일 발송(Spring Mail)" | EXT에 SMTP 추가, AUTH → SMTP 흐름 ("6자리 코드 · 재설정 링크") |
-| D6 | **EMAIL_VERIFICATION(·REFRESH_TOKEN) 저장소 미표기** — DBX에 USER/USER_AGREEMENT만 있다. | ERD와의 자기 일관성 | 인증 스토어에 EMAIL_VERIFICATION · REFRESH_TOKEN 추가 |
-
-### 2-3. 🔵 SPEC 갱신 필요 (의도된 재설계 — 오류 아님, 문서 정리 대상)
-
-정리본 v2는 "외부 API 실시간 호출, DB 적재 불인정"이라는 공모전 규정을 반영해 SPEC v3의 **앱 중심 구조를 서버 중심으로 재설계**했다. 방향 자체는 백엔드 단일 창구(🔒확정 결정-9)와도 맞고, 백엔드 포트폴리오 관점에서도 옳다. 다만 아래 항목이 SPEC 본문과 어긋난 채로 남아 있으니, 팀 합의 후 **12.1 결정표에 추가하고 해당 절을 개정**해야 한다.
-
-| # | SPEC v3 (현행) | 정리본 v2 (재설계) | 갱신 대상 |
-|---|---|---|---|
-| U1 | 대회 = 앱 assets `races.json` 번들 (원격 갱신 P2) | 대회 = 크롤링 배치(1일 1회) → **서버 DB** → 커서 페이징 API | §6.1 · §8.2 · §9.3 |
-| U2 | 동선 생성 엔진 = **앱 domain(Kotlin)** — AP-04 | 생성 엔진 = **서버 무상태 API** (규칙 파이프라인 서버 이식) | §5.6 · §9.1 · AP-04 |
-| U3 | 러닝코스 빌더 = 앱 domain + assets 번들 | 코스 API = 서버 제공 (두루누비 파싱본 서버 적재) | §5.8 · §6.1 · §9.3 |
-| U4 | POI 사전수집 `pois/{raceId}.json` + 폴백 체인 live→sample→synth | 전부 실시간 프록시, 저장 없음 (sample 단계 제거) | §8.1 · AP-20 |
-| U5 | 마감 임박 상위 6건 🔧정책 | 목업·정리본 4건 | §4.4 (🔧정책이라 4로 확정만 하면 됨) |
-| U6 | 홈 축제: 위치 권한 기반 🔧정책 | 조회 월 기준 행사정보조회 | §4.4 (명세는 두 안을 모두 수용하는 파라미터로 설계) |
-
-> ⚠️ U2·U3·U4는 **앱 담당 팀원과 반드시 합의**해야 한다. SPEC의 NFR-1(오프라인·백엔드 불가 시에도 번들 데이터로 동작)은 앱 쪽 폴백 체인을 전제로 하는데, 서버 중심으로 가면 "백엔드 다운 = 주요 기능 정지"가 된다. 권장 절충: 서버를 단일 창구로 하되, 앱은 마지막 성공 응답 캐시(Room) + synth 생성기만 폴백으로 유지.
-
-### 2-4. 🟡 보완 권장
-
-| # | 항목 |
-|---|---|
-| W1 | 보관함 조회 흐름(FAV가 ITINERARY·RUN_RECORD·SAVED_COURSE를 **읽는** 것)이 안 보임 — 고수준 DFD라 허용 범위지만, 수정안에는 조회 화살표를 점선으로 추가했다 |
-| W2 | 러닝코스 "걷기 좋은 곳"의 데이터 흐름 누락 — SPEC §5.9는 카카오 키워드 4종. 수정안에 반영 |
-| W3 | 이동시간(카카오모빌리티, A5)·카톡 공유(A4)는 P1 — DFD 생략은 무방하나 명세 부록에 예약 항목으로 기재 |
+| 목록과 월간 점의 필터 불일치 | 검색 Predicate와 `deriveRegStatus` 정책 테스트 공유 | 같은 조건을 두 번 구현하는 드리프트를 방지 |
+| `date` 필터 누락 | 공통 Predicate에 `contestDate == date` 포함 | 선택 날짜와 목록 결과 정합성 |
+| 커서 내부 구조 노출 | URL-safe 불투명 `nextCursor` | 내부 키 변경과 잘못된 클라이언트 조립 방지 |
+| Enum 한글/소문자 혼용 | JSON Enum 대문자 고정 | Kotlin/Java 직렬화 계약 단순화 |
+| 외부 장애가 Empty로 보임 | 502/504 ProblemDetail과 Empty 분리 | 사용자가 “결과 없음”과 “조회 실패”를 구분 |
+| RACE 보호를 클라이언트에만 의존 | 서버에서 모든 변경 경로 차단 | 변조 요청과 오래된 앱에서도 정책 보장 |
+| timestamp 시간대 혼용 | 날짜 판정 KST, 저장·JSON timestamp UTC `Z` | D-day/접수상태와 로그 정렬 오류 방지 |
+| 개인 목록/대회 목록 페이징 혼용 | 대회 cursor, 개인 Pageable | 대회는 안정적 미래 날짜 순회, 개인 목록은 전체 건수/페이지 UI에 적합 |
 
 ---
 
-## 3. 참고 — 검증 중 발견한 SPEC 자체 오탈자
+## 5. 남은 외부 확인
 
-- SPEC §3-2가 "§2.1의 **5탭**"이라고 쓰고 있는데 §2.1은 커뮤니티 제외(결정-13) 후 **4탭**이다(홈·캘린더·러닝코스·보관함). v2 흔적으로 보임 — SPEC 개정 시 함께 수정 권장.
-- §11 역할 분담 표 위 문단의 "5탭 내비게이션"(AP-06)도 동일.
+- 두루누비 `courseId`와 GPX 261코스의 실제 매칭률 및 `API_ONLY/GPX_ONLY` 건수.
+- KTO·두루누비 운영키 쿼터와 캐시 허용 범위.
+- 카카오 비즈앱의 이메일 동의 항목 사용 가능 여부. 단, 이메일 미제공이어도 계정 정책은 정상 동작해야 한다.
+
+이 세 항목은 구현을 막지 않는다. 매칭 통계·nullable 이메일·TTL 설정값으로 격리하고 운영 확인 후 조정한다.
 
 ---
 
-## 4. 결론 — 작업 순서 제안
+## 6. 최종 판정
 
-1. **ERD 수정안 반영** (E1~E6 필수, W1~W6 선택) → `런닝구_ERD_수정안.mermaid`
-2. **DFD 수정안 반영** (D1~D6) → `런닝구_DFD_수정안.mermaid`
-3. **팀 합의 안건 4건**: ① PostgreSQL 유지 vs MySQL 변경 ② 서버 중심 재설계(U1~U4)의 SPEC 개정 ③ 앱 오프라인 폴백 범위(NFR-1 재정의) ④ 주최측 질문 3건(크롤 DB 예외·스냅샷·단기 캐시)에 두루누비 절충안 추가
-4. API 명세서(`런닝구_API_명세서.md`)를 시드로 springdoc-openapi 구현 착수 (결정-18)
+- ERD: **구현 가능**
+- DFD: **구현 가능**
+- API 계약: **구현 가능, 계약 테스트 필수**
+- HTML 목업: **정책 표현 보강 후 UI 기준으로 사용**
+- 데이터 생성: **UTF-8·결정성 CI 통과를 병합 조건으로 사용**

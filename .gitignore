@@ -33,3 +33,6 @@ dist/
 
 # ── agent workspaces ──
 .claude/
+
+# Local-only documentation
+/docs/local/

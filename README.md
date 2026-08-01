@@ -15,7 +15,7 @@
 | 필수요건 | 한국관광공사 OpenAPI 활용 (국문관광정보·두루누비·웰니스) |
 | 형태 | **안드로이드 네이티브 앱** |
 
-핵심 기능(M1~M4·B·R): 종목·상황별 맞춤 동선 추천 · 전국 마라톤 통합 캘린더 · 대회 인근 축제 · 러닝/산책 코스 · GPS 러닝 기록 · 찜·보관함.
+핵심 기능(M1~M4·B·R): 종목·상황별 맞춤 동선 추천 · 전국 마라톤 통합 캘린더 · 대회 인근 축제 · 러닝/산책 코스 · GPS 러닝 기록 · 찜·마이.
 
 ---
 
@@ -27,10 +27,10 @@
 | UI | Jetpack Compose |
 | 아키텍처 | MVVM |
 | 네트워크 | Retrofit + OkHttp — 자체 백엔드 API 경유 (KTO·카카오 REST는 백엔드에서만 호출) |
-| 로컬 저장 | Room · DataStore |
+| 로컬 저장 | Room 읽기 캐시·GPS 임시 기록 · DataStore |
 | 지도 | 카카오맵 **Android SDK** |
 | 로그인 | 카카오 로그인 **Android SDK** |
-| 백엔드 | **Spring Boot + PostgreSQL** — 인증·커뮤니티·보관함·외부 API 프록시 |
+| 백엔드 | **Spring Boot + PostgreSQL** — 인증·canonical 대회·마이·외부 API 프록시·두루누비 동기화 |
 | 데이터 생성 | Python 스크립트 (1회성·보관용) |
 
 > ⚠️ 지도·로그인은 웹 JS SDK가 아니라 **안드로이드 SDK**를 써야 한다. 웹 프로토타입의 카카오맵 JS 연동은 참고만 하고 재구현한다.
@@ -46,27 +46,27 @@ runninggu/
 ├── SPEC.md              # 최종 통합 명세 (단일 기준, SSOT)
 ├── .gitignore
 │
-├── app/                 # 안드로이드 앱 모듈
-│   └── src/main/
+├── android/             # Android Studio 프로젝트
+│   └── app/src/main/    # 안드로이드 앱 모듈
 │       ├── java/com/runninggu/app/
 │       │   ├── ui/          # 화면 (Compose)
 │       │   │   ├── auth/     # A1 로그인 · A2 회원가입 · A3 비번찾기
 │       │   │   ├── home/     # S1 홈
 │       │   │   ├── calendar/ # S2 캘린더
 │       │   │   ├── course/   # S8 러닝코스 (+GPS 기록)
-│       │   │   ├── archive/  # S10 보관함 (동선·코스·찜)
+│       │   │   ├── my/      # S10 마이 (프로필·정보수정·동선·코스·찜)
 │       │   │   └── wizard/   # S4~S7 동선 만들기
 │       │   ├── data/        # 리포지토리·API·모델
-│       │   │   ├── remote/  # Retrofit (KTO·카카오)·Supabase
-│       │   │   ├── local/   # Room·DataStore
+│       │   │   ├── remote/  # Retrofit (자체 백엔드 단일 창구)
+│       │   │   ├── local/   # Room 읽기 캐시·DataStore
 │       │   │   └── model/
 │       │   ├── domain/      # 추천 엔진·코스 빌더 로직 (웹 engine.js 재구현)
 │       │   └── util/
 │       ├── res/            # 레이아웃·문자열·아이콘·테마
 │       └── assets/         # races.json·durunubi_courses.json 번들
 │
-├── build.gradle.kts     # 프로젝트 빌드 설정
-├── settings.gradle.kts
+│   ├── build.gradle.kts # 프로젝트 빌드 설정
+│   └── settings.gradle.kts
 │
 ├── docs/                # 기획·API 매뉴얼
 ├── scripts/             # 데이터 생성 Python (1회성·보관용, 크롤 CSV→races.json)
@@ -74,7 +74,7 @@ runninggu/
 └── reference-web/       # 구 design/ (React 목업 — UX 참조용, 빌드 대상 아님)
 ```
 
-> 참고: 기존 repo의 `design/`(React 웹 프로토타입)은 안드로이드 앱으로 이관되지 않으며 `reference-web/`으로 옮겨 **UX·화면흐름·로직 설계 참조**로만 쓴다. 옛 `web/`(Next.js 데모)는 사용하지 않는다. 앱이 쓰는 데이터(`races.json` 등)는 `app/src/main/assets/`에 번들한다.
+> 참고: `reference-web/`은 **UX·화면흐름·로직 설계 참조**로만 쓴다. 앱의 초기 대회본과 GPX 축약 폴백은 `android/app/src/main/assets/`에 두되, 온라인 데이터의 SSOT는 백엔드다.
 
 ---
 
@@ -86,7 +86,7 @@ runninggu/
 - 카카오 · 한국관광공사 API 키
 
 ### 실행
-1. Android Studio에서 프로젝트 열기 → Gradle Sync
+1. Android Studio에서 `android/` 열기 → Gradle Sync
 2. `local.properties`에 API 키 입력 (아래) — **커밋 금지**
 3. 에뮬레이터 또는 실기기에서 Run ▶
 
@@ -128,8 +128,8 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 
 | 팀원 | 담당 |
 |---|---|
-| **유선경** | **백엔드 전담** — Spring Boot·PostgreSQL (인증/이메일·보관함/찜/기록 API·외부 API 프록시·springdoc 문서·배포) + 카카오 콘솔/키 관리 |
-| **이건모** | **앱 코어** — 프로젝트 셋업·도메인 포팅(추천 엔진/코스 빌더)·데이터 레이어(Retrofit/Room/assets)·카카오맵 연동·러닝코스/GPS 기록 + 데이터 스크립트 |
-| **김민지** | **앱 UI** — Compose 테마(목업 토큰 이식)·내비게이션·인증/홈/캘린더/위저드/결과/보관함 화면·찜 UI |
+| **유선경** | **백엔드 전담** — USER+LOGIN_IDENTITY 인증·canonical 대회/원천·마이/찜/기록·외부 API 프록시·두루누비 동기화·springdoc·배포 |
+| **이건모** | **앱 코어** — 프로젝트 셋업·Retrofit/Room·공통 ProblemDetail/Enum/페이징 계약·카카오맵·두루누비+GPX 코스·GPS 기록·UTF-8 데이터 CI |
+| **김민지** | **앱 UI** — Compose 테마·4탭 내비게이션·인증/홈/캘린더/위저드/결과/마이 정보수정·찜 UI·Loading/Content/Empty/Error |
 
 상세 백로그 매핑은 [SPEC.md §11](./SPEC.md), 협업 규칙은 [CONVENTION.md](./CONVENTION.md) (GitHub Flow · PR 상호 리뷰).

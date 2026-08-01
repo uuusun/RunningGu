@@ -1,0 +1,44 @@
+name: Data validation
+
+on:
+  pull_request:
+    paths:
+      - "data/**"
+      - "scripts/**"
+      - ".github/workflows/data-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - "scripts/**"
+      - ".github/workflows/data-validation.yml"
+
+jobs:
+  races-json:
+    name: races.json UTF-8 and determinism (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate twice
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .ci | Out-Null
+          python scripts/build_races_json.py --out .ci/races-1.json
+          python scripts/build_races_json.py --out .ci/races-2.json
+
+      - name: Validate UTF-8, deterministic output, and expected counts
+        shell: pwsh
+        run: |
+          python -c "import json,pathlib; a=pathlib.Path('.ci/races-1.json').read_bytes(); b=pathlib.Path('.ci/races-2.json').read_bytes(); assert a==b, 'non-deterministic output'; rows=json.loads(a.decode('utf-8')); assert len(rows)==153, len(rows); assert sum(bool(r.get('imageUrl')) for r in rows)==133; print('OK: UTF-8, deterministic, 153 contests, 133 images')"

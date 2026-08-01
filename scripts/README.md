@@ -1,6 +1,6 @@
-# scripts — 데이터 생성 Python (1회성·보관용)
+# scripts — 데이터 생성 Python
 
-앱이 번들하는 데이터(`races.json` 등)를 만들 때만 쓴다. **앱 빌드와 무관.**
+대회 원천을 정규화하고 초기/검증용 데이터(`races.json`)를 만들 때 쓴다. 운영의 대회 SSOT는 백엔드 canonical `CONTEST`이며, 이 산출물은 목업과 앱 초기 폴백에 사용한다.
 
 | 스크립트 | 역할 |
 |---|---|
@@ -17,9 +17,13 @@ pip install -r requirements.txt      # requests
 cp .env.example .env                 # 키 입력 (커밋 금지)
 set -a; source .env; set +a
 
-# races.json 생성 — ⚠️ 기본 출력 경로가 구(舊) design/ 기준이라 --out 필수
-python build_races_json.py --out ../app/src/main/assets/races.json
+# 목업 데이터 생성(기본 경로: ../reference-web/public/data/races.json)
+python build_races_json.py
+
+# 앱 초기 폴백을 갱신할 때만 출력 경로를 명시
+python build_races_json.py --out ../android/app/src/main/assets/races.json
 ```
 
-- 입력 경로(`../data/races_sample.csv`)는 그대로 동작한다. 출력만 `--out`으로 지정.
-- ⚠️ `durunubi_courses.json`(두루누비 261코스 GPX 파싱본)은 **생성 스크립트가 유실된 산출물** — `reference-web/src/data/durunubi_courses.json`이 유일본이다. 삭제·재생성 금지, 앱에 번들할 때 그 파일을 복사한다.
+- 입력 경로는 저장소 루트 `data/races_sample.csv`다. 모든 입출력과 콘솔은 UTF-8로 처리한다.
+- `durunubi_courses.json`은 두루누비 GPX 파싱본 261코스다. 서버 경로 리소스의 원천으로 보존하고, 앱에는 축약본을 생성해 번들한다. 최신 이름·난이도 등 메타데이터는 서버가 두루누비 API에서 시작 시+하루 1회 동기화한다.
+- CI는 `PYTHONUTF8=1`에서 두 번 생성한 결과가 동일한지, JSON UTF-8 디코딩, 153건, 이미지 133건을 검증한다.
