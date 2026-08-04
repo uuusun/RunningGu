@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>런닝구 — UI 목업 v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400..900;1,400..900&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..700,0..1,0&display=swap">
+<style>
+/* ================================================================
+   런닝구 목업 v2 — 디자인 토큰
+   색감은 기존 브랜드 확정값(PRODUCT.md Brand Commitments) 그대로.
+   ================================================================ */
+:root{
+  --blue:#2B5CFF; --blue-ink:#1E40D8; --blue-soft:#EEF2FF; --blue-soft2:#F6F8FF;
+  --lime:#C9F23C; --lime-deep:#B3DC28; --orange:#FF6A2B;
+  --ink:#15161B; --ink2:#54565E; --ink3:#71747C; --ink4:#86878E; --ink5:#9A9CA2;
+  --surface:#FFFFFF; --page:#EDECE8; --fill:#F2F2F0; --fill2:#E9EBEF;
+  --line:#E4E4E6; --line2:#ECECEE; --line3:#F0F0F0;
+  /* 몰입 레지스터 — 블루 잉크의 심연 (3D·GPS 무대) */
+  --deep:#0C1024; --deep-2:#131A38; --deep-3:#1B2450;
+  --deep-t1:#F2F5FF; --deep-t2:#A9B4DC; --deep-t3:#6E7AA8; --deep-line:rgba(169,180,220,.16);
+  --cat-tour-bg:#EAF1FF; --cat-tour-fg:#2B5CFF;
+  --cat-food-bg:#FFF3CC; --cat-food-fg:#A66A00;
+  --cat-cafe-bg:#F1E9FF; --cat-cafe-fg:#7A4FD0;
+  --cat-wellness-bg:#E6F7EE; --cat-wellness-fg:#1B8A5A;
+  --cat-nature-bg:#F0FAD8; --cat-nature-fg:#5A8A0A;
+  --cat-history-bg:#EFEAFE; --cat-history-fg:#6B4FBB;
+  --cat-lodging-bg:#EAEFF5; --cat-lodging-fg:#3E5573;
+  --cat-race-bg:#EEF2FF; --cat-race-fg:#2B5CFF;
+  --cat-recovery-bg:#FFF1E9; --cat-recovery-fg:#C2410C; --cat-recovery-body:#7C4A2E;
+  --font-body:'Pretendard Variable',Pretendard,system-ui,-apple-system,sans-serif;
+  --font-num:'Archivo','Pretendard Variable',sans-serif;
+  --r-card:20px; --r-btn:16px; --r-md:15px; --r-chip:13px; --r-sm:11px; --r-xs:8px;
+  --sh-1:0 1px 2px rgba(21,22,27,.05),0 4px 14px rgba(21,22,27,.06);
+  --sh-2:0 2px 6px rgba(21,22,27,.08),0 10px 28px rgba(21,22,27,.10);
+  --sh-3:0 6px 16px rgba(12,16,36,.16),0 20px 48px rgba(12,16,36,.18);
+  --sh-sheet:0 -12px 40px rgba(12,16,36,.18);
+  --pad-x:22px; --cta-h:56px;
+  --ease-out:cubic-bezier(.16,1,.3,1); --ease-spring:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--page);font-family:var(--font-body);color:var(--ink);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font-family:inherit;border:0;background:none;padding:0;color:inherit;cursor:pointer;text-align:inherit}
+input{font-family:inherit;outline:none}
+::-webkit-scrollbar{width:0;height:0}
+.msr{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;
+  letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;
+  direction:ltr;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;user-select:none}
+.msr.fill{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+
+/* ── 스테이지(데스크톱 캔버스) ─────────────────────────── */
+.stage{min-height:100vh;padding:26px 20px 60px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.stage-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;max-width:920px}
+.stage-nav .brand{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--ink5);
+  text-transform:uppercase;font-family:var(--font-num);margin-right:4px}
+.stage-nav button{font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:13px;white-space:nowrap;
+  background:#fff;color:var(--ink2);border:1px solid #DEDEDA;transition:all .15s var(--ease-out)}
+.stage-nav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.phone{width:390px;height:844px;background:var(--surface);border-radius:42px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;flex:none;box-shadow:0 30px 70px rgba(20,22,30,.22),0 0 0 9px #1A1B20}
+.statusbar{height:46px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px 0 30px;position:relative;z-index:30}
+.statusbar .t{font-family:var(--font-num);font-size:14px;font-weight:600;letter-spacing:.02em}
+.statusbar.on-dark{color:var(--deep-t1)}
+.statusbar .cell{display:flex;align-items:flex-end;gap:2px;height:11px}
+.statusbar .cell i{width:3px;background:currentColor;border-radius:1px}
+.statusbar .batt{width:22px;height:11px;border:1.5px solid currentColor;border-radius:3px;padding:1.5px;margin-left:3px}
+.statusbar .batt i{display:block;width:70%;height:100%;background:currentColor;border-radius:1px}
+.viewport{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;overscroll-behavior:contain}
+.screen{min-height:100%;display:flow-root;animation:screenIn .34s var(--ease-out)}
+@keyframes screenIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes snackUp{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes popIn{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){
+  .screen,[class]{animation-duration:.001s !important;transition-duration:.001s !important}
+}
+
+/* ── 공통 컴포넌트 ────────────────────────────────────── */
+.px{padding-left:var(--pad-x);padding-right:var(--pad-x)}
+.h-screen{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.22}
+.h-sec{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.sub{font-size:13.5px;color:var(--ink2);line-height:1.55}
+.meta{font-size:12px;color:var(--ink4)}
+.num{font-family:var(--font-num)}
+.divider{height:1px;background:var(--line3)}
+.cta{height:var(--cta-h);border-radius:var(--r-btn);background:var(--blue);color:#fff;
+  font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  box-shadow:0 6px 18px rgba(30,42,90,.22);transition:transform .15s var(--ease-out),box-shadow .2s}
+.cta:active{transform:scale(.985)}
+.cta.ghost{background:var(--surface);color:var(--ink);border:1.5px solid var(--line);box-shadow:none}
+.cta.lime{background:var(--lime);color:var(--ink);box-shadow:0 6px 18px rgba(178,220,40,.35)}
+.cta[disabled]{background:var(--fill);color:var(--ink5);box-shadow:none;cursor:default}
+.chip{font-size:12px;font-weight:600;padding:5px 10px;border-radius:var(--r-chip);white-space:nowrap;display:inline-block}
+.chip-open{background:var(--lime);color:var(--ink);font-weight:700}
+.chip-before{background:var(--blue-soft);color:var(--blue);font-weight:700}
+.chip-closed{background:#EFEFEF;color:var(--ink5);font-weight:700}
+.src{font-size:11.5px;color:var(--ink3)}
+.badge-live{font-family:var(--font-num);font-size:10px;font-weight:800;letter-spacing:.08em;
+  padding:3px 7px;border-radius:7px;background:var(--blue);color:#fff}
+.badge-sample{font-family:var(--font-num);font-size:10px;font-weight:800;letter-spacing:.08em;
+  padding:3px 7px;border-radius:7px;background:var(--fill);color:var(--ink4)}
+.field{display:flex;align-items:center;gap:10px;background:var(--fill);border-radius:var(--r-btn);
+  padding:0 16px;height:52px;border:1.5px solid transparent;transition:border-color .15s,background .15s}
+.field:focus-within{border-color:var(--blue);background:#fff}
+.field input{flex:1;border:0;background:none;font-size:15px;color:var(--ink);min-width:0}
+.field input::placeholder{color:var(--ink4)}
+.seg{display:flex;background:var(--fill);border-radius:var(--r-md);padding:4px;gap:2px}
+.seg button{flex:1;height:38px;border-radius:12px;font-size:13.5px;font-weight:700;color:var(--ink3);
+  display:flex;align-items:center;justify-content:center;gap:6px;transition:all .18s var(--ease-out)}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:var(--sh-1)}
+.opt-chip{font-size:13.5px;font-weight:700;padding:9px 15px;border-radius:22px;border:1.5px solid var(--line);
+  color:var(--ink2);background:#fff;transition:all .15s var(--ease-out)}
+.opt-chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.opt-chip.on-blue{background:var(--blue-soft);color:var(--blue);border-color:var(--blue);font-weight:800}
+.heart{transition:transform .18s var(--ease-spring)}
+.heart.on{animation:popIn .3s var(--ease-spring)}
+.tag{font-size:11.5px;font-weight:600;padding:3.5px 9px;border-radius:9px;white-space:nowrap;display:inline-block}
+.spinner{width:26px;height:26px;border-radius:50%;border:3px solid var(--fill2);border-top-color:var(--blue);
+  animation:spin .8s linear infinite}
+.empty{text-align:center;padding:44px 30px}
+.empty .t{font-size:16px;font-weight:800}
+.empty .d{font-size:13px;color:var(--ink4);margin-top:7px;line-height:1.55}
+.empty button{color:var(--blue);font-size:14px;font-weight:700;margin-top:14px}
+.dbg{position:absolute;top:8px;right:10px;z-index:70;display:flex;gap:4px}
+.dbg button{font-family:var(--font-num);font-size:9px;font-weight:700;letter-spacing:.05em;padding:3px 7px;
+  border-radius:8px;background:rgba(21,22,27,.35);color:#fff;backdrop-filter:blur(4px)}
+.dbg button.on{background:var(--orange)}
+
+/* 하단 탭바 */
+.tabbar{flex:none;display:flex;align-items:stretch;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);
+  border-top:1px solid var(--line3);padding:10px 8px calc(10px + 8px);position:relative;z-index:40}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0;border-radius:12px}
+.tabbar .msr{font-size:24px;color:var(--ink5);transition:color .15s}
+.tabbar .lb{font-size:11px;font-weight:600;color:var(--ink5)}
+.tabbar button.on .msr{color:var(--blue)}
+.tabbar button.on .lb{color:var(--blue);font-weight:800}
+
+/* 스낵바 · 시트 · 모달 */
+.snack{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);background:#1F2026;color:#fff;
+  font-size:13.5px;font-weight:600;padding:12px 18px;border-radius:14px;box-shadow:var(--sh-2);
+  white-space:nowrap;animation:snackUp .22s var(--ease-out);z-index:80}
+.scrim{position:absolute;inset:0;background:rgba(12,16,36,.44);z-index:60;animation:fadeIn .2s ease}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;z-index:65;
+  box-shadow:var(--sh-sheet);animation:sheetUp .32s var(--ease-out);max-height:78%;display:flex;flex-direction:column}
+.sheet .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:10px auto 2px;flex:none}
+.sheet-body{overflow-y:auto;padding-bottom:26px}
+
+/* 몰입(다크) 레지스터 */
+.deepzone{background:var(--deep);color:var(--deep-t1)}
+.deepzone .sub{color:var(--deep-t2)}
+.deepzone .meta{color:var(--deep-t3)}
+.deepzone .divider{background:var(--deep-line)}
+.deepzone input::placeholder{color:var(--deep-t2)}
+.stat-num{font-family:var(--font-num);font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+
+/* 3D 히어로 패널 */
+.gl-panel{position:relative;overflow:hidden;background:
+  radial-gradient(120% 90% at 50% 0%,var(--deep-3) 0%,var(--deep-2) 46%,var(--deep) 100%)}
+.gl-panel canvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+.gl-panel .gl-fallback{position:absolute;inset:0;z-index:1}
+.gl-veil{position:absolute;left:0;right:0;bottom:0;height:38%;pointer-events:none;z-index:2;
+  background:linear-gradient(to top,rgba(12,16,36,.92),rgba(12,16,36,0))}
+
+/* 미니 고도 스트립(카드용 SVG) */
+.elev{display:block}
+.elev .line{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.elev .area{fill:var(--blue-soft);opacity:.9}
+.elev.closed .line{stroke:#C9CBD1}
+.elev.closed .area{fill:#F1F1F2}
+
+/* 지도 플레이스홀더 (2D 라이트) */
+.map2d{position:relative;background:#EDF0EA;overflow:hidden}
+.map2d svg{position:absolute;inset:0;width:100%;height:100%}
+.map-pin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center}
+.map-pin .dot{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:flex;
+  align-items:center;justify-content:center;font-family:var(--font-num);font-size:12.5px;font-weight:800;
+  box-shadow:0 2px 5px rgba(0,0,0,.25);border:2.5px solid #fff}
+.map-pin.lime .dot{background:var(--lime);color:var(--ink)}
+.map-pin.orange .dot{background:var(--orange)}
+
+/* ── 홈 히어로 ── */
+.hero{height:472px;flex:none;position:relative;display:flex;flex-direction:column;color:var(--deep-t1)}
+.hero .brandrow{position:relative;z-index:3;display:flex;align-items:center;gap:9px;padding:8px 22px 0}
+.hero .logo{width:34px;height:34px;border-radius:11px;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none}
+.hero .wordmark{font-size:20px;font-weight:800;letter-spacing:-.04em}
+.hero .searchwrap{position:relative;z-index:3;padding:12px 22px 0}
+.hero .field{background:rgba(19,26,56,.72);border:1.5px solid rgba(169,180,220,.22);backdrop-filter:blur(10px)}
+.hero .field input{color:var(--deep-t1)}
+.hero .field input::placeholder{color:var(--deep-t3)}
+.hero .field:focus-within{border-color:var(--lime);background:rgba(19,26,56,.9)}
+.hero .featured{position:relative;z-index:3;margin-top:auto;padding:0 22px 44px;cursor:pointer}
+.hero .featured .name{font-size:17px;font-weight:800;letter-spacing:-.03em;line-height:1.3}
+.hero .dday{font-size:52px;font-weight:900;line-height:.95;letter-spacing:-.04em;color:var(--lime);white-space:nowrap;flex:none}
+.quickbar{margin:-26px 22px 0;position:relative;z-index:4;background:var(--surface);border-radius:18px;
+  box-shadow:var(--sh-2);display:flex;padding:6px 4px}
+.quickbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 0 9px;border-radius:14px;transition:background .15s}
+.quickbar button:active{background:var(--blue-soft)}
+.quickbar .msr{font-size:25px;color:var(--blue)}
+.quickbar .lb{font-size:12px;font-weight:700;color:var(--ink2)}
+.railcard{width:212px;flex:none;border:1px solid var(--line2);border-radius:var(--r-card);padding:15px 15px 12px;
+  background:var(--surface);cursor:pointer;scroll-snap-align:start;box-shadow:var(--sh-1)}
+.pill-hot{font-family:var(--font-num);font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:13px;
+  background:var(--cat-recovery-bg);color:var(--cat-recovery-fg);display:inline-block}
+.pill-cool{font-family:var(--font-num);font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:13px;
+  background:var(--fill);color:var(--ink2);display:inline-block}
+.festcard{width:180px;flex:none;cursor:default}
+.festph{height:112px;border-radius:16px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  background:repeating-linear-gradient(45deg,#EEF2FF 0 10px,#E3EAFB 10px 20px)}
+.festph .lb{font-family:var(--font-num);font-size:10px;font-weight:700;letter-spacing:.08em;color:#8FA3D9}
+.festph .live{position:absolute;top:9px;left:9px;background:var(--lime);color:var(--ink);font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:10px}
+
+/* ── 대회 로우 (v2 카드) ── */
+.racerow{display:flex;gap:14px;padding:15px 16px;border-radius:var(--r-card);background:var(--surface);
+  border:1px solid var(--line2);cursor:pointer;position:relative;overflow:hidden;transition:transform .14s var(--ease-out),box-shadow .2s}
+.racerow:active{transform:scale(.988)}
+.racerow.featured{border:1.5px solid var(--blue);box-shadow:0 10px 26px rgba(43,92,255,.12)}
+.racerow.closed .name{color:var(--ink2)}
+.racerow.closed .dd{color:var(--ink3)}
+.racerow.closed .where{color:var(--ink4)}
+.racerow .datecol{width:46px;flex:none;text-align:center}
+.racerow .mon{font-family:var(--font-num);font-size:11.5px;font-weight:800;letter-spacing:.06em;color:var(--blue)}
+.racerow.closed .mon{color:var(--ink5)}
+.racerow .dd{font-family:var(--font-num);font-size:28px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+.racerow .dw{font-size:11.5px;color:var(--ink4);font-weight:600}
+.racerow .vline{width:1px;background:var(--line3);flex:none}
+.racerow .name{flex:1;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-.02em}
+.racerow .where{font-size:12.5px;color:var(--ink4);margin-top:4px}
+.racerow .elevline{margin-top:9px}
+
+/* ── 상세 · 결과 · 위저드 ── */
+.backbtn{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-left:-8px}
+.backbtn .msr{font-size:25px}
+.infobox{border:1px solid var(--line);border-radius:var(--r-card);padding:4px 16px;background:var(--surface)}
+.inforow{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--line3)}
+.inforow:last-of-type{border-bottom:0}
+.inforow .k{width:66px;flex:none;font-size:13px;color:var(--ink4)}
+.inforow .v{flex:1;font-size:13.5px;font-weight:600}
+.glcard{position:relative;height:196px;border-radius:var(--r-card);overflow:hidden;
+  background:radial-gradient(130% 100% at 50% 0%,var(--deep-3) 0%,var(--deep-2) 48%,var(--deep) 100%)}
+.glcard .cap{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:center;gap:6px;
+  background:rgba(12,16,36,.85);padding:5px 9px;border-radius:9px;backdrop-filter:blur(10px)}
+.glcard .cap .t{font-size:11.5px;font-weight:700;color:var(--deep-t2)}
+.recovery-banner{background:var(--cat-recovery-bg);border-radius:16px;padding:12px 14px;display:flex;gap:10px;align-items:center}
+.recovery-banner .msr{font-size:20px;color:var(--orange)}
+.recovery-banner .t{font-size:12.5px;font-weight:600;color:var(--cat-recovery-fg);line-height:1.4}
+.wbar{flex:1;height:4px;border-radius:2px;background:#EDEDEF}
+.wbar.on{background:var(--blue)}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr)}
+.timeline-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;
+  font-family:var(--font-num);font-size:12px;font-weight:800;background:var(--surface);color:var(--ink4);border:1.5px solid var(--line)}
+.stickycta{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,#fff 26%);padding:16px 22px 18px}
+
+/* 고도 스트립 draw-on */
+@keyframes strokeDraw{from{stroke-dashoffset:var(--len,480)}to{stroke-dashoffset:0}}
+.drawline{stroke-dasharray:var(--len,480);animation:strokeDraw 1.4s var(--ease-out) .15s both}
+
+/* 디버그 레일 (폰 옆) */
+.debug-rail{position:absolute;left:calc(100% + 18px);top:70px;display:flex;flex-direction:column;gap:4px;
+  background:rgba(21,22,27,.88);padding:8px;border-radius:12px;z-index:5;min-width:64px}
+.debug-rail .cap{font-family:var(--font-num);font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--ink5);padding:0 2px 2px}
+.debug-rail button{font-size:11px;font-weight:700;padding:5px 9px;border-radius:7px;text-align:center;color:#fff;background:rgba(255,255,255,.12)}
+.debug-rail button.on{color:var(--ink);background:#fff}
+
+/* GPS 기록(다크 몰입) */
+.runmap{position:absolute;inset:0;overflow:hidden}
+.runmap svg{position:absolute;inset:0;width:100%;height:100%}
+.run-pill{position:relative;margin:10px auto 0;background:rgba(201,242,60,.14);border:1px solid rgba(201,242,60,.3);
+  color:var(--lime);font-size:11.5px;font-weight:700;padding:7px 13px;border-radius:12px;width:max-content}
+</style>
+</head>
+<body>
+<!--
+THESIS: 러너의 데이터(코스 지형·경로·기록)가 화면의 주인공이 되는 러닝 관광 앱 — 회색 카드 나열형 카테고리 디폴트를 거부한다.
+OWN-WORLD: 확정 브랜드 블루 #2B5CFF·라임 #C9F23C·오렌지 #FF6A2B. 라이트 오퍼레이트 지면 + 블루 잉크 심연(--deep)의 몰입 무대 이원 레지스터. Pretendard 본문, Archivo 초고중량 숫자. 라임 리본이 3D 지형 위를 스스로 그린다. 콘텐츠 없이도 알아볼 표식: 심연 위 라임 경로 리본 + 고도 스트립이 박힌 대회 로우.
+STORY: 러너가 대회를 찾고(검색·캘린더) → 코스를 몸으로 이해하고(3D 지형) → 대회 전후 여행 동선을 받고 편집하고 → 뛴 기록이 리본으로 남는다. 게스트는 탐색까지, 저장은 로그인.
+FIRST VIEWPORT: 홈 상단 절반이 심연 3D 히어로 — 세종 호수공원 코스 리본이 지형 위로 그려지고 D-21이 대형 Archivo로 선다. 검색 바가 히어로 위 첫 레이어(회의 결정 '검색 우선'), 그 아래 마감임박·축제가 라이트 지면으로 이어진다. 주 액션: 히어로 CTA "이 대회로 동선 만들기".
+FORM: 사용자 핀 방향(기존 색감 유지 + NRC·스트라바/애플 피트니스 품질 기준) — 롤 2회(ef4f3062·c8c022c9) 재롤 후 사용자 지정이 롤을 대체. 데이터 3D 한정, 오브제 3D 배제, 하이브리드 포팅(3D는 히어로 존 전용).
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+<div class="stage">
+  <div class="stage-nav" id="stageNav"></div>
+  <div style="position:relative;flex:none">
+  <div class="phone">
+    <div class="statusbar" id="statusbar">
+      <span class="t">9:41</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span class="cell"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i></span>
+        <span class="batt"><i></i></span>
+      </div>
+    </div>
+    <div class="viewport" id="viewport"></div>
+    <div id="tabbarHost"></div>
+    <div id="overlayHost"></div>
+  </div>
+  <div id="debugHost"></div>
+  </div>
+</div>
+
+<script type="module">
+/* Three.js 로더 — 실패해도 앱은 SVG 폴백으로 완전 동작 (NFR-1 정신) */
+try{
+  const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js');
+  window.THREE = THREE;
+  window.dispatchEvent(new Event('three-ready'));
+}catch(e){ window.dispatchEvent(new Event('three-failed')); }
+</script>
+
+<script>
+/* ================================================================
+   RG3D — 데이터 3D 엔진: 등고 지형 + 코스 리본 + km 마커
+   모든 장면이 이 하나의 문법을 공유한다 (홈 히어로 · 코스 · 기록 요약)
+   ================================================================ */
+const RG3D = (() => {
+  let ready = false, failed = false;
+  const queue = [];
+  window.addEventListener('three-ready', () => { ready = true; queue.splice(0).forEach(fn => fn()); });
+  window.addEventListener('three-failed', () => { failed = true; queue.splice(0).forEach(fn => fn()); });
+  setTimeout(() => { if (!ready && !failed) { failed = true; queue.splice(0).forEach(fn => fn()); } }, 6000);
+
+  /* 결정적 값-노이즈 (시드 고정 → 코스마다 같은 지형) */
+  function makeNoise(seed){
+    const h = n => { const s = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453; return s - Math.floor(s); };
+    const g = (x, y) => h(x * 157 + y * 113);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+      return g(xi, yi) * (1 - u) * (1 - v) + g(xi + 1, yi) * u * (1 - v) +
+             g(xi, yi + 1) * (1 - u) * v + g(xi + 1, yi + 1) * u * v;
+    };
+  }
+  function heightAt(noise, x, z, amp){
+    return (noise(x * 1.6 + 4, z * 1.6 + 4) * .62 + noise(x * 3.6, z * 3.6) * .28 + noise(x * 8, z * 8) * .10) * amp;
+  }
+
+  /* 장면 스펙: { seed, amp, route:[[x,z],...] (-1..1), km:[라벨…], progress(0..1), spin, live } */
+  function mount(el, spec){
+    if (!el) return null;
+    const handle = { update(){}, setProgress(){}, dispose(){} };
+    const start = () => {
+      if (failed || !window.THREE) { svgFallback(el, spec); return; }
+      try { build(el, spec, handle); } catch (e) { svgFallback(el, spec); }
+    };
+    ready || failed ? start() : queue.push(start);
+    return handle;
+  }
+
+  function build(el, spec, handle){
+    const THREE = window.THREE;
+    const W = el.clientWidth || 390, H = el.clientHeight || 320;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(W, H);
+    el.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0c1024, 3.4, 7.8);
+    const cam = new THREE.PerspectiveCamera(38, W / H, .1, 30);
+    const noise = makeNoise(spec.seed || 1);
+    const amp = spec.amp ?? .34;
+
+    /* 지형 — 정점색: 심연 블루 → 능선으로 갈수록 밝은 블루 */
+    const seg = 96, size = 4.6;
+    const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, colors = [];
+    const cLow = new THREE.Color(0x111838), cMid = new THREE.Color(0x27367a), cHi = new THREE.Color(0x5570d6);
+    for (let i = 0; i < pos.count; i++){
+      const x = pos.getX(i), z = pos.getZ(i);
+      const y = heightAt(noise, x / size + .5, z / size + .5, amp);
+      pos.setY(i, y);
+      const t = Math.min(1, y / (amp * .85));
+      const c = t < .5 ? cLow.clone().lerp(cMid, t / .5) : cMid.clone().lerp(cHi, (t - .5) / .5);
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const terrain = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, flatShading: true, roughness: .88, metalness: .05 }));
+    scene.add(terrain);
+
+    /* 등고선 느낌의 와이어 오버레이(성긴 그리드) */
+    const wire = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
+      color: 0x5a6cbe, wireframe: true, transparent: true, opacity: .05 }));
+    wire.position.y += .002;
+    scene.add(wire);
+
+    /* 코스 리본 — 라임, setDrawRange 로 스스로 그려진다 */
+    let applyProgress = () => {}, progress = 1;
+    const dot = (v, color, s) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(s || .04, 16, 16),
+        new THREE.MeshBasicMaterial({ color }));
+      m.position.copy(v); scene.add(m); return m;
+    };
+    if (!spec.noRoute){
+      const rt = (spec.route && spec.route.length > 1 ? spec.route : [[-.6,-.4],[.2,-.5],[.55,.05],[.1,.5],[-.5,.35]])
+        .map(([x, z]) => new THREE.Vector3(x * size * .58, 0, z * size * .58));
+      rt.forEach(v => { v.y = heightAt(noise, v.x / size + .5, v.z / size + .5, amp) + .055; });
+      const curve = new THREE.CatmullRomCurve3(rt, !!spec.loop, 'centripetal', .8);
+      const tube = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 320, .034, 8, !!spec.loop),
+        new THREE.MeshStandardMaterial({ color: 0xC9F23C, emissive: 0x9dbf1e, emissiveIntensity: .8, roughness: .3 }));
+      scene.add(tube);
+      const idxCount = tube.geometry.index.count;
+      progress = spec.progress ?? 0;
+      applyProgress = p => tube.geometry.setDrawRange(0, Math.floor(idxCount * Math.max(0, Math.min(1, p))));
+      applyProgress(progress);
+      dot(rt[0], 0xC9F23C, .055);
+      /* km 마커 — 아이보리 구슬 (텍스처 없는 안전한 표현) */
+      (spec.km || []).forEach((label, i, arr) => {
+        const t = (i + 1) / (arr.length + (spec.loop ? 0 : 1));
+        const p = curve.getPointAt(Math.min(t, .999)).clone(); p.y += .02;
+        dot(p, 0xF2F5FF, .034);
+      });
+    }
+
+    scene.add(new THREE.AmbientLight(0x93a4dd, 1.0));
+    const key = new THREE.DirectionalLight(0xf2f5ff, 1.5); key.position.set(2.4, 3.2, 1.6); scene.add(key);
+    const rim = new THREE.DirectionalLight(0xC9F23C, .3); rim.position.set(-2.2, 1.2, -2.4); scene.add(rim);
+
+    /* 카메라 — 느린 궤도 + 드래그 */
+    let az = spec.az ?? .62, alt = spec.alt ?? .5, dist = spec.dist ?? 2.5, dragging = false, px = 0;
+    const setCam = () => {
+      cam.position.set(Math.sin(az) * Math.cos(alt) * dist, Math.sin(alt) * dist + .3, Math.cos(az) * Math.cos(alt) * dist);
+      cam.lookAt(0, .12, 0);
+    };
+    el.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; });
+    addEventListener('pointermove', e => { if (dragging){ az += (e.clientX - px) * .006; px = e.clientX; } });
+    addEventListener('pointerup', () => dragging = false);
+
+    let disposed = false, drawT = 0;
+    const clock = { last: performance.now() };
+    function frame(now){
+      if (disposed) return;
+      const dt = Math.min(.05, (now - clock.last) / 1000); clock.last = now;
+      if (!dragging) az += dt * (spec.spin ?? .07);
+      if (spec.autoDraw !== false && progress < 1){ drawT += dt; progress = Math.min(1, drawT / (spec.drawSec ?? 2.6)); applyProgress(progress); }
+      setCam(); renderer.render(scene, cam);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    handle.setProgress = p => { spec.autoDraw = false; progress = p; applyProgress(p); };
+    handle.dispose = () => { disposed = true; renderer.dispose(); el.contains(renderer.domElement) && el.removeChild(renderer.domElement); };
+  }
+
+  /* WebGL 불가 시: 같은 데이터로 그리는 정적 SVG (레이어드 능선 + 라임 경로) */
+  function svgFallback(el, spec){
+    const noise = makeNoise(spec.seed || 1);
+    const W = 390, H = 320;
+    let ridges = '';
+    for (let r = 0; r < 4; r++){
+      let d = `M0 ${H}`;
+      for (let x = 0; x <= W; x += 10){
+        const y = H * (.42 + r * .13) - heightAt(noise, x / W + r * .3, r * .5, 1) * 70;
+        d += ` L${x} ${y.toFixed(1)}`;
+      }
+      d += ` L${W} ${H} Z`;
+      const shade = ['#1B2450', '#182050', '#131A38', '#101736'][r];
+      ridges += `<path d="${d}" fill="${shade}"/>`;
+    }
+    const rt = (spec.route || [[-.6,-.4],[.2,-.5],[.55,.05],[.1,.5],[-.5,.35]])
+      .map(([x, z]) => [ (x * .42 + .5) * W, (z * .3 + .55) * H ]);
+    const path = 'M' + rt.map(p => p.map(n => n.toFixed(1)).join(' ')).join(' L');
+    el.innerHTML = `<div class="gl-fallback"><svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+      ${ridges}
+      <path d="${path}" fill="none" stroke="#C9F23C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${rt[0][0]}" cy="${rt[0][1]}" r="6" fill="#C9F23C"/>
+    </svg></div>`;
+  }
+
+  return { mount };
+})();
+
+/* ================================================================
+   데이터 — 원본 목업과 동일 (SPEC v3 샘플 계약)
+   ================================================================ */
+const TODAY = '2026-08-01';
+const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const DOW = ['일','월','화','수','목','금','토'];
+const REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+const EVENTS = ['5K','10K','하프','풀'];
+const INTENSITY = { '5K':'거의 정상', '10K':'낮은 피로', '하프':'중등도 피로', '풀':'고강도 회복 필요' };
+const CONTESTS = [
+  { id:'sejong', name:'2026 세종 호수공원 마라톤', region:'세종', place:'세종중앙공원', date:'2026-08-22', time:'08:00', events:['풀','하프','10K'], status:'open', deadline:'~08.10', source:'마라톤GO · 확인 07.15', host:'세종시체육회' },
+  { id:'seoul', name:'2026 서울 달빛 나이트런', region:'서울', place:'여의도한강공원', date:'2026-08-15', time:'20:00', events:['10K','5K'], status:'open', deadline:'~08.05', source:'마라톤GO · 확인 07.15', host:'서울특별시체육회' },
+  { id:'busan', name:'2026 부산 바다 하프마라톤', region:'부산', place:'해운대해수욕장', date:'2026-09-05', time:'07:30', events:['하프','10K','5K'], status:'open', deadline:'~08.28', source:'런너스 · 확인 07.12', host:'부산광역시체육회' },
+  { id:'chuncheon', name:'2026 춘천 호반 마라톤', region:'강원', place:'송암스포츠타운', date:'2026-09-20', time:'08:00', events:['풀','하프'], status:'before', deadline:'08.10~', source:'마라톤GO · 확인 07.15', host:'춘천시체육회' },
+  { id:'jeonju', name:'2026 전주 한옥 마라톤', region:'전북', place:'전주종합경기장', date:'2026-08-08', time:'08:00', events:['10K','5K'], status:'closed', deadline:'', source:'런너스 · 확인 07.12', host:'전주시체육회' },
+  { id:'jeju', name:'2026 제주 감귤 트레일런', region:'제주', place:'사려니숲길', date:'2026-10-17', time:'09:00', events:['트레일'], noEvent:true, status:'open', deadline:'~10.02', source:'마라톤GO · 확인 07.15', host:'제주특별자치도체육회' }
+];
+const CATS = {
+  '관광지':{bg:'var(--cat-tour-bg)',fg:'var(--cat-tour-fg)'}, '맛집':{bg:'var(--cat-food-bg)',fg:'var(--cat-food-fg)'},
+  '카페':{bg:'var(--cat-cafe-bg)',fg:'var(--cat-cafe-fg)'}, '힐링웰니스':{bg:'var(--cat-wellness-bg)',fg:'var(--cat-wellness-fg)'},
+  '자연트레킹':{bg:'var(--cat-nature-bg)',fg:'var(--cat-nature-fg)'}, '역사문화':{bg:'var(--cat-history-bg)',fg:'var(--cat-history-fg)'},
+  '숙소':{bg:'var(--cat-lodging-bg)',fg:'var(--cat-lodging-fg)'}, '대회':{bg:'var(--cat-race-bg)',fg:'var(--cat-race-fg)'},
+  '회복':{bg:'var(--cat-recovery-bg)',fg:'var(--cat-recovery-fg)'}
+};
+const POIS = [
+  { name:'세종호수공원', desc:'도심 속 인공호수 · 산책로', addr:'세종 연기면 세종리' },
+  { name:'베어트리파크', desc:'동물·수목 테마파크', addr:'세종 전동면 신송로' },
+  { name:'국립세종수목원', desc:'사계절 전시온실', addr:'세종 연기면 수목원로' },
+  { name:'밀마루전망대', desc:'시내 전경 전망대', addr:'세종 어진동 도움3로' },
+  { name:'조치원 문화정원', desc:'옛 정수장을 고친 정원', addr:'세종 조치원읍 로터리길' },
+  { name:'고복저수지', desc:'수변 데크길 · 노을', addr:'세종 연서면 용암리' },
+  { name:'비암사', desc:'천년 고찰 · 조용한 산책', addr:'세종 전의면 다방길' },
+  { name:'금강자연휴양림', desc:'숲길·출렁다리', addr:'세종 금남면 산림박물관길' }
+];
+const ITIN0 = [
+  { key:'d-1', tab:'D-1 · 08.21 금', label:'08.21 금 · D-1', note:'내일 완주 · 가볍게 먹고 푹 쉬기', recovery:false, blocks:[
+    { time:'15:00', title:'숙소 체크인', cat:'숙소', place:'호텔 세종 가온', desc:'짐 풀고 컨디션 정리' },
+    { time:'18:30', title:'카보로딩 저녁', cat:'맛집', place:'도담동 파스타집', desc:'탄수화물 위주로 든든하게' }
+  ]},
+  { key:'dday', tab:'D-DAY · 08.22 토', label:'08.22 토 · D-DAY', note:'', recovery:false, blocks:[
+    { time:'08:00', title:'하프 스타트', cat:'대회', place:'세종중앙공원', desc:'출발 08:00 · 짐 보관 07:20까지', race:true },
+    { time:'11:00', title:'온천·회복', cat:'힐링웰니스', place:'세종 스파온천', desc:'완주 직후 다리 풀기' },
+    { time:'14:30', title:'가벼운 관광', cat:'관광지', place:'금강보행교 이응다리', desc:'평지 위주 짧은 코스' },
+    { time:'18:00', title:'회복 저녁', cat:'맛집', place:'청벽가든', desc:'단백질 중심 한식' }
+  ]},
+  { key:'d1', tab:'D+1 · 08.23 일', label:'08.23 일 · 회복', note:'고강도 일정 없이 천천히', recovery:true, blocks:[
+    { time:'10:00', title:'온천·족욕', cat:'힐링웰니스', place:'금강 스파랜드', desc:'근육 이완 위주' },
+    { time:'12:30', title:'로컬 점심', cat:'맛집', place:'조치원 왕만두', desc:'가볍게 먹기' },
+    { time:'14:30', title:'오후 관광', cat:'관광지', place:'국립세종수목원', desc:'평지 산책 코스' },
+    { time:'17:00', title:'체크아웃·귀가', cat:'숙소', place:'호텔 세종 가온', desc:'짐 찾고 이동' }
+  ]}
+];
+const PINS = [
+  [[112,188],[252,108]],
+  [[78,226],[166,168],[252,118],[312,204]],
+  [[96,104],[172,196],[256,142],[322,232]]
+];
+const SPOTS = [
+  { name:'해운대해수욕장', cat:'해변', dist:'320m', x:56, y:150 },
+  { name:'동백섬 산책로', cat:'공원', dist:'650m', x:128, y:62 },
+  { name:'미포 블루라인파크', cat:'명소', dist:'1.1km', x:214, y:158 },
+  { name:'장산 등산로 입구', cat:'등산로', dist:'2.3km', x:286, y:44 },
+  { name:'송정해수욕장', cat:'해변', dist:'4.8km', x:330, y:168 }
+];
+const COURSE_REGIONS = [
+  { name:'경남', n:43 },{ name:'부산', n:38 },{ name:'강원', n:31 },{ name:'전남', n:28 },
+  { name:'경북', n:24 },{ name:'제주', n:21 },{ name:'충남', n:17 },{ name:'경기', n:12 }
+];
+const REGION_COURSES = [
+  { name:'이기대 해안산책로', meta:'부산 남구 · 4.8km · 난이도 중 · 약 120분' },
+  { name:'갈매길 3-1코스', meta:'부산 사하구 · 11.2km · 난이도 하 · 약 260분' },
+  { name:'남파랑길 3코스', meta:'부산 영도구 · 14.0km · 난이도 중 · 약 330분' },
+  { name:'해파랑길 1코스', meta:'부산 해운대구 · 16.9km · 난이도 중 · 약 400분' },
+  { name:'남파랑길 2코스', meta:'부산 중구 · 19.0km · 난이도 중 · 약 450분' }
+];
+const HOTELS = [
+  { name:'호텔 세종 가온', meta:'어진동 · 대회장 1.2km' },
+  { name:'어반스테이 세종', meta:'나성동 · 레이트 체크아웃' },
+  { name:'세종 시티호텔', meta:'도담동 · 조식 포함' },
+  { name:'한옥스테이 연기향', meta:'연기면 · 온돌 객실' },
+  { name:'레이크뷰 레지던스', meta:'어진동 · 주방 있는 객실' },
+  { name:'스테이 금강', meta:'나성동 · 대회장 2.4km' },
+  { name:'코업시티호텔 세종', meta:'보람동 · 무료 주차' },
+  { name:'게스트하우스 달빛', meta:'조치원읍 · 1인실 저렴' }
+];
+const PATTERNS = [
+  { key:'pre', label:'전날부터 · 1박2일', sub:'08.21~08.22', s:21, e:22 },
+  { key:'post', label:'대회+다음날 · 1박2일', sub:'08.22~08.23', s:22, e:23 },
+  { key:'both', label:'전후로 · 2박3일', sub:'08.21~08.23', s:21, e:23 },
+  { key:'day', label:'당일치기', sub:'08.22', s:22, e:22 },
+  { key:'custom', label:'직접 선택', sub:'달력에서 직접 고르기', s:null, e:null }
+];
+const PREF_LIST = ['관광지','맛집','카페','힐링웰니스','자연트레킹','역사문화'];
+const PREV = { detail:'calendar', w1:'detail', w2:'w1', w3:'w2', result:'w3', run:'courses', runsum:'run' };
+
+/* 대회별 3D 코스 형상 (정규화 -1..1) — 데이터 3D의 원천 */
+const ROUTES3D = {
+  sejong:   { seed:7,  amp:.34, loop:true,  km:['5','10','15'], route:[[-.55,-.15],[-.25,-.52],[.3,-.55],[.6,-.2],[.55,.3],[.15,.55],[-.35,.45],[-.6,.15]] },
+  seoul:    { seed:11, amp:.24, loop:false, km:['3','6','9'],   route:[[-.7,.2],[-.35,.05],[0,.15],[.35,-.05],[.7,.1]] },
+  busan:    { seed:23, amp:.42, loop:false, km:['5','10','15','20'], route:[[-.7,.35],[-.3,.2],[.05,.35],[.4,.15],[.7,.3]] },
+  chuncheon:{ seed:31, amp:.52, loop:true,  km:['10','20','30'], route:[[-.5,-.3],[.1,-.5],[.55,-.1],[.4,.4],[-.15,.5],[-.55,.2]] },
+  jeonju:   { seed:17, amp:.3,  loop:true,  km:['3','6','9'],   route:[[-.45,-.35],[.2,-.45],[.5,0],[.2,.45],[-.4,.35]] },
+  jeju:     { seed:41, amp:.56, loop:false, km:['4','8','12'],  route:[[-.65,.4],[-.3,.05],[.05,-.25],[.45,-.45],[.68,-.2]] },
+  runTrack: { seed:23, amp:.38, loop:true,  km:['1','2','3','4','5'], route:[[-.6,.25],[-.25,-.1],[.15,-.35],[.55,-.15],[.6,.25],[.15,.45],[-.3,.45]] },
+  haeparang:{ seed:23, amp:.42, loop:false, km:['1','2','3','4'], route:[[-.68,.3],[-.35,.1],[0,.28],[.35,.05],[.68,.22]] }
+};
+
+/* ================================================================
+   상태 + 라우터 (원본 DCLogic 계약 승계)
+   ================================================================ */
+const S = {
+  screen:'sheet', snack:'', detailId:'sejong',
+  q:'', view:'list', f:{ events:[], openOnly:false, regions:[] }, draft:null, filterOpen:false,
+  calY:2026, calM:7, selDate:null, fav:{ busan:true, seoul:true, jeonju:true }, festState:'ok', backTo:'calendar',
+  wPattern:'both', wStart:21, wEnd:23, wEvent:'하프', wPrefs:['관광지','맛집'],
+  hotelQ:'', hotel:null, generating:false, dbg:{ w3:'ok', courses:'ok', result:'ok', lib:'ok', login:'ok' },
+  itin:JSON.parse(JSON.stringify(ITIN0)), activeDay:1, activeBlock:0, editMode:false, poi:null, saved:true, courseStart:'부산 해운대',
+  cTab:'near', startQ:'', dist:5, course:'해파랑길 1코스', cRegion:null, ranSaved:true, libTab:'route',
+  cdRan:false, resultFrom:'w3', guest:false, guestOpen:false, suStep:1, agree:{ tos:false, privacy:false, mkt:false },
+  code:'', resendLeft:0, resetSent:false, pwChanged:false, homeQ:'',
+  runT:0, runOn:false, _drag:null
+};
+let glHandles = [], runTimer = null, resendTimer = null;
+
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+function set(patch, rerender = true){
+  Object.assign(S, patch);
+  if (rerender) render();
+}
+function go(k){
+  glHandles.forEach(h => h && h.dispose && h.dispose());
+  glHandles = [];
+  if (runTimer && k !== 'run'){ clearInterval(runTimer); runTimer = null; S.runOn = false; }
+  S.screen = k;
+  render();
+  $('#viewport').scrollTop = 0;
+}
+function toast(msg){
+  S.snack = msg; renderOverlays();
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { S.snack = ''; renderOverlays(); }, 2000);
+}
+function guard(){
+  if (S.guest){ S.guestOpen = true; renderOverlays(); return true; }
+  return false;
+}
+function filtered(){
+  const f = S.f, q = S.q.trim();
+  return CONTESTS.filter(c => {
+    if (c.date < TODAY) return false;
+    if (q && (c.name + c.place + c.region).indexOf(q) < 0) return false;
+    if (f.events.length && !c.events.some(e => f.events.indexOf(e) >= 0)) return false;
+    if (f.openOnly && c.status !== 'open') return false;
+    if (f.regions.length && f.regions.indexOf(c.region) < 0) return false;
+    return true;
+  }).sort((a, b) => a.date < b.date ? -1 : 1);
+}
+const statusLabel = c => c.status === 'open' ? '접수중 · ' + c.deadline : c.status === 'before' ? '접수전 · ' + c.deadline : '마감';
+const chipClass = c => c.status === 'open' ? 'chip-open' : c.status === 'before' ? 'chip-before' : 'chip-closed';
+const dday = date => Math.round((new Date(date + 'T00:00:00') - new Date(TODAY + 'T00:00:00')) / 86400000);
+
+function toggleFav(id){
+  if (guard()) return;
+  if (S.fav[id]){ delete S.fav[id]; toast('찜을 해제했어요'); } else { S.fav[id] = true; toast('찜했어요'); }
+  render();
+}
+function openDetail(id){
+  const from = S.screen;
+  S.detailId = id;
+  S.backTo = (from === 'library' || from === 'home') ? from : 'calendar';
+  go('detail');
+}
+function back(){
+  if (S.screen === 'detail') return go(S.backTo || 'calendar');
+  if (S.screen === 'result') return go(S.resultFrom || 'w3');
+  go(PREV[S.screen] || 'home');
+}
+function mutate(fn){
+  const itin = S.itin.map(d => ({ ...d, blocks: d.blocks.map(b => ({ ...b })) }));
+  fn(itin[S.activeDay]);
+  set({ itin });
+}
+
+/* 미니 고도 스트립 — 대회별 결정적 프로파일 (같은 노이즈 문법) */
+function elevPath(seed, W, H, closed){
+  let pts = [];
+  for (let i = 0; i <= 24; i++){
+    const t = i / 24;
+    const v = Math.abs(Math.sin(t * 9 + seed * 1.7) * .55 + Math.sin(t * 23 + seed * 3.1) * .3 + Math.sin(t * 47 + seed) * .15);
+    pts.push([t * W, H - 3 - v * (H - 8)]);
+  }
+  const line = 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+  return { line, area: line + ` L${W} ${H} L0 ${H} Z` };
+}
+function elevStrip(seed, W, H, closed){
+  const p = elevPath(seed, W, H);
+  return `<svg class="elev${closed ? ' closed' : ''}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+    <path class="area" d="${p.area}"></path><path class="line" d="${p.line}"></path></svg>`;
+}
+
+/* 2D 지도 플레이스홀더의 도로·수역 패턴 */
+function mapBase(w, h, seed){
+  const n = seed || 3;
+  return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <rect width="${w}" height="${h}" fill="#EDF0EA"/>
+    <path d="M0 ${h*.72} C ${w*.3} ${h*.6}, ${w*.55} ${h*.86}, ${w} ${h*.7} L${w} ${h} L0 ${h} Z" fill="#DCE8F5"/>
+    <path d="M-10 ${h*.3+n*4} L${w*.4} ${h*.22+n*2} L${w+10} ${h*.34}" stroke="#FFFFFF" stroke-width="7" fill="none"/>
+    <path d="M${w*.25} -10 L${w*.3} ${h*.5} L${w*.2} ${h+10}" stroke="#FFFFFF" stroke-width="5" fill="none"/>
+    <path d="M${w*.62} -10 L${w*.58} ${h*.44} L${w*.7} ${h+10}" stroke="#FFFFFF" stroke-width="5" fill="none"/>
+    <path d="M-10 ${h*.55} L${w*.5} ${h*.6} L${w+10} ${h*.52}" stroke="#FFFFFF" stroke-width="4" fill="none"/>
+    <rect x="${w*.08}" y="${h*.1}" width="${w*.1}" height="${h*.08}" rx="3" fill="#E2E6DE"/>
+    <rect x="${w*.44}" y="${h*.3}" width="${w*.12}" height="${h*.1}" rx="3" fill="#E2E6DE"/>
+    <rect x="${w*.78}" y="${h*.14}" width="${w*.09}" height="${h*.12}" rx="3" fill="#E2E6DE"/>
+  </svg>`;
+}
+
+/* ================================================================
+   공유 렌더 헬퍼
+   ================================================================ */
+const SEEDS = { sejong:7, seoul:11, busan:23, chuncheon:31, jeonju:17, jeju:41 };
+const msr = (name, opts = {}) => `<span class="msr${opts.fill ? ' fill' : ''}" style="font-size:${opts.size || 24}px;${opts.color ? 'color:' + opts.color : ''}" aria-hidden="true">${name}</span>`;
+
+function heartBtn(id, size = 21){
+  const on = !!S.fav[id];
+  return `<button class="heart${on ? ' on' : ''}" onclick="event.stopPropagation();APP.toggleFav('${id}')" aria-label="찜">
+    <span class="msr${on ? ' fill' : ''}" style="font-size:${size}px;color:${on ? 'var(--orange)' : '#C6C7CB'}">favorite</span></button>`;
+}
+function eventTags(c){
+  const tags = c.events.map((e, i) =>
+    `<span class="tag" style="background:${i === 0 ? 'var(--blue-soft)' : 'var(--fill)'};color:${i === 0 ? 'var(--blue)' : 'var(--ink2)'};font-weight:${i === 0 ? 800 : 600}">${e}</span>`);
+  if (c.noEvent) tags.push(`<span class="tag" style="background:#fff;color:var(--ink5);border:1px solid var(--line)">종목 미표기</span>`);
+  return tags.join('');
+}
+function raceRow(c, featured){
+  const d = new Date(c.date + 'T00:00:00');
+  const closed = c.status === 'closed';
+  return `<article class="racerow${featured ? ' featured' : ''}${closed ? ' closed' : ''}" onclick="APP.openDetail('${c.id}')">
+    <div class="datecol">
+      <div class="mon">${MON[d.getMonth()]}</div>
+      <div class="dd">${String(d.getDate()).padStart(2, '0')}</div>
+      <div class="dw">${DOW[d.getDay()]}</div>
+    </div>
+    <div class="vline"></div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <h3 class="name" style="margin:0">${esc(c.name)}</h3>
+        ${heartBtn(c.id)}
+      </div>
+      <div class="where">${esc(c.region)} · ${esc(c.place)}</div>
+      <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">${eventTags(c)}</div>
+      <div class="elevline">${elevStrip(SEEDS[c.id] || 3, 210, 22, closed)}</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+        <span class="chip ${chipClass(c)}" style="font-size:11.5px;padding:4px 9px">${statusLabel(c)}</span>
+        <span class="src">${esc(c.source)}</span>
+      </div>
+    </div>
+  </article>`;
+}
+function festCard(f){
+  return `<div class="festcard" style="width:${f.w || 180}px">
+    <div class="festph"><span class="lb">FESTIVAL PHOTO · KTO</span>${f.live ? '<span class="live">진행 중</span>' : ''}</div>
+    <div style="font-size:14.5px;font-weight:700;margin-top:9px;letter-spacing:-.02em">${esc(f.name)}</div>
+    <div style="font-size:12.5px;color:var(--ink4);margin-top:3px">${esc(f.meta)}</div>
+  </div>`;
+}
+const secHead = (title, aside) => `<div class="px" style="display:flex;align-items:baseline;justify-content:space-between">
+  <h2 class="h-sec" style="margin:0;white-space:nowrap">${title}</h2>${aside ? `<span class="meta">${aside}</span>` : ''}</div>`;
+const spinnerLine = text => `<div style="display:flex;align-items:center;gap:9px;color:var(--ink4);font-size:13.5px">
+  <span style="width:15px;height:15px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--blue);display:inline-block;animation:spin .8s linear infinite"></span>${text}</div>`;
+
+/* ================================================================
+   화면 템플릿
+   ================================================================ */
+const SCREENS = {};
+
+/* ── STEP0 디자인 시스템 ── */
+SCREENS.sheet = () => `
+<div class="screen" style="padding:8px 22px 40px">
+  <h1 class="h-screen" style="margin:0">런닝구 디자인 시스템 <span class="num" style="color:var(--blue)">v2</span></h1>
+  <p class="sub" style="margin:6px 0 0">전국 마라톤 일정 + 여행 동선 + 러닝코스 앱의 공통 토큰과 컴포넌트 — 라이트 지면과 블루 잉크 심연의 이원 레지스터, 데이터 3D.</p>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">컬러</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    ${[['#2B5CFF','주 색상 블루'],['#1E40D8','짙은 블루'],['#EEF2FF','연블루 배경'],['#C9F23C','포인트 라임'],['#FF6A2B','포인트 오렌지'],['#0C1024','심연(몰입 무대)']]
+      .map(([hex, name]) => `<div style="border:1px solid var(--line);border-radius:14px;overflow:hidden">
+        <div style="height:52px;background:${hex}"></div>
+        <div style="padding:8px 10px"><div style="font-size:12.5px;font-weight:700">${name}</div>
+        <div class="num" style="font-size:11.5px;color:var(--ink4)">${hex}</div></div></div>`).join('')}
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    ${[['#15161B','본문'],['#54565E','보조'],['#86878E','메타'],['#9A9CA2','약메타'],['#E4E4E6','보더']]
+      .map(([hex, name]) => `<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)">
+        <span style="width:14px;height:14px;border-radius:4px;background:${hex};display:inline-block;${hex === '#E4E4E6' ? 'border:1px solid var(--line)' : ''}"></span>${name} <span class="num">${hex}</span></span>`).join('')}
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">타이포</h2>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:26px;font-weight:800;letter-spacing:-.03em">화면 타이틀</span><span class="num meta" style="flex:none">26 / 800</span></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:17px;font-weight:800">섹션 헤딩</span><span class="num meta" style="flex:none">17 / 800</span></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:15px;font-weight:600">카드 제목</span><span class="num meta" style="flex:none">15 / 600</span></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span class="sub">본문 · 보조 설명 문구</span><span class="num meta" style="flex:none">13.5 / 400</span></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span class="meta">메타 · 출처 · 확인일</span><span class="num meta" style="flex:none">12 / 400</span></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span class="stat-num" style="font-size:38px">D-21 · 5.21<span style="font-size:20px">km</span></span><span class="num meta" style="flex:none">Archivo 800</span></div>
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">카테고리 태그 9종</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:7px">
+    ${Object.keys(CATS).map(k => `<span class="chip" style="background:${CATS[k].bg};color:${CATS[k].fg}">${k}</span>`).join('')}
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">상태 칩 · 배지</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+    <span class="chip chip-open">접수중</span>
+    <span class="chip chip-closed">마감</span>
+    <span class="badge-live">LIVE</span>
+    <span class="badge-sample">샘플</span>
+  </div>
+  <div class="recovery-banner" style="margin-top:12px;align-items:flex-start">
+    <span class="msr fill" style="font-size:20px;color:var(--orange)">spa</span>
+    <div>
+      <div style="font-size:13.5px;font-weight:700;color:var(--cat-recovery-fg)">D+1 회복 모드</div>
+      <div style="font-size:12.5px;color:var(--cat-recovery-fg);opacity:.82;margin-top:2px;line-height:1.45">고강도 일정을 빼고 온천·가벼운 산책 위주로 짭니다.</div>
+    </div>
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">데이터 3D · 고도 스트립</h2>
+  <div class="glcard" data-gl="sejong" data-gl-opts='{"dist":4.0,"alt":0.58}' style="height:170px">
+    <div class="cap"><span class="badge-sample">샘플</span><span class="t">코스 지형 · 라임 리본이 경로</span></div>
+  </div>
+  <div style="margin-top:10px;border:1px solid var(--line);border-radius:14px;padding:12px 14px">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:6px">대회별 고도 스트립</div>
+    ${elevStrip(7, 300, 26)}
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">대회 로우</h2>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    ${raceRow(CONTESTS[0], false)}
+    ${raceRow(CONTESTS[4], false)}
+  </div>
+
+  <div class="divider" style="margin:22px 0"></div>
+  <h2 style="font-size:15px;font-weight:800;margin:0 0 12px">빈 상태 · 버튼</h2>
+  <div style="border:1px dashed var(--line);border-radius:20px;padding:34px 20px" class="empty">
+    <div class="t">조건에 맞는 대회가 없어요.</div>
+    <div class="d">필터를 조금 넓혀 보세요.</div>
+    <button>필터 초기화</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+    <button class="cta">주요 CTA · 56px</button>
+    <button class="cta ghost">보조 버튼</button>
+    <button class="cta" disabled>비활성</button>
+  </div>
+</div>`;
+
+/* ── S1 홈 ── */
+SCREENS.home = () => {
+  const featured = CONTESTS[0];
+  const closing = [CONTESTS[1], CONTESTS[0], CONTESTS[2], CONTESTS[5]].map(c => {
+    const dl = { seoul:4, sejong:9, busan:27, jeju:62 }[c.id];
+    return { c, dl };
+  });
+  const fests = [
+    { name:'부산 바다축제', meta:'08.01~08.09 · 부산', live:true },
+    { name:'봉화 은어축제', meta:'08.01~08.10 · 경북', live:true },
+    { name:'세종 호수공원 물빛축제', meta:'08.20~08.24 · 세종' },
+    { name:'평창 백일홍축제', meta:'08.28~09.13 · 강원' }
+  ];
+  return `
+<div class="screen" style="padding-bottom:26px;background:var(--surface)">
+  <div class="hero gl-panel" data-gl="sejong" data-gl-opts='{"dist":3.6,"az":0.9,"alt":0.5}'>
+    <div class="gl-veil"></div>
+    <div class="brandrow">
+      <div class="logo">${msr('sprint', { size:21, fill:true, color:'var(--ink)' })}</div>
+      <span class="wordmark">런닝구</span>
+    </div>
+    <div class="searchwrap">
+      <div class="field" style="height:50px">
+        <button onclick="APP.goSearch()" aria-label="검색">${msr('search', { size:22, color:'var(--deep-t3)' })}</button>
+        <input id="homeQ" value="${esc(S.homeQ)}" placeholder="대회·지역 검색"
+          oninput="APP.setHomeQ(this.value)" onkeydown="if(event.key==='Enter')APP.goSearch()">
+      </div>
+    </div>
+    <div class="featured" onclick="APP.openDetail('${featured.id}')">
+      <div style="display:flex;align-items:flex-end;gap:14px">
+        <div class="dday stat-num">D-${dday(featured.date)}</div>
+        <div style="padding-bottom:4px;min-width:0;flex:1">
+          <div class="name">${esc(featured.name)}</div>
+          <div style="font-size:12.5px;color:var(--deep-t2);margin-top:3px">08.22 토 08:00 · ${esc(featured.place)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:13px">
+        <span class="chip chip-open" style="font-size:11.5px;padding:4px 9px;flex:none">접수중 · ~08.10</span>
+        <span style="font-size:12px;color:var(--deep-t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(featured.source)}</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:2px;font-size:12.5px;font-weight:700;color:var(--deep-t1);white-space:nowrap">대회 보기 ${msr('chevron_right', { size:16, color:'var(--deep-t2)' })}</span>
+      </div>
+      <button class="cta lime" style="height:52px;margin-top:14px;font-size:15.5px"
+        onclick="event.stopPropagation();APP.startWizardFromHero('${featured.id}')">이 대회로 동선 만들기</button>
+    </div>
+  </div>
+
+  <div class="quickbar">
+    <button onclick="APP.go('calendar')">${msr('calendar_month', { size:25 })}<span class="lb">달력</span></button>
+    <button onclick="APP.goCoursesTab('near')">${msr('map', { size:25 })}<span class="lb">지도</span></button>
+    <button onclick="APP.goCoursesTab('region')">${msr('route', { size:25 })}<span class="lb">코스</span></button>
+    <button onclick="APP.scrollFestival()">${msr('attractions', { size:25 })}<span class="lb">관광</span></button>
+  </div>
+
+  <div style="padding-top:28px">
+    ${secHead('마감 임박 대회', '접수 마감 순')}
+    <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 8px;scroll-snap-type:x mandatory">
+      ${closing.map(({ c, dl }) => `
+        <div class="railcard" onclick="APP.openDetail('${c.id}')">
+          <span class="${dl <= 10 ? 'pill-hot' : 'pill-cool'}">마감 D-${dl}</span>
+          <div style="font-size:15px;font-weight:700;margin-top:11px;line-height:1.35;letter-spacing:-.02em;min-height:40px">${esc(c.name)}</div>
+          <div style="font-size:12.5px;color:var(--ink4);margin:6px 0 9px">${esc(c.region)} · ${c.date.slice(5).replace('-', '.')} ${DOW[new Date(c.date + 'T00:00:00').getDay()]} ${c.time}</div>
+          ${elevStrip(SEEDS[c.id] || 3, 180, 20)}
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div id="home-festival" style="padding-top:26px">
+    ${secHead('축제·지역 관광 추천', '8월')}
+    <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px">
+      ${fests.map(festCard).join('')}
+    </div>
+    <div class="px src" style="padding-top:10px">출처 · 한국관광공사</div>
+  </div>
+</div>`;
+};
+
+/* ── S2 캘린더 ── */
+function calChips(){
+  const f = S.f, chips = [];
+  f.events.forEach(e => chips.push({ label:e, act:`APP.rmEventFilter('${e}')` }));
+  if (f.openOnly) chips.push({ label:'접수 가능만', act:'APP.rmOpenOnly()' });
+  f.regions.forEach(r => chips.push({ label:r, act:`APP.rmRegionFilter('${r}')` }));
+  return chips;
+}
+function calListBody(){
+  const all = filtered();
+  const monthPrefix = S.calY + '-' + String(S.calM + 1).padStart(2, '0');
+  const monthList = all.filter(c => c.date.indexOf(monthPrefix) === 0);
+  const dayList = S.selDate ? all.filter(c => c.date === S.selDate) : monthList;
+  const shown = S.view === 'list' ? all : dayList;
+  let firstOpen = -1;
+  shown.forEach((c, i) => { if (firstOpen < 0 && c.status === 'open') firstOpen = i; });
+  const emptyTitle = S.view === 'list' ? '조건에 맞는 대회가 없어요.' : S.selDate ? '이 날엔 대회가 없어요.' : '이 달엔 대회가 없어요.';
+  return `
+    ${S.view === 'list' ? `<div class="px" style="padding-top:4px;padding-bottom:10px;font-size:13.5px;font-weight:600;color:var(--ink2)">대회 <span class="num" style="color:var(--blue);font-weight:800">${all.length}</span></div>` : ''}
+    ${S.view === 'cal' ? calGrid() : ''}
+    <div class="px" style="display:flex;flex-direction:column;gap:10px">
+      ${shown.map((c, i) => raceRow(c, S.view === 'list' && i === firstOpen)).join('')}
+    </div>
+    ${shown.length === 0 ? `<div class="empty" style="padding:56px 34px">
+      <div class="t">${emptyTitle}</div>
+      ${S.view === 'list' ? `<button onclick="APP.resetFilters()">필터 초기화</button>` : ''}
+    </div>` : ''}`;
+}
+function calGrid(){
+  const first = new Date(S.calY, S.calM, 1);
+  const days = new Date(S.calY, S.calM + 1, 0).getDate();
+  const pad = first.getDay();
+  const counts = {};
+  filtered().forEach(c => { counts[c.date] = (counts[c.date] || 0) + 1; });
+  let cells = '';
+  for (let i = 0; i < pad; i++) cells += `<div style="height:46px"></div>`;
+  for (let d = 1; d <= days; d++){
+    const ds = S.calY + '-' + String(S.calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const dow = new Date(S.calY, S.calM, d).getDay();
+    const sel = S.selDate === ds, today = ds === TODAY, n = counts[ds] || 0;
+    cells += `<button onclick="APP.selDate('${ds}')" style="height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:13px;background:${sel ? 'var(--blue-soft)' : 'transparent'}">
+      <span class="num" style="width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:${sel ? 800 : 500};
+        color:${sel ? '#fff' : dow === 0 ? '#E5484D' : dow === 6 ? 'var(--blue)' : 'var(--ink)'};
+        background:${sel ? 'var(--blue)' : 'transparent'};border:1.5px solid ${today && !sel ? 'var(--blue)' : 'transparent'}">${d}</span>
+      ${n > 0 ? (n > 1
+        ? `<span class="num" style="height:13px;min-width:13px;padding:0 4px;border-radius:7px;background:var(--blue);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center">${n}</span>`
+        : `<span style="width:5px;height:5px;border-radius:50%;background:var(--blue)"></span>`)
+        : ''}
+    </button>`;
+  }
+  const selD = S.selDate ? new Date(S.selDate + 'T00:00:00') : null;
+  const monthPrefix = S.calY + '-' + String(S.calM + 1).padStart(2, '0');
+  const all = filtered();
+  const monthList = all.filter(c => c.date.indexOf(monthPrefix) === 0);
+  const dayList = S.selDate ? all.filter(c => c.date === S.selDate) : monthList;
+  const label = selD
+    ? `${String(selD.getMonth() + 1).padStart(2, '0')}.${String(selD.getDate()).padStart(2, '0')} (${DOW[selD.getDay()]}) 대회 ${dayList.length}`
+    : `${S.calY}.${S.calM + 1} 대회 ${monthList.length}`;
+  return `<div class="px" style="padding-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:center;gap:18px;padding:4px 0 12px">
+      <button onclick="APP.prevMonth()" aria-label="이전 달">${msr('chevron_left', { size:24, color:'var(--ink2)' })}</button>
+      <span class="num" style="font-size:19px;font-weight:800;letter-spacing:-.01em;min-width:88px;text-align:center">${S.calY}.${S.calM + 1}</span>
+      <button onclick="APP.nextMonth()" aria-label="다음 달">${msr('chevron_right', { size:24, color:'var(--ink2)' })}</button>
+    </div>
+    <div class="calgrid" style="margin-bottom:4px">
+      ${DOW.map((d, i) => `<div style="text-align:center;font-size:11.5px;font-weight:700;color:${i === 0 ? '#E5484D' : i === 6 ? 'var(--blue)' : 'var(--ink4)'}">${d}</div>`).join('')}
+    </div>
+    <div class="calgrid" style="gap:2px">${cells}</div>
+    <div style="font-size:12.5px;color:var(--ink2);font-weight:600;margin-top:14px">${label}</div>
+  </div>`;
+}
+SCREENS.calendar = () => {
+  const chips = calChips();
+  return `
+<div class="screen" style="padding-bottom:26px">
+  <div style="position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);z-index:5;padding:6px 22px 12px">
+    <div class="field" style="height:48px">
+      ${msr('search', { size:21, color:'var(--ink4)' })}
+      <input id="calQ" value="${esc(S.q)}" placeholder="대회·지역 검색" oninput="APP.setQ(this.value)">
+      ${S.q ? `<button onclick="APP.clearQ()" aria-label="지우기">${msr('cancel', { size:19, color:'var(--ink5)' })}</button>` : ''}
+    </div>
+    <div class="seg" style="margin-top:11px">
+      <button class="${S.view === 'list' ? 'on' : ''}" onclick="APP.setView('list')">리스트</button>
+      <button class="${S.view === 'cal' ? 'on' : ''}" onclick="APP.setView('cal')">캘린더</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:11px;overflow-x:auto;padding-bottom:2px">
+      <button onclick="APP.openFilter()" style="display:flex;align-items:center;gap:5px;flex:none;height:34px;padding:0 13px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap;
+        background:${chips.length ? 'var(--blue)' : '#fff'};color:${chips.length ? '#fff' : 'var(--ink)'};border:1px solid ${chips.length ? 'var(--blue)' : 'var(--line)'}">
+        ${msr('tune', { size:17 })}<span>필터</span>${chips.length ? `<span class="num" style="font-weight:800">${chips.length}</span>` : ''}
+      </button>
+      ${chips.map(ch => `<button onclick="${ch.act}" style="display:flex;align-items:center;gap:4px;flex:none;background:var(--blue-soft);color:var(--blue);font-size:12.5px;font-weight:600;padding:7px 10px 7px 12px;border-radius:13px;white-space:nowrap">
+        <span>${ch.label}</span>${msr('close', { size:15 })}</button>`).join('')}
+    </div>
+  </div>
+  <div id="cal-body">${calListBody()}</div>
+</div>`;
+};
+
+/* ── S3 대회 상세 ── */
+SCREENS.detail = () => {
+  const det = CONTESTS.find(c => c.id === S.detailId) || CONTESTS[0];
+  const d = new Date(det.date + 'T00:00:00');
+  const apply = det.status === 'closed' ? '07.01 ~ 07.25 (마감)' : det.status === 'before' ? '08.10 ~ 09.10' : '07.01 ~ ' + det.deadline.replace('~', '');
+  const fest = S.festState;
+  return `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column">
+  <div style="position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:space-between;padding:4px 18px 8px">
+    <button class="backbtn" onclick="APP.back()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="backbtn" style="margin:0" aria-label="공유">${msr('ios_share', { size:23, color:'var(--ink2)' })}</button>
+      ${heartBtn(det.id, 24)}
+    </div>
+  </div>
+
+  <div class="px" style="padding-top:6px">
+    <h1 style="font-size:25px;font-weight:800;letter-spacing:-.035em;line-height:1.28;margin:0">${esc(det.name)}</h1>
+    <div style="font-size:13px;font-weight:600;color:var(--ink2);margin-top:6px">${esc(det.region)} · 마라톤</div>
+    <div style="display:flex;align-items:flex-end;gap:12px;margin-top:16px">
+      <div class="stat-num" style="font-size:48px;line-height:.95;color:var(--blue)">D-${dday(det.date)}</div>
+      <div style="padding-bottom:3px">
+        <div style="font-size:15.5px;font-weight:700">${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${DOW[d.getDay()]}요일</div>
+        <div style="font-size:13px;color:var(--ink2);margin-top:2px;white-space:nowrap">출발 ${det.time} · ${esc(det.place)}</div>
+      </div>
+    </div>
+    <div style="margin-top:14px"><span class="chip ${chipClass(det)}" style="font-size:13px;padding:7px 13px">${statusLabel(det)}</span></div>
+
+    <div class="glcard" data-gl="${det.id}" data-gl-opts='{"dist":3.4,"alt":0.54}' style="margin-top:18px">
+      <div class="cap"><span class="badge-sample">샘플</span><span class="t">코스 지형 미리보기 · 드래그로 회전</span></div>
+    </div>
+  </div>
+
+  <div class="infobox" style="margin:18px 22px 0">
+    <div class="inforow"><div class="k">종목</div><div class="v">${det.events.join(' · ')}</div></div>
+    <div class="inforow"><div class="k">접수 기간</div><div class="v">${apply}</div></div>
+    <div class="inforow"><div class="k">주최</div><div class="v">${esc(det.host || det.region + '시체육회')}</div></div>
+    <div class="inforow" style="align-items:center"><div class="k">출처</div><div style="flex:1;font-size:13px;color:var(--ink2)">${esc(det.source)}</div></div>
+    <div style="padding:2px 0 14px">
+      <button style="width:100%;height:42px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:5px;font-size:13.5px;font-weight:700">
+        <span style="white-space:nowrap">공식 페이지</span>${msr('open_in_new', { size:17, color:'var(--ink2)' })}
+      </button>
+    </div>
+  </div>
+
+  <div style="padding-top:26px">
+    ${secHead('인근 축제')}
+    ${fest === 'ok' ? `
+      <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px">
+        ${festCard({ name:'세종 호수공원 물빛축제', meta:'08.20~08.24 · 대회장 0.8km', w:200 })}
+        ${festCard({ name:'조치원 복숭아축제', meta:'08.21~08.23 · 대회장 12.4km', w:200 })}
+      </div>
+      <div class="px src" style="padding-top:10px">출처 · 한국관광공사</div>` : ''}
+    ${fest === 'loading' ? `<div class="px" style="padding:34px 22px">${spinnerLine('축제를 찾는 중…')}</div>` : ''}
+    ${fest === 'empty' ? `<div style="padding:30px 22px 0;text-align:center">
+      <div style="font-size:14.5px;font-weight:700">대회 기간에 열리는 인근 축제가 없어요.</div>
+      <div style="font-size:13px;color:var(--ink4);margin-top:6px;line-height:1.5">대회 전후 여행 동선은 그대로 짜드릴 수 있어요.</div>
+    </div>` : ''}
+  </div>
+
+  <div style="flex:1;min-height:26px"></div>
+  <div class="stickycta">
+    <button class="cta" onclick="APP.go('w1')">이 대회로 동선 만들기</button>
+  </div>
+</div>`;
+};
+
+/* ── S10 보관함 ── */
+SCREENS.library = () => {
+  const favList = CONTESTS.filter(c => S.fav[c.id]);
+  const libEmpty = S.dbg.lib === 'empty';
+  const courses = (S.ranSaved ? [{ ran:true, name:'해파랑길 1코스 왕복', meta:"07.28 (화) · 실제 5.21km · 32:10 · 6'11\"/km" }] : [])
+    .concat([{ ran:false, name:'해파랑길 1코스 왕복', meta:'부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }]);
+  let body = '';
+  if (S.libTab === 'route'){
+    body = (S.saved && !libEmpty) ? `
+      <article style="margin:16px 22px 0;border:1px solid var(--line2);border-radius:20px;padding:17px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openSavedRoute()">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:19px;font-weight:800;letter-spacing:-.03em">세종 2박 3일</div>
+            <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">2026 세종 호수공원 마라톤 · 하프</div>
+          </div>
+          <span style="background:var(--cat-recovery-bg);color:var(--cat-recovery-fg);font-size:11px;font-weight:800;padding:5px 9px;border-radius:11px;white-space:nowrap;flex:none">D+1 회복 모드</span>
+        </div>
+        ${elevStrip(7, 300, 24)}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:13px;border-top:1px solid var(--line3)">
+          <div style="font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap">08.21~08.23 · 10곳</div>
+          <button onclick="event.stopPropagation();APP.deleteSavedRoute()" aria-label="삭제">${msr('delete', { size:20, color:'var(--ink5)' })}</button>
+        </div>
+      </article>` : `
+      <div class="empty" style="padding:70px 34px">
+        <div class="t">아직 저장한 동선이 없어요.</div>
+        <div class="d">대회를 골라 첫 동선을 만들어 보세요.</div>
+        <button onclick="APP.go('calendar')">대회 둘러보기</button>
+      </div>`;
+  } else if (S.libTab === 'course'){
+    body = !libEmpty ? `
+      <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:9px">
+        ${courses.map(c => `
+          <article style="border:1px solid var(--line2);border-radius:20px;padding:16px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openCourseDetail(${c.ran})">
+            ${c.ran ? `<span style="background:var(--lime);color:var(--ink);font-size:11px;font-weight:800;padding:4px 9px;border-radius:11px">완료</span>` : ''}
+            <div style="font-size:15.5px;font-weight:700;letter-spacing:-.025em;margin-top:${c.ran ? 8 : 0}px">${esc(c.name)}</div>
+            <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">${esc(c.meta)}</div>
+          </article>`).join('')}
+      </div>` : `
+      <div class="empty" style="padding:70px 34px">
+        <div class="t">저장한 코스가 없어요.</div>
+        <button onclick="APP.go('courses')">러닝코스 둘러보기</button>
+      </div>`;
+  } else {
+    body = (favList.length && !libEmpty) ? `
+      <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:10px">
+        ${favList.map(c => raceRow(c, false)).join('')}
+      </div>` : `
+      <div class="empty" style="padding:70px 34px">
+        <div class="t">찜한 대회가 없어요.</div>
+        <button onclick="APP.go('calendar')">대회 둘러보기</button>
+      </div>`;
+  }
+  return `
+<div class="screen" style="padding-bottom:26px">
+  <div style="padding:6px 22px 0">
+    <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">보관함</h1>
+    <div class="seg" style="margin-top:14px">
+      <button class="${S.libTab === 'route' ? 'on' : ''}" onclick="APP.setLibTab('route')">동선</button>
+      <button class="${S.libTab === 'course' ? 'on' : ''}" onclick="APP.setLibTab('course')">러닝코스</button>
+      <button class="${S.libTab === 'fav' ? 'on' : ''}" onclick="APP.setLibTab('fav')">찜한 대회</button>
+    </div>
+  </div>
+  ${body}
+</div>`;
+};
+
+/* ── 보관함 코스 상세 ── */
+SCREENS.coursedetail = () => {
+  const statRow = cells => `
+    <div style="display:flex;margin-top:18px;border:1px solid var(--line);border-radius:20px;padding:18px 8px;background:var(--surface)">
+      ${cells.map(([k, v], i) => `
+        ${i ? '<div style="width:1px;background:var(--line3)"></div>' : ''}
+        <div style="flex:1;text-align:center">
+          <div style="font-size:11.5px;color:var(--ink4);font-weight:600">${k}</div>
+          <div class="stat-num" style="font-size:22px;margin-top:4px">${v}</div>
+        </div>`).join('')}
+    </div>`;
+  return `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
+  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.goLibrary()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div class="px" style="padding-top:6px">
+    <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin:0">${S.cdRan ? '해파랑길 1코스 왕복 · 뛴 기록' : '해파랑길 1코스 왕복'}</h1>
+    <div style="font-size:13px;color:var(--ink4);margin-top:5px">${S.cdRan ? '07.28 (화) · 부산 해운대구' : '부산 해운대구 · 5.0km · 약 45분 · 난이도 중'}</div>
+    <div class="glcard" data-gl="${S.cdRan ? 'runTrack' : 'haeparang'}" data-gl-opts='{"dist":4.1,"alt":0.6}' style="margin-top:16px;height:230px">
+      <div class="cap">${S.cdRan ? '<span class="badge-live">GPS</span>' : '<span class="badge-sample">샘플</span>'}<span class="t">${S.cdRan ? '뛴 경로 · 라임 리본' : '코스 지형 · 드래그로 회전'}</span></div>
+    </div>
+    ${S.cdRan
+      ? statRow([['거리','5.21 km'],['시간','32:10'],["페이스","6'11\""]]) + `
+        <div class="src" style="margin-top:12px">GPS 기록 · 해파랑길 1코스 왕복 기준</div>`
+      : statRow([['거리','5.0 km'],['예상 시간','약 45분'],['난이도','중']]) + `
+        <div style="margin-top:14px;border:1px solid var(--line);border-radius:16px;padding:13px 15px;background:var(--surface)">
+          <div style="display:flex;align-items:center;gap:8px">
+            ${msr('my_location', { size:18, color:'var(--blue)' })}
+            <div style="font-size:13.5px;font-weight:600">부산 해운대 출발 · 진입점까지 420m</div>
+          </div>
+          ${elevStrip(23, 300, 26)}
+        </div>
+        <div class="src" style="margin-top:12px">두루누비 걷기길 · 한국관광공사</div>`}
+  </div>
+  <div style="flex:1;min-height:20px"></div>
+  ${!S.cdRan ? `
+  <div style="padding:0 22px 18px">
+    <button class="cta lime" onclick="APP.go('run')">이 코스 뛰기</button>
+  </div>` : ''}
+</div>`;
+};
+
+/* ── A1 로그인 ── */
+SCREENS.login = () => `
+<div class="screen deepzone" style="min-height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden">
+  <div class="gl-panel" data-gl="sejong" data-gl-opts='{"dist":3.4,"spin":0.05,"noRoute":true}' style="position:absolute;inset:0"></div>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:62%;background:linear-gradient(to top,var(--deep) 55%,rgba(12,16,36,0));pointer-events:none"></div>
+  <div style="position:relative;z-index:2;display:flex;flex-direction:column;min-height:100%;padding:0 22px 22px;flex:1">
+    <div style="padding-top:52px;display:flex;flex-direction:column;align-items:center">
+      <div style="width:62px;height:62px;border-radius:20px;background:var(--lime);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(201,242,60,.25)">
+        ${msr('sprint', { size:36, fill:true, color:'var(--ink)' })}
+      </div>
+      <div style="font-size:27px;font-weight:800;letter-spacing:-.04em;margin-top:14px">런닝구</div>
+      <div style="font-size:13.5px;color:var(--deep-t2);margin-top:6px;white-space:nowrap">내가 뛸 동네를 가장 잘 아는 친구</div>
+    </div>
+    <div style="margin-top:40px;display:flex;flex-direction:column;gap:9px">
+      <input placeholder="이메일" style="width:100%;height:52px;border-radius:16px;border:1.5px solid var(--deep-line);padding:0 15px;font-size:14.5px;color:var(--deep-t1);background:rgba(19,26,56,.7)">
+      <input type="password" placeholder="비밀번호" style="width:100%;height:52px;border-radius:16px;border:1.5px solid var(--deep-line);padding:0 15px;font-size:14.5px;color:var(--deep-t1);background:rgba(19,26,56,.7)">
+      ${S.dbg.login === 'error' ? `<div style="font-size:12.5px;color:#FF8B7E;font-weight:600;padding-left:4px">이메일 또는 비밀번호를 확인해 주세요</div>` : ''}
+      <button class="cta" style="margin-top:5px" onclick="APP.doLogin()">로그인</button>
+      <button class="cta" style="background:#FEE500;color:var(--ink);box-shadow:none" onclick="APP.doLogin()">
+        ${msr('chat_bubble', { size:21, fill:true })}카카오로 시작하기
+      </button>
+    </div>
+    <div style="flex:1;min-height:24px"></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px">
+      <button style="font-size:13.5px;font-weight:600;color:var(--deep-t2)" onclick="APP.goSignup()">회원가입</button>
+      <div style="width:1px;height:12px;background:var(--deep-line)"></div>
+      <button style="font-size:13.5px;font-weight:600;color:var(--deep-t2)" onclick="APP.goFindPw()">비밀번호 찾기</button>
+      <div style="width:1px;height:12px;background:var(--deep-line)"></div>
+      <button style="font-size:13.5px;font-weight:800;color:var(--lime)" onclick="APP.doGuest()">둘러보기</button>
+    </div>
+  </div>
+</div>`;
+
+/* ── A2 회원가입 ── */
+function codeBoxesHtml(){
+  return [0,1,2,3,4,5].map(i => `
+    <div class="num" style="flex:1;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;
+      background:#F7F7F5;border:1.5px solid ${S.code.length === i ? 'var(--blue)' : 'var(--line)'}">${S.code[i] || ''}</div>`).join('');
+}
+SCREENS.signup = () => {
+  const st = S.suStep;
+  const allAgree = S.agree.tos && S.agree.privacy && S.agree.mkt;
+  const ctaOn = !(st === 1 && !(S.agree.tos && S.agree.privacy)) && !(st === 3 && S.code.length < 6);
+  const input = `width:100%;height:52px;border-radius:16px;border:1px solid var(--line);padding:0 15px;font-size:14.5px;color:var(--ink);background:#fff`;
+  let body = '';
+  if (st === 1) body = `
+    <div style="padding:26px 22px 0">
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">약관에 동의해 주세요</h1>
+      <button style="width:100%;display:flex;align-items:center;gap:10px;padding:15px 14px;border-radius:16px;background:#F7F7F5;margin-top:20px" onclick="APP.toggleAllAgree()">
+        ${msr('check_circle', { size:24, fill:true, color: allAgree ? 'var(--blue)' : '#C6C7CB' })}
+        <span style="font-size:15px;font-weight:800">전체 동의</span>
+      </button>
+      <div style="display:flex;flex-direction:column;margin-top:6px">
+        ${[['tos','[필수] 이용약관 동의'],['privacy','[필수] 개인정보 수집·이용 동의'],['mkt','[선택] 마케팅 정보 수신 동의']].map(([k, l]) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:13px 4px">
+            <button onclick="APP.toggleAgree('${k}')" aria-label="${l} 동의">${msr('check_circle', { size:22, fill:true, color: S.agree[k] ? 'var(--blue)' : '#D6D6DA' })}</button>
+            <div style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink)">${l}</div>
+            <button style="font-size:12.5px;color:var(--ink5);text-decoration:underline">보기</button>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  else if (st === 2) body = `
+    <div style="padding:26px 22px 0">
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">정보를 입력해 주세요</h1>
+      <div style="display:flex;gap:8px;margin-top:20px">
+        <input placeholder="이메일" style="${input};flex:1;min-width:0;width:auto">
+        <button style="flex:none;height:52px;padding:0 15px;border-radius:16px;border:1px solid var(--line);font-size:13.5px;font-weight:700;white-space:nowrap">중복 확인</button>
+      </div>
+      <div style="margin-top:10px">
+        <input type="password" placeholder="비밀번호" style="${input}">
+        <div style="font-size:12px;color:var(--ink4);margin-top:6px;padding-left:4px">8자 이상 영문+숫자</div>
+      </div>
+      <div style="margin-top:10px"><input type="password" placeholder="비밀번호 확인" style="${input}"></div>
+      <div style="margin-top:10px">
+        <input placeholder="닉네임" style="${input}">
+        <div style="font-size:12px;color:var(--ink4);margin-top:6px;padding-left:4px">2~12자</div>
+      </div>
+    </div>`;
+  else if (st === 3) body = `
+    <div style="padding:26px 22px 0">
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">이메일 인증</h1>
+      <div class="sub" style="margin-top:8px">입력한 이메일로 인증 코드를 보냈어요</div>
+      <div style="position:relative;margin-top:22px">
+        <div id="codeBoxes" style="display:flex;gap:7px">${codeBoxesHtml()}</div>
+        <input id="codeInput" value="${esc(S.code)}" maxlength="6" inputmode="numeric" autocomplete="one-time-code"
+          oninput="APP.setCode(this.value)" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+        <div class="num" style="font-size:14px;font-weight:800;color:var(--blue)">9:41</div>
+        <button id="resendBtn" onclick="APP.resend()" style="font-size:13px;font-weight:700;color:${S.resendLeft > 0 ? 'var(--ink5)' : 'var(--blue)'}">${S.resendLeft > 0 ? '재발송 ' + S.resendLeft + '초' : '재발송'}</button>
+      </div>
+    </div>`;
+  else body = `
+    <div style="padding:70px 22px 0;text-align:center">
+      <div style="width:78px;height:78px;border-radius:50%;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;margin:0 auto;animation:popIn .4s var(--ease-spring)">
+        ${msr('check_circle', { size:44, fill:true, color:'var(--blue)' })}
+      </div>
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:20px 0 0">가입이 완료됐어요</h1>
+      <div class="sub" style="margin-top:8px">이제 대회를 찜하고 동선을 저장할 수 있어요</div>
+    </div>`;
+  return `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column">
+  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.signupBack()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div style="display:flex;align-items:flex-start;gap:6px;padding:12px 22px 0">
+    ${['동의','정보 입력','이메일 인증','완료'].map((l, i) => {
+      const n = i + 1, on = st >= n, cur = st === n;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div class="num" style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+          background:${on ? 'var(--blue)' : 'var(--fill)'};color:${on ? '#fff' : 'var(--ink5)'}">${n}</div>
+        <div style="font-size:11px;font-weight:${cur ? 800 : 600};color:${cur ? 'var(--ink)' : 'var(--ink5)'};white-space:nowrap">${l}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  ${body}
+  <div style="flex:1;min-height:26px"></div>
+  <div class="stickycta">
+    <button class="cta" id="suCta" ${ctaOn ? '' : 'disabled'} onclick="APP.suNext()">${st === 4 ? '시작하기' : st === 3 ? '인증 확인' : '다음'}</button>
+  </div>
+</div>`;
+};
+
+/* ── A3 비밀번호 찾기 ── */
+SCREENS.findpw = () => `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column">
+  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.go('login')" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div class="px" style="padding-top:16px">
+    <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">비밀번호 찾기</h1>
+    <div class="sub" style="margin-top:8px">가입한 이메일로 재설정 링크를 보내드려요.</div>
+    <div style="margin-top:22px"><input placeholder="이메일" style="width:100%;height:52px;border-radius:16px;border:1px solid var(--line);padding:0 15px;font-size:14.5px;background:#fff"></div>
+    <button class="cta" style="margin-top:12px" onclick="APP.sendReset()">재설정 메일 발송</button>
+    ${S.resetSent ? `
+      <div style="margin-top:14px;background:var(--blue-soft);color:var(--blue);font-size:13px;font-weight:600;padding:13px 15px;border-radius:16px;line-height:1.45">가입된 이메일이면 재설정 링크를 보냈어요</div>
+      <button style="display:block;margin:14px auto 0;font-size:13px;font-weight:700;color:var(--ink5)" onclick="APP.goNewPw()">메일의 링크 열기 (데모)</button>` : ''}
+  </div>
+</div>`;
+
+/* ── A3 새 비밀번호 (웹) ── */
+SCREENS.newpw = () => {
+  const webInput = `width:100%;height:44px;border-radius:10px;border:1px solid var(--line);padding:0 13px;font-size:14px;background:#fff`;
+  return `
+<div class="screen" style="min-height:100%;background:#F4F5F7;padding:30px 20px">
+  <div style="max-width:340px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 22px;box-shadow:var(--sh-1)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:26px;height:26px;border-radius:8px;background:var(--lime);display:flex;align-items:center;justify-content:center">${msr('sprint', { size:16, fill:true })}</div>
+      <div style="font-size:15px;font-weight:800;letter-spacing:-.03em">런닝구</div>
+    </div>
+    ${S.pwChanged ? `
+      <div style="font-size:18px;font-weight:700;margin-top:22px;letter-spacing:-.02em">비밀번호가 변경됐어요.</div>
+      <div class="sub" style="margin-top:8px">다시 로그인해 주세요.</div>
+      <button style="width:100%;height:46px;border-radius:10px;background:var(--blue);color:#fff;font-size:14.5px;font-weight:700;margin-top:20px;display:flex;align-items:center;justify-content:center" onclick="APP.go('login')">앱으로 돌아가기</button>` : `
+      <div style="font-size:18px;font-weight:700;margin-top:22px;letter-spacing:-.02em">새 비밀번호 설정</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:16px">
+        <input type="password" placeholder="새 비밀번호" style="${webInput}">
+        <input type="password" placeholder="새 비밀번호 확인" style="${webInput}">
+      </div>
+      <button style="width:100%;height:46px;border-radius:10px;background:var(--blue);color:#fff;font-size:14.5px;font-weight:700;margin-top:16px;display:flex;align-items:center;justify-content:center" onclick="APP.changePw()">변경하기</button>`}
+  </div>
+</div>`;
+};
+
+/* ── S8 러닝코스 ── */
+function coursesMapHtml(){
+  const hasCourse = S.dbg.courses === 'ok';
+  return `<div class="map2d" style="height:230px;margin-top:18px">
+    ${mapBase(390, 230, 2)}
+    ${hasCourse ? `<svg viewBox="0 0 390 230" style="position:absolute;inset:0;width:100%;height:100%">
+      <polyline class="drawline" style="--len:420" points="60,180 96,120 150,96 214,104 268,74 322,96"
+        fill="none" stroke="var(--blue)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    </svg>` : ''}
+    ${SPOTS.map((sp, i) => `<div style="position:absolute;left:${sp.x}px;top:${sp.y}px;width:24px;height:24px;border-radius:50%;background:#fff;color:var(--ink);
+      display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:11.5px;font-weight:800;border:2px solid var(--ink);box-shadow:0 2px 6px rgba(21,22,27,.18)">${i + 1}</div>`).join('')}
+  </div>`;
+}
+function courseInfoHtml(){
+  const spec = `왕복 ${S.dist.toFixed(1)}km · 약 ${Math.round(S.dist * 9)}분 · 난이도 중`;
+  const where = (S.courseStart === '부산 해운대' ? '부산 해운대구' : S.courseStart) + ' · 출발지→진입점 420m';
+  return `
+    <div style="margin:16px 22px 0;border:1.5px solid var(--blue);border-radius:20px;padding:16px;background:var(--surface);box-shadow:0 10px 26px rgba(43,92,255,.10)">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1;font-size:16px;font-weight:800;letter-spacing:-.025em">${esc(S.course)} 왕복</div>
+        <span class="badge-sample">샘플</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">${esc(where)}</div>
+      <div id="course-spec" style="font-size:13.5px;font-weight:700;color:var(--blue);margin-top:9px">${spec}</div>
+      ${elevStrip(23, 300, 26)}
+      <div id="course-short">${S.dist > 12 ? `<div style="margin-top:10px;background:var(--cat-recovery-bg);color:var(--cat-recovery-fg);font-size:12px;font-weight:600;padding:9px 11px;border-radius:12px;line-height:1.4">이 코스가 짧아 목표(${S.dist.toFixed(1)}km)보다 짧게 짜였어요.</div>` : ''}</div>
+    </div>`;
+}
+SCREENS.courses = () => {
+  const cd = S.dbg.courses;
+  const hasMap = cd === 'ok' || cd === 'nocourse';
+  const alts = ['해파랑길 2코스', '남파랑길 2코스', '남파랑길 3코스'].filter(c => c !== S.course)
+    .concat(S.course === '해파랑길 1코스' ? [] : ['해파랑길 1코스']).slice(0, 3);
+  const nearBody = `
+    <div style="padding:16px 22px 0">
+      <div style="display:flex;gap:8px">
+        <button onclick="APP.useMyLocation()" style="flex:none;height:44px;padding:0 13px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;gap:5px;white-space:nowrap;background:#fff">
+          ${msr('my_location', { size:19, color:'var(--blue)' })}<span style="font-size:13px;font-weight:700">내 위치</span>
+        </button>
+        <div class="field" style="flex:1;height:44px;min-width:0;border-radius:14px;padding:0 13px">
+          ${msr('search', { size:19, color:'var(--ink4)' })}
+          <input id="startQ" value="${esc(S.startQ)}" placeholder="출발지 검색" oninput="APP.setStartQ(this.value)" style="font-size:14px">
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;overflow-x:auto;margin-top:9px;padding-bottom:2px">
+        ${['부산 해운대','여수','강릉','인천 강화','서울시청'].map(p => `
+          <button class="opt-chip ${S.courseStart === p ? 'on-blue' : ''}" style="flex:none;font-size:12.5px;padding:8px 13px" onclick="APP.setCourseStart('${p}')">${p}</button>`).join('')}
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:22px">
+        <div style="font-size:13.5px;font-weight:700;white-space:nowrap">목표 거리</div>
+        <div id="dist-label" class="stat-num" style="font-size:28px;color:var(--blue);line-height:1">${S.dist.toFixed(1)}km</div>
+      </div>
+      <input type="range" min="1" max="21" step="0.5" value="${S.dist}" oninput="APP.setDist(this.value)"
+        style="width:100%;margin-top:10px;accent-color:var(--blue)" aria-label="목표 거리">
+      <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink5)"><span>1km</span><span>21km</span></div>
+    </div>
+    ${cd === 'locating' ? `<div style="padding:60px 22px;display:flex;justify-content:center">${spinnerLine('위치를 확인하는 중…')}</div>` : ''}
+    ${cd === 'nostart' ? `<div class="empty" style="padding:60px 34px"><div class="t">출발지를 정해주세요.</div><div class="d">내 위치를 켜거나 위 프리셋에서 골라주세요.</div></div>` : ''}
+    ${cd === 'none' ? `<div class="empty" style="padding:60px 34px"><div class="t">이 근처엔 걸을 곳을 못 찾았어요.</div><div class="d">위 프리셋 지역으로 바꿔서 찾아보세요.</div></div>` : ''}
+    ${hasMap ? coursesMapHtml() : ''}
+    ${cd === 'ok' ? `
+      <div id="course-card">${courseInfoHtml()}</div>
+      <div style="padding-top:22px">
+        <div class="px" style="font-size:14px;font-weight:800">다른 코스 3개</div>
+        <div style="display:flex;gap:9px;overflow-x:auto;padding:11px 22px 4px">
+          ${alts.map(c => `<button onclick="APP.setCourse('${c}')" style="width:178px;flex:none;border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff;text-align:left">
+            <div style="font-size:14px;font-weight:700;letter-spacing:-.02em">${c} 왕복</div>
+            <div style="font-size:12px;color:var(--ink4);margin-top:4px">부산 · 난이도 중</div>
+          </button>`).join('')}
+        </div>
+      </div>` : ''}
+    ${cd === 'nocourse' ? `
+      <div style="margin:16px 22px 0;background:#F7F7F5;border-radius:18px;padding:16px;text-align:center">
+        <div style="font-size:14px;font-weight:700;line-height:1.45">이 근처엔 두루누비 코스가 없어요.</div>
+        <div style="font-size:12.5px;color:var(--ink4);margin-top:5px;line-height:1.45">대신 걸을 만한 공원·하천을 모았어요.</div>
+      </div>` : ''}
+    ${hasMap ? `
+      <div style="padding:24px 22px 0">
+        <div style="font-size:14px;font-weight:800">걷기 좋은 곳</div>
+        <div style="display:flex;flex-direction:column;margin-top:8px">
+          ${SPOTS.map((sp, i) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line3)">
+              <div class="num" style="width:24px;height:24px;border-radius:50%;background:var(--blue-soft);color:var(--blue);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">${i + 1}</div>
+              <div style="flex:1;min-width:0;font-size:14px;font-weight:600">${sp.name}</div>
+              <div style="font-size:12px;color:var(--ink4);white-space:nowrap">${sp.cat} · ${sp.dist}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+    ${cd === 'ok' ? `
+      <div style="display:flex;gap:9px;padding:22px 22px 0">
+        <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">코스 저장</button>
+        <button class="cta lime" style="flex:1.3" onclick="APP.go('run')">이 코스 뛰기</button>
+      </div>` : ''}`;
+  const regionBody = `
+    <div style="display:flex;gap:7px;overflow-x:auto;padding:16px 22px 2px">
+      ${COURSE_REGIONS.map(r => `<button class="opt-chip ${S.cRegion === r.name ? 'on' : ''}" style="flex:none;font-size:12.5px;padding:9px 13px" onclick="APP.setCRegion('${r.name}')">${r.name} <span class="num">${r.n}</span></button>`).join('')}
+    </div>
+    <div class="px" style="padding-top:14px;font-size:13.5px;font-weight:600;color:var(--ink2)">
+      ${S.cRegion ? `${S.cRegion} 코스 ${(COURSE_REGIONS.find(r => r.name === S.cRegion) || {}).n} · 두루누비 걷기길` : '전국 코스 261 · 두루누비 걷기길'}
+    </div>
+    ${(!S.cRegion || S.cRegion === '부산') ? `
+      <div style="padding:12px 22px 0;display:flex;flex-direction:column;gap:9px">
+        ${REGION_COURSES.map((c, i) => `
+          <article style="border:1px solid var(--line2);border-radius:20px;padding:15px;background:var(--surface)">
+            <div style="font-size:15px;font-weight:700;letter-spacing:-.02em">${c.name}</div>
+            <div style="font-size:12.5px;color:var(--ink4);margin:5px 0 8px">${c.meta}</div>
+            ${elevStrip(50 + i * 7, 300, 20)}
+          </article>`).join('')}
+      </div>` : `<div class="empty" style="padding:60px 34px"><div class="t">이 지역엔 코스가 없어요.</div></div>`}`;
+  return `
+<div class="screen" style="padding-bottom:26px">
+  <div style="padding:6px 22px 0">
+    <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">러닝·산책 코스</h1>
+    <div class="seg" style="margin-top:14px">
+      <button class="${S.cTab === 'near' ? 'on' : ''}" onclick="APP.setCTab('near')">내 주변</button>
+      <button class="${S.cTab === 'region' ? 'on' : ''}" onclick="APP.setCTab('region')">지역별</button>
+    </div>
+  </div>
+  ${S.cTab === 'near' ? nearBody : regionBody}
+</div>`;
+};
+
+/* ── R1 러닝 기록 중 (다크 몰입 · 라이브) ── */
+const RUN_PTS = [[70,600],[110,520],[150,470],[210,440],[268,400],[300,330],[330,250]];
+function runPathLen(pts){ let L = 0; for (let i = 1; i < pts.length; i++){ const dx = pts[i][0]-pts[i-1][0], dy = pts[i][1]-pts[i-1][1]; L += Math.hypot(dx, dy); } return L; }
+function runPointAt(pts, t){
+  const total = runPathLen(pts); let target = total * t;
+  for (let i = 1; i < pts.length; i++){
+    const seg = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+    if (target <= seg){ const r = target / seg; return [pts[i-1][0] + (pts[i][0]-pts[i-1][0]) * r, pts[i-1][1] + (pts[i][1]-pts[i-1][1]) * r]; }
+    target -= seg;
+  }
+  return pts[pts.length - 1];
+}
+const fmtClock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+SCREENS.run = () => {
+  const pts = RUN_PTS.map(p => p.join(',')).join(' ');
+  const len = runPathLen(RUN_PTS);
+  const prog = Math.min(1, .52 + (S.runT % 600) * .0006);
+  const pos = runPointAt(RUN_PTS, prog);
+  return `
+<div class="screen deepzone" style="height:100%;position:relative;display:flex;flex-direction:column;background:var(--deep)">
+  <div class="runmap">
+    <svg viewBox="0 0 390 740" preserveAspectRatio="xMidYMid slice">
+      <rect width="390" height="740" fill="var(--deep)"/>
+      <path d="M-20 210 L200 170 L410 230" stroke="#1B2450" stroke-width="16" fill="none"/>
+      <path d="M120 -20 L150 380 L110 760" stroke="#1B2450" stroke-width="12" fill="none"/>
+      <path d="M-20 470 L240 500 L410 450" stroke="#161E42" stroke-width="26" fill="none"/>
+      <path d="M240 520 C 300 540, 360 600, 400 640 L400 740 L200 740 Z" fill="#131A38"/>
+      <polyline points="${pts}" fill="none" stroke="#2A356B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline id="runProg" points="${pts}" fill="none" stroke="var(--lime)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"
+        stroke-dasharray="${len.toFixed(0)}" stroke-dashoffset="${(len * (1 - prog)).toFixed(0)}"/>
+    </svg>
+    <div id="runDot" style="position:absolute;width:22px;height:22px;border-radius:50%;background:var(--lime);
+      border:4px solid var(--deep);box-shadow:0 0 0 2px var(--lime),0 0 18px rgba(201,242,60,.5);
+      left:${(pos[0] / 390 * 100).toFixed(2)}%;top:${(pos[1] / 740 * 100).toFixed(2)}%;margin:-11px 0 0 -11px;animation:pulse 2.2s ease-in-out infinite"></div>
+  </div>
+  <div style="position:relative;margin:14px 14px 0;background:rgba(19,26,56,.86);backdrop-filter:blur(12px);border:1px solid var(--deep-line);border-radius:24px;padding:20px;box-shadow:var(--sh-3)">
+    <div style="font-size:12px;font-weight:700;color:var(--deep-t2);letter-spacing:.02em">경과 시간</div>
+    <div id="runClock" class="stat-num" style="font-size:58px;line-height:1.05;color:var(--deep-t1)">${fmtClock(1421 + S.runT)}</div>
+    <div style="display:flex;gap:26px;margin-top:12px">
+      <div>
+        <div style="font-size:11.5px;color:var(--deep-t2);font-weight:600">거리</div>
+        <div id="runDist" class="stat-num" style="font-size:22px;margin-top:2px">${(3.82 + S.runT * .00269).toFixed(2)} km</div>
+      </div>
+      <div style="width:1px;background:var(--deep-line)"></div>
+      <div>
+        <div style="font-size:11.5px;color:var(--deep-t2);font-weight:600">평균 페이스</div>
+        <div class="stat-num" style="font-size:22px;margin-top:2px">6'12"/km</div>
+      </div>
+    </div>
+  </div>
+  <div class="run-pill">기록 중 · 화면을 꺼도 계속 기록돼요</div>
+  <div style="flex:1"></div>
+  <div style="position:relative;padding:0 22px 22px">
+    <button class="cta" style="height:60px;border-radius:18px;background:var(--lime);color:var(--ink);font-size:17px;box-shadow:0 10px 26px rgba(201,242,60,.22)" onclick="APP.go('runsum')">종료</button>
+  </div>
+</div>`;
+};
+
+/* ── R1 러닝 종료 요약 ── */
+SCREENS.runsum = () => `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
+  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.back()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div class="px" style="padding-top:6px">
+    <h1 style="font-size:25px;font-weight:800;letter-spacing:-.035em;margin:0">오늘의 러닝</h1>
+    <div style="font-size:13.5px;color:var(--ink4);margin-top:5px">08.01 (토)</div>
+    <div class="glcard" data-gl="runTrack" data-gl-opts='{"drawSec":2.4,"dist":2.9}' style="margin-top:16px;height:210px">
+      <div class="cap"><span class="badge-live">GPS</span><span class="t">뛴 경로 · 라임 리본이 내 트랙</span></div>
+    </div>
+    <div style="display:flex;margin-top:20px;border:1px solid var(--line);border-radius:20px;padding:18px 8px;background:var(--surface)">
+      ${[['거리','5.21 km','runsum-d'],['시간','32:10','runsum-t'],['평균 페이스',"6'11\"",'runsum-p']].map(([k, v, id], i) => `
+        ${i ? '<div style="width:1px;background:var(--line3)"></div>' : ''}
+        <div style="flex:1;text-align:center">
+          <div style="font-size:11.5px;color:var(--ink4);font-weight:600">${k}</div>
+          <div id="${id}" class="stat-num" style="font-size:23px;margin-top:4px">${v}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:12.5px;color:var(--ink2);margin-top:12px">해파랑길 1코스 왕복 기준</div>
+  </div>
+  <div style="flex:1;min-height:20px"></div>
+  <div style="padding:0 22px 18px">
+    <button class="cta" onclick="APP.saveRun()">기록 저장하기</button>
+    <button style="display:block;margin:14px auto 0;font-size:13.5px;font-weight:700;color:var(--ink5)" onclick="APP.go('courses')">삭제</button>
+  </div>
+</div>`;
+
+/* ── S7 추천 동선 결과 ── */
+function resultBlocks(day, dayC){
+  return day.blocks.map((b, i) => {
+    const on = i === S.activeBlock, cat = CATS[b.cat] || CATS['관광지'], last = i === day.blocks.length - 1;
+    return `
+    <div class="tl-block" data-block="${i}" onclick="APP.setActiveBlock(${i})" style="display:flex;gap:12px;align-items:stretch;cursor:pointer">
+      <div style="width:26px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div class="timeline-num" style="${on ? `background:${dayC};color:#fff;border-color:${dayC}` : ''}">${i + 1}</div>
+        <div style="width:2px;flex:1;background:${last ? 'transparent' : '#EDEDEF'};border-radius:1px"></div>
+      </div>
+      <div style="flex:1;min-width:0;border-radius:18px;padding:14px;background:var(--surface);border:1.5px solid ${on ? dayC : 'var(--line)'};${on ? 'box-shadow:var(--sh-1)' : ''}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="num" style="font-size:12.5px;font-weight:800;color:${on ? dayC : 'var(--ink4)'};flex:none">${b.time}</span>
+          <span style="font-size:14.5px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:4px">${b.race ? msr('sports_score', { size:17, color:dayC }) : ''}${esc(b.title)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap">
+          <span class="tag" style="background:${cat.bg};color:${cat.fg};font-weight:700">${b.cat}</span>
+          <span style="font-size:13px;font-weight:600;white-space:nowrap">${esc(b.place)}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--ink4);margin-top:5px;line-height:1.45">${esc(b.desc)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+SCREENS.result = () => {
+  if (S.dbg.result === 'empty') return `
+<div class="screen" style="min-height:100%">
+  <div class="empty" style="padding:120px 34px">
+    <div class="t" style="font-size:16px">동선이 아직 없어요.</div>
+    <button class="cta ghost" style="height:48px;margin-top:16px;color:var(--blue)" onclick="APP.back()">다시 추천받기</button>
+  </div>
+</div>`;
+  const itin = S.itin, day = itin[S.activeDay];
+  const dayC = day.recovery ? 'var(--orange)' : 'var(--blue)';
+  const pins = day.blocks.map((b, i) => (PINS[S.activeDay] && PINS[S.activeDay][i]) || [70 + ((i * 97) % 260), 70 + ((i * 61) % 180)]);
+  const placeCount = itin.reduce((n, d) => n + d.blocks.length, 0);
+  return `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column">
+  <div class="map2d" style="height:300px;flex:none">
+    ${mapBase(390, 300, 5)}
+    <svg viewBox="0 0 390 300" style="position:absolute;inset:0;width:100%;height:100%">
+      <polyline class="drawline" style="--len:600" points="${pins.map(p => p.join(',')).join(' ')}"
+        fill="none" stroke="${dayC}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"></polyline>
+    </svg>
+    ${pins.map((p, i) => {
+      const on = i === S.activeBlock, sz = on ? 34 : 26;
+      return `<button class="rpin" data-pin="${i}" onclick="APP.setActiveBlock(${i})" style="position:absolute;left:${p[0] - sz / 2}px;top:${p[1] - sz / 2}px;width:${sz}px;height:${sz}px;border-radius:50%;
+        background:${dayC};color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:${on ? 15 : 12.5}px;font-weight:800;
+        border:2.5px solid #fff;box-shadow:${on ? '0 6px 16px rgba(21,22,27,.3)' : '0 2px 6px rgba(21,22,27,.2)'};z-index:${on ? 3 : 2}">${i + 1}</button>`;
+    }).join('')}
+    <button onclick="APP.back()" aria-label="뒤로" style="position:absolute;left:14px;top:14px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.14)">${msr('arrow_back', { size:22 })}</button>
+    <button onclick="APP.shareRoute()" aria-label="공유" style="position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.14)">${msr('ios_share', { size:20 })}</button>
+    <div style="position:absolute;left:14px;bottom:14px;background:rgba(255,255,255,.94);border-radius:11px;padding:7px 10px;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+      <span style="width:9px;height:9px;border-radius:50%;background:${dayC};display:inline-block"></span>
+      <span style="font-size:11px;font-weight:600;color:var(--ink2)">${day.recovery ? '회복일 동선' : '일자 동선'}</span>
+    </div>
+  </div>
+
+  <div class="px" style="padding-top:16px">
+    <div class="recovery-banner">
+      ${msr('spa', { size:20, fill:true, color:'var(--orange)' })}
+      <div class="t">D+1 회복 모드 · 온천+짧은 산책(고강도 제외)</div>
+    </div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:18px">
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0;white-space:nowrap">세종 2박 3일</h1>
+      <div style="font-size:14px;font-weight:700;color:var(--ink2);white-space:nowrap">${placeCount}곳</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:7px;overflow-x:auto;padding:14px 22px 2px">
+    ${itin.map((d, i) => {
+      const on = i === S.activeDay;
+      return `<button onclick="APP.setDay(${i})" style="flex:none;padding:9px 14px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap;
+        background:${on ? (d.recovery ? 'var(--orange)' : 'var(--blue)') : (d.recovery ? 'var(--cat-recovery-bg)' : 'var(--fill)')};
+        color:${on ? '#fff' : (d.recovery ? 'var(--cat-recovery-fg)' : 'var(--ink2)')}">${d.tab}</button>`;
+    }).join('')}
+  </div>
+
+  <div class="px" style="padding-top:14px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:14px;font-weight:800;letter-spacing:-.02em">${day.label}</div>
+    <button style="font-size:13.5px;font-weight:800;color:var(--blue);padding:4px 2px" onclick="APP.toggleEdit()">${S.editMode ? '완료' : '편집'}</button>
+  </div>
+
+  ${(day.note && !S.editMode) ? `<div style="margin:9px 22px 0;background:#F7F7F5;border-radius:14px;padding:10px 13px;font-size:12.5px;color:var(--ink2)">${esc(day.note)}</div>` : ''}
+
+  ${!S.editMode ? `
+    <div class="px" style="padding-top:16px;display:flex;flex-direction:column;gap:10px" id="blocks">${resultBlocks(day, dayC)}</div>
+    <div style="margin:22px 22px 0;border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;align-items:center;gap:12px;background:var(--surface)">
+      <div style="width:44px;height:44px;border-radius:14px;background:var(--blue-soft);display:flex;align-items:center;justify-content:center;flex:none">${msr('directions_walk', { size:23, color:'var(--blue)' })}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14.5px;font-weight:700;letter-spacing:-.02em">숙소 주변에서 뛰기·걷기</div>
+        <div style="font-size:12.5px;color:var(--ink4);margin-top:3px">호텔 세종 가온 출발</div>
+      </div>
+      <button style="font-size:13px;font-weight:800;color:var(--blue);white-space:nowrap;flex:none" onclick="APP.goCoursesFromHotel()">러닝코스에서 보기 →</button>
+    </div>` : `
+    <div style="margin:14px 22px 0;background:var(--blue-soft);border-radius:14px;padding:10px 13px;font-size:12.5px;color:var(--blue);font-weight:600">드래그로 순서 변경 · ↺ 교체 · ✕ 삭제</div>
+    <div class="px" style="padding-top:12px;display:flex;flex-direction:column;gap:8px">
+      ${day.blocks.map((b, i) => `
+        <div draggable="true" ondragstart="APP.dragStart(${i})" ondragover="event.preventDefault()" ondrop="APP.dropOn(${i})"
+          style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;border:1px solid var(--line);background:var(--surface)">
+          ${msr('drag_indicator', { size:21, color:'var(--ink5)' })}
+          <div class="num" style="width:22px;height:22px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:var(--fill);color:var(--ink2);font-size:11.5px;font-weight:800">${i + 1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;letter-spacing:-.02em">${esc(b.title)}</div>
+            <div style="font-size:12px;color:var(--ink4);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.time} · ${esc(b.place)} · ${b.cat}</div>
+          </div>
+          ${!b.race ? `<button onclick="APP.openSwap(${i},'${b.cat}')" aria-label="교체">${msr('refresh', { size:20, color:'var(--ink2)' })}</button>` : ''}
+          <button onclick="APP.removeBlock(${i})" aria-label="삭제">${msr('close', { size:20, color:'var(--ink5)' })}</button>
+        </div>`).join('')}
+      <button onclick="APP.openAdd()" style="height:50px;border-radius:16px;border:1.5px dashed #C9CAD0;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:800;color:var(--blue)">
+        ${msr('add', { size:19 })}장소 추가
+      </button>
+    </div>`}
+
+  <div style="flex:1;min-height:26px"></div>
+  <div class="stickycta">
+    <button class="cta" onclick="APP.saveRoute()">이 동선 저장하기</button>
+  </div>
+</div>`;
+};
+
+/* ── S4~S6 위저드 ── */
+function wizardShell(step, body, ctaLabel, ctaOn){
+  return `
+<div class="screen" style="min-height:100%;display:flex;flex-direction:column">
+  <div style="position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);padding:4px 22px 12px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <button class="backbtn" onclick="APP.back()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button>
+      <span class="num" style="font-size:13px;font-weight:800;color:var(--ink4)">${step}/3</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <div class="wbar on"></div>
+      <div class="wbar ${step >= 2 ? 'on' : ''}"></div>
+      <div class="wbar ${step >= 3 ? 'on' : ''}"></div>
+    </div>
+  </div>
+  ${body}
+  <div style="flex:1;min-height:26px"></div>
+  <div class="stickycta">
+    <button class="cta" ${ctaOn ? '' : 'disabled'} onclick="APP.wizardNext()">${ctaLabel}</button>
+  </div>
+</div>`;
+}
+function wizCalHtml(){
+  const pad = new Date(2026, 7, 1).getDay();
+  let cells = '';
+  for (let i = 0; i < pad; i++) cells += '<div style="height:38px"></div>';
+  for (let d = 1; d <= 31; d++){
+    const inR = S.wStart && S.wEnd && d >= S.wStart && d <= S.wEnd;
+    const isStart = d === S.wStart, isEnd = d === S.wEnd, race = d === 22;
+    const dow = new Date(2026, 7, d).getDay();
+    const radius = inR ? ((isStart && isEnd) ? '11px' : isStart ? '11px 0 0 11px' : isEnd ? '0 11px 11px 0' : '0') : '11px';
+    cells += `<button onclick="APP.tapWizDay(${d})" style="height:38px;display:flex;align-items:center;justify-content:center;
+      background:${inR || isStart ? 'var(--blue-soft)' : 'transparent'};border-radius:${radius};cursor:${S.wPattern === 'custom' ? 'pointer' : 'default'}">
+      <span class="num" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:${race ? 800 : 500};
+        background:${race ? 'var(--blue)' : 'transparent'};color:${race ? '#fff' : dow === 0 ? '#E5484D' : dow === 6 ? 'var(--blue)' : 'var(--ink)'};
+        border:1.5px solid ${(isStart || isEnd) && !race ? 'var(--blue)' : 'transparent'}">${d}</span>
+    </button>`;
+  }
+  const rangeLabel = !S.wStart ? '여행 기간을 골라주세요'
+    : !S.wEnd ? '08.' + String(S.wStart).padStart(2, '0') + ' ~ 종료일 선택'
+    : '08.' + String(S.wStart).padStart(2, '0') + ' ~ 08.' + String(S.wEnd).padStart(2, '0') + ' · ' + (S.wEnd - S.wStart + 1) + '일';
+  return `
+  <div style="margin-top:20px;border:1px solid var(--line);border-radius:20px;padding:16px 14px;background:var(--surface)">
+    <div class="num" style="text-align:center;font-size:15px;font-weight:800;margin-bottom:10px">2026.8</div>
+    <div class="calgrid" style="margin-bottom:4px">
+      ${DOW.map((d, i) => `<div style="text-align:center;font-size:11px;font-weight:700;color:${i === 0 ? '#E5484D' : i === 6 ? 'var(--blue)' : 'var(--ink4)'}">${d}</div>`).join('')}
+    </div>
+    <div class="calgrid" style="gap:2px 0">${cells}</div>
+    ${(S.wPattern === 'custom' && S.wStart && !S.wEnd) ? `<div style="margin-top:12px;background:var(--blue-soft);color:var(--blue);font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:12px;text-align:center">종료일을 눌러주세요</div>` : ''}
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px">
+      <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink2)"><span style="width:11px;height:11px;border-radius:50%;background:var(--blue);display:inline-block"></span>대회일</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink2)"><span style="width:11px;height:11px;border-radius:3px;background:var(--blue-soft);display:inline-block"></span>여행 기간</span>
+    </div>
+    <div style="text-align:center;font-size:14px;font-weight:700;margin-top:10px">${rangeLabel}</div>
+  </div>`;
+}
+SCREENS.w1 = () => {
+  const det = CONTESTS.find(c => c.id === S.detailId) || CONTESTS[0];
+  const d = new Date(det.date + 'T00:00:00');
+  const body = `
+  <div class="px" style="padding-top:14px">
+    <h1 style="font-size:24px;font-weight:800;letter-spacing:-.035em;margin:0">언제 다녀올까요?</h1>
+    <div class="sub" style="margin-top:7px">${esc(det.name)} (${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}) 기준으로 짜드릴게요.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
+      ${PATTERNS.map(p => {
+        const on = S.wPattern === p.key;
+        return `<button onclick="APP.pickPattern('${p.key}')" style="display:flex;align-items:center;gap:12px;padding:15px 16px;border-radius:18px;text-align:left;
+          background:${on ? 'var(--blue-soft)' : 'var(--surface)'};border:1.5px solid ${on ? 'var(--blue)' : 'var(--line)'}">
+          <div style="flex:1">
+            <div style="font-size:14.5px;font-weight:700;color:${on ? 'var(--blue)' : 'var(--ink)'};letter-spacing:-.02em">${p.label}</div>
+            <div style="font-size:12.5px;color:var(--ink4);margin-top:3px">${p.sub}</div>
+          </div>
+          ${msr('radio_button_checked', { size:21, fill:on, color: on ? 'var(--blue)' : '#D6D6DA' })}
+        </button>`;
+      }).join('')}
+    </div>
+    ${wizCalHtml()}
+  </div>`;
+  return wizardShell(1, body, '다음', true);
+};
+SCREENS.w2 = () => {
+  const det = CONTESTS.find(c => c.id === S.detailId) || CONTESTS[0];
+  const hint = det.events.indexOf(S.wEvent) >= 0 ? '대회에서 가져왔어요 · 바꿀 수 있어요' : '이 대회 종목엔 없지만 선택할 수 있어요';
+  const showRecovery = S.wEvent === '하프' || S.wEvent === '풀';
+  const body = `
+  <div class="px" style="padding-top:14px">
+    <h1 style="font-size:24px;font-weight:800;letter-spacing:-.035em;margin:0">어떻게 뛰고, 뭘 좋아하세요?</h1>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:22px">
+      <div style="font-size:13.5px;font-weight:800">종목</div>
+      <div style="font-size:12.5px;color:var(--ink4)">· 회복강도 ${INTENSITY[S.wEvent]}</div>
+    </div>
+    <div class="seg" style="margin-top:9px">
+      ${EVENTS.map(e => `<button class="${S.wEvent === e ? 'on' : ''}" onclick="APP.setWEvent('${e}')">${e}</button>`).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--ink4);margin-top:8px">${hint}</div>
+    <div style="font-size:13.5px;font-weight:800;margin-top:24px">여행 취향</div>
+    <div style="font-size:12px;color:var(--ink4);margin-top:3px">복수 선택할 수 있어요</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:11px">
+      ${PREF_LIST.map(p => {
+        const on = S.wPrefs.indexOf(p) >= 0, cat = CATS[p];
+        return `<button onclick="APP.togglePref('${p}')" style="font-size:13px;font-weight:600;padding:9px 14px;border-radius:13px;white-space:nowrap;
+          background:${on ? cat.bg : '#fff'};color:${on ? cat.fg : 'var(--ink4)'};border:1px solid ${on ? cat.fg : 'var(--line)'}">${p}</button>`;
+      }).join('')}
+    </div>
+    ${showRecovery ? `
+    <div class="recovery-banner" style="margin-top:24px;border-radius:18px;padding:15px 16px;align-items:flex-start">
+      ${msr('spa', { size:21, fill:true, color:'var(--orange)' })}
+      <div style="font-size:13px;color:var(--cat-recovery-fg);line-height:1.55;font-weight:500">${S.wEvent}는 완주 다음날 회복이 중요해요. D+1은 고강도 일정을 빼고 온천·가벼운 산책 위주로 동선을 짭니다.</div>
+    </div>` : ''}
+  </div>`;
+  return wizardShell(2, body, '다음', S.wPrefs.length > 0);
+};
+function hotelListHtml(){
+  const list = HOTELS.filter(h => !S.hotelQ.trim() || (h.name + h.meta).indexOf(S.hotelQ.trim()) >= 0);
+  return list.map(h => {
+    const on = S.hotel === h.name;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;background:var(--surface);border:1.5px solid ${on ? 'var(--blue)' : 'var(--line)'}">
+      <div style="width:52px;height:52px;border-radius:14px;background:repeating-linear-gradient(45deg,#EEF2FF 0 8px,#E3EAFB 8px 16px);flex:none"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14.5px;font-weight:700;letter-spacing:-.02em">${esc(h.name)}</div>
+        <div style="font-size:12.5px;color:var(--ink4);margin-top:3px">${esc(h.meta)}</div>
+      </div>
+      <button onclick="APP.setHotel('${h.name}')" style="flex:none;height:34px;padding:0 14px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap;
+        background:${on ? 'var(--blue)' : 'var(--fill)'};color:${on ? '#fff' : 'var(--ink2)'}">${on ? '선택됨' : '선택'}</button>
+    </div>`;
+  }).join('');
+}
+SCREENS.w3 = () => {
+  const loading = S.dbg.w3 === 'loading';
+  const body = `
+  <div class="px" style="padding-top:14px">
+    <h1 style="font-size:24px;font-weight:800;letter-spacing:-.035em;margin:0">어디서 묵을까요?</h1>
+    <div class="sub" style="margin-top:7px">건너뛰면 대회장 주변으로 잡아드려요.</div>
+    <div class="field" style="height:48px;margin-top:16px">
+      ${msr('search', { size:21, color:'var(--ink4)' })}
+      <input id="hotelQ" value="${esc(S.hotelQ)}" placeholder="숙소 검색 · 카카오 로컬" oninput="APP.setHotelQ(this.value)">
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:20px">
+      <div style="font-size:13.5px;font-weight:800;white-space:nowrap">대회장 주변 숙소</div>
+      <span class="badge-live">LIVE</span>
+    </div>
+    ${loading ? `<div style="padding:40px 0;display:flex;justify-content:center">${spinnerLine('숙소를 찾는 중…')}</div>`
+      : `<div id="hotel-list" style="display:flex;flex-direction:column;gap:8px;margin-top:11px">${hotelListHtml()}</div>`}
+  </div>`;
+  const ctaLabel = S.generating ? '동선 짜는 중…' : S.hotel ? '이 숙소로 동선 추천받기' : '숙소 없이 추천받기';
+  return wizardShell(3, body, ctaLabel, !S.generating);
+};
+
+/* ================================================================
+   오버레이 · 탭바 · 디버그 · 스테이지 내비
+   ================================================================ */
+function overlaysHtml(){
+  let html = '';
+  if (S.filterOpen && S.draft){
+    const dr = S.draft;
+    html += `
+    <div class="scrim" onclick="APP.cancelFilter()"></div>
+    <div class="sheet" style="padding:8px 22px 22px;max-height:86%;overflow-y:auto;display:block">
+      <div class="grab"></div>
+      <h2 style="font-size:18px;font-weight:800;letter-spacing:-.02em;margin:12px 0 0">필터</h2>
+      <div style="font-size:13.5px;font-weight:800;margin:18px 0 9px">종목</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${EVENTS.map(e => `<button onclick="APP.toggleDraft('events','${e}')" style="padding:8px 13px;border-radius:13px;font-size:13px;font-weight:600;
+          background:${dr.events.indexOf(e) >= 0 ? 'var(--blue)' : 'var(--fill)'};color:${dr.events.indexOf(e) >= 0 ? '#fff' : 'var(--ink2)'}">${e}</button>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
+        <div>
+          <div style="font-size:13.5px;font-weight:800">접수 가능만</div>
+          <div style="font-size:12px;color:var(--ink4);margin-top:2px">마감·접수전 대회를 숨겨요</div>
+        </div>
+        <button onclick="APP.toggleOpenOnly()" role="switch" aria-checked="${dr.openOnly}" style="width:48px;height:28px;border-radius:14px;padding:3px;display:flex;
+          justify-content:${dr.openOnly ? 'flex-end' : 'flex-start'};background:${dr.openOnly ? 'var(--blue)' : 'var(--line)'};transition:background .15s">
+          <span style="width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+        </button>
+      </div>
+      <div style="font-size:13.5px;font-weight:800;margin:20px 0 9px">지역</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${REGIONS.map(r => `<button onclick="APP.toggleDraft('regions','${r}')" style="padding:8px 13px;border-radius:13px;font-size:13px;font-weight:600;
+          background:${dr.regions.indexOf(r) >= 0 ? 'var(--blue)' : 'var(--fill)'};color:${dr.regions.indexOf(r) >= 0 ? '#fff' : 'var(--ink2)'}">${r}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:24px;align-items:center">
+        <button onclick="APP.resetDraft()" style="height:52px;padding:0 18px;border-radius:16px;border:1px solid var(--line);font-size:14.5px;font-weight:700;color:var(--ink2);flex:none">초기화</button>
+        <button onclick="APP.cancelFilter()" style="flex:1;height:52px;border-radius:16px;border:1px solid var(--line);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center">취소</button>
+        <button onclick="APP.applyFilter()" style="flex:1.4;height:52px;border-radius:16px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center">완료</button>
+      </div>
+    </div>`;
+  }
+  if (S.guestOpen){
+    html += `
+    <div class="scrim" style="z-index:80" onclick="APP.closeGuest()"></div>
+    <div role="dialog" aria-modal="true" style="position:absolute;left:26px;right:26px;top:50%;transform:translateY(-50%);background:#fff;border-radius:22px;padding:24px 22px 18px;z-index:81;box-shadow:0 20px 50px rgba(21,22,27,.28);animation:popIn .28s var(--ease-spring)">
+      <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">로그인이 필요해요</div>
+      <div class="sub" style="margin-top:8px">찜과 보관함은 로그인하면 쓸 수 있어요</div>
+      <div style="display:flex;gap:8px;margin-top:20px">
+        <button onclick="APP.closeGuest()" style="flex:1;height:50px;border-radius:14px;border:1px solid var(--line);font-size:14.5px;font-weight:700;color:var(--ink2);display:flex;align-items:center;justify-content:center">닫기</button>
+        <button onclick="APP.goLoginFromGuest()" style="flex:1.3;height:50px;border-radius:14px;background:var(--blue);color:#fff;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center">로그인하기</button>
+      </div>
+    </div>`;
+  }
+  if (S.poi){
+    html += `
+    <div class="scrim" onclick="APP.closePoi()"></div>
+    <div class="sheet" style="max-height:80%;padding-bottom:18px">
+      <div class="grab"></div>
+      <div style="padding:12px 22px 0;display:flex;align-items:center;gap:8px;flex:none">
+        <h2 style="font-size:17px;font-weight:800;letter-spacing:-.02em;margin:0;white-space:nowrap">${S.poi.cat}${S.poi.mode === 'add' ? ' 추가 · 인근' : ' 교체 · 인근'}</h2>
+        <span class="badge-live">LIVE</span>
+      </div>
+      ${S.poi.mode === 'add' ? `
+      <div style="display:flex;gap:6px;overflow-x:auto;padding:12px 22px 2px;flex:none">
+        ${['관광지','맛집','카페','힐링웰니스','자연트레킹','역사문화','숙소'].map(c => `
+          <button onclick="APP.setPoiCat('${c}')" style="flex:none;padding:8px 13px;border-radius:13px;font-size:12.5px;font-weight:600;white-space:nowrap;
+            background:${S.poi.cat === c ? 'var(--blue)' : 'var(--fill)'};color:${S.poi.cat === c ? '#fff' : 'var(--ink2)'}">${c}</button>`).join('')}
+      </div>` : ''}
+      <div class="sheet-body" style="padding:12px 22px 0;display:flex;flex-direction:column;gap:8px">
+        ${POIS.map((p, i) => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:18px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14.5px;font-weight:700;letter-spacing:-.02em">${esc(p.name)}</div>
+              <div style="font-size:12.5px;color:var(--ink2);margin-top:3px">${esc(p.desc)}</div>
+              <div style="font-size:11.5px;color:var(--ink5);margin-top:3px">${esc(p.addr)}</div>
+            </div>
+            <button onclick="APP.pickPoi(${i})" style="flex:none;height:34px;padding:0 14px;border-radius:12px;background:var(--fill);color:var(--ink2);font-size:13px;font-weight:700;white-space:nowrap">선택</button>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+  if (S.snack) html += `<div class="snack">${esc(S.snack)}</div>`;
+  return html;
+}
+function renderOverlays(){ $('#overlayHost').innerHTML = overlaysHtml(); }
+
+function tabbarHtml(){
+  if (['home','calendar','courses','library'].indexOf(S.screen) < 0) return '';
+  const tabs = [['home','home','홈'],['calendar','calendar_month','캘린더'],['courses','route','러닝코스'],['library','bookmark','보관함']];
+  return `<nav class="tabbar">
+    ${tabs.map(([k, icon, label]) => `
+      <button class="${S.screen === k ? 'on' : ''}" onclick="APP.go('${k}')" aria-label="${label}">
+        <span class="msr${S.screen === k ? ' fill' : ''}">${icon}</span><span class="lb">${label}</span>
+      </button>`).join('')}
+  </nav>`;
+}
+function debugHtml(){
+  const mk = (opts, cur, actName) => `<div class="debug-rail"><div class="cap">STATE</div>
+    ${opts.map(([k, l]) => `<button class="${cur === k ? 'on' : ''}" onclick="APP.${actName}('${k}')">${l}</button>`).join('')}</div>`;
+  if (S.screen === 'detail') return mk([['ok','기본'],['loading','로딩'],['empty','빈']], S.festState, 'setFestState');
+  if (S.screen === 'w3') return mk([['ok','기본'],['loading','로딩']], S.dbg.w3, 'dbgW3');
+  if (S.screen === 'result') return mk([['ok','기본'],['empty','빈']], S.dbg.result, 'dbgResult');
+  if (S.screen === 'courses') return mk([['ok','기본'],['locating','위치'],['nostart','출발지'],['nocourse','코스0'],['none','0건']], S.dbg.courses, 'dbgCourses');
+  if (S.screen === 'library') return mk([['ok','기본'],['empty','빈']], S.dbg.lib, 'dbgLib');
+  if (S.screen === 'login') return mk([['ok','기본'],['error','오류']], S.dbg.login || 'ok', 'dbgLogin');
+  return '';
+}
+function stageNavHtml(){
+  const nav = [['sheet','디자인 시스템'],['home','홈'],['calendar','캘린더'],['detail','대회 상세'],['w1','위저드'],['result','동선 결과'],['courses','러닝코스'],['run','GPS 기록'],['library','보관함'],['login','로그인']];
+  return `<span class="brand">런닝구 · UI MOCKUP V2</span>
+    ${nav.map(([k, l]) => `<button class="${S.screen === k || (k === 'w1' && ['w1','w2','w3'].indexOf(S.screen) >= 0) ? 'on' : ''}" onclick="APP.go('${k}')">${l}</button>`).join('')}`;
+}
+
+/* ================================================================
+   3D 장면 마운트 · 화면별 부트
+   ================================================================ */
+function mountScenes(){
+  const staticShot = location.hash.indexOf('!s') >= 0; /* 검수용: 리본 완성 상태로 캡처 */
+  document.querySelectorAll('[data-gl]').forEach(el => {
+    const spec = Object.assign({}, ROUTES3D[el.getAttribute('data-gl')] || ROUTES3D.sejong);
+    try { Object.assign(spec, JSON.parse(el.getAttribute('data-gl-opts') || '{}')); } catch (e) {}
+    if (staticShot){ spec.progress = 1; spec.autoDraw = false; }
+    glHandles.push(RG3D.mount(el, spec));
+  });
+}
+function startRunTimer(){
+  clearInterval(runTimer);
+  const len = runPathLen(RUN_PTS);
+  runTimer = setInterval(() => {
+    if (S.screen !== 'run'){ clearInterval(runTimer); return; }
+    S.runT += 1;
+    const clock = $('#runClock'), dist = $('#runDist'), prog = $('#runProg'), dot = $('#runDot');
+    if (clock) clock.textContent = fmtClock(1421 + S.runT);
+    if (dist) dist.textContent = (3.82 + S.runT * .00269).toFixed(2) + ' km';
+    const p = Math.min(1, .52 + (S.runT % 600) * .0006);
+    if (prog) prog.setAttribute('stroke-dashoffset', (len * (1 - p)).toFixed(0));
+    if (dot){ const pos = runPointAt(RUN_PTS, p); dot.style.left = (pos[0] / 390 * 100) + '%'; dot.style.top = (pos[1] / 740 * 100) + '%'; }
+  }, 1000);
+}
+function countUp(id, target, fmt, ms){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const t0 = performance.now();
+  const tick = now => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(target * e);
+    if (k < 1 && document.getElementById(id)) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function bootScreen(){
+  if (S.screen === 'run') startRunTimer();
+  if (S.screen === 'runsum'){
+    countUp('runsum-d', 5.21, v => v.toFixed(2) + ' km', 1100);
+    countUp('runsum-t', 1930, v => fmtClock(v), 1100);
+  }
+  if (S.screen === 'result' && !S.editMode){
+    const vp = $('#viewport');
+    vp.onscroll = () => {
+      if (S.screen !== 'result' || S.editMode) return;
+      const box = vp.getBoundingClientRect(), mid = box.top + box.height * .45;
+      let best = null, bd = 1e9;
+      document.querySelectorAll('[data-block]').forEach(el => {
+        const r = el.getBoundingClientRect(), d = Math.abs(r.top + r.height / 2 - mid);
+        if (d < bd){ bd = d; best = parseInt(el.getAttribute('data-block'), 10); }
+      });
+      if (best !== null && best !== S.activeBlock){ S.activeBlock = best; render(); }
+    };
+  } else { $('#viewport').onscroll = null; }
+}
+
+/* ================================================================
+   렌더 루트
+   ================================================================ */
+const DEEP_SCREENS = { home:'var(--deep-2)', login:'var(--deep-2)', run:'var(--deep)' };
+function render(){
+  glHandles.forEach(h => h && h.dispose && h.dispose());
+  glHandles = [];
+  const sb = $('#statusbar');
+  sb.className = 'statusbar' + (DEEP_SCREENS[S.screen] ? ' on-dark' : '');
+  sb.style.background = DEEP_SCREENS[S.screen] || 'var(--surface)';
+  $('#viewport').innerHTML = (SCREENS[S.screen] || SCREENS.home)();
+  $('#tabbarHost').innerHTML = tabbarHtml();
+  $('#stageNav').innerHTML = stageNavHtml();
+  $('#debugHost').innerHTML = debugHtml();
+  renderOverlays();
+  mountScenes();
+  bootScreen();
+}
+
+/* ================================================================
+   APP — 전역 핸들러 (원본 DCLogic 계약 1:1)
+   ================================================================ */
+const APP = {
+  go, back, openDetail, toggleFav,
+  /* 홈 */
+  setHomeQ: v => { S.homeQ = v; },
+  startWizardFromHero(id){ S.detailId = id; S.backTo = 'home'; go('w1'); },
+  goCoursesTab(tab){ S.cTab = tab; go('courses'); },
+  goSearch(){ S.q = S.homeQ; go('calendar'); },
+  scrollFestival(){
+    const el = document.getElementById('home-festival');
+    if (el) $('#viewport').scrollTo({ top: el.offsetTop - 60, behavior:'smooth' });
+  },
+  /* 캘린더 · 필터 */
+  setQ(v){ S.q = v; const b = $('#cal-body'); if (b) b.innerHTML = calListBody(); },
+  clearQ(){ S.q = ''; render(); },
+  setView(v){ set({ view: v }); },
+  selDate(ds){ set({ selDate: S.selDate === ds ? null : ds }); },
+  prevMonth(){ set({ calM: S.calM === 0 ? 11 : S.calM - 1, calY: S.calM === 0 ? S.calY - 1 : S.calY, selDate:null }); },
+  nextMonth(){ set({ calM: S.calM === 11 ? 0 : S.calM + 1, calY: S.calM === 11 ? S.calY + 1 : S.calY, selDate:null }); },
+  openFilter(){ set({ filterOpen:true, draft:{ events:S.f.events.slice(), openOnly:S.f.openOnly, regions:S.f.regions.slice() } }); },
+  cancelFilter(){ set({ filterOpen:false, draft:null }); },
+  applyFilter(){ set({ f:S.draft || S.f, filterOpen:false, draft:null, selDate:null }); },
+  resetDraft(){ set({ draft:{ events:[], openOnly:false, regions:[] } }); },
+  resetFilters(){ set({ f:{ events:[], openOnly:false, regions:[] }, q:'' }); },
+  toggleDraft(key, val){
+    const arr = S.draft[key].slice(), i = arr.indexOf(val);
+    if (i >= 0) arr.splice(i, 1); else arr.push(val);
+    S.draft[key] = arr; render();
+  },
+  toggleOpenOnly(){ S.draft.openOnly = !S.draft.openOnly; render(); },
+  rmEventFilter(e){ set({ f: Object.assign({}, S.f, { events: S.f.events.filter(x => x !== e) }) }); },
+  rmRegionFilter(r){ set({ f: Object.assign({}, S.f, { regions: S.f.regions.filter(x => x !== r) }) }); },
+  rmOpenOnly(){ set({ f: Object.assign({}, S.f, { openOnly:false }) }); },
+  /* 보관함 */
+  setLibTab(t){ set({ libTab: t }); },
+  openSavedRoute(){ S.activeDay = 0; S.activeBlock = 0; S.editMode = false; S.resultFrom = 'library'; go('result'); },
+  deleteSavedRoute(){ set({ saved:false }); },
+  openCourseDetail(ran){ S.cdRan = ran; go('coursedetail'); },
+  goLibrary(){ if (guard()) return; go('library'); },
+  /* 인증 */
+  doLogin(){ S.guest = false; go('home'); },
+  doGuest(){ S.guest = true; go('home'); },
+  goSignup(){ S.suStep = 1; go('signup'); },
+  goFindPw(){ S.resetSent = false; go('findpw'); },
+  goNewPw(){ S.pwChanged = false; go('newpw'); },
+  sendReset(){ S.resetSent = true; render(); toast('재설정 링크를 이메일로 보냈어요'); },
+  changePw(){ set({ pwChanged:true }); },
+  signupBack(){ if (S.suStep > 1) set({ suStep: S.suStep - 1 }); else go('login'); },
+  toggleAllAgree(){ const all = !(S.agree.tos && S.agree.privacy && S.agree.mkt); set({ agree:{ tos:all, privacy:all, mkt:all } }); },
+  toggleAgree(k){ S.agree[k] = !S.agree[k]; render(); },
+  setCode(v){
+    S.code = v.replace(/[^0-9]/g, '').slice(0, 6);
+    const boxes = $('#codeBoxes'); if (boxes) boxes.innerHTML = codeBoxesHtml();
+    const cta = $('#suCta'); if (cta) cta.disabled = S.code.length < 6;
+    const inp = $('#codeInput'); if (inp && inp.value !== S.code) inp.value = S.code;
+  },
+  resend(){
+    if (S.resendLeft > 0) return;
+    S.resendLeft = 60; toast('인증 메일을 보냈어요');
+    const btn = () => $('#resendBtn');
+    if (btn()){ btn().textContent = '재발송 60초'; btn().style.color = 'var(--ink5)'; }
+    clearInterval(resendTimer);
+    resendTimer = setInterval(() => {
+      S.resendLeft -= 1;
+      if (S.resendLeft <= 0){ clearInterval(resendTimer); S.resendLeft = 0; if (btn()){ btn().textContent = '재발송'; btn().style.color = 'var(--blue)'; } }
+      else if (btn()) btn().textContent = '재발송 ' + S.resendLeft + '초';
+    }, 1000);
+  },
+  suNext(){
+    if (S.suStep === 1 && !(S.agree.tos && S.agree.privacy)) return;
+    if (S.suStep === 3 && S.code.length < 6) return;
+    if (S.suStep === 4){ S.guest = false; toast('가입이 완료됐어요'); go('home'); return; }
+    set({ suStep: S.suStep + 1 });
+  },
+  closeGuest(){ S.guestOpen = false; renderOverlays(); },
+  goLoginFromGuest(){ S.guestOpen = false; go('login'); },
+  /* 러닝코스 */
+  setCTab(t){ set({ cTab: t }); },
+  setStartQ: v => { S.startQ = v; },
+  setCourseStart(p){ set({ courseStart: p }); },
+  setCourse(c){ set({ course: c }); },
+  setCRegion(r){ set({ cRegion: S.cRegion === r ? null : r }); },
+  setDist(v){
+    S.dist = parseFloat(v);
+    const lb = $('#dist-label'); if (lb) lb.textContent = S.dist.toFixed(1) + 'km';
+    const card = $('#course-card'); if (card) card.innerHTML = courseInfoHtml();
+  },
+  useMyLocation(){
+    S.dbg.courses = 'locating'; render();
+    setTimeout(() => { S.dbg.courses = 'ok'; S.courseStart = '내 위치'; render(); }, 900);
+  },
+  saveCourse(){ if (guard()) return; S.libTab = 'course'; toast('보관함에 저장했어요'); },
+  saveRun(){ if (guard()) return; S.ranSaved = true; S.libTab = 'course'; toast('러닝 기록을 저장했어요'); setTimeout(() => go('library'), 700); },
+  /* 동선 결과 · 편집 */
+  setDay(i){ set({ activeDay:i, activeBlock:0 }); },
+  setActiveBlock(i){ set({ activeBlock:i }); },
+  toggleEdit(){ set({ editMode: !S.editMode }); },
+  removeBlock(i){ mutate(d => d.blocks.splice(i, 1)); },
+  dragStart(i){ S._drag = i; },
+  dropOn(i){ if (S._drag !== null && S._drag !== i) mutate(d => { const [x] = d.blocks.splice(S._drag, 1); d.blocks.splice(i, 0, x); }); S._drag = null; },
+  openSwap(i, cat){ S.poi = { mode:'replace', idx:i, cat }; renderOverlays(); },
+  openAdd(){ S.poi = { mode:'add', idx:-1, cat:'관광지' }; renderOverlays(); },
+  closePoi(){ S.poi = null; renderOverlays(); },
+  setPoiCat(c){ S.poi = Object.assign({}, S.poi, { cat:c }); renderOverlays(); },
+  pickPoi(idx){
+    const p = POIS[idx];
+    if (S.poi.mode === 'replace') mutate(d => { d.blocks[S.poi.idx] = Object.assign({}, d.blocks[S.poi.idx], { place:p.name, desc:p.desc }); });
+    else mutate(d => d.blocks.push({ time:'13:00', title:'추가 일정', cat:S.poi.cat, place:p.name, desc:p.desc }));
+    S.poi = null; render();
+  },
+  shareRoute(){ toast('동선을 공유했어요'); },
+  saveRoute(){ if (guard()) return; S.saved = true; S.libTab = 'route'; toast('보관함에 저장했어요'); setTimeout(() => go('library'), 700); },
+  goCoursesFromHotel(){ S.courseStart = '호텔 세종 가온'; go('courses'); },
+  /* 위저드 */
+  pickPattern(key){
+    const p = PATTERNS.find(x => x.key === key);
+    if (key === 'custom') set({ wPattern:key, wStart:null, wEnd:null });
+    else set({ wPattern:key, wStart:p.s, wEnd:p.e });
+  },
+  tapWizDay(d){
+    if (S.wPattern !== 'custom') return;
+    if (!S.wStart || (S.wStart && S.wEnd)) set({ wStart:d, wEnd:null });
+    else if (d < S.wStart) set({ wStart:d, wEnd:S.wStart });
+    else set({ wEnd:d });
+  },
+  setWEvent(e){ set({ wEvent:e }); },
+  togglePref(label){
+    const a = S.wPrefs.slice(), i = a.indexOf(label);
+    if (i >= 0) a.splice(i, 1); else a.push(label);
+    set({ wPrefs:a });
+  },
+  setHotelQ(v){ S.hotelQ = v; const l = $('#hotel-list'); if (l) l.innerHTML = hotelListHtml(); },
+  setHotel(name){ set({ hotel: S.hotel === name ? null : name }); },
+  wizardNext(){
+    if (S.screen === 'w1') go('w2');
+    else if (S.screen === 'w2'){ if (S.wPrefs.length) go('w3'); }
+    else if (S.screen === 'w3'){
+      if (S.generating) return;
+      set({ generating:true });
+      setTimeout(() => { S.generating = false; S.resultFrom = 'w3'; S.activeDay = 1; S.activeBlock = 0; go('result'); }, 900);
+    }
+  },
+  /* 디버그 */
+  setFestState(k){ set({ festState:k }); },
+  dbgW3(k){ S.dbg.w3 = k; render(); },
+  dbgResult(k){ S.dbg.result = k; render(); },
+  dbgCourses(k){ S.dbg.courses = k; render(); },
+  dbgLib(k){ S.dbg.lib = k; render(); },
+  dbgLogin(k){ S.dbg.login = k; render(); }
+};
+window.APP = APP;
+
+/* 해시 딥링크 — 데모·검수용: #home · #calendar-cal · #calendar-filter · #result-edit · #signup-3 … */
+(function bootFromHash(){
+  const h = (location.hash || '').replace('#', '').replace('!s', '');
+  if (!h) return;
+  const [key, mod] = h.split('-');
+  if (SCREENS[key]) S.screen = key;
+  if (key === 'calendar' && mod === 'cal') S.view = 'cal';
+  if (key === 'calendar' && mod === 'filter'){ S.filterOpen = true; S.draft = { events:S.f.events.slice(), openOnly:S.f.openOnly, regions:S.f.regions.slice() }; }
+  if (key === 'result' && mod === 'edit') S.editMode = true;
+  if (key === 'result' && mod === 'poi') S.poi = { mode:'add', idx:-1, cat:'관광지' };
+  if (key === 'signup' && mod) S.suStep = Math.max(1, Math.min(4, parseInt(mod, 10) || 1));
+  if (key === 'courses' && mod === 'region') S.cTab = 'region';
+  if (key === 'library' && mod === 'course') S.libTab = 'course';
+  if (key === 'library' && mod === 'fav') S.libTab = 'fav';
+  if (key === 'home' && mod === 'guest'){ S.guest = true; S.guestOpen = true; }
+})();
+
+render();
+
+</script>
+</body>
+</html>
