@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "RunningGu"
 include(":app")
+include(":tools:codex-orchestrator")

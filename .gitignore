@@ -33,6 +33,7 @@ dist/
 
 # ── agent workspaces ──
 .claude/
+.codex-orchestrator/
 
 # Local-only documentation
 /docs/local/
