@@ -3,8 +3,10 @@ package com.runninggu.app.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.home.HomeScreen
@@ -26,8 +28,32 @@ fun RunningGuNavHost(
         startDestination = Routes.HOME,
         modifier = modifier,
     ) {
-        composable(Routes.HOME) { HomeScreen() }
-        composable(Routes.CALENDAR) { CalendarScreen() }
+        composable(Routes.HOME) {
+            HomeScreen(
+                // 검색 실행 → 캘린더로 이동하며 검색어 전달 (SPEC §4.4-1)
+                onSearch = { query ->
+                    navController.navigate(Routes.calendarWithQuery(query))
+                },
+                onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
+                onOpenCourses = { navController.navigate(Routes.COURSES) },
+                // TODO(AP-11): S3 대회 상세·위저드가 생기면 연결한다.
+                onRaceClick = {},
+                onStartWizard = {},
+            )
+        }
+        composable(
+            route = Routes.CALENDAR_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_QUERY) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
+            CalendarScreen(
+                initialQuery = entry.arguments?.getString(Routes.ARG_QUERY).orEmpty(),
+            )
+        }
         composable(Routes.COURSES) { CourseScreen() }
         composable(Routes.MY) { MyScreen() }
     }
