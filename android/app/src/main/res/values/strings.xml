@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">RunningGu</string>
+
+    <!-- 하단 탭 (SPEC §2.1) -->
+    <string name="tab_home">홈</string>
+    <string name="tab_calendar">캘린더</string>
+    <string name="tab_courses">러닝코스</string>
+    <string name="tab_my">마이</string>
 </resources>
