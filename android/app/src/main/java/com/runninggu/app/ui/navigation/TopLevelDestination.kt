@@ -43,7 +43,10 @@ enum class TopLevelDestination(
     ;
 
     companion object {
-        fun fromRoute(route: String?): TopLevelDestination? =
-            entries.firstOrNull { it.route == route }
+        /** 인자가 붙은 route("calendar?q=서울")도 해당 탭으로 인식한다. */
+        fun fromRoute(route: String?): TopLevelDestination? {
+            val base = Routes.baseOf(route) ?: return null
+            return entries.firstOrNull { it.route == base }
+        }
     }
 }

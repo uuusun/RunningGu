@@ -1,5 +1,7 @@
 package com.runninggu.app.ui.navigation
 
+import android.net.Uri
+
 /**
  * 내비게이션 route 상수. (SPEC §2.2 내비게이션 그래프)
  *
@@ -11,4 +13,17 @@ object Routes {
     const val CALENDAR = "calendar"
     const val COURSES = "courses"
     const val MY = "my"
+
+    /** 캘린더 검색어 인자. 홈에서 검색 실행 시 넘어온다. (SPEC §4.4-1) */
+    const val ARG_QUERY = "q"
+
+    /** 선택 인자를 포함한 캘린더 route 패턴. */
+    const val CALENDAR_PATTERN = "$CALENDAR?$ARG_QUERY={$ARG_QUERY}"
+
+    /** 검색어를 실어 캘린더로 이동할 때 쓰는 route. */
+    fun calendarWithQuery(query: String): String =
+        "$CALENDAR?$ARG_QUERY=${Uri.encode(query)}"
+
+    /** "calendar?q={q}" 같은 패턴에서 인자를 떼어낸 기본 route. */
+    fun baseOf(route: String?): String? = route?.substringBefore('?')
 }
