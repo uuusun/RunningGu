@@ -10,8 +10,14 @@ import androidx.navigation.navArgument
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.home.HomeScreen
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.compose.navigation
 import com.runninggu.app.ui.my.MyScreen
 import com.runninggu.app.ui.racedetail.RaceDetailScreen
+import com.runninggu.app.ui.wizard.PlanScreen
+import com.runninggu.app.ui.wizard.WizardViewModel
 
 /**
  * main 그래프. 시작 화면은 홈(S1).
@@ -29,6 +35,7 @@ fun RunningGuNavHost(
         startDestination = Routes.HOME,
         modifier = modifier,
     ) {
+        // 위저드는 아래 wizardGraph()에서 붙인다.
         composable(Routes.HOME) {
             HomeScreen(
                 // 검색 실행 → 캘린더로 이동하며 검색어 전달 (SPEC §4.4-1)
@@ -69,8 +76,40 @@ fun RunningGuNavHost(
             RaceDetailScreen(
                 raceId = entry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
                 onBack = { navController.popBackStack() },
-                // TODO(AP-11): S4 일정 선택이 생기면 연결한다.
-                onStartWizard = {},
+                onStartWizard = { raceId -> navController.navigate(Routes.wizard(raceId)) },
+            )
+        }
+
+        wizardGraph(navController)
+    }
+}
+
+/**
+ * 위저드 그래프 S4~S7. (SPEC §2.2 · §2.4)
+ *
+ * 그래프 안의 화면들은 **그래프 back stack entry에 묶인 [WizardViewModel] 하나**를 공유한다.
+ * 화면마다 `viewModel()`을 부르면 각자 다른 인스턴스가 생겨서, S5에서 뒤로 왔을 때
+ * S4에서 고른 일정이 사라진다. 그래서 그래프 entry를 owner로 넘긴다.
+ */
+private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
+    navigation(
+        route = Routes.WIZARD_GRAPH_PATTERN,
+        startDestination = Routes.PLAN,
+        arguments = listOf(navArgument(Routes.ARG_RACE_ID) { type = NavType.StringType }),
+    ) {
+        composable(Routes.PLAN) { entry ->
+            // 이 entry가 아니라 그래프 entry를 owner로 써야 공유가 된다.
+            val graphEntry = remember(entry) {
+                navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
+            }
+            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+
+            PlanScreen(
+                raceId = graphEntry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
+                onBack = { navController.popBackStack() },
+                // TODO(AP-11): S5 종목·취향이 생기면 연결한다.
+                onNext = {},
+                viewModel = wizardViewModel,
             )
         }
     }

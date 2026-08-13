@@ -65,7 +65,8 @@ fun RaceCard(
             containerColor = if (featured) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
+                // 목업 카드는 흰 면 (--surface). 배경 --page 위에 떠 보이게 한다.
+                MaterialTheme.colorScheme.surface
             },
         ),
     ) {

@@ -314,7 +314,8 @@ private fun StatusChip(race: RaceSummary, modifier: Modifier = Modifier) {
         status.label
     }
     val container = if (isOpen) {
-        MaterialTheme.colorScheme.primaryContainer
+        // 접수중은 라임 (목업 .chip-open). S2 카드와 같은 색을 쓴다.
+        MaterialTheme.colorScheme.tertiaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
@@ -406,7 +407,8 @@ private fun ClosingSoonCard(
         modifier = modifier.width(200.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            // 목업 카드는 흰 면 위에 웜그레이 배경이 깔린 구조다 (--surface / --page).
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -493,7 +495,8 @@ private fun FestivalCard(
         modifier = modifier.width(200.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            // 목업 카드는 흰 면 위에 웜그레이 배경이 깔린 구조다 (--surface / --page).
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
