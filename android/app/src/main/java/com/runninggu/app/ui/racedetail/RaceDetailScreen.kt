@@ -51,6 +51,8 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
+import com.runninggu.app.ui.theme.Ink5
+import com.runninggu.app.ui.theme.Orange
 import com.runninggu.app.ui.model.NearbyFestival
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.RegistrationStatus
@@ -122,11 +124,7 @@ fun RaceDetailScreen(
                             },
                             contentDescription = if (state.isFavorite) "찜 해제" else "찜하기",
                             // 색은 S2 카드(RaceCard)와 맞춘다 — 같은 찜인데 화면마다 색이 다르면 안 된다.
-                            tint = if (state.isFavorite) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            },
+                            tint = if (state.isFavorite) Orange else Ink5,
                         )
                     }
                 },
