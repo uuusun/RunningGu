@@ -11,6 +11,7 @@ import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.home.HomeScreen
 import com.runninggu.app.ui.my.MyScreen
+import com.runninggu.app.ui.racedetail.RaceDetailScreen
 
 /**
  * main 그래프. 시작 화면은 홈(S1).
@@ -36,8 +37,8 @@ fun RunningGuNavHost(
                 },
                 onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
                 onOpenCourses = { navController.navigate(Routes.COURSES) },
-                // TODO(AP-11): S3 대회 상세·위저드가 생기면 연결한다.
-                onRaceClick = {},
+                onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
+                // TODO(AP-11): S4 일정 선택이 생기면 연결한다.
                 onStartWizard = {},
             )
         }
@@ -52,11 +53,25 @@ fun RunningGuNavHost(
         ) { entry ->
             CalendarScreen(
                 initialQuery = entry.arguments?.getString(Routes.ARG_QUERY).orEmpty(),
-                // TODO(AP-11): S3 대회 상세가 생기면 연결한다.
-                onRaceClick = {},
+                onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
             )
         }
         composable(Routes.COURSES) { CourseScreen() }
         composable(Routes.MY) { MyScreen() }
+
+        // S3 대회 상세 — 최상위 화면이 아니므로 탭바는 자동으로 숨는다 (SPEC §2.1).
+        composable(
+            route = Routes.RACE_DETAIL_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_RACE_ID) { type = NavType.StringType },
+            ),
+        ) { entry ->
+            RaceDetailScreen(
+                raceId = entry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
+                onBack = { navController.popBackStack() },
+                // TODO(AP-11): S4 일정 선택이 생기면 연결한다.
+                onStartWizard = {},
+            )
+        }
     }
 }

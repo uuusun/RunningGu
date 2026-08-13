@@ -2,6 +2,7 @@ package com.runninggu.app.ui.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.sample.SampleData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,12 @@ class CalendarViewModel : ViewModel() {
 
     init {
         load()
+        // 찜은 S3 상세·S10 마이와 같은 값을 봐야 하므로 공용 보관소를 구독한다. (SPEC §4.5)
+        viewModelScope.launch {
+            FavoriteStore.favoriteIds.collect { ids ->
+                _uiState.update { it.copy(favoriteIds = ids) }
+            }
+        }
     }
 
     /** 홈에서 넘어온 검색어를 최초 1회만 적용한다. (SPEC §4.5) */
@@ -120,15 +127,8 @@ class CalendarViewModel : ViewModel() {
 
     /** 하트 토글. 카드 이동과 독립이며 스낵바를 띄운다. (SPEC §4.5 · 결정-16) */
     fun onFavoriteToggle(raceId: String) {
-        _uiState.update { state ->
-            val next = if (state.isFavorite(raceId)) {
-                state.favoriteIds - raceId
-            } else {
-                state.favoriteIds + raceId
-            }
-            _message.value = if (raceId in next) "찜했어요" else "찜을 해제했어요"
-            state.copy(favoriteIds = next)
-        }
+        // 상태 갱신은 보관소 구독(init)이 받아서 반영한다.
+        _message.value = if (FavoriteStore.toggle(raceId)) "찜했어요" else "찜을 해제했어요"
     }
 
     fun onMessageShown() {

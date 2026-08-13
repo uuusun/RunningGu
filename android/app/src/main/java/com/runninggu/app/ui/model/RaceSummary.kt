@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.model
 
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 /**
  * 화면에서 쓰는 대회 요약. 홈(S1)·캘린더(S2)가 공유한다.
@@ -23,7 +24,25 @@ data class RaceSummary(
     val checked: LocalDate?,
     /** 크롤 스냅샷의 접수 상태 원본. 날짜 정보가 없을 때만 쓴다. */
     val rawRegStatus: String? = null,
+    /**
+     * 아래 두 필드는 S3 상세에만 나온다. 카드(S1·S2)는 쓰지 않으므로 없을 수 있다.
+     * (API 명세 §3-4 — 상세 응답에서만 내려온다)
+     */
+    val organizer: String? = null,
+    val officialUrl: String? = null,
 )
+
+/** 대회일까지 남은 일수. 오늘이면 0, 지났으면 음수. (SPEC §4.6 · KST 기준 §6.6) */
+fun RaceSummary.dDay(today: LocalDate = LocalDate.now()): Long =
+    ChronoUnit.DAYS.between(today, date)
+
+/** "D-18" · "D-day" · "D+2" 표기. (SPEC §4.6) */
+fun RaceSummary.dDayLabel(today: LocalDate = LocalDate.now()): String =
+    when (val d = dDay(today)) {
+        0L -> "D-day"
+        in 1..Long.MAX_VALUE -> "D-$d"
+        else -> "D+${-d}"
+    }
 
 /** 접수 상태. (SPEC §5.5) */
 enum class RegistrationStatus(val label: String) {
@@ -50,6 +69,22 @@ fun RaceSummary.registrationStatus(today: LocalDate = LocalDate.now()): Registra
         else -> RegistrationStatus.UNKNOWN
     }
 }
+
+/**
+ * S3 대회 인근 축제. (SPEC §4.6 M3 · API 명세 §3-5)
+ *
+ * 서버가 대회일 ±14일 ∧ 반경 40km로 걸러 거리순 6건을 내려준다 — 앱은 거르지 않고 그대로 그린다.
+ */
+data class NearbyFestival(
+    val contentId: String,
+    val name: String,
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    /** 대회장 기준 직선거리(km). 카드에 "대회장 {d.d}km"로 표기한다. */
+    val distanceKm: Double,
+    val imageUrl: String?,
+    val address: String,
+)
 
 /** 홈 축제 캐러셀 항목. 출처는 한국관광공사 고정 표기. (NFR-7) */
 data class FestivalSummary(

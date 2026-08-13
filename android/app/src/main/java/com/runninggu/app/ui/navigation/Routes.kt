@@ -17,6 +17,12 @@ object Routes {
     /** 캘린더 검색어 인자. 홈에서 검색 실행 시 넘어온다. (SPEC §4.4-1) */
     const val ARG_QUERY = "q"
 
+    /** S3 대회 상세. 대회 id를 경로에 실어 넘긴다. (SPEC §2.2 · §4.6) */
+    const val ARG_RACE_ID = "raceId"
+    const val RACE_DETAIL_PATTERN = "raceDetail/{$ARG_RACE_ID}"
+
+    fun raceDetail(raceId: String): String = "raceDetail/${Uri.encode(raceId)}"
+
     /** 선택 인자를 포함한 캘린더 route 패턴. */
     const val CALENDAR_PATTERN = "$CALENDAR?$ARG_QUERY={$ARG_QUERY}"
 
