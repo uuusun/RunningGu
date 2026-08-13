@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.home
 
-import java.time.LocalDate
+import com.runninggu.app.ui.model.FestivalSummary
+import com.runninggu.app.ui.model.RaceSummary
 
 /**
  * S1 홈의 UI 계약. (SPEC §4.4 · §3-5)
@@ -32,28 +33,3 @@ sealed interface HomeUiState {
             get() = featured == null && closingSoon.isEmpty() && festivals.isEmpty()
     }
 }
-
-/** 홈에서 쓰는 대회 요약. 상세 필드는 S3(AP-11)에서 확장한다. */
-data class RaceSummary(
-    val id: String,
-    val name: String,
-    val region: String,
-    val venue: String,
-    val date: LocalDate,
-    val startTime: String,
-    /** 접수 마감일. 마감 D-n 계산에 쓴다. */
-    val regEnd: LocalDate?,
-    val eventTypes: List<String>,
-    val source: String,
-    val isRegistrationOpen: Boolean,
-)
-
-/** 홈 축제 캐러셀 항목. 출처는 한국관광공사 고정 표기. (NFR-7) */
-data class FestivalSummary(
-    val id: String,
-    val name: String,
-    val region: String,
-    val period: String,
-    /** 진행 중이면 true — 카드에 라이브 표시. */
-    val isOngoing: Boolean,
-)

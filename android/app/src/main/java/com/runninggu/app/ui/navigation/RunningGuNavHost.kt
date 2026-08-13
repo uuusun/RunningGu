@@ -52,6 +52,8 @@ fun RunningGuNavHost(
         ) { entry ->
             CalendarScreen(
                 initialQuery = entry.arguments?.getString(Routes.ARG_QUERY).orEmpty(),
+                // TODO(AP-11): S3 대회 상세가 생기면 연결한다.
+                onRaceClick = {},
             )
         }
         composable(Routes.COURSES) { CourseScreen() }

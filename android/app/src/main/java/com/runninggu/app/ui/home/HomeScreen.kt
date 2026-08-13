@@ -50,6 +50,10 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
+import com.runninggu.app.ui.model.FestivalSummary
+import com.runninggu.app.ui.model.RaceSummary
+import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.ui.model.registrationStatus
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -302,14 +306,14 @@ private fun FeaturedRaceCard(
 
 @Composable
 private fun StatusChip(race: RaceSummary, modifier: Modifier = Modifier) {
-    val label = if (race.isRegistrationOpen && race.regEnd != null) {
+    val status = race.registrationStatus()
+    val isOpen = status == RegistrationStatus.OPEN
+    val label = if (isOpen && race.regEnd != null) {
         "접수중 · ~${race.regEnd.toShortDate()}"
-    } else if (race.isRegistrationOpen) {
-        "접수중"
     } else {
-        "마감"
+        status.label
     }
-    val container = if (race.isRegistrationOpen) {
+    val container = if (isOpen) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceVariant
