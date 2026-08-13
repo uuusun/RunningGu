@@ -32,7 +32,9 @@ private val RunningGuColorScheme = lightColorScheme(
     tertiaryContainer = Lime,
     onTertiaryContainer = Ink,
 
-    background = Page,
+    // 앱 배경은 흰색이다. 목업의 --page(웜그레이)는 폰 목업들이 놓인 데스크톱 캔버스
+    // 색이지 앱 화면 색이 아니다 — .phone{background:var(--surface)}가 실제 앱 바탕이다.
+    background = Surface,
     onBackground = Ink,
 
     surface = Surface,
@@ -48,7 +50,7 @@ private val RunningGuColorScheme = lightColorScheme(
     surfaceContainerHigh = Fill,
     surfaceContainerHighest = Fill2,
     surfaceBright = Surface,
-    surfaceDim = Page,
+    surfaceDim = Fill,
     inverseSurface = Ink,
     inverseOnSurface = Surface,
     // 고도(elevation)에 따라 primary를 덧입히는 기능도 끈다.

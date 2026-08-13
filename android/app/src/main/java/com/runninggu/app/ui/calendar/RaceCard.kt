@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,9 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.runninggu.app.ui.theme.Ink2
+import com.runninggu.app.ui.theme.Ink4
+import com.runninggu.app.ui.theme.Ink5
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
@@ -55,20 +58,19 @@ fun RaceCard(
     val status = race.registrationStatus()
     val closed = status != RegistrationStatus.OPEN
 
+    // 목업 .racerow — 흰 바탕에 옅은 테두리로 구분하고, featured만 파란 테두리로 강조한다.
+    // 마감은 카드 전체를 흐리게 하지 않고 텍스트 색만 낮춘다 (.racerow.closed).
     Card(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .alpha(if (closed) 0.55f else 1f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (featured) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                // 목업 카드는 흰 면 (--surface). 배경 --page 위에 떠 보이게 한다.
-                MaterialTheme.colorScheme.surface
-            },
-        ),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp), // --r-card
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (featured) {
+            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = if (featured) 6.dp else 0.dp),
     ) {
         Row(modifier = Modifier.padding(14.dp)) {
             DateColumn(race = race, featured = featured)
@@ -79,6 +81,7 @@ fun RaceCard(
                         text = race.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
+                        color = if (closed) Ink2 else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(
@@ -105,7 +108,7 @@ fun RaceCard(
                 Text(
                     text = "${race.region} · ${race.venue}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (closed) Ink5 else Ink4,
                 )
 
                 Spacer(Modifier.height(8.dp))

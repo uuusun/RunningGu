@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -406,10 +407,10 @@ private fun ClosingSoonCard(
         onClick = onClick,
         modifier = modifier.width(200.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            // 목업 카드는 흰 면 위에 웜그레이 배경이 깔린 구조다 (--surface / --page).
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+        // 목업 .railcard — 흰 바탕 + 옅은 테두리 + 얕은 그림자.
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             if (deadline != null) {
@@ -494,10 +495,10 @@ private fun FestivalCard(
     Card(
         modifier = modifier.width(200.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            // 목업 카드는 흰 면 위에 웜그레이 배경이 깔린 구조다 (--surface / --page).
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+        // 목업 .railcard — 흰 바탕 + 옅은 테두리 + 얕은 그림자.
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             if (festival.isOngoing) {
