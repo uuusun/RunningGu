@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -100,6 +101,9 @@ fun RaceDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
+                // 상태바 여백은 앱 셸(RunningGuApp)의 Scaffold가 이미 넣었다.
+                // 여기서 또 넣으면 두 번 들어가 앱바가 아래로 밀린다.
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -119,10 +123,11 @@ fun RaceDetailScreen(
                                 Icons.Filled.FavoriteBorder
                             },
                             contentDescription = if (state.isFavorite) "찜 해제" else "찜하기",
+                            // 색은 S2 카드(RaceCard)와 맞춘다 — 같은 찜인데 화면마다 색이 다르면 안 된다.
                             tint = if (state.isFavorite) {
-                                MaterialTheme.colorScheme.primary
+                                MaterialTheme.colorScheme.error
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                MaterialTheme.colorScheme.outline
                             },
                         )
                     }
