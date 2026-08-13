@@ -101,9 +101,7 @@ fun RaceDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                // 상태바 여백은 앱 셸(RunningGuApp)의 Scaffold가 이미 넣었다.
-                // 여기서 또 넣으면 두 번 들어가 앱바가 아래로 밀린다.
-                windowInsets = WindowInsets(0, 0, 0, 0),
+                // 상단 인셋은 앱 셸이 넘기지 않으므로 TopAppBar 기본 동작(statusBars)에 맡긴다.
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {

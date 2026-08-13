@@ -37,8 +37,14 @@ val Line = Color(0xFFE4E4E6)        // --line
 val Line2 = Color(0xFFECECEE)       // --line2
 val Line3 = Color(0xFFF0F0F0)       // --line3
 
-// 몰입(다크) 레지스터 — 지도·기록 화면용. 아직 미사용.
+// 몰입(다크) 레지스터 — 홈 히어로·지도·GPS 기록.
 val Deep = Color(0xFF0C1024)        // --deep
+val Deep2 = Color(0xFF131A38)       // --deep-2
+val Deep3 = Color(0xFF1B2450)       // --deep-3
+val DeepT1 = Color(0xFFF2F5FF)      // --deep-t1  본문
+val DeepT2 = Color(0xFFA9B4DC)      // --deep-t2  보조
+val DeepT3 = Color(0xFF6E7AA8)      // --deep-t3  메타
+val DeepLine = Color(0x2BA9B4DC)    // --deep-line rgba(169,180,220,.16)
 
 // 요일·상태
 val SundayRed = Color(0xFFE5484D)

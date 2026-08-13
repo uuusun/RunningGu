@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.navigation
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -61,10 +62,11 @@ fun RunningGuNavHost(
             CalendarScreen(
                 initialQuery = entry.arguments?.getString(Routes.ARG_QUERY).orEmpty(),
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
+                modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.COURSES) { CourseScreen() }
-        composable(Routes.MY) { MyScreen() }
+        composable(Routes.COURSES) { CourseScreen(Modifier.statusBarsPadding()) }
+        composable(Routes.MY) { MyScreen(Modifier.statusBarsPadding()) }
 
         // S3 대회 상세 — 최상위 화면이 아니므로 탭바는 자동으로 숨는다 (SPEC §2.1).
         composable(

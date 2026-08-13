@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -35,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,6 +65,10 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val ScreenPadding = 20.dp
+
+/** 퀵바 카드 높이와 히어로에 겹치는 양. (목업 .quickbar) */
+private val QUICKBAR_HEIGHT = 72.dp
+private val QUICKBAR_OVERLAP = 26.dp
 
 /**
  * S1 홈. (SPEC §4.4 / AP-09)
@@ -118,14 +125,19 @@ private fun HomeContent(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        item { HomeHeader() }
-
+        // 히어로(로고·검색·대표 대회)는 다크 몰입 레지스터 한 덩어리다 (목업 .hero).
         item {
-            SearchBar(
+            HomeHero(
+                race = (uiState as? HomeUiState.Content)?.featured,
                 query = query,
                 onQueryChange = onQueryChange,
                 onSearch = onSearch,
-                modifier = Modifier.padding(horizontal = ScreenPadding),
+                onRaceClick = {
+                    (uiState as? HomeUiState.Content)?.featured?.let { onRaceClick(it.id) }
+                },
+                onStartWizard = {
+                    (uiState as? HomeUiState.Content)?.featured?.let { onStartWizard(it.id) }
+                },
             )
         }
 
@@ -145,30 +157,30 @@ private fun HomeContent(
                         )
                     }
                 } else {
-                    uiState.featured?.let { race ->
-                        item {
-                            FeaturedRaceCard(
-                                race = race,
-                                onClick = { onRaceClick(race.id) },
-                                onStartWizard = { onStartWizard(race.id) },
-                                modifier = Modifier.padding(horizontal = ScreenPadding),
+                    // 퀵바는 흰 카드로 히어로 하단에 26dp 겹친다 (목업 .quickbar margin-top:-26px).
+                    item {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(QUICKBAR_HEIGHT - QUICKBAR_OVERLAP)
+                                // unbounded — 카드가 이 칸보다 커도 잘리지 않고 위로 넘치게 둔다.
+                                .wrapContentHeight(align = Alignment.Top, unbounded = true),
+                        ) {
+                            QuickActionRow(
+                                onCalendar = onOpenCalendar,
+                                onMap = onOpenCourses,
+                                onCourse = onOpenCourses,
+                                // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
+                                onTour = {
+                                    scope.launch {
+                                        listState.animateScrollToItem(uiState.festivalSectionIndex)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .offset(y = -QUICKBAR_OVERLAP)
+                                    .padding(horizontal = 22.dp),
                             )
                         }
-                    }
-
-                    item {
-                        QuickActionRow(
-                            onCalendar = onOpenCalendar,
-                            onMap = onOpenCourses,
-                            onCourse = onOpenCourses,
-                            // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
-                            onTour = {
-                                scope.launch {
-                                    listState.animateScrollToItem(uiState.festivalSectionIndex)
-                                }
-                            },
-                            modifier = Modifier.padding(horizontal = ScreenPadding),
-                        )
                     }
 
                     item {
@@ -338,14 +350,23 @@ private fun QuickActionRow(
     onTour: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // 목업 .quickbar — 히어로에 걸쳐 뜨는 흰 카드. 그림자로 떠 보이게 한다.
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 10.dp,
     ) {
-        QuickAction("달력", Icons.Filled.DateRange, onCalendar)
-        QuickAction("지도", Icons.Filled.LocationOn, onMap)
-        QuickAction("코스", Icons.Filled.Place, onCourse)
-        QuickAction("관광", Icons.Filled.Face, onTour)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            QuickAction("달력", Icons.Filled.DateRange, onCalendar)
+            QuickAction("지도", Icons.Filled.LocationOn, onMap)
+            QuickAction("코스", Icons.Filled.Place, onCourse)
+            QuickAction("관광", Icons.Filled.Face, onTour)
+        }
     }
 }
 

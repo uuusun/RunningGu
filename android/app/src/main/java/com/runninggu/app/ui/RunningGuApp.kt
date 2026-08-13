@@ -1,5 +1,6 @@
 package com.runninggu.app.ui
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -36,6 +37,9 @@ fun RunningGuApp(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        // 상단 인셋을 셸에서 먹지 않는다 — 홈 히어로가 상태바 뒤까지 깔려야 하기 때문이다
+        // (목업 .statusbar.on-dark). 상태바 여백은 각 화면이 statusBarsPadding()으로 처리한다.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             // 탭바는 최상위 화면에서만 노출한다 (SPEC §2.1).
             if (currentTab != null) {

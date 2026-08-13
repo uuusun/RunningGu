@@ -59,8 +59,6 @@ fun PlanScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                // 상태바 여백은 앱 셸 Scaffold가 이미 넣었다 (S3와 동일).
-                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("동선 만들기", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
