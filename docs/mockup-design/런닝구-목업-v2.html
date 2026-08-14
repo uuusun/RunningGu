@@ -572,7 +572,7 @@ const PATTERNS = [
   { key:'custom', label:'직접 선택', sub:'달력에서 직접 고르기', s:null, e:null }
 ];
 const PREF_LIST = ['관광지','맛집','카페','힐링웰니스','자연트레킹','역사문화'];
-const PREV = { detail:'calendar', w1:'detail', w2:'w1', w3:'w2', result:'w3', run:'courses', runsum:'run' };
+const PREV = { detail:'calendar', w1:'detail', w2:'w1', w3:'w2', result:'w3', run:'courses', runsum:'run', account:'library', coursedetail:'library' };
 
 /* 대회별 3D 코스 형상 (정규화 -1..1) — 데이터 3D의 원천 */
 const ROUTES3D = {
@@ -594,12 +594,16 @@ const S = {
   q:'', view:'list', f:{ events:[], openOnly:false, regions:[] }, draft:null, filterOpen:false,
   calY:2026, calM:7, selDate:null, fav:{ busan:true, seoul:true, jeonju:true }, festState:'ok', backTo:'calendar',
   wPattern:'both', wStart:21, wEnd:23, wEvent:'하프', wPrefs:['관광지','맛집'],
-  hotelQ:'', hotel:null, generating:false, dbg:{ w3:'ok', courses:'ok', result:'ok', lib:'ok', login:'ok' },
+  hotelQ:'', hotel:null, generating:false,
+  dbg:{ w3:'ok', courses:'ok', result:'ok', lib:'ok', login:'ok', home:'ok', fest:'ok', cal:'ok' },
   itin:JSON.parse(JSON.stringify(ITIN0)), activeDay:1, activeBlock:0, editMode:false, poi:null, saved:true, courseStart:'부산 해운대',
   cTab:'near', startQ:'', dist:5, course:'해파랑길 1코스', cRegion:null, ranSaved:true, libTab:'route',
   cdRan:false, resultFrom:'w3', guest:false, guestOpen:false, suStep:1, agree:{ tos:false, privacy:false, mkt:false },
   code:'', resendLeft:0, resetSent:false, pwChanged:false, homeQ:'',
-  runT:0, runOn:false, _drag:null
+  runT:0, runOn:false, _drag:null,
+  /* 보완 — 코스 저장 · 계정 · 확인 모달 · 오프라인 · 게스트 복귀 */
+  courseSaved:false, guestReason:'save', returnTo:null, confirm:null, offline:false,
+  nick:'민지', acctMkt:true, kakaoLinked:true, syncedAt:'08.13 21:40'
 };
 let glHandles = [], runTimer = null, resendTimer = null;
 
@@ -623,10 +627,47 @@ function toast(msg){
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { S.snack = ''; renderOverlays(); }, 2000);
 }
-function guard(){
-  if (S.guest){ S.guestOpen = true; renderOverlays(); return true; }
+/* 로그인이 필요한 동작 — 동작마다 모달 문구가 다르고, 로그인 후 원래 화면으로 돌아온다.
+   돌아온 뒤 저장·찜을 자동 실행하지는 않는다 (피드백 4번 권장 흐름 5단계). */
+const GUEST_MSG = {
+  fav:    ['로그인이 필요해요', '대회를 찜하려면 로그인해 주세요'],
+  route:  ['로그인이 필요해요', '만든 동선을 저장하려면 로그인해 주세요'],
+  course: ['로그인이 필요해요', '코스를 보관함에 담으려면 로그인해 주세요'],
+  run:    ['로그인이 필요해요', '오늘 뛴 기록을 남기려면 로그인해 주세요'],
+  library:['로그인이 필요해요', '보관함은 로그인하면 쓸 수 있어요']
+};
+function guard(reason){
+  if (S.guest){
+    S.guestReason = reason || 'library';
+    S.returnTo = S.screen;
+    S.guestOpen = true; renderOverlays(); return true;
+  }
   return false;
 }
+
+/* 되돌릴 수 없는 동작 — 확인 모달을 거친다 */
+const CONFIRMS = {
+  route:   { title:'이 동선을 삭제할까요?',   desc:'저장한 세종 2박 3일 동선이 지워져요.', yes:'삭제', act:'doDeleteRoute' },
+  course:  { title:'저장한 코스를 삭제할까요?', desc:'보관함에서 이 코스가 사라져요.',       yes:'삭제', act:'doDeleteCourse' },
+  run:     { title:'러닝 기록을 삭제할까요?',   desc:'기록한 거리·시간·경로가 모두 지워져요.', yes:'삭제', act:'doDeleteRun' },
+  quit:    { title:'탈퇴하면 저장한 동선과 기록이 모두 삭제돼요. 계속할까요?', desc:'삭제된 데이터는 되돌릴 수 없어요.', yes:'탈퇴', act:'doQuit' },
+  runsave: { title:'기록을 저장하지 않고 나갈까요?', desc:'방금 뛴 5.21km 기록이 사라져요.', yes:'저장 안 함', act:'doDropRun' }
+};
+
+/* 오류 · 오프라인 공통 조각 */
+const errorBlock = (text, act, pad) => `<div class="empty" style="padding:${pad || '44px'} 30px">
+  <div class="t">${text}</div>
+  <button onclick="${act}">다시 시도</button>
+</div>`;
+const offlineBanner = () => !S.offline ? '' : `
+  <div style="margin:0 22px 4px;background:#F7F7F5;border:1px solid var(--line);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:9px">
+    ${msr('cloud_off', { size:19, color:'var(--ink4)' })}
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700">오프라인 상태예요</div>
+      <div style="font-size:11.5px;color:var(--ink4);margin-top:2px">마지막 업데이트: ${S.syncedAt}</div>
+    </div>
+    <button onclick="APP.reconnect()" style="flex:none;font-size:12.5px;font-weight:800;color:var(--blue);white-space:nowrap">새로고침</button>
+  </div>`;
 function filtered(){
   const f = S.f, q = S.q.trim();
   return CONTESTS.filter(c => {
@@ -643,7 +684,7 @@ const chipClass = c => c.status === 'open' ? 'chip-open' : c.status === 'before'
 const dday = date => Math.round((new Date(date + 'T00:00:00') - new Date(TODAY + 'T00:00:00')) / 86400000);
 
 function toggleFav(id){
-  if (guard()) return;
+  if (guard('fav')) return;
   if (S.fav[id]){ delete S.fav[id]; toast('찜을 해제했어요'); } else { S.fav[id] = true; toast('찜했어요'); }
   render();
 }
@@ -751,6 +792,22 @@ const secHead = (title, aside) => `<div class="px" style="display:flex;align-ite
 const spinnerLine = text => `<div style="display:flex;align-items:center;gap:9px;color:var(--ink4);font-size:13.5px">
   <span style="width:15px;height:15px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--blue);display:inline-block;animation:spin .8s linear infinite"></span>${text}</div>`;
 
+/* 스켈레톤 — 로딩 상태의 카드 자리 */
+const skelBar = (w, h, mt) => `<div style="width:${w};height:${h}px;border-radius:${h > 16 ? 10 : 5}px;background:var(--fill2);${mt ? 'margin-top:' + mt + 'px;' : ''}animation:pulse 1.4s ease-in-out infinite"></div>`;
+const skelRail = (n, w, tall) => `<div style="display:flex;gap:10px;overflow-x:hidden;padding:12px 22px 8px">
+  ${Array.from({ length:n }, () => `<div style="width:${w}px;flex:none;${tall ? '' : 'border:1px solid var(--line2);border-radius:20px;padding:15px;background:var(--surface)'}">
+    ${tall ? skelBar('100%', 112) : skelBar('55%', 15)}
+    ${skelBar(tall ? '80%' : '100%', 15, tall ? 9 : 11)}
+    ${skelBar('60%', 12, 6)}
+  </div>`).join('')}
+</div>`;
+const skelRaceRows = n => `<div class="px" style="display:flex;flex-direction:column;gap:10px">
+  ${Array.from({ length:n }, () => `<div style="display:flex;gap:14px;padding:15px 16px;border-radius:var(--r-card);background:var(--surface);border:1px solid var(--line2)">
+    <div style="width:46px;flex:none">${skelBar('100%', 34)}</div>
+    <div style="flex:1;min-width:0">${skelBar('80%', 15)}${skelBar('50%', 12, 7)}${skelBar('100%', 22, 9)}</div>
+  </div>`).join('')}
+</div>`;
+
 /* ================================================================
    화면 템플릿
    ================================================================ */
@@ -843,6 +900,8 @@ SCREENS.sheet = () => `
 
 /* ── S1 홈 ── */
 SCREENS.home = () => {
+  /* 영역 단위 상태 — 한쪽이 실패해도 다른 쪽은 그대로 쓸 수 있다 (부분 실패) */
+  const hs = S.dbg.home, fs = S.dbg.fest;
   const featured = CONTESTS[0];
   const closing = [CONTESTS[1], CONTESTS[0], CONTESTS[2], CONTESTS[5]].map(c => {
     const dl = { seoul:4, sejong:9, busan:27, jeju:62 }[c.id];
@@ -894,8 +953,16 @@ SCREENS.home = () => {
     <button onclick="APP.scrollFestival()">${msr('attractions', { size:25 })}<span class="lb">관광</span></button>
   </div>
 
-  <div style="padding-top:28px">
+  <div style="padding-top:${S.offline ? 18 : 28}px">
+    ${offlineBanner()}
     ${secHead('마감 임박 대회', '접수 마감 순')}
+    ${hs === 'loading' ? skelRail(3, 212) : ''}
+    ${hs === 'empty' ? `<div class="empty" style="padding:34px 30px">
+      <div class="t">현재 접수 중인 대회가 없어요</div>
+      <div class="d">새 대회가 열리면 여기에 보여드릴게요.</div>
+    </div>` : ''}
+    ${hs === 'error' ? errorBlock('대회 정보를 불러오지 못했어요', "APP.dbgHome('ok')", '34px') : ''}
+    ${hs === 'ok' ? `
     <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 8px;scroll-snap-type:x mandatory">
       ${closing.map(({ c, dl }) => `
         <div class="railcard" onclick="APP.openDetail('${c.id}')">
@@ -904,15 +971,22 @@ SCREENS.home = () => {
           <div style="font-size:12.5px;color:var(--ink4);margin:6px 0 9px">${esc(c.region)} · ${c.date.slice(5).replace('-', '.')} ${DOW[new Date(c.date + 'T00:00:00').getDay()]} ${c.time}</div>
           ${elevStrip(SEEDS[c.id] || 3, 180, 20)}
         </div>`).join('')}
-    </div>
+    </div>` : ''}
   </div>
 
   <div id="home-festival" style="padding-top:26px">
     ${secHead('축제·지역 관광 추천', '8월')}
+    ${fs === 'loading' ? skelRail(2, 180, true) : ''}
+    ${fs === 'empty' ? `<div class="empty" style="padding:34px 30px">
+      <div class="t">이번 달 추천 축제가 없어요</div>
+      <div class="d">다음 달 축제가 열리면 알려드릴게요.</div>
+    </div>` : ''}
+    ${fs === 'error' ? errorBlock('축제 정보를 불러오지 못했어요', "APP.dbgFest('ok')", '34px') : ''}
+    ${fs === 'ok' ? `
     <div style="display:flex;gap:10px;overflow-x:auto;padding:12px 22px 4px">
       ${fests.map(festCard).join('')}
     </div>
-    <div class="px src" style="padding-top:10px">출처 · 한국관광공사</div>
+    <div class="px src" style="padding-top:10px">출처 · 한국관광공사</div>` : ''}
   </div>
 </div>`;
 };
@@ -933,7 +1007,18 @@ function calListBody(){
   const shown = S.view === 'list' ? all : dayList;
   let firstOpen = -1;
   shown.forEach((c, i) => { if (firstOpen < 0 && c.status === 'open') firstOpen = i; });
-  const emptyTitle = S.view === 'list' ? '조건에 맞는 대회가 없어요.' : S.selDate ? '이 날엔 대회가 없어요.' : '이 달엔 대회가 없어요.';
+  /* 빈 상태는 "왜 비었는지"에 따라 문구가 갈린다 — 검색 / 필터 / 날짜 / 달 */
+  const hasFilter = S.f.events.length || S.f.regions.length || S.f.openOnly;
+  const emptyTitle = S.view === 'list'
+    ? (S.q.trim() ? '검색 결과가 없어요' : hasFilter ? '조건에 맞는 대회가 없어요' : '예정된 대회가 없어요')
+    : S.selDate ? '이 날에는 대회가 없어요' : '이 달에는 대회가 없어요';
+  const cs = S.dbg.cal;
+  if (cs === 'loading') return `
+    ${S.view === 'cal' ? calGrid() : ''}
+    ${skelRaceRows(4)}`;
+  if (cs === 'error') return `
+    ${S.view === 'cal' ? calGrid() : ''}
+    ${errorBlock('대회 정보를 불러오지 못했어요', "APP.dbgCal('ok')", '56px')}`;
   return `
     ${S.view === 'list' ? `<div class="px" style="padding-top:4px;padding-bottom:10px;font-size:13.5px;font-weight:600;color:var(--ink2)">대회 <span class="num" style="color:var(--blue);font-weight:800">${all.length}</span></div>` : ''}
     ${S.view === 'cal' ? calGrid() : ''}
@@ -942,15 +1027,17 @@ function calListBody(){
     </div>
     ${shown.length === 0 ? `<div class="empty" style="padding:56px 34px">
       <div class="t">${emptyTitle}</div>
-      ${S.view === 'list' ? `<button onclick="APP.resetFilters()">필터 초기화</button>` : ''}
+      ${(S.q.trim() || hasFilter) ? `<button onclick="APP.resetFilters()">필터 초기화</button>` : ''}
     </div>` : ''}`;
 }
 function calGrid(){
   const first = new Date(S.calY, S.calM, 1);
   const days = new Date(S.calY, S.calM + 1, 0).getDate();
   const pad = first.getDay();
+  /* 날짜별 대회 수 조회만 실패한 경우 — 목록은 그대로 두고 날짜 점만 숨긴다 (부분 실패) */
+  const noDots = S.dbg.cal === 'nodots';
   const counts = {};
-  filtered().forEach(c => { counts[c.date] = (counts[c.date] || 0) + 1; });
+  if (!noDots) filtered().forEach(c => { counts[c.date] = (counts[c.date] || 0) + 1; });
   let cells = '';
   for (let i = 0; i < pad; i++) cells += `<div style="height:46px"></div>`;
   for (let d = 1; d <= days; d++){
@@ -985,6 +1072,7 @@ function calGrid(){
       ${DOW.map((d, i) => `<div style="text-align:center;font-size:11.5px;font-weight:700;color:${i === 0 ? '#E5484D' : i === 6 ? 'var(--blue)' : 'var(--ink4)'}">${d}</div>`).join('')}
     </div>
     <div class="calgrid" style="gap:2px">${cells}</div>
+    ${noDots ? `<div style="margin-top:12px;background:#F7F7F5;border-radius:12px;padding:9px 12px;font-size:12px;color:var(--ink2);line-height:1.45">날짜별 대회 수를 불러오지 못했어요. 날짜를 누르면 목록은 그대로 볼 수 있어요.</div>` : ''}
     <div style="font-size:12.5px;color:var(--ink2);font-weight:600;margin-top:14px">${label}</div>
   </div>`;
 }
@@ -1086,10 +1174,16 @@ SCREENS.detail = () => {
 SCREENS.library = () => {
   const favList = CONTESTS.filter(c => S.fav[c.id]);
   const libEmpty = S.dbg.lib === 'empty';
+  /* 빈 상태와 조회 실패는 다른 화면이다 — 탭마다 실패 문구가 따로 있다 */
+  const libErr = S.dbg.lib === 'error';
+  const LIB_ERR = { route:'저장한 동선을 불러오지 못했어요', course:'러닝코스 기록을 불러오지 못했어요', fav:'찜한 대회를 불러오지 못했어요' };
+  const off = S.offline;
   const courses = (S.ranSaved ? [{ ran:true, name:'해파랑길 1코스 왕복', meta:"07.28 (화) · 실제 5.21km · 32:10 · 6'11\"/km" }] : [])
     .concat([{ ran:false, name:'해파랑길 1코스 왕복', meta:'부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }]);
   let body = '';
-  if (S.libTab === 'route'){
+  if (libErr){
+    body = errorBlock(LIB_ERR[S.libTab], "APP.dbgLib('ok')", '70px');
+  } else if (S.libTab === 'route'){
     body = (S.saved && !libEmpty) ? `
       <article style="margin:16px 22px 0;border:1px solid var(--line2);border-radius:20px;padding:17px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openSavedRoute()">
         <div style="display:flex;align-items:flex-start;gap:10px">
@@ -1102,7 +1196,7 @@ SCREENS.library = () => {
         ${elevStrip(7, 300, 24)}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:13px;border-top:1px solid var(--line3)">
           <div style="font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap">08.21~08.23 · 10곳</div>
-          <button onclick="event.stopPropagation();APP.deleteSavedRoute()" aria-label="삭제">${msr('delete', { size:20, color:'var(--ink5)' })}</button>
+          <button ${off ? 'disabled' : ''} onclick="event.stopPropagation();APP.askDelete('route')" aria-label="삭제">${msr('delete', { size:20, color: off ? 'var(--line)' : 'var(--ink5)' })}</button>
         </div>
       </article>` : `
       <div class="empty" style="padding:70px 34px">
@@ -1115,13 +1209,18 @@ SCREENS.library = () => {
       <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:9px">
         ${courses.map(c => `
           <article style="border:1px solid var(--line2);border-radius:20px;padding:16px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openCourseDetail(${c.ran})">
-            ${c.ran ? `<span style="background:var(--lime);color:var(--ink);font-size:11px;font-weight:800;padding:4px 9px;border-radius:11px">완료</span>` : ''}
-            <div style="font-size:15.5px;font-weight:700;letter-spacing:-.025em;margin-top:${c.ran ? 8 : 0}px">${esc(c.name)}</div>
-            <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">${esc(c.meta)}</div>
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <div style="flex:1;min-width:0">
+                ${c.ran ? `<span style="background:var(--lime);color:var(--ink);font-size:11px;font-weight:800;padding:4px 9px;border-radius:11px">완료</span>` : ''}
+                <div style="font-size:15.5px;font-weight:700;letter-spacing:-.025em;margin-top:${c.ran ? 8 : 0}px">${esc(c.name)}</div>
+                <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">${esc(c.meta)}</div>
+              </div>
+              <button ${off ? 'disabled' : ''} onclick="event.stopPropagation();APP.askDelete('${c.ran ? 'run' : 'course'}')" aria-label="삭제" style="flex:none">${msr('delete', { size:20, color: off ? 'var(--line)' : 'var(--ink5)' })}</button>
+            </div>
           </article>`).join('')}
       </div>` : `
       <div class="empty" style="padding:70px 34px">
-        <div class="t">저장한 코스가 없어요.</div>
+        <div class="t">저장한 코스나 러닝 기록이 없어요.</div>
         <button onclick="APP.go('courses')">러닝코스 둘러보기</button>
       </div>`;
   } else {
@@ -1137,13 +1236,19 @@ SCREENS.library = () => {
   return `
 <div class="screen" style="padding-bottom:26px">
   <div style="padding:6px 22px 0">
-    <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">보관함</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">보관함</h1>
+      <button onclick="APP.go('account')" aria-label="내 정보·계정 관리" style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-right:-8px">
+        ${msr('settings', { size:23, color:'var(--ink2)' })}
+      </button>
+    </div>
     <div class="seg" style="margin-top:14px">
       <button class="${S.libTab === 'route' ? 'on' : ''}" onclick="APP.setLibTab('route')">동선</button>
       <button class="${S.libTab === 'course' ? 'on' : ''}" onclick="APP.setLibTab('course')">러닝코스</button>
       <button class="${S.libTab === 'fav' ? 'on' : ''}" onclick="APP.setLibTab('fav')">찜한 대회</button>
     </div>
   </div>
+  ${S.offline ? `<div style="padding-top:14px">${offlineBanner()}</div>` : ''}
   ${body}
 </div>`;
 };
@@ -1161,7 +1266,12 @@ SCREENS.coursedetail = () => {
     </div>`;
   return `
 <div class="screen" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
-  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.goLibrary()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div style="padding:4px 18px 0;display:flex;align-items:center;justify-content:space-between">
+    <button class="backbtn" onclick="APP.goLibrary()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button>
+    ${S.cdRan
+      ? `<button class="backbtn" style="margin:0" onclick="APP.askDelete('run')" aria-label="기록 삭제">${msr('delete', { size:22, color:'var(--ink2)' })}</button>`
+      : `<button class="backbtn" style="margin:0" onclick="APP.saveCourse()" aria-label="코스 저장">${msr('bookmark', { size:23, fill:S.courseSaved, color:S.courseSaved ? 'var(--blue)' : 'var(--ink2)' })}</button>`}
+  </div>
   <div class="px" style="padding-top:6px">
     <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin:0">${S.cdRan ? '해파랑길 1코스 왕복 · 뛴 기록' : '해파랑길 1코스 왕복'}</h1>
     <div style="font-size:13px;color:var(--ink4);margin-top:5px">${S.cdRan ? '07.28 (화) · 부산 해운대구' : '부산 해운대구 · 5.0km · 약 45분 · 난이도 중'}</div>
@@ -1183,9 +1293,68 @@ SCREENS.coursedetail = () => {
   </div>
   <div style="flex:1;min-height:20px"></div>
   ${!S.cdRan ? `
-  <div style="padding:0 22px 18px">
-    <button class="cta lime" onclick="APP.go('run')">이 코스 뛰기</button>
+  <div style="display:flex;gap:9px;padding:0 22px 18px">
+    <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">${S.courseSaved ? '저장됨' : '코스 저장'}</button>
+    <button class="cta lime" style="flex:1.3" onclick="APP.go('run')">이 코스 뛰기</button>
   </div>` : ''}
+</div>`;
+};
+
+/* ── S11 내 정보 · 계정 관리 (보관함 설정 아이콘에서 진입) ── */
+SCREENS.account = () => {
+  const row = (label, value, act, danger) => `
+    <button ${act ? `onclick="${act}"` : ''} style="width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;text-align:left">
+      <div style="flex:1;min-width:0;font-size:14.5px;font-weight:600;color:${danger ? '#E5484D' : 'var(--ink)'}">${label}</div>
+      ${value ? `<div style="font-size:13px;color:var(--ink4);white-space:nowrap">${value}</div>` : ''}
+      ${act ? msr('chevron_right', { size:20, color:'var(--ink5)' }) : ''}
+    </button>`;
+  const group = rows => `<div class="infobox" style="padding:0;margin-top:12px;overflow:hidden">
+    ${rows.map((r, i) => (i ? '<div class="divider" style="margin:0 16px"></div>' : '') + r).join('')}
+  </div>`;
+  return `
+<div class="screen" style="padding-bottom:30px">
+  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.go('library')" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
+  <div class="px" style="padding-top:6px">
+    <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">내 정보</h1>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-top:20px;padding:16px;border-radius:20px;background:var(--blue-soft2);border:1px solid var(--line2)">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none">
+        ${msr('person', { size:30, fill:true, color:'var(--ink)' })}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:17px;font-weight:800;letter-spacing:-.03em">${esc(S.nick)}</div>
+        <div style="font-size:12.5px;color:var(--ink4);margin-top:3px">minji@runninggu.kr</div>
+      </div>
+    </div>
+
+    <div style="font-size:13.5px;font-weight:800;margin-top:26px">계정</div>
+    ${group([
+      row('닉네임 변경', esc(S.nick), "APP.toast('닉네임을 바꿨어요')"),
+      row('비밀번호 변경', '', "APP.go('newpw')"),
+      row('카카오 계정', S.kakaoLinked ? '연결됨' : '연결 안 됨', 'APP.toggleKakao()')
+    ])}
+
+    <div style="font-size:13.5px;font-weight:800;margin-top:24px">알림</div>
+    <div class="infobox" style="padding:0;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:12px;padding:15px 16px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14.5px;font-weight:600">마케팅 정보 수신</div>
+          <div style="font-size:12px;color:var(--ink4);margin-top:3px">새 대회·축제 소식을 이메일로 받아요</div>
+        </div>
+        <button onclick="APP.toggleMkt()" role="switch" aria-checked="${S.acctMkt}" style="flex:none;width:48px;height:28px;border-radius:14px;padding:3px;display:flex;
+          justify-content:${S.acctMkt ? 'flex-end' : 'flex-start'};background:${S.acctMkt ? 'var(--blue)' : 'var(--line)'};transition:background .15s">
+          <span style="width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-top:26px">
+      ${group([
+        row('로그아웃', '', "APP.logout()"),
+        row('회원 탈퇴', '', "APP.askDelete('quit')", true)
+      ])}
+    </div>
+  </div>
 </div>`;
 };
 
@@ -1439,7 +1608,7 @@ SCREENS.courses = () => {
       </div>` : ''}
     ${cd === 'ok' ? `
       <div style="display:flex;gap:9px;padding:22px 22px 0">
-        <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">코스 저장</button>
+        <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">${S.courseSaved ? '저장됨' : '코스 저장'}</button>
         <button class="cta lime" style="flex:1.3" onclick="APP.go('run')">이 코스 뛰기</button>
       </div>` : ''}`;
   const regionBody = `
@@ -1552,7 +1721,7 @@ SCREENS.runsum = () => `
   <div style="flex:1;min-height:20px"></div>
   <div style="padding:0 22px 18px">
     <button class="cta" onclick="APP.saveRun()">기록 저장하기</button>
-    <button style="display:block;margin:14px auto 0;font-size:13.5px;font-weight:700;color:var(--ink5)" onclick="APP.go('courses')">삭제</button>
+    <button style="display:block;margin:14px auto 0;font-size:13.5px;font-weight:700;color:var(--ink5)" onclick="APP.askDelete('runsave')">삭제</button>
   </div>
 </div>`;
 
@@ -1865,14 +2034,28 @@ function overlaysHtml(){
     </div>`;
   }
   if (S.guestOpen){
+    const [gt, gd] = GUEST_MSG[S.guestReason] || GUEST_MSG.library;
     html += `
     <div class="scrim" style="z-index:80" onclick="APP.closeGuest()"></div>
     <div role="dialog" aria-modal="true" style="position:absolute;left:26px;right:26px;top:50%;transform:translateY(-50%);background:#fff;border-radius:22px;padding:24px 22px 18px;z-index:81;box-shadow:0 20px 50px rgba(21,22,27,.28);animation:popIn .28s var(--ease-spring)">
-      <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">로그인이 필요해요</div>
-      <div class="sub" style="margin-top:8px">찜과 보관함은 로그인하면 쓸 수 있어요</div>
+      <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">${gt}</div>
+      <div class="sub" style="margin-top:8px">${gd}</div>
       <div style="display:flex;gap:8px;margin-top:20px">
         <button onclick="APP.closeGuest()" style="flex:1;height:50px;border-radius:14px;border:1px solid var(--line);font-size:14.5px;font-weight:700;color:var(--ink2);display:flex;align-items:center;justify-content:center">닫기</button>
         <button onclick="APP.goLoginFromGuest()" style="flex:1.3;height:50px;border-radius:14px;background:var(--blue);color:#fff;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center">로그인하기</button>
+      </div>
+    </div>`;
+  }
+  if (S.confirm && CONFIRMS[S.confirm]){
+    const cf = CONFIRMS[S.confirm];
+    html += `
+    <div class="scrim" style="z-index:82" onclick="APP.closeConfirm()"></div>
+    <div role="dialog" aria-modal="true" style="position:absolute;left:26px;right:26px;top:50%;transform:translateY(-50%);background:#fff;border-radius:22px;padding:24px 22px 18px;z-index:83;box-shadow:0 20px 50px rgba(21,22,27,.28);animation:popIn .28s var(--ease-spring)">
+      <div style="font-size:17.5px;font-weight:800;letter-spacing:-.03em;line-height:1.35">${cf.title}</div>
+      <div class="sub" style="margin-top:8px">${cf.desc}</div>
+      <div style="display:flex;gap:8px;margin-top:20px">
+        <button onclick="APP.closeConfirm()" style="flex:1;height:50px;border-radius:14px;border:1px solid var(--line);font-size:14.5px;font-weight:700;color:var(--ink2);display:flex;align-items:center;justify-content:center">취소</button>
+        <button onclick="APP.${cf.act}()" style="flex:1.3;height:50px;border-radius:14px;background:#E5484D;color:#fff;font-size:14.5px;font-weight:700;display:flex;align-items:center;justify-content:center">${cf.yes}</button>
       </div>
     </div>`;
   }
@@ -1920,18 +2103,23 @@ function tabbarHtml(){
   </nav>`;
 }
 function debugHtml(){
-  const mk = (opts, cur, actName) => `<div class="debug-rail"><div class="cap">STATE</div>
+  /* 한 화면에 상태 축이 여러 개면 레일도 여러 개 — 축마다 독립으로 바꿔 부분 실패를 만든다 */
+  const rail = (cap, opts, cur, actName, top) => `<div class="debug-rail" style="${top ? 'top:' + top + 'px' : ''}"><div class="cap">${cap}</div>
     ${opts.map(([k, l]) => `<button class="${cur === k ? 'on' : ''}" onclick="APP.${actName}('${k}')">${l}</button>`).join('')}</div>`;
-  if (S.screen === 'detail') return mk([['ok','기본'],['loading','로딩'],['empty','빈']], S.festState, 'setFestState');
-  if (S.screen === 'w3') return mk([['ok','기본'],['loading','로딩']], S.dbg.w3, 'dbgW3');
-  if (S.screen === 'result') return mk([['ok','기본'],['empty','빈']], S.dbg.result, 'dbgResult');
-  if (S.screen === 'courses') return mk([['ok','기본'],['locating','위치'],['nostart','출발지'],['nocourse','코스0'],['none','0건']], S.dbg.courses, 'dbgCourses');
-  if (S.screen === 'library') return mk([['ok','기본'],['empty','빈']], S.dbg.lib, 'dbgLib');
-  if (S.screen === 'login') return mk([['ok','기본'],['error','오류']], S.dbg.login || 'ok', 'dbgLogin');
+  const LBE = [['ok','기본'],['loading','로딩'],['empty','빈'],['error','오류']];
+  const net = top => rail('NET', [['off','오프라인'],['on','온라인']], S.offline ? 'off' : 'on', 'dbgNet', top);
+  if (S.screen === 'home') return rail('마감임박', LBE, S.dbg.home, 'dbgHome') + rail('축제', LBE, S.dbg.fest, 'dbgFest', 232) + net(464);
+  if (S.screen === 'calendar') return rail('STATE', [['ok','기본'],['loading','로딩'],['error','오류'],['nodots','점실패']], S.dbg.cal, 'dbgCal');
+  if (S.screen === 'detail') return rail('STATE', [['ok','기본'],['loading','로딩'],['empty','빈']], S.festState, 'setFestState');
+  if (S.screen === 'w3') return rail('STATE', [['ok','기본'],['loading','로딩']], S.dbg.w3, 'dbgW3');
+  if (S.screen === 'result') return rail('STATE', [['ok','기본'],['empty','빈']], S.dbg.result, 'dbgResult');
+  if (S.screen === 'courses') return rail('STATE', [['ok','기본'],['locating','위치'],['nostart','출발지'],['nocourse','코스0'],['none','0건']], S.dbg.courses, 'dbgCourses');
+  if (S.screen === 'library') return rail('STATE', LBE.filter(o => o[0] !== 'loading'), S.dbg.lib, 'dbgLib') + net(200);
+  if (S.screen === 'login') return rail('STATE', [['ok','기본'],['error','오류']], S.dbg.login || 'ok', 'dbgLogin');
   return '';
 }
 function stageNavHtml(){
-  const nav = [['sheet','디자인 시스템'],['home','홈'],['calendar','캘린더'],['detail','대회 상세'],['w1','위저드'],['result','동선 결과'],['courses','러닝코스'],['run','GPS 기록'],['library','보관함'],['login','로그인']];
+  const nav = [['sheet','디자인 시스템'],['home','홈'],['calendar','캘린더'],['detail','대회 상세'],['w1','위저드'],['result','동선 결과'],['courses','러닝코스'],['run','GPS 기록'],['library','보관함'],['account','내 정보'],['login','로그인']];
   return `<span class="brand">런닝구 · UI MOCKUP V2</span>
     ${nav.map(([k, l]) => `<button class="${S.screen === k || (k === 'w1' && ['w1','w2','w3'].indexOf(S.screen) >= 0) ? 'on' : ''}" onclick="APP.go('${k}')">${l}</button>`).join('')}`;
 }
@@ -2053,9 +2241,15 @@ const APP = {
   openSavedRoute(){ S.activeDay = 0; S.activeBlock = 0; S.editMode = false; S.resultFrom = 'library'; go('result'); },
   deleteSavedRoute(){ set({ saved:false }); },
   openCourseDetail(ran){ S.cdRan = ran; go('coursedetail'); },
-  goLibrary(){ if (guard()) return; go('library'); },
-  /* 인증 */
-  doLogin(){ S.guest = false; go('home'); },
+  goLibrary(){ if (guard('library')) return; go('library'); },
+  /* 인증 — 게스트가 로그인 유도를 거쳐 왔으면 원래 화면으로 돌려보낸다.
+     돌아온 뒤 저장·찜을 자동 실행하지는 않는다 (사용자가 다시 누르게 둔다). */
+  doLogin(){
+    S.guest = false;
+    const back = S.returnTo; S.returnTo = null;
+    if (back && back !== 'login'){ toast('로그인했어요'); go(back); return; }
+    go('home');
+  },
   doGuest(){ S.guest = true; go('home'); },
   goSignup(){ S.suStep = 1; go('signup'); },
   goFindPw(){ S.resetSent = false; go('findpw'); },
@@ -2106,8 +2300,8 @@ const APP = {
     S.dbg.courses = 'locating'; render();
     setTimeout(() => { S.dbg.courses = 'ok'; S.courseStart = '내 위치'; render(); }, 900);
   },
-  saveCourse(){ if (guard()) return; S.libTab = 'course'; toast('보관함에 저장했어요'); },
-  saveRun(){ if (guard()) return; S.ranSaved = true; S.libTab = 'course'; toast('러닝 기록을 저장했어요'); setTimeout(() => go('library'), 700); },
+  saveCourse(){ if (guard('course')) return; S.courseSaved = true; S.libTab = 'course'; render(); toast('보관함에 저장했어요'); },
+  saveRun(){ if (guard('run')) return; S.ranSaved = true; S.libTab = 'course'; toast('러닝 기록을 저장했어요'); setTimeout(() => go('library'), 700); },
   /* 동선 결과 · 편집 */
   setDay(i){ set({ activeDay:i, activeBlock:0 }); },
   setActiveBlock(i){ set({ activeBlock:i }); },
@@ -2126,7 +2320,7 @@ const APP = {
     S.poi = null; render();
   },
   shareRoute(){ toast('동선을 공유했어요'); },
-  saveRoute(){ if (guard()) return; S.saved = true; S.libTab = 'route'; toast('보관함에 저장했어요'); setTimeout(() => go('library'), 700); },
+  saveRoute(){ if (guard('route')) return; S.saved = true; S.libTab = 'route'; toast('보관함에 저장했어요'); setTimeout(() => go('library'), 700); },
   goCoursesFromHotel(){ S.courseStart = '호텔 세종 가온'; go('courses'); },
   /* 위저드 */
   pickPattern(key){
@@ -2157,13 +2351,33 @@ const APP = {
       setTimeout(() => { S.generating = false; S.resultFrom = 'w3'; S.activeDay = 1; S.activeBlock = 0; go('result'); }, 900);
     }
   },
+  /* 확인 모달 — 되돌릴 수 없는 동작 */
+  askDelete(k){ S.confirm = k; renderOverlays(); },
+  closeConfirm(){ S.confirm = null; renderOverlays(); },
+  doDeleteRoute(){ S.confirm = null; S.saved = false; render(); toast('동선을 삭제했어요'); },
+  doDeleteCourse(){ S.confirm = null; S.courseSaved = false; S.libTab = 'course'; go('library'); toast('코스를 삭제했어요'); },
+  doDeleteRun(){ S.confirm = null; S.ranSaved = false; S.libTab = 'course'; go('library'); toast('러닝 기록을 삭제했어요'); },
+  doDropRun(){ S.confirm = null; go('courses'); toast('기록을 저장하지 않았어요'); },
+  doQuit(){ S.confirm = null; S.guest = false; S.returnTo = null; go('login'); toast('탈퇴가 처리됐어요'); },
+  /* 내 정보 · 계정 관리 */
+  toast,
+  toggleMkt(){ S.acctMkt = !S.acctMkt; render(); toast(S.acctMkt ? '마케팅 수신에 동의했어요' : '마케팅 수신을 껐어요'); },
+  toggleKakao(){ S.kakaoLinked = !S.kakaoLinked; render(); toast(S.kakaoLinked ? '카카오 계정을 연결했어요' : '카카오 연결을 해제했어요'); },
+  logout(){ S.guest = false; S.returnTo = null; go('login'); },
+  /* 네트워크 */
+  setOffline(v){ S.offline = v; render(); },
+  dbgNet(k){ S.offline = k === 'off'; render(); },
+  reconnect(){ S.offline = false; render(); toast('최신 정보로 새로고침했어요'); },
   /* 디버그 */
   setFestState(k){ set({ festState:k }); },
   dbgW3(k){ S.dbg.w3 = k; render(); },
   dbgResult(k){ S.dbg.result = k; render(); },
   dbgCourses(k){ S.dbg.courses = k; render(); },
   dbgLib(k){ S.dbg.lib = k; render(); },
-  dbgLogin(k){ S.dbg.login = k; render(); }
+  dbgLogin(k){ S.dbg.login = k; render(); },
+  dbgHome(k){ S.dbg.home = k; render(); },
+  dbgFest(k){ S.dbg.fest = k; render(); },
+  dbgCal(k){ S.dbg.cal = k; render(); }
 };
 window.APP = APP;
 
