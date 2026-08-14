@@ -1,0 +1,112 @@
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 16px;
+    font: 12px/1.5 "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #15161B; background: #fff;
+  }
+  @media (prefers-color-scheme: dark) { body { color: #F2F5FF; background: #1E1E1E; } }
+  h1 { font-size: 13px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.01em; }
+  p { margin: 0 0 12px; opacity: .7; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+    background: rgba(127,127,127,.16); padding: 1px 5px; border-radius: 4px; }
+  .drop {
+    border: 1.5px dashed rgba(127,127,127,.45); border-radius: 10px;
+    padding: 18px 14px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.on { border-color: #2B5CFF; background: rgba(43,92,255,.06); }
+  .drop b { display: block; font-size: 12.5px; margin-bottom: 3px; }
+  .drop span { opacity: .65; }
+  input[type=file] { display: none; }
+  .bar { height: 5px; border-radius: 3px; background: rgba(127,127,127,.2); overflow: hidden; margin-top: 12px; }
+  .bar i { display: block; height: 100%; width: 0; background: #2B5CFF; transition: width .12s linear; }
+  .status { margin-top: 8px; font-variant-numeric: tabular-nums; opacity: .75; min-height: 16px; }
+  .status.err { color: #E5484D; opacity: 1; }
+  .row { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    flex: 1; height: 34px; border: 0; border-radius: 7px; font: inherit; font-weight: 700;
+    cursor: pointer; background: #2B5CFF; color: #fff;
+  }
+  button.ghost { background: rgba(127,127,127,.18); color: inherit; flex: 0 0 84px; }
+  button[disabled] { opacity: .45; cursor: default; }
+</style>
+
+<h1>런닝구 화면 플로우 보드</h1>
+<p>
+  <code>docs/mockup-design/shots/png/</code> 안의 PNG를 전부 선택해줘.
+  선택한 파일만 쓰고 외부로 나가는 통신은 없다.
+</p>
+
+<label class="drop" id="drop">
+  <b id="dropTitle">PNG 고르기</b>
+  <span id="dropSub">폴더를 열고 <code>Ctrl+A</code> 로 전체 선택</span>
+  <input type="file" id="files" multiple accept="image/png">
+</label>
+
+<div class="bar"><i id="barFill"></i></div>
+<div class="status" id="status">아직 고른 파일이 없다</div>
+
+<div class="row">
+  <button class="ghost" id="cancel">닫기</button>
+  <button id="build" disabled>보드 그리기</button>
+</div>
+
+<script>
+const MAX_DIM = 4096;          // Figma 이미지 한 변 상한
+let picked = [];
+
+const $ = id => document.getElementById(id);
+const setStatus = (t, err) => { $('status').textContent = t; $('status').className = 'status' + (err ? ' err' : ''); };
+const setBar = r => { $('barFill').style.width = Math.round(r * 100) + '%'; };
+
+$('files').addEventListener('change', e => {
+  picked = [...e.target.files].filter(f => /\.png$/i.test(f.name));
+  $('build').disabled = picked.length === 0;
+  $('dropTitle').textContent = picked.length ? picked.length + '장 선택됨' : 'PNG 고르기';
+  setStatus(picked.length ? '“보드 그리기”를 누르면 시작한다' : 'PNG 파일이 없다', !picked.length);
+  setBar(0);
+});
+
+/* 한 변이 4096px 를 넘으면 Figma 가 거부한다 — 비율을 지키며 줄여서 보낸다.
+   디자인 시스템 시트처럼 세로로 아주 긴 캡처가 여기 걸린다. */
+async function toBytes(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const bmp = await createImageBitmap(new Blob([buf], { type: 'image/png' }));
+  if (bmp.width <= MAX_DIM && bmp.height <= MAX_DIM) { bmp.close(); return buf; }
+  const k = MAX_DIM / Math.max(bmp.width, bmp.height);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(bmp.width * k);
+  cv.height = Math.round(bmp.height * k);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  bmp.close();
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+$('build').addEventListener('click', async () => {
+  $('build').disabled = true;
+  try {
+    for (let i = 0; i < picked.length; i++) {
+      const f = picked[i];
+      const bytes = await toBytes(f);
+      parent.postMessage({ pluginMessage: { type: 'img', name: f.name.replace(/\.png$/i, ''), bytes } }, '*');
+      setBar((i + 1) / picked.length);
+      setStatus('이미지 보내는 중 ' + (i + 1) + ' / ' + picked.length);
+    }
+    setStatus('보드 그리는 중…');
+    parent.postMessage({ pluginMessage: { type: 'build' } }, '*');
+  } catch (e) {
+    setStatus('이미지를 읽지 못했다: ' + e.message, true);
+    $('build').disabled = false;
+  }
+});
+
+$('cancel').addEventListener('click', () => parent.postMessage({ pluginMessage: { type: 'close' } }, '*'));
+
+onmessage = e => {
+  const m = e.data.pluginMessage;
+  if (!m) return;
+  if (m.type === 'progress') { setStatus(m.text); if (m.ratio != null) setBar(m.ratio); }
+  if (m.type === 'error') { setStatus(m.text, true); $('build').disabled = false; }
+};
+</script>
