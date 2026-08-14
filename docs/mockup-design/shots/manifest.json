@@ -166,7 +166,7 @@
     "label": "동선 결과",
     "mode": "full",
     "w": 390,
-    "h": 1194,
+    "h": 1238,
     "file": "png/23-result.png"
   },
   {
@@ -176,7 +176,7 @@
     "label": "동선 결과 · 편집 모드",
     "mode": "full",
     "w": 390,
-    "h": 1035,
+    "h": 1055,
     "file": "png/24-result-edit.png"
   },
   {
@@ -196,7 +196,7 @@
     "label": "러닝 코스 · 내 주변",
     "mode": "full",
     "w": 390,
-    "h": 1311,
+    "h": 1635,
     "file": "png/30-courses.png"
   },
   {
@@ -206,7 +206,7 @@
     "label": "러닝 코스 · 지역별",
     "mode": "full",
     "w": 390,
-    "h": 860,
+    "h": 889,
     "file": "png/31-courses-region.png"
   },
   {
@@ -366,7 +366,7 @@
     "label": "러닝 코스 · 코스 0",
     "mode": "full",
     "w": 390,
-    "h": 1067,
+    "h": 1249,
     "file": "png/68-courses-nocourse.png"
   },
   {
@@ -556,7 +556,7 @@
     "label": "동선 결과 · 편집 · 블록 삭제 후",
     "mode": "full",
     "w": 390,
-    "h": 968,
+    "h": 988,
     "file": "png/95-result-edit-rm.png"
   },
   {
@@ -564,9 +564,9 @@
     "hash": "courses-region",
     "setup": "document.querySelector('button[onclick*=\"setCRegion\"]').click()",
     "label": "러닝 코스 · 지역 선택",
-    "mode": "frame",
+    "mode": "full",
     "w": 390,
-    "h": 844,
+    "h": 889,
     "file": "png/96-courses-region-sel.png"
   },
   {
@@ -576,7 +576,7 @@
     "label": "러닝 코스 · 목표 20km (코스 짧음 안내)",
     "mode": "full",
     "w": 390,
-    "h": 1356,
+    "h": 1680,
     "file": "png/97-courses-longdist.png"
   },
   {
@@ -868,6 +868,16 @@
     "w": 390,
     "h": 844,
     "file": "png/132-library-error-fav.png"
+  },
+  {
+    "name": "140-courses-seoul",
+    "hash": "courses",
+    "setup": "APP.setCourseStart('서울시청')",
+    "label": "러닝 코스 · 서울 (걷기 좋은 곳)",
+    "mode": "full",
+    "w": 390,
+    "h": 1249,
+    "file": "png/140-courses-seoul.png"
   },
   {
     "name": "133-library-offline",

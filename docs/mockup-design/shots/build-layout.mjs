@@ -53,10 +53,10 @@ const SECTIONS = [
   },
   {
     id: 'courses', title: '[러닝 코스 · GPS 기록]', fill: '#F8F5FF',
-    note: '코스 상세에서 기록을 시작하면 심연(deep) 지면의 GPS 화면으로 전환되고, 종료 시 요약으로 넘어간다. 코스 상세와 러닝 요약은 각각 보관함으로 흘러든다.',
+    note: '코스 상세에서 기록을 시작하면 심연(deep) 지면의 GPS 화면으로 전환되고, 종료 시 요약으로 넘어간다. 두루누비 코스가 없는 수도권은 걷기 좋은 곳이 기본 화면이 되며, 경로 없이 바로 기록을 시작한다.',
     rows: [
       ['30-courses', '32-coursedetail', '33-run', '34-runsum'],
-      ['31-courses-region']
+      ['31-courses-region', '140-courses-seoul']
     ]
   },
   {
@@ -158,6 +158,8 @@ const CONNECTORS = [
   ['10-home', '30-courses', '탭 · 러닝코스'],
   ['30-courses', '32-coursedetail', '코스 선택'],
   ['30-courses', '31-courses-region', '지역 탭'],
+  ['30-courses', '140-courses-seoul', '출발지 · 서울시청'],
+  ['140-courses-seoul', '33-run', '여기서 뛰기'],
   ['32-coursedetail', '33-run', '기록 시작'],
   ['33-run', '34-runsum', '종료'],
   ['34-runsum', '40-library', '기록 저장'],

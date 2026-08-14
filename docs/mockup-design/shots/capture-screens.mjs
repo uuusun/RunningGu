@@ -125,6 +125,7 @@ const SHOTS = [
   ['130-library-error-route', 'library',       "APP.dbgLib('error')", '보관함 · 동선 조회 실패'],
   ['131-library-error-course','library-course',"APP.dbgLib('error')", '보관함 · 러닝코스 조회 실패'],
   ['132-library-error-fav',   'library-fav',   "APP.dbgLib('error')", '보관함 · 찜한 대회 조회 실패'],
+  ['140-courses-seoul',      'courses', "APP.setCourseStart('서울시청')", '러닝 코스 · 서울 (걷기 좋은 곳)'],
   ['133-library-offline',     'library',       "APP.setOffline(true)",'보관함 · 오프라인 (수정 비활성)']
 ];
 
