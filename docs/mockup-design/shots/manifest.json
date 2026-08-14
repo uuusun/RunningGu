@@ -1,0 +1,882 @@
+[
+  {
+    "name": "01-login",
+    "hash": "login",
+    "setup": "",
+    "label": "로그인",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/01-login.png"
+  },
+  {
+    "name": "02-signup-1",
+    "hash": "signup-1",
+    "setup": "",
+    "label": "회원가입 1 · 약관 동의",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/02-signup-1.png"
+  },
+  {
+    "name": "03-signup-2",
+    "hash": "signup-2",
+    "setup": "",
+    "label": "회원가입 2 · 정보 입력",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/03-signup-2.png"
+  },
+  {
+    "name": "04-signup-3",
+    "hash": "signup-3",
+    "setup": "",
+    "label": "회원가입 3 · 이메일 인증",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/04-signup-3.png"
+  },
+  {
+    "name": "05-signup-4",
+    "hash": "signup-4",
+    "setup": "",
+    "label": "회원가입 4 · 가입 완료",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/05-signup-4.png"
+  },
+  {
+    "name": "06-findpw",
+    "hash": "findpw",
+    "setup": "",
+    "label": "비밀번호 찾기",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/06-findpw.png"
+  },
+  {
+    "name": "07-newpw",
+    "hash": "newpw",
+    "setup": "",
+    "label": "비밀번호 재설정",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/07-newpw.png"
+  },
+  {
+    "name": "10-home",
+    "hash": "home",
+    "setup": "",
+    "label": "홈",
+    "mode": "full",
+    "w": 390,
+    "h": 1128,
+    "file": "png/10-home.png"
+  },
+  {
+    "name": "11-home-guest",
+    "hash": "home-guest",
+    "setup": "",
+    "label": "홈 · 게스트 로그인 유도",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/11-home-guest.png"
+  },
+  {
+    "name": "12-calendar",
+    "hash": "calendar",
+    "setup": "",
+    "label": "캘린더 · 리스트",
+    "mode": "full",
+    "w": 390,
+    "h": 1387,
+    "file": "png/12-calendar.png"
+  },
+  {
+    "name": "13-calendar-cal",
+    "hash": "calendar-cal",
+    "setup": "",
+    "label": "캘린더 · 월간",
+    "mode": "full",
+    "w": 390,
+    "h": 1220,
+    "file": "png/13-calendar-cal.png"
+  },
+  {
+    "name": "14-calendar-filter",
+    "hash": "calendar-filter",
+    "setup": "",
+    "label": "캘린더 · 필터 시트",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/14-calendar-filter.png"
+  },
+  {
+    "name": "15-detail",
+    "hash": "detail",
+    "setup": "",
+    "label": "대회 상세",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/15-detail.png"
+  },
+  {
+    "name": "20-w1",
+    "hash": "w1",
+    "setup": "",
+    "label": "위저드 1 · 언제 다녀올까요",
+    "mode": "full",
+    "w": 390,
+    "h": 1073,
+    "file": "png/20-w1.png"
+  },
+  {
+    "name": "21-w2",
+    "hash": "w2",
+    "setup": "",
+    "label": "위저드 2 · 어떻게 뛰고 뭘 좋아하세요",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/21-w2.png"
+  },
+  {
+    "name": "22-w3",
+    "hash": "w3",
+    "setup": "",
+    "label": "위저드 3 · 어디서 묵을까요",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/22-w3.png"
+  },
+  {
+    "name": "23-result",
+    "hash": "result",
+    "setup": "",
+    "label": "동선 결과",
+    "mode": "full",
+    "w": 390,
+    "h": 1194,
+    "file": "png/23-result.png"
+  },
+  {
+    "name": "24-result-edit",
+    "hash": "result-edit",
+    "setup": "",
+    "label": "동선 결과 · 편집 모드",
+    "mode": "full",
+    "w": 390,
+    "h": 1035,
+    "file": "png/24-result-edit.png"
+  },
+  {
+    "name": "25-result-poi",
+    "hash": "result-poi",
+    "setup": "",
+    "label": "동선 결과 · POI 추가 시트",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/25-result-poi.png"
+  },
+  {
+    "name": "30-courses",
+    "hash": "courses",
+    "setup": "",
+    "label": "러닝 코스 · 내 주변",
+    "mode": "full",
+    "w": 390,
+    "h": 1311,
+    "file": "png/30-courses.png"
+  },
+  {
+    "name": "31-courses-region",
+    "hash": "courses-region",
+    "setup": "",
+    "label": "러닝 코스 · 지역별",
+    "mode": "full",
+    "w": 390,
+    "h": 860,
+    "file": "png/31-courses-region.png"
+  },
+  {
+    "name": "32-coursedetail",
+    "hash": "courses",
+    "setup": "APP.openCourseDetail(false)",
+    "label": "코스 상세",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/32-coursedetail.png"
+  },
+  {
+    "name": "33-run",
+    "hash": "run",
+    "setup": "",
+    "label": "GPS 기록 중",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/33-run.png"
+  },
+  {
+    "name": "34-runsum",
+    "hash": "runsum",
+    "setup": "",
+    "label": "러닝 요약",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/34-runsum.png"
+  },
+  {
+    "name": "40-library",
+    "hash": "library",
+    "setup": "",
+    "label": "보관함 · 동선",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/40-library.png"
+  },
+  {
+    "name": "41-library-course",
+    "hash": "library-course",
+    "setup": "",
+    "label": "보관함 · 러닝코스",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/41-library-course.png"
+  },
+  {
+    "name": "42-library-fav",
+    "hash": "library-fav",
+    "setup": "",
+    "label": "보관함 · 찜한 대회",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/42-library-fav.png"
+  },
+  {
+    "name": "50-sheet",
+    "hash": "sheet",
+    "setup": "",
+    "label": "디자인 시스템 v2",
+    "mode": "full",
+    "w": 390,
+    "h": 2339,
+    "file": "png/50-sheet.png"
+  },
+  {
+    "name": "60-login-error",
+    "hash": "login",
+    "setup": "APP.dbgLogin('error')",
+    "label": "로그인 · 오류",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/60-login-error.png"
+  },
+  {
+    "name": "61-detail-loading",
+    "hash": "detail",
+    "setup": "APP.setFestState('loading')",
+    "label": "대회 상세 · 인근 축제 로딩",
+    "mode": "full",
+    "w": 390,
+    "h": 977,
+    "file": "png/61-detail-loading.png"
+  },
+  {
+    "name": "62-detail-empty",
+    "hash": "detail",
+    "setup": "APP.setFestState('empty')",
+    "label": "대회 상세 · 인근 축제 없음",
+    "mode": "full",
+    "w": 390,
+    "h": 965,
+    "file": "png/62-detail-empty.png"
+  },
+  {
+    "name": "63-w3-loading",
+    "hash": "w3",
+    "setup": "APP.dbgW3('loading')",
+    "label": "위저드 3 · 숙소 로딩",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/63-w3-loading.png"
+  },
+  {
+    "name": "64-result-empty",
+    "hash": "result",
+    "setup": "APP.dbgResult('empty')",
+    "label": "동선 결과 · 빈 상태",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/64-result-empty.png"
+  },
+  {
+    "name": "65-result-poi-swap",
+    "hash": "result",
+    "setup": "APP.openSwap(1,'관광지')",
+    "label": "동선 결과 · POI 교체 시트",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/65-result-poi-swap.png"
+  },
+  {
+    "name": "66-courses-locating",
+    "hash": "courses",
+    "setup": "APP.dbgCourses('locating')",
+    "label": "러닝 코스 · 위치 확인 중",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/66-courses-locating.png"
+  },
+  {
+    "name": "67-courses-nostart",
+    "hash": "courses",
+    "setup": "APP.dbgCourses('nostart')",
+    "label": "러닝 코스 · 출발지 없음",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/67-courses-nostart.png"
+  },
+  {
+    "name": "68-courses-nocourse",
+    "hash": "courses",
+    "setup": "APP.dbgCourses('nocourse')",
+    "label": "러닝 코스 · 코스 0",
+    "mode": "full",
+    "w": 390,
+    "h": 1067,
+    "file": "png/68-courses-nocourse.png"
+  },
+  {
+    "name": "69-courses-none",
+    "hash": "courses",
+    "setup": "APP.dbgCourses('none')",
+    "label": "러닝 코스 · 결과 0건",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/69-courses-none.png"
+  },
+  {
+    "name": "70-library-empty",
+    "hash": "library",
+    "setup": "APP.dbgLib('empty')",
+    "label": "보관함 · 빈 상태",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/70-library-empty.png"
+  },
+  {
+    "name": "71-coursedetail-ran",
+    "hash": "courses",
+    "setup": "APP.openCourseDetail(true)",
+    "label": "코스 상세 · 뛴 기록",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/71-coursedetail-ran.png"
+  },
+  {
+    "name": "80-signup-1-agreed",
+    "hash": "signup-1",
+    "setup": "APP.toggleAllAgree()",
+    "label": "회원가입 1 · 전체 동의 (다음 활성)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/80-signup-1-agreed.png"
+  },
+  {
+    "name": "81-signup-3-filled",
+    "hash": "signup-3",
+    "setup": "APP.setCode('482913')",
+    "label": "회원가입 3 · 인증코드 입력 완료",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/81-signup-3-filled.png"
+  },
+  {
+    "name": "82-findpw-sent",
+    "hash": "findpw",
+    "setup": "APP.sendReset()",
+    "label": "비밀번호 찾기 · 링크 발송 완료",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/82-findpw-sent.png"
+  },
+  {
+    "name": "83-newpw-changed",
+    "hash": "newpw",
+    "setup": "APP.changePw()",
+    "label": "비밀번호 재설정 · 변경 완료",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/83-newpw-changed.png"
+  },
+  {
+    "name": "84-calendar-selday",
+    "hash": "calendar-cal",
+    "setup": "[...document.querySelectorAll('button[onclick*=\"selDate\"]')].find(x=>x.children.length>1).click()",
+    "label": "캘린더 · 대회 있는 날짜 선택",
+    "mode": "full",
+    "w": 390,
+    "h": 870,
+    "file": "png/84-calendar-selday.png"
+  },
+  {
+    "name": "85-calendar-nextmonth",
+    "hash": "calendar-cal",
+    "setup": "APP.nextMonth()",
+    "label": "캘린더 · 다음 달",
+    "mode": "full",
+    "w": 390,
+    "h": 997,
+    "file": "png/85-calendar-nextmonth.png"
+  },
+  {
+    "name": "86-calendar-filtered",
+    "hash": "calendar",
+    "setup": "APP.openFilter();APP.toggleDraft('events','10K');APP.toggleDraft('regions','세종');APP.applyFilter()",
+    "label": "캘린더 · 필터 적용 (칩 노출)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/86-calendar-filtered.png"
+  },
+  {
+    "name": "87-calendar-noresult",
+    "hash": "calendar",
+    "setup": "APP.openFilter();APP.toggleDraft('events','풀');APP.toggleDraft('regions','제주');APP.applyFilter()",
+    "label": "캘린더 · 조건에 맞는 대회 0건",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/87-calendar-noresult.png"
+  },
+  {
+    "name": "88-calendar-search",
+    "hash": "calendar",
+    "setup": "document.querySelector('#calQ').value='부산';APP.setQ('부산')",
+    "label": "캘린더 · 검색 결과",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/88-calendar-search.png"
+  },
+  {
+    "name": "89-w1-custom",
+    "hash": "w1",
+    "setup": "APP.pickPattern('custom')",
+    "label": "위저드 1 · 직접 날짜 선택",
+    "mode": "full",
+    "w": 390,
+    "h": 1073,
+    "file": "png/89-w1-custom.png"
+  },
+  {
+    "name": "90-w2-none",
+    "hash": "w2",
+    "setup": "APP.togglePref('관광지');APP.togglePref('맛집')",
+    "label": "위저드 2 · 미선택 (다음 비활성)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/90-w2-none.png"
+  },
+  {
+    "name": "91-w3-picked",
+    "hash": "w3",
+    "setup": "APP.setHotel('호텔 세종 가온')",
+    "label": "위저드 3 · 숙소 선택됨",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/91-w3-picked.png"
+  },
+  {
+    "name": "92-w3-generating",
+    "hash": "w3",
+    "setup": "window.setTimeout=function(){return 0};APP.setHotel('호텔 세종 가온');APP.wizardNext()",
+    "label": "위저드 3 · 동선 생성 중",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/92-w3-generating.png"
+  },
+  {
+    "name": "93-result-d1",
+    "hash": "result",
+    "setup": "APP.setDay(0)",
+    "label": "동선 결과 · D-1",
+    "mode": "full",
+    "w": 390,
+    "h": 1021,
+    "file": "png/93-result-d1.png"
+  },
+  {
+    "name": "94-result-dplus1",
+    "hash": "result",
+    "setup": "APP.setDay(2)",
+    "label": "동선 결과 · D+1 (회복 모드)",
+    "mode": "full",
+    "w": 390,
+    "h": 1238,
+    "file": "png/94-result-dplus1.png"
+  },
+  {
+    "name": "95-result-edit-rm",
+    "hash": "result-edit",
+    "setup": "APP.removeBlock(1)",
+    "label": "동선 결과 · 편집 · 블록 삭제 후",
+    "mode": "full",
+    "w": 390,
+    "h": 968,
+    "file": "png/95-result-edit-rm.png"
+  },
+  {
+    "name": "96-courses-region-sel",
+    "hash": "courses-region",
+    "setup": "document.querySelector('button[onclick*=\"setCRegion\"]').click()",
+    "label": "러닝 코스 · 지역 선택",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/96-courses-region-sel.png"
+  },
+  {
+    "name": "97-courses-longdist",
+    "hash": "courses",
+    "setup": "APP.setDist(20)",
+    "label": "러닝 코스 · 목표 20km (코스 짧음 안내)",
+    "mode": "full",
+    "w": 390,
+    "h": 1356,
+    "file": "png/97-courses-longdist.png"
+  },
+  {
+    "name": "98-detail-closed",
+    "hash": "calendar",
+    "setup": "APP.openDetail('jeonju')",
+    "label": "대회 상세 · 접수 마감",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/98-detail-closed.png"
+  },
+  {
+    "name": "99-detail-before",
+    "hash": "calendar",
+    "setup": "APP.openDetail('chuncheon')",
+    "label": "대회 상세 · 접수 전",
+    "mode": "full",
+    "w": 390,
+    "h": 1089,
+    "file": "png/99-detail-before.png"
+  },
+  {
+    "name": "16-account",
+    "hash": "account",
+    "setup": "",
+    "label": "내 정보 · 계정 관리",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/16-account.png"
+  },
+  {
+    "name": "17-coursedetail-saved",
+    "hash": "courses",
+    "setup": "APP.openCourseDetail(false);APP.saveCourse()",
+    "label": "코스 상세 · 보관함에 저장",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/17-coursedetail-saved.png"
+  },
+  {
+    "name": "72-guest-fav",
+    "hash": "calendar",
+    "setup": "APP.doGuest();APP.go('calendar');APP.toggleFav('sejong')",
+    "label": "게스트 · 찜 시도 (로그인 유도)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/72-guest-fav.png"
+  },
+  {
+    "name": "73-guest-route",
+    "hash": "result",
+    "setup": "APP.doGuest();APP.go('result');APP.saveRoute()",
+    "label": "게스트 · 동선 저장 시도 (로그인 유도)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/73-guest-route.png"
+  },
+  {
+    "name": "74-guest-course",
+    "hash": "courses",
+    "setup": "APP.doGuest();APP.openCourseDetail(false);APP.saveCourse()",
+    "label": "게스트 · 코스 저장 시도 (로그인 유도)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/74-guest-course.png"
+  },
+  {
+    "name": "75-login-return",
+    "hash": "result",
+    "setup": "APP.doGuest();APP.go('result');APP.saveRoute();APP.goLoginFromGuest();APP.doLogin()",
+    "label": "로그인 후 원래 화면 복귀",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/75-login-return.png"
+  },
+  {
+    "name": "100-confirm-route",
+    "hash": "library",
+    "setup": "APP.askDelete('route')",
+    "label": "확인 · 동선 삭제",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/100-confirm-route.png"
+  },
+  {
+    "name": "101-confirm-course",
+    "hash": "library-course",
+    "setup": "APP.askDelete('course')",
+    "label": "확인 · 저장 코스 삭제",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/101-confirm-course.png"
+  },
+  {
+    "name": "102-confirm-run",
+    "hash": "library-course",
+    "setup": "APP.askDelete('run')",
+    "label": "확인 · 러닝 기록 삭제",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/102-confirm-run.png"
+  },
+  {
+    "name": "103-confirm-quit",
+    "hash": "account",
+    "setup": "APP.askDelete('quit')",
+    "label": "확인 · 회원 탈퇴",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/103-confirm-quit.png"
+  },
+  {
+    "name": "104-confirm-runsave",
+    "hash": "runsum",
+    "setup": "APP.askDelete('runsave')",
+    "label": "확인 · 기록 저장 전 취소",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/104-confirm-runsave.png"
+  },
+  {
+    "name": "110-home-loading",
+    "hash": "home",
+    "setup": "APP.dbgHome('loading')",
+    "label": "홈 · 마감 임박 로딩",
+    "mode": "full",
+    "w": 390,
+    "h": 1067,
+    "file": "png/110-home-loading.png"
+  },
+  {
+    "name": "111-home-empty",
+    "hash": "home",
+    "setup": "APP.dbgHome('empty')",
+    "label": "홈 · 접수 중 대회 없음",
+    "mode": "full",
+    "w": 390,
+    "h": 1070,
+    "file": "png/111-home-empty.png"
+  },
+  {
+    "name": "112-home-error",
+    "hash": "home",
+    "setup": "APP.dbgHome('error')",
+    "label": "홈 · 마감 임박 조회 실패",
+    "mode": "full",
+    "w": 390,
+    "h": 1074,
+    "file": "png/112-home-error.png"
+  },
+  {
+    "name": "113-home-fest-loading",
+    "hash": "home",
+    "setup": "APP.dbgFest('loading')",
+    "label": "홈 · 축제 로딩",
+    "mode": "full",
+    "w": 390,
+    "h": 1106,
+    "file": "png/113-home-fest-loading.png"
+  },
+  {
+    "name": "114-home-fest-empty",
+    "hash": "home",
+    "setup": "APP.dbgFest('empty')",
+    "label": "홈 · 추천 축제 없음",
+    "mode": "full",
+    "w": 390,
+    "h": 1046,
+    "file": "png/114-home-fest-empty.png"
+  },
+  {
+    "name": "115-home-fest-error",
+    "hash": "home",
+    "setup": "APP.dbgFest('error')",
+    "label": "홈 · 축제만 실패 (부분 실패)",
+    "mode": "full",
+    "w": 390,
+    "h": 1050,
+    "file": "png/115-home-fest-error.png"
+  },
+  {
+    "name": "116-home-offline",
+    "hash": "home",
+    "setup": "APP.setOffline(true)",
+    "label": "홈 · 오프라인",
+    "mode": "full",
+    "w": 390,
+    "h": 1177,
+    "file": "png/116-home-offline.png"
+  },
+  {
+    "name": "120-calendar-loading",
+    "hash": "calendar",
+    "setup": "APP.dbgCal('loading')",
+    "label": "캘린더 · 로딩",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/120-calendar-loading.png"
+  },
+  {
+    "name": "121-calendar-error",
+    "hash": "calendar",
+    "setup": "APP.dbgCal('error')",
+    "label": "캘린더 · 조회 실패",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/121-calendar-error.png"
+  },
+  {
+    "name": "122-calendar-nodots",
+    "hash": "calendar-cal",
+    "setup": "APP.dbgCal('nodots')",
+    "label": "캘린더 · 날짜 수만 실패 (부분 실패)",
+    "mode": "full",
+    "w": 390,
+    "h": 1285,
+    "file": "png/122-calendar-nodots.png"
+  },
+  {
+    "name": "123-calendar-searchnone",
+    "hash": "calendar",
+    "setup": "document.querySelector('#calQ').value='없는대회명';APP.setQ('없는대회명')",
+    "label": "캘린더 · 검색 결과 없음",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/123-calendar-searchnone.png"
+  },
+  {
+    "name": "124-calendar-dayempty",
+    "hash": "calendar-cal",
+    "setup": "APP.selDate('2026-08-05')",
+    "label": "캘린더 · 이 날에는 대회 없음",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/124-calendar-dayempty.png"
+  },
+  {
+    "name": "125-calendar-monthempty",
+    "hash": "calendar-cal",
+    "setup": "APP.nextMonth();APP.nextMonth();APP.nextMonth()",
+    "label": "캘린더 · 이 달에는 대회 없음",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/125-calendar-monthempty.png"
+  },
+  {
+    "name": "130-library-error-route",
+    "hash": "library",
+    "setup": "APP.dbgLib('error')",
+    "label": "보관함 · 동선 조회 실패",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/130-library-error-route.png"
+  },
+  {
+    "name": "131-library-error-course",
+    "hash": "library-course",
+    "setup": "APP.dbgLib('error')",
+    "label": "보관함 · 러닝코스 조회 실패",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/131-library-error-course.png"
+  },
+  {
+    "name": "132-library-error-fav",
+    "hash": "library-fav",
+    "setup": "APP.dbgLib('error')",
+    "label": "보관함 · 찜한 대회 조회 실패",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/132-library-error-fav.png"
+  },
+  {
+    "name": "133-library-offline",
+    "hash": "library",
+    "setup": "APP.setOffline(true)",
+    "label": "보관함 · 오프라인 (수정 비활성)",
+    "mode": "frame",
+    "w": 390,
+    "h": 844,
+    "file": "png/133-library-offline.png"
+  }
+]
