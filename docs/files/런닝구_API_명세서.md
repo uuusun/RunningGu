@@ -1,7 +1,8 @@
 # 런닝구 백엔드 API 명세서 v2.0
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v3 + ERD·DFD 수정안
-> **스택**: Spring Boot 3.x (Java 17) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail
+> **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine
+> **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
 > **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · EMAIL/KAKAO 다중 로그인 수단 · 시스템 관리 RACE 블록 · 두루누비 API+GPX 결합
 
@@ -21,7 +22,7 @@
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
-- 인증 방식: `Authorization: Bearer {accessToken}` (JWT). **액세스 30분 · 리프레시 14일** 🔧, 리프레시는 회전(rotate) + 서버 저장(해시) — 로그아웃·비밀번호 재설정 시 전체 무효화(NFR-11).
+- 인증 방식: `Authorization: Bearer {accessToken}`. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 서명 키는 서버 환경변수로만 관리한다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 회전(rotate) + 서버 저장(SHA-256 해시) — 로그아웃·비밀번호 재설정 시 전체 무효화한다(NFR-11). 🔒
 - 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
@@ -71,6 +72,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 카카오 429 | 1회 재시도 후 실패 처리 (NFR-5) |
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
 | 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
+| 캐시 구현 | 단일 서버 MVP는 Spring Cache + Caffeine 인메모리 캐시. Redis는 MVP에서 사용하지 않음 🔒 |
 | 예외 | **동선 생성만은 502를 내지 않는다** — POI 조회 실패 시 해당 블록 `place=null` 강등, 생성은 성공(NFR-3) |
 
 ---
