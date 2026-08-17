@@ -1,0 +1,82 @@
+<!-- @dsCard group="카드" name="대회 카드" subtitle="featured · 기본 · 마감(흐림) — 찜 하트 포함" width="400" height="640" -->
+<!-- 출처: reference-web/src/styles/base.css (.race-card) · HomeScreen.jsx RaceCard — 하트=찜 토글(SPEC v3 B2) -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>대회 카드</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-primary-soft:#EEF2FF;--c-orange:#FF6A2B;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-3:#71747C;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-ink-7:#B7B9BE;--c-surface:#fff;--c-fill:#F2F2F0;--c-line-2:#ECECEE;--chip-open-bg:#C9F23C;--chip-open-fg:#15161B;--chip-closed-bg:#EFEFEF;--chip-closed-fg:#9A9CA2;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-card:20px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:18px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.race-card{display:flex;gap:14px;padding:16px;border-radius:var(--r-card);border:1px solid var(--c-line-2);background:var(--c-surface)}
+.race-card.featured{border:1.5px solid var(--c-ink)}
+.race-card.closed{opacity:.72}
+.datecol{flex:none;width:50px;text-align:center}
+.datecol .mon{font:800 11px var(--font-num);letter-spacing:1px;color:var(--c-ink-7)}
+.datecol .mon.hot{color:var(--c-orange)}
+.datecol .day{font:800 26px var(--font-num);line-height:1.05}
+.datecol .dow{font-size:11px;font-weight:700;color:var(--c-ink-4)}
+.body{flex:1;min-width:0}
+.tops{display:flex;justify-content:space-between;gap:8px}
+.name{font-size:17px;font-weight:800;letter-spacing:-.3px}
+.place{font-size:13px;color:var(--c-ink-3);margin-top:2px}
+.evt-tags{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.evt-tag{padding:4px 9px;border-radius:7px;background:var(--c-fill);color:var(--c-ink-2);font-size:11px;font-weight:600}
+.evt-tag.hi{background:var(--c-primary-soft);color:var(--c-primary);font-weight:700}
+.statusline{display:flex;align-items:center;gap:8px;margin-top:11px}
+.statuschip{padding:4px 9px;border-radius:7px;font-size:11px;font-weight:800}
+.statuschip.open{background:var(--chip-open-bg);color:var(--chip-open-fg)}
+.statuschip.closed{background:var(--chip-closed-bg);color:var(--chip-closed-fg)}
+.source{font-size:11px;color:var(--c-ink-5)}
+.heart{flex:none;width:22px;height:22px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px}
+.stack{display:flex;flex-direction:column;gap:12px}
+</style>
+</head>
+<body>
+<div class="ds-sec">featured (목록 첫 접수중 · 잉크 보더 · 월 오렌지 · 찜됨)</div>
+<div class="race-card featured">
+  <div class="datecol"><div class="mon hot">AUG</div><div class="day">22</div><div class="dow">토</div></div>
+  <div class="body">
+    <div class="tops">
+      <div class="name">2026 세종 호수공원 마라톤</div>
+      <svg class="heart" viewBox="0 0 24 24" fill="#FF6A2B" stroke="#FF6A2B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20l-1.2-1C5.6 14.5 3 11.6 3 8.2 3 5.6 5 3.6 7.5 3.6c1.6 0 3.2.9 4.5 2.6 1.3-1.7 2.9-2.6 4.5-2.6C19 3.6 21 5.6 21 8.2c0 3.4-2.6 6.3-7.8 10.8z"/></svg>
+    </div>
+    <div class="place">세종 · 세종중앙공원</div>
+    <div class="evt-tags"><span class="evt-tag hi">풀</span><span class="evt-tag">하프</span><span class="evt-tag">10K</span></div>
+    <div class="statusline"><span class="statuschip open">접수중</span><span class="source">마라톤GO · 확인 07.15</span></div>
+  </div>
+</div>
+
+<div class="ds-sec">기본 (찜 안 됨 · 하트 아웃라인)</div>
+<div class="race-card">
+  <div class="datecol"><div class="mon">SEP</div><div class="day">05</div><div class="dow">토</div></div>
+  <div class="body">
+    <div class="tops">
+      <div class="name">2026 부산 바다 하프마라톤</div>
+      <svg class="heart" viewBox="0 0 24 24" fill="none" stroke="#C2C4C9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20l-1.2-1C5.6 14.5 3 11.6 3 8.2 3 5.6 5 3.6 7.5 3.6c1.6 0 3.2.9 4.5 2.6 1.3-1.7 2.9-2.6 4.5-2.6C19 3.6 21 5.6 21 8.2c0 3.4-2.6 6.3-7.8 10.8z"/></svg>
+    </div>
+    <div class="place">부산 · 해운대해수욕장</div>
+    <div class="evt-tags"><span class="evt-tag hi">하프</span><span class="evt-tag">10K</span><span class="evt-tag">5K</span></div>
+    <div class="statusline"><span class="statuschip open">접수중</span><span class="source">런너스 · 확인 07.12</span></div>
+  </div>
+</div>
+
+<div class="ds-sec">마감 (카드 전체 72% 불투명)</div>
+<div class="race-card closed">
+  <div class="datecol"><div class="mon">AUG</div><div class="day">08</div><div class="dow">토</div></div>
+  <div class="body">
+    <div class="tops">
+      <div class="name">2026 전주 한옥 마라톤</div>
+      <svg class="heart" viewBox="0 0 24 24" fill="none" stroke="#C2C4C9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20l-1.2-1C5.6 14.5 3 11.6 3 8.2 3 5.6 5 3.6 7.5 3.6c1.6 0 3.2.9 4.5 2.6 1.3-1.7 2.9-2.6 4.5-2.6C19 3.6 21 5.6 21 8.2c0 3.4-2.6 6.3-7.8 10.8z"/></svg>
+    </div>
+    <div class="place">전북 · 전주종합경기장</div>
+    <div class="evt-tags"><span class="evt-tag hi">10K</span><span class="evt-tag">5K</span></div>
+    <div class="statusline"><span class="statuschip closed">마감</span><span class="source">런너스 · 확인 07.12</span></div>
+  </div>
+</div>
+<div class="note">하트 탭 = 찜 토글(카드 이동과 독립) · 찜됨 = 오렌지 채움 · 날짜 컬럼 = 영문 월 + 큰 일 + 요일</div>
+</body>
+</html>

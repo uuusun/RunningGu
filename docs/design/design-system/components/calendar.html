@@ -1,0 +1,70 @@
+<!-- @dsCard group="캘린더 · 동선" name="캘린더" subtitle="미니 캘린더(위저드) · 월 캘린더 셀 상태" width="400" height="760" -->
+<!-- 출처: reference-web PlanScreen.jsx MiniCalendar · HomeScreen.jsx CalendarView -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>캘린더</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-primary-soft:#EEF2FF;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-ink-6:#AEB0B6;--c-line-2:#ECECEE;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:20px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.cal{border:1px solid var(--c-line-2);border-radius:16px;padding:14px}
+.cal .ttl{text-align:center;font-weight:800;font-size:14px;margin-bottom:10px}
+.g7{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wd{text-align:center;font-size:11px;color:var(--c-ink-5);font-weight:700;padding-bottom:4px}
+.d{text-align:center;font-size:13px;padding:7px 0;border-radius:8px;font-weight:600;color:var(--c-ink-2)}
+.d.range{background:var(--c-primary-soft);color:var(--c-primary)}
+.d.race{background:var(--c-primary);color:#fff;font-weight:800}
+.legend{display:flex;gap:14px;margin-top:10px;justify-content:center;font-size:11px;color:var(--c-ink-4)}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend .sw{width:10px;height:10px;border-radius:3px}
+.hint{font-size:12px;color:var(--c-ink-5);margin-top:9px}
+.cell{height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.cell .n{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.cell .dots{height:5px;display:flex;gap:2px;align-items:center}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--c-primary)}
+.cnt{font-size:9px;line-height:5px;color:var(--c-ink-5);font-weight:700}
+.stlbl{font-size:10px;color:var(--c-ink-5);text-align:center;margin-top:2px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="ds-sec">미니 캘린더 (위저드 일정 선택 · 2026.08)</div>
+<div class="cal">
+  <div class="ttl">2026.08</div>
+  <div class="g7">
+    <div class="wd">일</div><div class="wd">월</div><div class="wd">화</div><div class="wd">수</div><div class="wd">목</div><div class="wd">금</div><div class="wd">토</div>
+    <div></div><div></div><div></div><div></div><div></div><div></div><div class="d">1</div>
+    <div class="d">2</div><div class="d">3</div><div class="d">4</div><div class="d">5</div><div class="d">6</div><div class="d">7</div><div class="d">8</div>
+    <div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div><div class="d">13</div><div class="d">14</div><div class="d">15</div>
+    <div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d">19</div><div class="d">20</div><div class="d range">21</div><div class="d race">22</div>
+    <div class="d range">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div><div class="d">27</div><div class="d">28</div><div class="d">29</div>
+    <div class="d">30</div><div class="d">31</div><div></div><div></div><div></div><div></div><div></div>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--c-primary)"></span>대회일</span>
+    <span><span class="sw" style="background:var(--c-primary-soft)"></span>여행 기간</span>
+  </div>
+</div>
+<div class="hint">08.21 ~ 08.23 · 3일</div>
+<div class="note">직접 선택 모드: 첫 탭=시작일 → "종료일을 눌러주세요" → 둘째 탭=종료일(역순 자동 정렬)</div>
+
+<div class="ds-sec">월 캘린더 셀 상태 (캘린더 뷰)</div>
+<div class="cal">
+  <div class="g7" style="gap:2px">
+    <div class="wd" style="color:#E5484D">일</div><div class="wd">월</div><div class="wd">화</div><div class="wd">수</div><div class="wd">목</div><div class="wd">금</div><div class="wd" style="color:var(--c-primary)">토</div>
+  </div>
+  <div class="g7" style="gap:2px;margin-top:2px">
+    <div class="cell"><span class="n" style="color:var(--c-ink-6);font-weight:500">3</span><span class="dots"></span><span class="stlbl">대회 없음</span></div>
+    <div class="cell"><span class="n" style="border:1.5px solid var(--c-primary)">1</span><span class="dots"></span><span class="stlbl">오늘</span></div>
+    <div class="cell"><span class="n">8</span><span class="dots"><span class="dot"></span></span><span class="stlbl">1건</span></div>
+    <div class="cell"><span class="n">15</span><span class="dots"><span class="dot"></span><span class="cnt">2</span></span><span class="stlbl">2건</span></div>
+    <div class="cell"><span class="n" style="background:var(--c-primary);color:#fff">22</span><span class="dots"></span><span class="stlbl">선택됨</span></div>
+    <div></div><div></div>
+  </div>
+</div>
+<div class="note">날짜 탭 → 해당 일자 대회 목록 · 재탭 해제 · 월 이동 시 선택 초기화 · 요일 헤더 일=빨강 #E5484D · 토=파랑</div>
+</body>
+</html>

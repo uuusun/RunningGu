@@ -1,0 +1,61 @@
+<!-- @dsCard group="캘린더 · 동선" name="히어로 · 정보 행" subtitle="대회 상세 잉크 히어로 + D-day · 정보 리스트" width="400" height="640" -->
+<!-- 출처: reference-web/src/styles/base.css (.hero-ink .info-rows) · RaceScreen.jsx -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>히어로 · 정보 행</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-lime:#C9F23C;--c-ink:#15161B;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-ink-6:#AEB0B6;--c-line-3:#F0F0F0;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:20px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.hero-ink{background:var(--c-ink);border-radius:22px;padding:22px 22px 20px;color:#fff}
+.hero-ink .eyebrow{font:800 11px var(--font-num);letter-spacing:1.5px;text-transform:uppercase;color:var(--c-lime)}
+.hero-ink .h{font-size:25px;font-weight:800;letter-spacing:-.5px;margin-top:7px}
+.hero-ink .dday{font:800 44px var(--font-num);color:var(--c-lime);line-height:.9}
+.hero-ink .when{display:flex;align-items:flex-end;gap:14px;margin-top:18px}
+.hero-ink .d1{font-size:14px;font-weight:700}
+.hero-ink .d2{font-size:12px;color:#9DA0A8;margin-top:2px}
+.hero-ink .reg{display:inline-block;margin-top:16px;padding:6px 12px;border-radius:9px;background:var(--c-lime);color:var(--c-ink);font-size:12px;font-weight:800}
+.hero-ink .reg.closed{background:#3A3B40;color:#B7B9BE}
+.info-rows{padding:18px 0 0}
+.info-row{display:flex;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--c-line-3)}
+.info-row .k{font-size:14px;color:var(--c-ink-4)}
+.info-row .v{font-size:14px;font-weight:700;text-align:right}
+.srcline{display:flex;align-items:center;justify-content:space-between;padding:14px 0 4px}
+.srcline .s{font-size:12px;color:var(--c-ink-6)}
+.srcline a{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--c-primary);text-decoration:none}
+svg{width:14px;height:14px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="ds-sec">잉크 히어로 (대회 상세 상단)</div>
+<div class="hero-ink">
+  <div class="eyebrow">세종 · 마라톤</div>
+  <div class="h">2026 세종 호수공원 마라톤</div>
+  <div class="when">
+    <div class="dday">D-21</div>
+    <div style="padding-bottom:4px">
+      <div class="d1">08.22 토요일</div>
+      <div class="d2">출발 08:00 · 세종중앙공원</div>
+    </div>
+  </div>
+  <span class="reg">접수중 · ~08.10</span>
+</div>
+<div class="note">마감 시 접수 배지: <span style="display:inline-block;padding:4px 10px;border-radius:8px;background:#3A3B40;color:#B7B9BE;font-size:11px;font-weight:800">마감</span> (어두운 회색) · D-day는 오늘 기준 재계산(Asia/Seoul)</div>
+
+<div class="ds-sec">정보 행 (키-값 리스트)</div>
+<div class="info-rows">
+  <div class="info-row"><span class="k">종목</span><span class="v">풀 · 하프 · 10K</span></div>
+  <div class="info-row"><span class="k">접수 기간</span><span class="v">07.01 ~ 08.10</span></div>
+  <div class="info-row"><span class="k">주최</span><span class="v">세종시체육회</span></div>
+  <div class="srcline">
+    <span class="s">출처 마라톤GO · 확인 07.15</span>
+    <a href="#">공식 페이지<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg></a>
+  </div>
+</div>
+<div class="note">출처·확인일 상시 노출(신뢰성) · 공식 페이지는 외부 브라우저(Custom Tabs)로</div>
+</body>
+</html>

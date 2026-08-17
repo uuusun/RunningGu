@@ -1,0 +1,65 @@
+<!-- @dsCard group="배지 · 피드백" name="태그 · 배지" subtitle="종목 태그 · 접수 상태 · 카테고리 태그 · 소스 배지" width="400" height="700" -->
+<!-- 출처: reference-web/src/styles/base.css (.evt-tag .statuschip .cat-tag .src-badge) · chrome.jsx -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>태그 · 배지</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-primary-soft:#EEF2FF;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-fill:#F2F2F0;--cat-food-bg:#FFF3CC;--cat-food-fg:#A66A00;--cat-tour-bg:#EAF1FF;--cat-tour-fg:#2B5CFF;--cat-cafe-bg:#F1E9FF;--cat-cafe-fg:#7A4FD0;--cat-wellness-bg:#E6F7EE;--cat-wellness-fg:#1B8A5A;--cat-nature-bg:#F0FAD8;--cat-nature-fg:#5A8A0A;--cat-history-bg:#EFEAFE;--cat-history-fg:#6B4FBB;--cat-lodging-bg:#EAEFF5;--cat-lodging-fg:#3E5573;--cat-race-bg:#EEF2FF;--cat-race-fg:#2B5CFF;--cat-recovery-bg:#FFF1E9;--cat-recovery-fg:#C2410C;--chip-open-bg:#C9F23C;--chip-open-fg:#15161B;--chip-closed-bg:#EFEFEF;--chip-closed-fg:#9A9CA2;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.evt-tag{padding:4px 9px;border-radius:7px;background:var(--c-fill);color:var(--c-ink-2);font-size:11px;font-weight:600}
+.evt-tag.hi{background:var(--c-primary-soft);color:var(--c-primary);font-weight:700}
+.statuschip{padding:4px 9px;border-radius:7px;font-size:11px;font-weight:800}
+.statuschip.open{background:var(--chip-open-bg);color:var(--chip-open-fg)}
+.statuschip.closed{background:var(--chip-closed-bg);color:var(--chip-closed-fg)}
+.source{font-size:11px;color:var(--c-ink-5)}
+.cat-tag{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap}
+.src-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:6px;font:700 10px var(--font-num);letter-spacing:.5px}
+.src-badge.live{background:var(--cat-wellness-bg);color:var(--cat-wellness-fg)}
+.src-badge.sample{background:var(--c-fill);color:var(--c-ink-4)}
+.src-badge.synth{background:var(--cat-recovery-bg);color:var(--cat-recovery-fg)}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+.lbl{font-size:11px;color:var(--c-ink-4);width:52px;flex:none}
+</style>
+</head>
+<body>
+<div class="ds-sec">종목 태그 (첫 태그만 강조)</div>
+<div class="row">
+  <span class="evt-tag hi">풀</span><span class="evt-tag">하프</span><span class="evt-tag">10K</span><span class="evt-tag">5K</span>
+</div>
+<div class="note">코스 메타에도 재사용: <span class="evt-tag hi">5.0km</span> <span class="evt-tag">약 45분</span> <span class="evt-tag">난이도 중</span></div>
+
+<div class="ds-sec">접수 상태 + 출처 (statusline)</div>
+<div class="row">
+  <span class="statuschip open">접수중</span>
+  <span class="statuschip closed">마감</span>
+  <span class="statuschip closed">접수전</span>
+  <span class="source">마라톤GO · 확인 07.15</span>
+</div>
+<div class="note">상태는 오늘 기준 재계산해 표기 · 출처·확인일은 상시 노출(신뢰성 원칙)</div>
+
+<div class="ds-sec">카테고리 태그 9종</div>
+<div class="row">
+  <span class="cat-tag" style="background:var(--cat-tour-bg);color:var(--cat-tour-fg)">관광지</span>
+  <span class="cat-tag" style="background:var(--cat-food-bg);color:var(--cat-food-fg)">맛집</span>
+  <span class="cat-tag" style="background:var(--cat-cafe-bg);color:var(--cat-cafe-fg)">카페</span>
+  <span class="cat-tag" style="background:var(--cat-wellness-bg);color:var(--cat-wellness-fg)">힐링·웰니스</span>
+  <span class="cat-tag" style="background:var(--cat-nature-bg);color:var(--cat-nature-fg)">자연·트레킹</span>
+  <span class="cat-tag" style="background:var(--cat-history-bg);color:var(--cat-history-fg)">역사·문화</span>
+  <span class="cat-tag" style="background:var(--cat-lodging-bg);color:var(--cat-lodging-fg)">숙소</span>
+  <span class="cat-tag" style="background:var(--cat-race-bg);color:var(--cat-race-fg)">대회</span>
+  <span class="cat-tag" style="background:var(--cat-recovery-bg);color:var(--cat-recovery-fg)">회복</span>
+</div>
+<div class="note">타임라인·후보 시트·편집 행에서 장소 성격 표시 — 색+한글 라벨 병행(접근성)</div>
+
+<div class="ds-sec">소스 배지 (POI 데이터 출처)</div>
+<div class="row"><span class="lbl">live</span><span class="src-badge live">LIVE</span><span class="note" style="margin:0">백엔드 실시간 조회 (카카오/KTO)</span></div>
+<div class="row" style="margin-top:8px"><span class="lbl">sample</span><span class="src-badge sample">샘플</span><span class="note" style="margin:0">사전 수집 번들 데이터</span></div>
+<div class="row" style="margin-top:8px"><span class="lbl">synth</span><span class="src-badge synth">샘플</span><span class="note" style="margin:0">합성 생성 폴백 (오프라인)</span></div>
+<div class="note">폴백 투명성 원칙: live → sample → synth 체인의 현재 소스를 항상 배지로 노출</div>
+</body>
+</html>

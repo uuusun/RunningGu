@@ -1,0 +1,72 @@
+<!-- @dsCard group="내비게이션" name="앱바 · 탭바" subtitle="헤더 3형 · 하단 탭 4개(SPEC v3)" width="400" height="600" -->
+<!-- 출처: reference-web/src/styles/base.css (.appbar .tabbar) · TabBar.jsx — 탭 구성은 SPEC v3 §2.1 (홈·캘린더·러닝코스·보관함) -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>앱바 · 탭바</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-lime:#C9F23C;--c-ink:#15161B;--c-ink-5:#9A9CA2;--c-ink-6:#AEB0B6;--c-surface:#fff;--c-line-2:#ECECEE;--c-line-3:#F0F0F0;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:20px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.frame{border:1px solid var(--c-line-3);border-radius:14px;overflow:hidden}
+.appbar{display:flex;align-items:center;gap:8px;padding:12px 18px}
+.appbar .title{font-size:15px;font-weight:800}
+.appbar .big{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.appbar .spacer{flex:1}
+.appbar .actions{display:flex;gap:14px;align-items:center}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--c-lime);display:flex;align-items:center;justify-content:center}
+.wordmark{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;color:var(--c-ink)}
+.tabbar{height:76px;border-top:1px solid var(--c-line-2);background:var(--c-surface);display:flex;padding:11px 6px 0;justify-content:space-around}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--c-ink-6);width:64px}
+.tab.active{color:var(--c-primary)}
+.tab span{font-size:11px;font-weight:700}
+svg{width:23px;height:23px}
+.sm{width:17px;height:17px}
+.md{width:22px;height:22px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="ds-sec">홈 헤더 (로고 + 워드마크)</div>
+<div class="frame">
+  <div class="appbar">
+    <span class="logo"><svg class="sm" viewBox="0 0 24 24" fill="none" stroke="#15161B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 5-8"/><circle cx="20" cy="5" r="1.4" fill="#15161B" stroke="none"/></svg></span>
+    <span class="wordmark">런닝구</span>
+    <span class="spacer"></span>
+    <button class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/></svg></button>
+  </div>
+</div>
+
+<div class="ds-sec">화면 타이틀 헤더 / 상세 헤더 (뒤로 + 액션)</div>
+<div class="frame">
+  <div class="appbar"><span class="big">러닝·산책 코스</span></div>
+</div>
+<div style="height:8px"></div>
+<div class="frame">
+  <div class="appbar">
+    <button class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px"><polyline points="15 5 8 12 15 19"/></svg></button>
+    <span class="title">동선 만들기</span>
+    <span class="spacer"></span>
+    <div class="actions">
+      <button class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8" y1="11" x2="16" y2="6.5"/><line x1="8" y1="13" x2="16" y2="17.5"/></svg></button>
+      <button class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20l-1.2-1C5.6 14.5 3 11.6 3 8.2 3 5.6 5 3.6 7.5 3.6c1.6 0 3.2.9 4.5 2.6 1.3-1.7 2.9-2.6 4.5-2.6C19 3.6 21 5.6 21 8.2c0 3.4-2.6 6.3-7.8 10.8z"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="ds-sec">하단 탭바 4개 — SPEC v3 (동선·커뮤니티 탭 없음)</div>
+<div class="frame">
+  <nav class="tabbar">
+    <button class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/></svg><span>홈</span></button>
+    <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>캘린더</span></button>
+    <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18c3 0 3-9 6-9s3 6 6 6 3-6 6-6"/><circle cx="20" cy="6" r="1.3" fill="currentColor" stroke="none"/></svg><span>러닝코스</span></button>
+    <button class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>보관함</span></button>
+  </nav>
+</div>
+<div class="note">탭바는 최상위 4개 화면에서만 노출 — 상세·위저드·결과·기록·인증에선 숨김.<br>활성 = primary · 비활성 = ink-6 · 라벨 11/700</div>
+</body>
+</html>
