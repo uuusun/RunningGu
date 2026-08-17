@@ -1,6 +1,10 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.domain.EventType
+import com.runninggu.app.domain.PoiCategory
+import com.runninggu.app.domain.Recovery
 import com.runninggu.app.domain.TripPattern
+import com.runninggu.app.domain.stdEvents
 import com.runninggu.app.ui.model.RaceSummary
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -21,6 +25,14 @@ data class WizardUiState(
     val end: LocalDate? = null,
     /** 직접 선택에서 시작일만 고른 상태. 안내 문구와 다음 탭 처리를 가른다. (SPEC §4.7) */
     val awaitingEndDate: Boolean = false,
+    /**
+     * S5 종목(단일). 세그먼트가 4종을 상시 노출하므로 미선택 상태는 없다. (SPEC §4.8)
+     *
+     * 화면 진입 시 [WizardViewModel.start] 가 "이전 선택 → 하프 우선 → 첫 종목" 으로 채운다.
+     */
+    val event: EventType = EventType.HALF,
+    /** S5 여행 취향(복수). 0개면 CTA 를 막는다. (SPEC §4.8) */
+    val themes: List<PoiCategory> = PoiCategory.DEFAULT_THEMES,
 ) {
     /** 기간 일수. 당일치기는 1. */
     val dayCount: Int
@@ -37,4 +49,26 @@ data class WizardUiState(
     /** 다음 단계로 갈 수 있는가. 직접 선택에서 종료일을 안 골랐으면 막는다. */
     val canProceed: Boolean
         get() = start != null && end != null && !awaitingEndDate
+
+    // ── S5 종목·취향 (SPEC §4.8) ────────────────────────────────
+
+    /** 이 대회가 실제로 여는 종목. 세그먼트 힌트 문구를 가른다. */
+    val raceEvents: List<EventType>
+        get() = stdEvents(race?.eventTypes)
+
+    /** 선택한 종목을 대회가 여는가. 아니면 "이 대회 종목엔 없지만" 힌트를 띄운다. */
+    val isEventInRace: Boolean
+        get() = event in raceEvents
+
+    /** "종목 · 회복강도 {intensity}" 라벨에 쓴다. 종목을 바꾸면 즉시 따라간다. */
+    val intensity: String
+        get() = Recovery[event].intensity
+
+    /** 하프·풀만 회복 안내를 띄운다. (SPEC §4.8 · §5.1 noHard) */
+    val showsRecoveryNotice: Boolean
+        get() = Recovery[event].noHard
+
+    /** S5 에서 다음으로 갈 수 있는가. 취향을 하나도 안 고르면 막는다. (SPEC §4.8) */
+    val canProceedFromPrefs: Boolean
+        get() = themes.isNotEmpty()
 }

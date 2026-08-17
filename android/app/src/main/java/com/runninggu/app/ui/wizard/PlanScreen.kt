@@ -178,8 +178,9 @@ private fun RangeSummary(state: WizardUiState) {
     )
 }
 
+/** 위저드 하단 고정 CTA. S4·S5 가 같이 쓴다. (SPEC §4.7 · §4.8) */
 @Composable
-private fun NextBar(enabled: Boolean, onClick: () -> Unit) {
+internal fun NextBar(enabled: Boolean, onClick: () -> Unit) {
     Surface(shadowElevation = 8.dp) {
         Button(
             onClick = onClick,
