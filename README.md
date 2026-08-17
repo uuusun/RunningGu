@@ -132,7 +132,9 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 | 팀원 | 담당 |
 |---|---|
 | **유선경** | **백엔드 전담** — USER+LOGIN_IDENTITY 인증·canonical 대회/원천·마이/찜/기록·외부 API 프록시·두루누비 동기화·springdoc·배포 |
-| **이건모** | **앱 코어** — 프로젝트 셋업·Retrofit/Room·공통 ProblemDetail/Enum/페이징 계약·카카오맵·두루누비+GPX 코스·GPS 기록·UTF-8 데이터 CI |
-| **김민지** | **앱 UI** — Compose 테마·4탭 내비게이션·인증/홈/캘린더/위저드/결과/마이 정보수정·찜 UI·Loading/Content/Empty/Error |
+| **이건모** | **앱 UI** — Compose 테마·4탭 내비게이션·인증/홈/캘린더/위저드/결과/마이 정보수정·찜 UI·Loading/Content/Empty/Error |
+| **김민지** | **앱 코어** — 프로젝트 셋업·Retrofit/Room·공통 ProblemDetail/Enum/페이징 계약·카카오맵·두루누비+GPX 코스·GPS 기록·UTF-8 데이터 CI |
+
+> 앱 담당 2인은 2026-08-17에 UI ↔ 코어를 맞바꿨다. 진행 상황은 [SPEC.md §11](./SPEC.md) 참고.
 
 상세 백로그 매핑은 [SPEC.md §11](./SPEC.md), 공통 작업 지침은 [AGENTS.md](./AGENTS.md), Git 협업 규칙은 [CONVENTION.md](./CONVENTION.md) (Git Flow · PR 상호 리뷰).

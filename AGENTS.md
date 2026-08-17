@@ -136,9 +136,9 @@ cd android
 
 | 경계 | 주는 쪽 | 받는 쪽 |
 |---|---|---|
-| HTTP API | 백엔드(유선경) | 앱(이건모) |
-| `UiState` | ViewModel(이건모) | Compose 화면(김민지) |
-| 도메인 모델 ↔ DTO | `data/remote` 매퍼(이건모) | — |
+| HTTP API | 백엔드(유선경) | 앱 코어(김민지) |
+| `UiState` | ViewModel · 앱 코어(김민지) | Compose 화면 · 앱 UI(이건모) |
+| 도메인 모델 ↔ DTO | `data/remote` 매퍼(김민지) | — |
 
 ---
 
@@ -262,7 +262,10 @@ git push -u origin feature/작업이름
 | 팀원 | 영역 | 백로그 |
 |---|---|---|
 | 유선경 | 백엔드 (Spring Boot + PostgreSQL) | AP-02 · 07 · 23 · 24(서버) |
-| 이건모 | 앱 코어 — domain/data · 지도 · GPX · GPS · CI | AP-01 · 03 · 04 · 05 · 12 · 14 · 22 · 24(앱) |
-| 김민지 | 앱 UI — Compose · 내비 · 화면 | AP-06 · 08 · 09 · 10 · 11 · 13 · 21 |
+| 이건모 | **앱 UI** — Compose · 내비 · 화면 | AP-06 · 08 · 09 · 10 · 11 · 13 · 21 |
+| 김민지 | **앱 코어** — domain/data · 지도 · GPX · GPS · CI | AP-01 · 03 · 04 · 05 · 12 · 14 · 22 · 24(앱) |
+
+> 2026-08-17 에 앱 담당 2인이 UI ↔ 코어를 맞바꿨다. 이전 커밋의 작성자와 담당이 다를 수 있다.
+> 진행 상황은 `SPEC.md` §11.
 
 `ui/` ↔ `domain/` 경계는 `UiState` 를 합의하고 병렬로 간다(4장).
