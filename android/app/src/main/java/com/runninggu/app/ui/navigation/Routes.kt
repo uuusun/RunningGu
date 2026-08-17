@@ -38,6 +38,9 @@ object Routes {
     /** S5 종목·취향. (SPEC §4.8) */
     const val PREFS = "prefs"
 
+    /** S7 추천 동선 결과. (SPEC §4.10) */
+    const val RESULT = "result"
+
     fun wizard(raceId: String): String = "wizard/${Uri.encode(raceId)}"
 
     /** 선택 인자를 포함한 캘린더 route 패턴. */

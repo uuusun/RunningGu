@@ -19,6 +19,8 @@ import com.runninggu.app.ui.my.MyScreen
 import com.runninggu.app.ui.racedetail.RaceDetailScreen
 import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
+import com.runninggu.app.ui.wizard.ResultScreen
+import com.runninggu.app.ui.wizard.ResultViewModel
 import com.runninggu.app.ui.wizard.WizardViewModel
 
 /**
@@ -121,9 +123,28 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
 
             PrefsScreen(
                 onBack = { navController.popBackStack() },
-                // TODO(AP-11): S6 숙소 선택이 생기면 연결한다.
-                onNext = {},
+                // TODO(AP-11): S6 숙소 선택이 생기면 S5 → S6 → S7 사이에 끼운다.
+                //  지금은 S6이 없어 바로 결과로 간다 — 숙소는 null(대회장 중심)로 처리된다(§4.9).
+                onNext = { navController.navigate(Routes.RESULT) },
                 viewModel = wizardViewModel,
+            )
+        }
+        composable(Routes.RESULT) { entry ->
+            val graphEntry = remember(entry) {
+                navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
+            }
+            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            // 결과 상태는 이 화면만 쓰므로 그래프에 묶지 않는다.
+            val resultViewModel: ResultViewModel = viewModel(entry)
+
+            ResultScreen(
+                onBack = { navController.popBackStack() },
+                // 빈 상태의 [조건 바꾸기] — 입력을 유지한 채 위저드로 돌아간다 (SPEC §4.10).
+                onChangeConditions = { navController.popBackStack() },
+                // TODO(AP-12): S8에 출발지(숙소)와 목표 거리를 실어 넘긴다 (SPEC §4.10 · §4.11).
+                onOpenCourses = { navController.navigate(Routes.COURSES) },
+                wizardViewModel = wizardViewModel,
+                viewModel = resultViewModel,
             )
         }
     }
