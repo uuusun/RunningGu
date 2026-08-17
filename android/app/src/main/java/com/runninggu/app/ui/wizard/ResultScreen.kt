@@ -131,9 +131,9 @@ private fun Content(
         MapPlaceholder()
 
         Column(Modifier.padding(horizontal = 20.dp)) {
-            state.itinerary?.recovery?.let {
+            state.result?.recovery?.let {
                 Spacer(Modifier.height(16.dp))
-                RecoveryBadge(label = it.label, text = it.text)
+                RecoveryBadge(label = it.label, text = it.note)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -219,7 +219,7 @@ private fun DayTabs(state: ResultUiState, onSelect: (Int) -> Unit) {
                 selected = index == state.activeDayIndex,
                 onClick = { onSelect(index) },
                 label = { Text("${day.label} · ${day.dateLabel}") },
-                leadingIcon = if (state.isRecoveryDay(day)) {
+                leadingIcon = if (state.isRecoveryDay(index)) {
                     { RecoveryDot() }
                 } else {
                     null
