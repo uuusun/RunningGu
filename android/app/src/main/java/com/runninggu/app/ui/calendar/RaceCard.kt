@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,9 +26,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.runninggu.app.ui.theme.Ink2
+import com.runninggu.app.ui.theme.Ink4
+import com.runninggu.app.ui.theme.Ink5
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.runninggu.app.ui.common.ElevationLine
+import com.runninggu.app.ui.theme.Ink3
+import com.runninggu.app.ui.theme.NumeralLabel
+import com.runninggu.app.ui.theme.NumeralLarge
+import com.runninggu.app.ui.theme.Orange
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
@@ -55,22 +66,36 @@ fun RaceCard(
     val status = race.registrationStatus()
     val closed = status != RegistrationStatus.OPEN
 
+    // 목업 .racerow — 흰 바탕에 옅은 테두리로 구분하고, featured만 파란 테두리로 강조한다.
+    // 마감은 카드 전체를 흐리게 하지 않고 텍스트 색만 낮춘다 (.racerow.closed).
     Card(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .alpha(if (closed) 0.55f else 1f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (featured) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp), // --r-card
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (featured) {
+            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = if (featured) 6.dp else 0.dp),
     ) {
-        Row(modifier = Modifier.padding(14.dp)) {
-            DateColumn(race = race, featured = featured)
+        // IntrinsicSize.Min — 세로 실선(vline)이 fillMaxHeight로 늘어나려면
+        // Row가 자기 높이를 알아야 한다. 없으면 실선 높이가 0이 되어 안 보인다.
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 15.dp)
+                .height(IntrinsicSize.Min),
+        ) {
+            DateColumn(race = race, featured = featured, closed = closed)
+            Spacer(Modifier.width(14.dp))
+            // 목업 .racerow .vline — 날짜 컬럼과 본문을 세로 실선으로 가른다.
+            Box(
+                Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.Top) {
@@ -78,6 +103,7 @@ fun RaceCard(
                         text = race.name,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
+                        color = if (closed) Ink2 else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(
@@ -91,11 +117,8 @@ fun RaceCard(
                                 Icons.Filled.FavoriteBorder
                             },
                             contentDescription = if (isFavorite) "찜 해제" else "찜하기",
-                            tint = if (isFavorite) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            },
+                            // 목업 하트 채움은 포인트 오렌지다.
+                            tint = if (isFavorite) Orange else Ink5,
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -104,7 +127,7 @@ fun RaceCard(
                 Text(
                     text = "${race.region} · ${race.venue}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (closed) Ink5 else Ink4,
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -114,9 +137,17 @@ fun RaceCard(
                     }
                 }
 
+                // 코스 고도 스트립. (목업 .racerow .elevline)
+                Spacer(Modifier.height(9.dp))
+                ElevationLine(
+                    seed = race.id.hashCode(),
+                    closed = closed,
+                    modifier = Modifier.fillMaxWidth().height(28.dp),
+                )
+
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusChip(status = status)
+                    StatusChip(status = status, race = race)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = buildString {
@@ -135,30 +166,34 @@ fun RaceCard(
 }
 
 @Composable
-private fun DateColumn(race: RaceSummary, featured: Boolean, modifier: Modifier = Modifier) {
+private fun DateColumn(
+    race: RaceSummary,
+    featured: Boolean,
+    closed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    // 목업 .racerow .datecol — 월은 파랑 mono, 일은 큰 mono, 요일은 옅은 회색.
     Column(
-        modifier = modifier.width(44.dp),
+        modifier = modifier.width(46.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = MONTHS_EN[race.date.monthValue - 1],
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (featured) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            style = NumeralLabel,
+            color = when {
+                closed -> Ink5
+                else -> MaterialTheme.colorScheme.primary
             },
         )
         Text(
             text = "%02d".format(race.date.dayOfMonth),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
+            style = NumeralLarge,
+            color = if (closed) Ink3 else MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = race.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Ink4,
         )
     }
 }
@@ -168,30 +203,37 @@ private fun EventTag(label: String, highlighted: Boolean, modifier: Modifier = M
     Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Normal,
-        color = if (highlighted) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
+        fontWeight = FontWeight.Bold,
+        // 목업 태그 — 대표 종목은 연파랑 바탕에 파란 글씨, 나머지는 옅은 회색 바탕이다.
+        color = if (highlighted) MaterialTheme.colorScheme.primary else Ink2,
         modifier = modifier
             .background(
                 if (highlighted) {
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surface
+                    MaterialTheme.colorScheme.surfaceVariant
                 },
-                CircleShape,
+                RoundedCornerShape(9.dp),
             )
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .padding(horizontal = 9.dp, vertical = 4.dp),
     )
 }
 
 @Composable
-private fun StatusChip(status: RegistrationStatus, modifier: Modifier = Modifier) {
+private fun StatusChip(
+    status: RegistrationStatus,
+    race: RaceSummary,
+    modifier: Modifier = Modifier,
+) {
     val open = status == RegistrationStatus.OPEN
+    // 목업은 마감일을 칩 안에 넣어 "접수중 · ~08.05" 한 덩어리로 보여준다.
+    val label = if (open && race.regEnd != null) {
+        "${status.label} · ~%02d.%02d".format(race.regEnd.monthValue, race.regEnd.dayOfMonth)
+    } else {
+        status.label
+    }
     Text(
-        text = status.label,
+        text = label,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         color = if (open) {

@@ -1,16 +1,21 @@
 package com.runninggu.app.ui
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import com.runninggu.app.ui.theme.Ink5
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -32,6 +37,9 @@ fun RunningGuApp(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        // 상단 인셋을 셸에서 먹지 않는다 — 홈 히어로가 상태바 뒤까지 깔려야 하기 때문이다
+        // (목업 .statusbar.on-dark). 상태바 여백은 각 화면이 statusBarsPadding()으로 처리한다.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             // 탭바는 최상위 화면에서만 노출한다 (SPEC §2.1).
             if (currentTab != null) {
@@ -54,7 +62,7 @@ private fun RunningGuBottomBar(
     currentTab: TopLevelDestination,
     onTabSelected: (TopLevelDestination) -> Unit,
 ) {
-    NavigationBar {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
         TopLevelDestination.entries.forEach { tab ->
             val label = stringResource(tab.labelRes)
             NavigationBarItem(
@@ -62,6 +70,14 @@ private fun RunningGuBottomBar(
                 onClick = { onTabSelected(tab) },
                 icon = { Icon(imageVector = tab.icon, contentDescription = label) },
                 label = { Text(label) },
+                // 목업 .tabbar — 활성은 파랑 아이콘+라벨, 비활성은 ink5. 알약 배경은 쓰지 않는다.
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = Ink5,
+                    unselectedTextColor = Ink5,
+                    indicatorColor = Color.Transparent,
+                ),
             )
         }
     }
