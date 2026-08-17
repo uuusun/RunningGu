@@ -2,6 +2,8 @@ package com.runninggu.app.ui.wizard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.domain.ItineraryDay
+import com.runninggu.app.domain.ItineraryEdits
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +46,38 @@ class ResultViewModel(
     /** 일자 탭 선택. 지도와 타임라인이 함께 따라간다. (SPEC §4.10) */
     fun onDaySelect(index: Int) {
         _uiState.update { it.copy(activeDayIndex = index) }
+    }
+
+    // ── 저장 전 로컬 편집 (SPEC §4.10 · §5.7) ───────────────────
+    //
+    // 편집은 앱 몫이다(결정-41). 연산은 domain/ItineraryEdits 가 하고 여기서는 결과를
+    // 상태에 넣기만 한다 — 대회 블록 거부도 그쪽이 판단한다.
+
+    fun onToggleEdit() {
+        _uiState.update { it.copy(isEditing = !it.isEditing) }
+    }
+
+    /** 블록 삭제. 대회 블록이면 [ItineraryEdits] 가 거부해 목록이 그대로 온다. */
+    fun onRemoveBlock(blockId: String) {
+        editActiveDay { days, dayIndex ->
+            ItineraryEdits.removeBlock(days, dayIndex, blockId)
+        }
+    }
+
+    /** 한 칸 위/아래로. 같은 일자 안에서만 움직인다. (SPEC §5.7) */
+    fun onMoveBlock(from: Int, to: Int) {
+        editActiveDay { days, dayIndex ->
+            ItineraryEdits.moveBlock(days, dayIndex, from, to)
+        }
+    }
+
+    private inline fun editActiveDay(
+        transform: (days: List<ItineraryDay>, dayIndex: Int) -> List<ItineraryDay>,
+    ) {
+        _uiState.update { state ->
+            val result = state.result ?: return@update state
+            state.copy(result = result.copy(days = transform(result.days, state.activeDayIndex)))
+        }
     }
 
     private fun send(request: GenerateItineraryRequest) {
