@@ -1,0 +1,12 @@
+{
+  "name": "런닝구 화면 플로우 보드",
+  "id": "runninggu-flow-board",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "reasoning": "이미지는 사용자가 로컬에서 직접 고른 파일만 쓴다. 외부 통신 없음."
+  }
+}
