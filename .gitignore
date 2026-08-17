@@ -22,6 +22,12 @@ __pycache__/
 geocode_cache.json
 output/
 
+# ── 러닝코스 원천 데이터 (커밋 금지 — 공공데이터 배포본 200MB+) ──
+.cache/
+data/100대명산/
+data/한국등산트레킹지원센터_*/
+data/courses_gpx/
+
 # ── Node (reference-web/) ──
 node_modules/
 dist/
