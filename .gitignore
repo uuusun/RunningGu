@@ -32,7 +32,9 @@ dist/
 *.tmp
 
 # ── agent workspaces ──
-.claude/
+# .claude/ 는 팀 공유한다(settings.json·skills·commands). 개인 설정만 제외.
+.claude/settings.local.json
+.claude/local/
 .codex-orchestrator/
 
 # Local-only documentation
