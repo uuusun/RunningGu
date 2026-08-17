@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.sample.SampleData
+import com.runninggu.app.domain.today
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,7 +56,7 @@ class CalendarViewModel : ViewModel() {
             delay(LOADING_DELAY_MS) // 임시 — 실제 조회로 교체하면 제거한다.
 
             // 노출 대상은 오늘 이후 대회만. (SPEC §4.5)
-            val today = LocalDate.now()
+            val today = today()
             val upcoming = SampleData.races.filter { !it.date.isBefore(today) }
 
             _uiState.update {

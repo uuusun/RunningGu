@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * 도메인 규칙이 SPEC §5 표와 한 글자도 다르지 않은지 지킨다.
@@ -192,5 +193,23 @@ class DomainRulesTest {
         assertEquals(21, dDay(LocalDate.of(2026, 8, 22), today))
         assertEquals(0, dDay(today, today))
         assertEquals(-1, dDay(LocalDate.of(2026, 7, 31), today))
+    }
+
+    @Test
+    fun `D-day 표기는 남은 날은 D빼기 지난 날은 D더하기다`() {
+        val today = LocalDate.of(2026, 8, 1)
+        assertEquals("D-21", dDayLabel(LocalDate.of(2026, 8, 22), today))
+        assertEquals("D-1", dDayLabel(LocalDate.of(2026, 8, 2), today))
+        assertEquals("D-day", dDayLabel(today, today))
+        assertEquals("D+1", dDayLabel(LocalDate.of(2026, 7, 31), today))
+        assertEquals("D+2", dDayLabel(LocalDate.of(2026, 7, 30), today))
+    }
+
+    @Test
+    fun `오늘은 기기 타임존이 아니라 KST 기준이다`() {
+        // 기기가 UTC 여도 KST 로 계산해야 한다. UTC 09-00 이전이면 한국은 이미 다음 날이다.
+        // (SPEC §6.6 — 버그 1순위)
+        assertEquals(ZoneId.of("Asia/Seoul"), KST)
+        assertEquals(LocalDate.now(KST), today())
     }
 }

@@ -1,27 +1,9 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.domain.TripPattern
 import com.runninggu.app.ui.model.RaceSummary
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-
-/**
- * 일정 패턴. (SPEC §5.2 `PATTERNS`)
- *
- * [offsetStart]·[offsetEnd]는 대회일 기준 오프셋이다 — 규칙 값은 명세가 기준이므로 바꾸지 않는다.
- * [CUSTOM]만 오프셋이 없고 사용자가 미니 캘린더로 직접 고른다.
- */
-enum class TripPattern(
-    val label: String,
-    val hint: String,
-    val offsetStart: Long?,
-    val offsetEnd: Long?,
-) {
-    PRE("전날부터", "1박 2일", -1, 0),
-    POST("대회+다음날", "1박 2일", 0, 1),
-    AROUND("전후로", "2박 3일", -1, 1),
-    DAY("당일치기", "", 0, 0),
-    CUSTOM("직접 선택", "", null, null),
-}
 
 /**
  * 위저드(S4~S7) 공유 상태. (SPEC §2.4)
@@ -34,7 +16,7 @@ enum class TripPattern(
  */
 data class WizardUiState(
     val race: RaceSummary? = null,
-    val pattern: TripPattern = TripPattern.AROUND, // 기본 "전후로" (SPEC §4.7)
+    val pattern: TripPattern = TripPattern.DEFAULT, // 기본 "전후로" (SPEC §4.7 · §5.2)
     val start: LocalDate? = null,
     val end: LocalDate? = null,
     /** 직접 선택에서 시작일만 고른 상태. 안내 문구와 다음 탭 처리를 가른다. (SPEC §4.7) */

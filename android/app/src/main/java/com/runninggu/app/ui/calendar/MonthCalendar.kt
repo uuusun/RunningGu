@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.runninggu.app.ui.model.RaceSummary
+import com.runninggu.app.domain.today
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -118,7 +119,7 @@ private fun DayGrid(
     onDateSelect: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val today = LocalDate.now()
+    val today = today()
     // 일요일 시작으로 맞춘다. DayOfWeek는 월=1이므로 일요일이 0이 되도록 보정.
     val leadingBlanks = month.atDay(1).dayOfWeek.value % DayOfWeek.SUNDAY.value
     val cells: List<LocalDate?> =

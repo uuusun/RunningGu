@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.wizard
 
 import androidx.lifecycle.ViewModel
+import com.runninggu.app.domain.TripPattern
 import com.runninggu.app.ui.sample.SampleData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,7 @@ class WizardViewModel : ViewModel() {
     fun start(raceId: String) {
         if (_uiState.value.race?.id == raceId) return
         val race = SampleData.raceById(raceId) ?: return
-        _uiState.value = WizardUiState(race = race).withPattern(TripPattern.AROUND)
+        _uiState.value = WizardUiState(race = race).withPattern(TripPattern.DEFAULT)
     }
 
     /** 패턴 칩 선택. 직접 선택은 날짜를 비우고 사용자 입력을 기다린다. (SPEC §4.7) */
@@ -58,20 +59,19 @@ class WizardViewModel : ViewModel() {
     }
 }
 
-/** 패턴에 맞춰 start·end를 다시 계산한다. 대회가 없으면 그대로 둔다. */
+/**
+ * 패턴에 맞춰 start·end를 다시 계산한다. 대회가 없으면 그대로 둔다.
+ *
+ * 오프셋 적용은 [TripPattern.rangeOf]가 한다 — §5.2 규칙이라 `domain`이 갖고 있다.
+ */
 private fun WizardUiState.withPattern(pattern: TripPattern): WizardUiState {
     val raceDate = race?.date ?: return copy(pattern = pattern)
-    val offsetStart = pattern.offsetStart
-    val offsetEnd = pattern.offsetEnd
-    return if (offsetStart == null || offsetEnd == null) {
-        // 직접 선택 — 날짜를 비우고 첫 탭을 기다린다.
-        copy(pattern = pattern, start = null, end = null, awaitingEndDate = false)
-    } else {
-        copy(
-            pattern = pattern,
-            start = raceDate.plusDays(offsetStart),
-            end = raceDate.plusDays(offsetEnd),
-            awaitingEndDate = false,
-        )
-    }
+    // 직접 선택이면 null — 날짜를 비우고 첫 탭을 기다린다.
+    val range = pattern.rangeOf(raceDate)
+    return copy(
+        pattern = pattern,
+        start = range?.start,
+        end = range?.endInclusive,
+        awaitingEndDate = false,
+    )
 }

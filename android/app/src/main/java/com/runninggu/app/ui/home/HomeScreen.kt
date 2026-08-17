@@ -58,6 +58,7 @@ import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
+import com.runninggu.app.domain.today
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -553,7 +554,7 @@ private fun FestivalCard(
 // TODO(AP-04): 도메인 포팅(dates.kt·KST 규칙)이 들어오면 그쪽으로 옮긴다.
 
 private fun LocalDate.daysFromToday(): Long =
-    ChronoUnit.DAYS.between(LocalDate.now(), this)
+    ChronoUnit.DAYS.between(today(), this)
 
 private fun LocalDate.toKoreanDate(): String {
     val dow = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)

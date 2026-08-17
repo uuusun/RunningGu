@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.domain.TripPattern
 import com.runninggu.app.ui.common.LoadingState
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -136,18 +137,21 @@ private fun PatternChips(
             FilterChip(
                 selected = pattern == selected,
                 onClick = { onSelect(pattern) },
-                label = {
-                    Text(
-                        if (pattern.hint.isEmpty()) {
-                            pattern.label
-                        } else {
-                            "${pattern.label} · ${pattern.hint}"
-                        },
-                    )
-                },
+                label = { Text(pattern.chipLabel()) },
             )
         }
     }
+}
+
+/**
+ * 칩 문구. 여러 날에 걸치는 패턴만 "· 1박 2일" 같은 기간을 덧붙인다. (SPEC §4.7)
+ *
+ * `domain`의 [TripPattern.sub]는 당일치기·직접 선택에도 문구("당일"·"달력에서 직접 고르기")를
+ * 갖고 있는데, 칩에는 기간만 보여주는 게 목업 표기다. 그래서 하루짜리는 라벨만 쓴다.
+ */
+private fun TripPattern.chipLabel(): String {
+    val spansMultipleDays = startOffset != null && startOffset != endOffset
+    return if (spansMultipleDays) "$label · $sub" else label
 }
 
 /** "MM.DD ~ MM.DD · n일" 또는 직접 선택 안내 문구. (SPEC §4.7) */
