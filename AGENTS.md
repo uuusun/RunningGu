@@ -16,7 +16,8 @@
 |---|---|
 | 기준 브랜치 | `develop` (`main` 은 릴리스 전용) |
 | 최종 기준 문서 | `SPEC.md` |
-| 빌드 | `cd android && ./gradlew :app:testDebugUnitTest` (JDK 21) |
+| Android 빌드 | `cd android && ./gradlew :app:testDebugUnitTest` (JDK 21) |
+| 백엔드 빌드 | `cd backend && ./gradlew test bootJar` (JDK 21 · Docker) |
 | 막히면 | 연결부 · 스키마 · 범위 관련이면 **묻는다.** 그 외는 가정을 밝히고 진행 |
 | 끝낼 때 | 구현 + 테스트 + **문서 반영**까지가 완료 |
 
@@ -38,7 +39,7 @@
 | `docs/files/런닝구_API_명세서.md` | **HTTP API 계약.** 백엔드 시드 계약 — 앱은 이걸 보고 만든다 |
 | `docs/screen-api-matrix.md` | **화면 ↔ API 매핑표.** 화면마다 언제 무엇을 호출하고 어떤 필드를 쓰는지 + **미정 계약 목록**(§10) |
 | `docs/mockup-design/런닝구-목업-v2.html` | 화면·상호작용 참고 |
-| springdoc / Swagger | 백엔드 구현 후 **최종 실행 계약**이 된다 (아직 없음) |
+| springdoc / Swagger | 백엔드의 **최종 실행 계약**. 현재 공통 골격부터 존재하며 엔드포인트 구현과 함께 확장 |
 | `CONVENTION.md` | Git · PR 규칙 |
 | `docs/domain-logic-audit.md` | 원본 코드가 SPEC 보다 낡은 지점 대조표 |
 | `docs/android-porting-plan.md` | 파일 단위 포팅 순서 |
@@ -73,6 +74,12 @@ android/app/src/main/java/com/runninggu/app/
 └── util/
 ```
 
+```
+backend/src/main/java/com/runninggu/server/
+├── common/    오류·보안·OpenAPI·KST/UTC·JPA 공통 기반
+└── <feature>/ api · application · domain · infrastructure (기능 구현 시 생성)
+```
+
 1. **`domain` 은 Android 를 모른다.** `android.*` · Compose · Context 를 import 하지 않는다.
 2. **데이터 기준 저장소(SSOT)는 서버다.** Room 은 **읽기 캐시**일 뿐 — 양방향 동기화하지 않는다.
 3. **외부 API 는 앱이 직접 부르지 않는다.** KTO · 카카오 REST 는 전부 우리 서버를 거친다.
@@ -95,9 +102,13 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)   # Windows 는 참고 문서 3
 cd android
 ./gradlew :app:testDebugUnitTest     # 단위 테스트
 ./gradlew :app:assembleDebug         # 디버그 빌드
+
+cd ../backend
+./gradlew test bootJar               # 백엔드 단위·PostgreSQL 통합 테스트 + 실행 JAR
 ```
 
 `android/local.properties` 에 `sdk.dir` 이 필요하다(gitignore 대상, 각자 생성).
+백엔드 통합 테스트는 Testcontainers를 사용하므로 Docker가 실행 중이어야 한다.
 
 ### 작업 종류별 최소 검증
 
@@ -107,6 +118,7 @@ cd android
 | `data/` | `:app:testDebugUnitTest` + 매퍼 단위 테스트 |
 | `ui/` | `:app:assembleDebug` + 화면 스크린샷 |
 | `scripts/` | 해당 스크립트 2회 실행 후 결과가 같은지(결정성) |
+| `backend/` | `test` + `bootJar`; DB 연동은 Testcontainers PostgreSQL로 검증 |
 | 문서만 | 없음 |
 
 **린트 · 포맷터는 아직 없다.** "린트 통과" 를 완료 조건으로 삼지 않는다.

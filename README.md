@@ -23,14 +23,14 @@
 
 | 영역 | 스택 |
 |---|---|
-| 언어 | Kotlin |
+| 언어 | Kotlin(Android) · Java 21(백엔드) |
 | UI | Jetpack Compose |
 | 아키텍처 | MVVM |
 | 네트워크 | Retrofit + OkHttp — 자체 백엔드 API 경유 (KTO·카카오 REST는 백엔드에서만 호출) |
 | 로컬 저장 | Room 읽기 캐시·GPS 임시 기록 · DataStore |
 | 지도 | 카카오맵 **Android SDK** |
 | 로그인 | 카카오 로그인 **Android SDK** |
-| 백엔드 | **Spring Boot + PostgreSQL** — 인증·canonical 대회·마이·외부 API 프록시·두루누비 동기화 |
+| 백엔드 | **Spring Boot + PostgreSQL** — `com.runninggu.server`, 인증·canonical 대회·마이·외부 API 프록시·두루누비 동기화 |
 | 데이터 생성 | Python 스크립트 (1회성·보관용) |
 
 > ⚠️ 지도·로그인은 웹 JS SDK가 아니라 **안드로이드 SDK**를 써야 한다. 웹 프로토타입의 카카오맵 JS 연동은 참고만 하고 재구현한다.
@@ -69,6 +69,12 @@ runninggu/
 │   ├── build.gradle.kts # 프로젝트 빌드 설정
 │   └── settings.gradle.kts
 │
+├── backend/             # Java 21 Spring Boot 백엔드 (`com.runninggu.server`)
+│   ├── src/main/java/com/runninggu/server/
+│   │   └── common/      # 오류·보안·OpenAPI·KST/UTC·JPA 공통 기반
+│   ├── compose.yaml     # 로컬 PostgreSQL 17
+│   └── build.gradle.kts # 백엔드 독립 Gradle 빌드
+│
 ├── docs/                # 기획·API 매뉴얼
 ├── scripts/             # 데이터 생성 Python (1회성·보관용, 크롤 CSV→races.json)
 ├── data/                # 원천 데이터 (CSV 등)
@@ -84,12 +90,22 @@ runninggu/
 ### 사전 준비
 - Android Studio (최신 안정판)
 - JDK 21
+- Docker Desktop (백엔드 PostgreSQL·통합 테스트)
 - 카카오 · 한국관광공사 API 키
 
-### 실행
+### Android 실행
 1. Android Studio에서 `android/` 열기 → Gradle Sync
 2. `local.properties`에 API 키 입력 (아래) — **커밋 금지**
 3. 에뮬레이터 또는 실기기에서 Run ▶
+
+### 백엔드 실행
+
+백엔드 환경변수·PostgreSQL·Swagger 실행 방법은 [`backend/README.md`](./backend/README.md)를 따른다.
+
+```powershell
+cd backend
+.\gradlew.bat clean test bootJar --console=plain
+```
 
 ### API 키 (`local.properties`)
 
