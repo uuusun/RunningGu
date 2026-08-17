@@ -38,6 +38,9 @@ object Routes {
     /** S5 종목·취향. (SPEC §4.8) */
     const val PREFS = "prefs"
 
+    /** S6 숙소 선택. (SPEC §4.9) */
+    const val STAY = "stay"
+
     /** S7 추천 동선 결과. (SPEC §4.10) */
     const val RESULT = "result"
 

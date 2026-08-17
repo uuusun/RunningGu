@@ -14,6 +14,8 @@ data class GenerateItineraryRequest(
     val endDate: LocalDate,
     val event: EventType,
     val themes: List<PoiCategory>,
+    /** 숙소. null 이면 서버가 대회장 중심으로 슬롯을 채운다. (API 명세 §5-1 · SPEC §4.9) */
+    val hotel: PoiItem? = null,
 )
 
 /**
