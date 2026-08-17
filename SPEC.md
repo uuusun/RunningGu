@@ -667,7 +667,9 @@ app/src/main/java/com/runninggu/app/
 
 회원(U1~U3)·canonical 대회·마이/찜·동선·러닝 기록(R1)·**외부 API 프록시(REST 키 격리 🔒확정)** ·두루누비 동기화를 서버가 담당한다.
 
-- 스택: **Spring Boot + PostgreSQL** + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(세션은 JWT 액세스+리프레시 🔧정책).
+- 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(Access JWT + Refresh JWT, HS256, 액세스 30분·리프레시 14일, 회전 발급·DB 해시 저장 🔒확정).
+- 테스트: JUnit 5 + Testcontainers(PostgreSQL 통합 테스트) 🔒확정.
+- 외부 API TTL 캐시는 단일 서버 MVP에서 Spring Cache + Caffeine을 사용하고 Redis는 사용하지 않는다 🔒확정.
 - 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ 마이(동선·코스·기록)·찜 SSOT ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타 동기화+GPX 결합. 프록시에는 서버 캐싱·레이트리밋을 둔다.
 - **API 계약은 springdoc-openapi로 확정** 🔒확정(결정-18) — 컨트롤러 코드에서 Swagger UI 자동 생성, 앱 팀은 그 문서 기준으로 Retrofit DTO 작성. §9.3 초안이 시드.
 
