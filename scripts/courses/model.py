@@ -6,9 +6,20 @@
 """
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 
 from .geo import cum_dist, cum_gain, simplify_indices
+
+
+def nfc(s: str) -> str:
+    """한글을 NFC(완성형)로 맞춘다.
+
+    macOS 파일시스템은 파일명을 NFD(분해형)로 돌려준다. 파일명에서 코스 이름을 뽑는
+    `gpx` 어댑터가 그대로 두면 `북한산` 이 `ᄇ ᅮ ᆨ …` 으로 저장돼, API 문자열에서 온
+    두루누비(NFC)와 섞였을 때 검색·정렬·비교가 전부 어긋난다. 눈으로는 구분되지 않는다.
+    """
+    return unicodedata.normalize("NFC", s or "")
 
 # 두루누비 crsLevel 과 같은 척도. 1 하 · 2 중 · 3 상.
 LEVEL_LABEL = {1: "쉬움", 2: "보통", 3: "어려움"}
@@ -121,15 +132,15 @@ def normalize(raw: RawCourse, source: str, tolerance_m: float = 8.0) -> Course:
     return Course(
         id=raw.id,
         source=source,
-        name=raw.name,
-        sido=raw.sido,
-        sigun=raw.sigun,
+        name=nfc(raw.name),
+        sido=nfc(raw.sido),
+        sigun=nfc(raw.sigun),
         dist_km=total_km,
         gain_m=total_gain,
         level=level,
         level_label=LEVEL_LABEL.get(level, "보통"),
-        cycle=raw.cycle,
-        summary=raw.summary,
+        cycle=nfc(raw.cycle),
+        summary=nfc(raw.summary),
         data_source=raw.data_source,
         points=points,
     )
