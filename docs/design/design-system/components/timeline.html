@@ -1,0 +1,122 @@
+<!-- @dsCard group="캘린더 · 동선" name="일자 탭 · 타임라인 · 편집" subtitle="일자 탭(회복일 주황) · 번호 레일 타임라인 · 편집 행" width="400" height="980" -->
+<!-- 출처: reference-web/src/styles/base.css (.daytab .tl-* .edit-row .add-row) · ResultScreen.jsx -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>일자 탭 · 타임라인 · 편집</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-primary-soft:#EEF2FF;--c-orange:#FF6A2B;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-ink-7:#B7B9BE;--c-surface:#fff;--c-fill:#F2F2F0;--c-line:#E4E4E6;--c-line-2:#ECECEE;--cat-wellness-bg:#E6F7EE;--cat-wellness-fg:#1B8A5A;--cat-tour-bg:#EAF1FF;--cat-tour-fg:#2B5CFF;--cat-food-bg:#FFF3CC;--cat-food-fg:#A66A00;--cat-recovery-bg:#FFF1E9;--cat-recovery-fg:#C2410C;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-md:15px;--r-sm:11px;--r-xs:8px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:20px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.daytabs{display:flex;gap:8px;overflow-x:auto}
+.daytab{flex:none;padding:8px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:800;background:var(--c-fill);color:var(--c-ink-2)}
+.daytab.active{background:var(--c-primary);color:#fff}
+.daytab.recovery-day.active{background:var(--c-orange)}
+.tl-daylabel{display:inline-flex;align-items:center;gap:7px;font:800 11px var(--font-num);letter-spacing:1px;color:var(--c-primary);background:var(--c-primary-soft);padding:5px 10px;border-radius:var(--r-xs)}
+.tl-daylabel.recovery{color:var(--cat-recovery-fg);background:var(--cat-recovery-bg)}
+.tl-note{font-size:12px;color:var(--c-ink-4);margin-top:6px}
+.tl-row{display:flex;gap:14px}
+.tl-rail{flex:none;display:flex;flex-direction:column;align-items:center}
+.tl-num{width:26px;height:26px;border-radius:50%;color:#fff;font:800 12px var(--font-num);display:flex;align-items:center;justify-content:center}
+.tl-line{width:2px;flex:1;background:var(--c-line);margin:4px 0;min-height:10px}
+.tl-card{flex:1;padding-bottom:16px}
+.tl-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.tl-title{font-size:15px;font-weight:800}
+.tl-card.active .tl-title{color:var(--c-primary)}
+.tl-row.is-active .tl-num{box-shadow:0 0 0 4px var(--c-primary-soft)}
+.tl-time{font:700 12px var(--font-num);color:var(--c-ink-4);white-space:nowrap}
+.tl-meta{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap}
+.tl-place{font-size:12px;color:var(--c-ink-4)}
+.cat-tag{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap}
+.edit-row{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--c-line-2);border-radius:var(--r-md);margin-bottom:10px;background:var(--c-surface)}
+.edit-row .grip{color:var(--c-ink-7)}
+.edit-row .num{flex:none;width:24px;height:24px;border-radius:50%;color:#fff;font:800 11px var(--font-num);display:flex;align-items:center;justify-content:center}
+.edit-row .info{flex:1;min-width:0}
+.edit-row .info .t{font-size:14px;font-weight:800}
+.edit-row .info .s{font-size:11px;color:var(--c-ink-4)}
+.edit-row .ops{display:flex;gap:7px}
+.opbtn{width:32px;height:32px;border-radius:9px;background:var(--c-fill);display:flex;align-items:center;justify-content:center;color:var(--c-ink-2)}
+.opbtn.del{background:#FDECEC;color:#E5484D}
+.add-row{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:1.5px dashed #C9CBD0;border-radius:var(--r-md);color:var(--c-ink-2);font-size:13px;font-weight:700}
+svg{width:16px;height:16px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="ds-sec">일자 탭 (활성 = 파랑 · 회복일 활성 = 주황)</div>
+<div class="daytabs">
+  <button class="daytab">D-1 · 08.21 금</button>
+  <button class="daytab active">D-DAY · 08.22 토</button>
+  <button class="daytab">D+1 · 08.23 일</button>
+</div>
+<div style="height:8px"></div>
+<div class="daytabs">
+  <button class="daytab">D-DAY · 08.22 토</button>
+  <button class="daytab recovery-day active">D+1 · 08.23 일</button>
+</div>
+
+<div class="ds-sec">일자 라벨 + 노트</div>
+<div style="display:flex;align-items:center;justify-content:space-between">
+  <span class="tl-daylabel">D-DAY · 08.22 토 · D-DAY</span>
+  <button style="font-size:14px;font-weight:800;color:var(--c-primary)">편집</button>
+</div>
+<div style="margin-top:6px"><span class="tl-daylabel recovery">D+1 · 08.23 일 · 회복</span></div>
+<div class="tl-note">내일 완주 · 가볍게 먹고 푹 쉬기</div>
+
+<div class="ds-sec">타임라인 (조회 모드 · 번호 = 카테고리 색)</div>
+<div class="tl-row">
+  <div class="tl-rail"><div class="tl-num" style="background:var(--c-primary)">1</div><div class="tl-line"></div></div>
+  <div class="tl-card">
+    <div class="tl-head"><span class="tl-title">🏁 하프 스타트</span><span class="tl-time">08:00</span></div>
+    <div class="tl-meta"><span class="tl-place">세종중앙공원</span></div>
+  </div>
+</div>
+<div class="tl-row is-active">
+  <div class="tl-rail"><div class="tl-num" style="background:var(--cat-wellness-fg)">2</div><div class="tl-line"></div></div>
+  <div class="tl-card active">
+    <div class="tl-head"><span class="tl-title">온천·회복</span><span class="tl-time">11:00</span></div>
+    <div class="tl-meta"><span class="cat-tag" style="background:var(--cat-wellness-bg);color:var(--cat-wellness-fg)">힐링·웰니스</span><span class="tl-place">세종 스파온천</span></div>
+    <div class="tl-place" style="margin-top:3px">완주 후 근육 이완 · 족욕</div>
+  </div>
+</div>
+<div class="tl-row">
+  <div class="tl-rail"><div class="tl-num" style="background:var(--c-primary)">3</div><div class="tl-line"></div></div>
+  <div class="tl-card">
+    <div class="tl-head"><span class="tl-title">가벼운 관광</span><span class="tl-time">14:30</span></div>
+    <div class="tl-meta"><span class="cat-tag" style="background:var(--cat-tour-bg);color:var(--cat-tour-fg)">관광지</span><span class="tl-place">금강보행교 이응다리</span></div>
+  </div>
+</div>
+<div class="tl-row">
+  <div class="tl-rail"><div class="tl-num" style="background:var(--cat-food-fg)">4</div></div>
+  <div class="tl-card" style="padding-bottom:0">
+    <div class="tl-head"><span class="tl-title">회복 저녁</span><span class="tl-time">18:00</span></div>
+    <div class="tl-meta"><span class="cat-tag" style="background:var(--cat-food-bg);color:var(--cat-food-fg)">맛집</span><span class="tl-place">청벽가든</span></div>
+  </div>
+</div>
+<div class="note">활성 카드 = 번호 링 + 제목 파랑 · 지도 핀·카드 스크롤 양방향 동기화</div>
+
+<div class="ds-sec">편집 모드 행 (드래그 ≡ · ↺ 교체 · ✕ 삭제)</div>
+<div class="edit-row">
+  <span class="grip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg></span>
+  <span class="num" style="background:var(--c-primary)">1</span>
+  <div class="info"><div class="t">🏁 하프 스타트</div><div class="s">08:00 · 세종중앙공원 · 대회</div></div>
+  <div class="ops">
+    <button class="opbtn del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+  </div>
+</div>
+<div class="edit-row">
+  <span class="grip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg></span>
+  <span class="num" style="background:var(--cat-wellness-fg)">2</span>
+  <div class="info"><div class="t">온천·회복</div><div class="s">11:00 · 세종 스파온천 · 힐링·웰니스</div></div>
+  <div class="ops">
+    <button class="opbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+    <button class="opbtn del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+  </div>
+</div>
+<button class="add-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>장소 추가</button>
+<div class="note">대회 블록은 교체(↺) 불가 — 삭제만 · 드래그 중 50% 불투명 · 드롭 대상 = 파랑 점선 보더</div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!-- @dsCard group="캘린더 · 동선" name="바텀시트 (후보 시트)" subtitle="교체·추가 공용 — 카테고리 칩 · 검색 · 후보 리스트" width="400" height="680" -->
+<!-- 출처: reference-web/src/styles/base.css (.sheet .cand) · ResultScreen.jsx CandidateSheet -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>바텀시트 (후보 시트)</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-lime:#C9F23C;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-surface:#fff;--c-fill:#F2F2F0;--c-fill-2:#E9EBEF;--c-line:#E4E4E6;--c-line-4:#F2F2F2;--cat-wellness-bg:#E6F7EE;--cat-wellness-fg:#1B8A5A;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-chip:13px;--r-sm:11px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.stage{position:relative;height:600px;border-radius:18px;overflow:hidden;background:#DFE3E8}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.32)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--c-surface);border-radius:24px 24px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.13);padding:10px 0 20px;display:flex;flex-direction:column;max-height:88%}
+.grab{width:40px;height:5px;border-radius:3px;background:#E3E3E5;margin:0 auto 14px}
+.sheet-title{padding:0 20px 12px;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+.src-badge{display:inline-flex;padding:3px 7px;border-radius:6px;font:700 10px var(--font-num);letter-spacing:.5px;background:var(--cat-wellness-bg);color:var(--cat-wellness-fg)}
+.chip-row{display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px}
+.chip{flex:none;display:inline-flex;align-items:center;padding:8px 13px;border-radius:var(--r-sm);font-size:13px;font-weight:700;border:1.5px solid var(--c-line);color:var(--c-ink-2);background:var(--c-surface);white-space:nowrap}
+.chip.active{background:var(--c-lime);color:var(--c-ink);border-color:var(--c-lime)}
+.sheet-search{margin:0 20px 14px;display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--r-chip);background:var(--c-fill);font-size:13px;color:var(--c-ink-5)}
+.sheet-list{padding:0 20px;overflow-y:auto}
+.cand{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--c-line-4)}
+.cand .thumb{flex:none;width:46px;height:46px;border-radius:11px;background:var(--c-fill-2)}
+.cand .info{flex:1;min-width:0}
+.cand .cname{font-size:14px;font-weight:700}
+.cand .cmeta{font-size:11px;color:var(--c-ink-4)}
+.cand .pick{padding:8px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:700;border:1.5px solid var(--c-line);color:var(--c-ink);background:var(--c-surface)}
+.cand .pick.primary{background:var(--c-ink);color:#fff;border-color:var(--c-ink)}
+svg{width:18px;height:18px;flex:none}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:10px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="sheet-title">관광지 추가 · 인근 <span class="src-badge">LIVE</span></div>
+    <div class="chip-row">
+      <button class="chip active">관광지</button>
+      <button class="chip">맛집</button>
+      <button class="chip">카페</button>
+      <button class="chip">힐링·웰니스</button>
+      <button class="chip">자연·트레킹</button>
+      <button class="chip">역사·문화</button>
+      <button class="chip">숙소</button>
+    </div>
+    <div class="sheet-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/></svg><span>장소 검색 · 카카오 로컬</span></div>
+    <div class="sheet-list">
+      <div class="cand">
+        <div class="thumb"></div>
+        <div class="info"><div class="cname">세종호수공원</div><div class="cmeta">관광지 · 세종 연기면 세종리</div></div>
+        <button class="pick primary">선택</button>
+      </div>
+      <div class="cand">
+        <div class="thumb"></div>
+        <div class="info"><div class="cname">국립세종수목원</div><div class="cmeta">관광지 · 세종 연기면 수목원로 136</div></div>
+        <button class="pick">선택</button>
+      </div>
+      <div class="cand">
+        <div class="thumb"></div>
+        <div class="info"><div class="cname">베어트리파크</div><div class="cmeta">관광지 · 세종 전동면 신송로 217</div></div>
+        <button class="pick">선택</button>
+      </div>
+      <div class="cand" style="border-bottom:none">
+        <div class="thumb"></div>
+        <div class="info"><div class="cname">밀마루전망대</div><div class="cmeta">관광지 · 세종 도움3로 12</div></div>
+        <button class="pick">선택</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note">라운드 24 상단 · 그랩 핸들 · 최대 높이 78~88% · 스크림 32% — 카테고리 칩 줄은 "추가" 모드에서만 노출, "교체" 모드는 타이틀만("관광지 교체 · 인근"). 뒤로가기(back)는 시트 닫기 우선.</div>
+</body>
+</html>

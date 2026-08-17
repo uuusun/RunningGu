@@ -1,0 +1,33 @@
+<!-- @dsCard group="파운데이션" name="타이포그래피" subtitle="Pretendard 본문 · Archivo 숫자" width="720" height="760" -->
+<!-- 출처: reference-web/src/styles/tokens.css · base.css — 런닝구 디자인 시스템 -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>타이포그래피</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-lime:#C9F23C;--c-ink:#15161B;--c-ink-3:#71747C;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-line-3:#F0F0F0;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff;-webkit-font-smoothing:antialiased}
+.row{display:flex;align-items:baseline;gap:18px;padding:12px 0;border-bottom:1px solid var(--c-line-3)}
+.spec{flex:none;width:170px;font:600 11px var(--font-num);color:var(--c-ink-5);letter-spacing:.3px;line-height:1.6}
+.spec b{display:block;font:700 12px var(--font-body);color:var(--c-ink-4);letter-spacing:0}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:14px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="row"><span class="spec"><b>페이지 타이틀</b>26 / 800 / -0.6px</span><span style="font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3">언제<br>다녀올까요?</span></div>
+<div class="row"><span class="spec"><b>히어로 타이틀</b>25 / 800 / -0.5px</span><span style="font-size:25px;font-weight:800;letter-spacing:-.5px">2026 세종 호수공원 마라톤</span></div>
+<div class="row"><span class="spec"><b>D-day 디스플레이</b>Archivo 44 / 800</span><span style="font:800 44px var(--font-num);line-height:.9;color:var(--c-primary)">D-21</span></div>
+<div class="row"><span class="spec"><b>화면 타이틀</b>20 / 800 / -0.5px</span><span style="font-size:20px;font-weight:800;letter-spacing:-.5px">러닝·산책 코스</span></div>
+<div class="row"><span class="spec"><b>대회명 (카드)</b>17 / 800 / -0.3px</span><span style="font-size:17px;font-weight:800;letter-spacing:-.3px">2026 부산 바다 하프마라톤</span></div>
+<div class="row"><span class="spec"><b>섹션 타이틀</b>16 / 800</span><span style="font-size:16px;font-weight:800">대회 기간 인근 축제</span></div>
+<div class="row"><span class="spec"><b>본문·버튼</b>14~16 / 600~800</span><span style="font-size:14px;font-weight:600">건너뛰면 대회장 주변으로 잡아드려요.</span></div>
+<div class="row"><span class="spec"><b>보조 텍스트</b>13 / 400~700 / ink-3</span><span style="font-size:13px;color:var(--c-ink-3)">세종 · 세종중앙공원</span></div>
+<div class="row"><span class="spec"><b>메타</b>12 / 400 / ink-4</span><span style="font-size:12px;color:var(--c-ink-4)">08.20~08.24 · 대회장 0.8km</span></div>
+<div class="row"><span class="spec"><b>캡션·출처</b>11 / 700 / ink-5</span><span style="font-size:11px;font-weight:700;color:var(--c-ink-5)">마라톤GO · 확인 07.15</span></div>
+<div class="row"><span class="spec"><b>필드 라벨</b>13 / 800 / ink-4 / +0.5px</span><span style="font-size:13px;font-weight:800;color:var(--c-ink-4);letter-spacing:.5px">일정 패턴</span></div>
+<div class="row"><span class="spec"><b>eyebrow</b>Archivo 11 / 800 / +1.5px</span><span style="font:800 11px var(--font-num);letter-spacing:1.5px;text-transform:uppercase;color:var(--c-primary)">SEJONG · MARATHON</span></div>
+<div class="row" style="border-bottom:none"><span class="spec"><b>숫자·시간</b>Archivo 700</span><span style="font:700 15px var(--font-num);letter-spacing:.5px">08:00 · 26 · D+1 · 5.0km</span></div>
+<div class="note">본문 = Pretendard(시스템 산세리프 폴백) · 숫자/영문 라벨/날짜 컬럼 = Archivo 컨덴스드 톤.<br>제목은 800 웨이트 + 음수 자간, 메타는 ink-4~5로 위계를 만든다.</div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!-- @dsCard group="컨트롤 · 입력" name="인풋 · 슬라이더" subtitle="검색 인풋 · 출발지 검색 · 목표 거리 슬라이더" width="400" height="520" -->
+<!-- 출처: reference-web/src/styles/base.css (.sheet-search) · CoursesScreen.jsx -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>인풋 · 슬라이더</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-5:#9A9CA2;--c-ink-6:#AEB0B6;--c-surface:#fff;--c-fill:#F2F2F0;--c-line:#E4E4E6;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-chip:13px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.search{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--r-chip);background:var(--c-fill)}
+.search input{border:none;outline:none;background:transparent;flex:1;min-width:0;font-size:14px;color:var(--c-ink);font-family:inherit}
+.search input::placeholder{color:var(--c-ink-5)}
+.search .go{flex:none;padding:6px 14px;border-radius:11px;border:1.5px solid var(--c-ink);font-size:13px;font-weight:700;color:var(--c-ink);background:var(--c-surface)}
+.search svg{flex:none;width:18px;height:18px;color:var(--c-ink-5)}
+.slider-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.slider-head .q{font-size:12px;color:var(--c-ink-5)}
+.slider-head .v{font-size:15px;font-weight:800;color:var(--c-primary)}
+input[type=range]{width:100%;accent-color:var(--c-primary)}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--c-ink-6);margin-top:2px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="ds-sec">검색 인풋 (필드형 · fill 배경)</div>
+<label class="search">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/></svg>
+  <input placeholder="대회·지역 검색">
+</label>
+<div style="height:10px"></div>
+<label class="search">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/></svg>
+  <input placeholder="숙소 검색 · 카카오 로컬">
+</label>
+<div class="note">placeholder에 데이터 출처를 함께 표기 ("· 카카오 로컬")</div>
+
+<div class="ds-sec">출발지 검색 (인풋 + 검색 버튼)</div>
+<label class="search" style="padding-right:10px">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16" y2="16"/></svg>
+  <input placeholder="출발지 검색 (예: 경주역, 해운대)">
+  <button class="go">검색</button>
+</label>
+
+<div class="ds-sec">목표 거리 슬라이더 (1~21km · 0.5 단위)</div>
+<div class="slider-head"><span class="q">몇 km 뛸까요</span><span class="v">5km</span></div>
+<input type="range" min="1" max="21" step="0.5" value="5">
+<div class="scale"><span>1km</span><span>21km (풀코스 하프)</span></div>
+<div class="note">현재 값은 우측 상단 primary 800 — 값 변경 시 즉시 경로 재계산</div>
+</body>
+</html>

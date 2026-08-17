@@ -1,0 +1,52 @@
+<!-- @dsCard group="파운데이션" name="셰이프 · 그림자 · 간격" subtitle="라운드 스케일 · 그림자 4종 · 좌우 22px · CTA 56px" width="720" height="620" -->
+<!-- 출처: reference-web/src/styles/tokens.css — 런닝구 디자인 시스템 -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>셰이프 · 그림자 · 간격</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-ink:#15161B;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-fill:#F2F2F0;--c-line:#E4E4E6;--c-line-3:#F0F0F0;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.rrow{display:flex;gap:14px;align-items:flex-end}
+.r{width:86px;height:64px;background:var(--c-fill);border:1.5px solid var(--c-line);display:flex;align-items:center;justify-content:center;font:700 11px var(--font-num);color:var(--c-ink-4)}
+.srow{display:flex;gap:18px}
+.s{width:150px;height:74px;border-radius:16px;background:#fff;display:flex;align-items:center;justify-content:center;font:700 11px var(--font-num);color:var(--c-ink-4)}
+.lbl{font-size:11px;color:var(--c-ink-5);margin-top:6px;text-align:center}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:10px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="ds-sec">라운드</div>
+<div class="rrow">
+  <div><div class="r" style="border-radius:20px">20</div><div class="lbl">card</div></div>
+  <div><div class="r" style="border-radius:16px">16</div><div class="lbl">btn·인포박스</div></div>
+  <div><div class="r" style="border-radius:15px">15</div><div class="lbl">md·편집 행</div></div>
+  <div><div class="r" style="border-radius:13px">13</div><div class="lbl">chip·인풋</div></div>
+  <div><div class="r" style="border-radius:11px">11</div><div class="lbl">sm·필터 칩</div></div>
+  <div><div class="r" style="border-radius:8px">8</div><div class="lbl">xs·일자 라벨</div></div>
+</div>
+<div class="note">폰 프레임 30px · 바텀시트 상단 24px · 태그류 6~7px</div>
+
+<div class="ds-sec">그림자</div>
+<div class="srow">
+  <div><div class="s" style="box-shadow:0 2px 8px rgba(0,0,0,.16)">float</div><div class="lbl">지도 위 버튼·범례</div></div>
+  <div><div class="s" style="box-shadow:0 2px 5px rgba(0,0,0,.25)">pin</div><div class="lbl">지도 핀</div></div>
+  <div><div class="s" style="box-shadow:0 -8px 30px rgba(0,0,0,.13)">sheet</div><div class="lbl">바텀시트</div></div>
+  <div><div class="s" style="box-shadow:0 10px 34px rgba(0,0,0,.13)">phone</div><div class="lbl">폰 프레임(목업)</div></div>
+</div>
+
+<div class="ds-sec">간격 · 크기</div>
+<div style="border:1px dashed var(--c-line);border-radius:14px;overflow:hidden">
+  <div style="display:flex;align-items:stretch;height:44px">
+    <div style="width:22px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;font:700 9px var(--font-num);color:var(--c-primary)">22</div>
+    <div style="flex:1;display:flex;align-items:center;padding:0 12px;font-size:12px;color:var(--c-ink-4)">콘텐츠 — 화면 좌우 패딩 22px (pad-x)</div>
+    <div style="width:22px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;font:700 9px var(--font-num);color:var(--c-primary)">22</div>
+  </div>
+</div>
+<div style="margin-top:12px;height:56px;border-radius:16px;background:var(--c-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800">주요 CTA 높이 56px</div>
+<div class="note">카드 사이 간격 10~12px · 섹션 상단 여백 28px · 탭바 높이 76px · 지도 기본 높이 230~300px</div>
+</body>
+</html>

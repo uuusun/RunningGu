@@ -1,0 +1,70 @@
+<!-- @dsCard group="캘린더 · 동선" name="지도 요소" subtitle="번호 핀 · 폴리라인 · 범례 · 오버레이 버튼" width="400" height="620" -->
+<!-- 출처: reference-web/src/styles/base.css (.mapwrap .pin .map-legend) · MapView.jsx — 앱은 카카오맵 SDK, 목업은 플레이스홀더 -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>지도 요소</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-orange:#FF6A2B;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-5:#9A9CA2;--c-surface:#fff;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--sh-float:0 2px 8px rgba(0,0,0,.16);--sh-pin:0 2px 5px rgba(0,0,0,.25)}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:20px 0 10px}
+.ds-sec:first-child{margin-top:0}
+.mapwrap{position:relative;height:250px;border-radius:16px;background:#E7EDE9;overflow:hidden}
+.pin{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;border:2.5px solid #fff;box-shadow:var(--sh-pin);display:flex;align-items:center;justify-content:center;color:#fff;font:800 13px var(--font-num)}
+.pin.active{transform:translate(-50%,-50%) scale(1.25);z-index:3}
+.map-legend{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;background:rgba(255,255,255,.92);border-radius:10px;padding:6px 9px;box-shadow:var(--sh-float)}
+.map-legend .lg{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--c-ink-2)}
+.map-legend .sw{width:9px;height:9px;border-radius:50%}
+.ov-tl{position:absolute;top:14px;left:14px}
+.ov-tr{position:absolute;top:14px;right:14px}
+.iconbtn-float{width:40px;height:40px;border-radius:13px;background:var(--c-surface);box-shadow:var(--sh-float);display:inline-flex;align-items:center;justify-content:center;color:var(--c-ink)}
+.row{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:11px;color:var(--c-ink-5);margin-top:6px;text-align:center}
+svg.ic{width:22px;height:22px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="ds-sec">동선 지도 (활성 일자 핀 + 폴리라인)</div>
+<div class="mapwrap">
+  <svg width="100%" height="100%" viewBox="0 0 360 250" preserveAspectRatio="none" style="position:absolute;inset:0">
+    <path d="M-10 60 C60 40 120 90 200 70 S330 30 370 55" stroke="#fff" stroke-width="7" fill="none" opacity=".8"/>
+    <path d="M40 -10 C60 60 30 140 70 260" stroke="#fff" stroke-width="5" fill="none" opacity=".7"/>
+    <path d="M-10 170 C100 150 220 200 370 165" stroke="#fff" stroke-width="9" fill="none" opacity=".8"/>
+    <path d="M250 -10 C230 80 280 160 250 260" stroke="#fff" stroke-width="5" fill="none" opacity=".7"/>
+    <ellipse cx="315" cy="215" rx="70" ry="34" fill="#CFE0DC" opacity=".9"/>
+    <path d="M70 185 L150 95 L235 140 L300 78" stroke="#2B5CFF" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <span class="pin" style="left:19.5%;top:74%;background:var(--c-primary)">1</span>
+  <span class="pin active" style="left:41.5%;top:38%;background:var(--c-primary)">2</span>
+  <span class="pin" style="left:65%;top:56%;background:var(--c-primary)">3</span>
+  <span class="pin" style="left:83%;top:31%;background:var(--c-primary)">4</span>
+  <div class="ov-tl"><button class="iconbtn-float"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"/></svg></button></div>
+  <div class="ov-tr"><button class="iconbtn-float"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8" y1="11" x2="16" y2="6.5"/><line x1="8" y1="13" x2="16" y2="17.5"/></svg></button></div>
+  <div class="map-legend">
+    <span class="lg"><span class="sw" style="background:var(--c-primary)"></span>동선</span>
+    <span class="lg"><span class="sw" style="background:var(--c-orange)"></span>회복일</span>
+  </div>
+</div>
+<div class="note">좌표 있는 블록만 방문 순서 번호 핀 + 폴리라인 · 활성 핀 1.25배 확대 · 회복일은 주황 액센트 · 핀 탭 ↔ 카드 스크롤 동기화 · 카메라는 구성 변경 시 전체 bounds</div>
+
+<div class="ds-sec">핀 상태</div>
+<div class="row">
+  <div><span class="pin" style="position:static;transform:none;display:flex;background:var(--c-primary)">1</span><div class="lbl">기본</div></div>
+  <div><span class="pin" style="position:static;transform:scale(1.25);display:flex;background:var(--c-primary)">2</span><div class="lbl">활성 ×1.25</div></div>
+  <div><span class="pin" style="position:static;transform:none;display:flex;background:var(--c-orange)">3</span><div class="lbl">회복일</div></div>
+  <div><span class="pin" style="position:static;transform:none;display:flex;background:var(--c-primary)">1</span><div class="lbl">걷기 스팟(리스트 번호 일치)</div></div>
+</div>
+
+<div class="ds-sec">경로 폴리라인</div>
+<svg width="100%" height="34" viewBox="0 0 360 34">
+  <path d="M6 24 C80 6 150 30 230 12 S330 20 354 10" stroke="#2B5CFF" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>
+<svg width="100%" height="34" viewBox="0 0 360 34">
+  <path d="M6 24 C80 6 150 30 230 12 S330 20 354 10" stroke="#FF6A2B" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>
+<div class="note">동선 = 파랑 · 회복일 = 주황 · 러닝코스 왕복 경로는 핀 없이 폴리라인 단독. 걷기 스팟 핀은 선으로 잇지 않음. 지도 SDK 실패 시 지도 영역만 안내 문구로 대체(리스트·기능 유지)</div>
+</body>
+</html>

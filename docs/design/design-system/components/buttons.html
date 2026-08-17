@@ -1,0 +1,54 @@
+<!-- @dsCard group="컨트롤 · 입력" name="버튼" subtitle="CTA 바 · 상태 · 보조 버튼" width="400" height="720" -->
+<!-- 출처: reference-web/src/styles/base.css (.btn .cta-bar .iconbtn-float) -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>버튼</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-5:#9A9CA2;--c-surface:#fff;--c-line:#E4E4E6;--c-line-4:#F2F2F2;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-btn:16px;--sh-float:0 2px 8px rgba(0,0,0,.16);--cta-h:56px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.btn{height:var(--cta-h);border-radius:var(--r-btn);display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:800}
+.btn-primary{flex:1;background:var(--c-primary);color:#fff}
+.btn-primary:disabled{opacity:.4;pointer-events:none}
+.btn-ghost{flex:none;width:56px;border:1.5px solid var(--c-line);color:var(--c-ink);background:var(--c-surface)}
+.btn-block{width:100%}
+.cta-bar{padding:14px 0 4px;border-top:1px solid var(--c-line-4);display:flex;gap:10px}
+.iconbtn-float{width:40px;height:40px;border-radius:13px;background:var(--c-surface);box-shadow:var(--sh-float);display:inline-flex;align-items:center;justify-content:center;color:var(--c-ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:11px;font-size:13px;font-weight:700;border:1.5px solid var(--c-line);color:var(--c-ink-2);background:var(--c-surface)}
+.chip.outline-ink{border-color:var(--c-ink);color:var(--c-ink)}
+.e-link{color:var(--c-primary);font-weight:700;font-size:13px}
+.txtbtn{font-size:14px;font-weight:800;color:var(--c-primary)}
+svg{width:22px;height:22px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="ds-sec">CTA 바 (하단 고정 · 보조 + 주 버튼)</div>
+<div class="cta-bar">
+  <button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8l6 6"/><path d="M14 4v6h6"/><path d="M18 14v6M15 17h6"/></svg></button>
+  <button class="btn btn-primary">이 동선 저장하기</button>
+</div>
+
+<div class="ds-sec">주 버튼 상태</div>
+<button class="btn btn-primary btn-block">이 대회로 동선 만들기</button>
+<div style="height:10px"></div>
+<button class="btn btn-primary btn-block" disabled>다음</button>
+<div class="note">비활성 = 40% 불투명 (취향 0개 · 필수 미동의 등)</div>
+<div style="height:10px"></div>
+<button class="btn btn-primary btn-block" disabled>동선 짜는 중…</button>
+<div class="note">로딩 = 진행 문구로 교체 + 비활성 (중복 실행 방지)</div>
+
+<div class="ds-sec">보조 버튼</div>
+<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+  <button class="iconbtn-float"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"/></svg></button>
+  <button class="chip outline-ink">검색</button>
+  <button class="txtbtn">편집</button>
+  <button class="e-link">필터 초기화</button>
+</div>
+<div class="note">플로트 아이콘 버튼 = 지도 위 뒤로/공유 · 텍스트 버튼 = 편집 토글 · e-link = 빈 상태 복구 액션</div>
+</body>
+</html>

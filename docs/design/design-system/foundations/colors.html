@@ -1,0 +1,79 @@
+<!-- @dsCard group="파운데이션" name="컬러" subtitle="브랜드 · 잉크 · 표면 · 카테고리 · 상태" width="720" height="980" -->
+<!-- 출처: reference-web/src/styles/tokens.css — 런닝구 디자인 시스템 "활기찬 스포티" -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>컬러</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-primary-ink:#1E40D8;--c-primary-soft:#EEF2FF;--c-primary-soft2:#F6F8FF;--c-lime:#C9F23C;--c-orange:#FF6A2B;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-3:#71747C;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-ink-6:#AEB0B6;--c-ink-7:#B7B9BE;--c-surface:#fff;--c-page:#e7e5df;--c-fill:#F2F2F0;--c-fill-2:#E9EBEF;--c-line:#E4E4E6;--c-line-2:#ECECEE;--c-line-3:#F0F0F0;--c-line-4:#F2F2F2;--cat-food-bg:#FFF3CC;--cat-food-fg:#A66A00;--cat-tour-bg:#EAF1FF;--cat-tour-fg:#2B5CFF;--cat-cafe-bg:#F1E9FF;--cat-cafe-fg:#7A4FD0;--cat-wellness-bg:#E6F7EE;--cat-wellness-fg:#1B8A5A;--cat-nature-bg:#F0FAD8;--cat-nature-fg:#5A8A0A;--cat-history-bg:#EFEAFE;--cat-history-fg:#6B4FBB;--cat-lodging-bg:#EAEFF5;--cat-lodging-fg:#3E5573;--cat-race-bg:#EEF2FF;--cat-race-fg:#2B5CFF;--cat-recovery-bg:#FFF1E9;--cat-recovery-fg:#C2410C;--cat-recovery-border:#FFD9C2;--chip-open-bg:#C9F23C;--chip-open-fg:#15161B;--chip-closed-bg:#EFEFEF;--chip-closed-fg:#9A9CA2;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:var(--c-surface);-webkit-font-smoothing:antialiased}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.grid.g4{grid-template-columns:repeat(4,1fr)}
+.sw{border:1px solid var(--c-line-3);border-radius:12px;overflow:hidden}
+.sw .box{height:52px}
+.sw .meta{padding:7px 9px}
+.sw .nm{font-size:11px;font-weight:700}
+.sw .hx{font:600 10px var(--font-num);color:var(--c-ink-5);letter-spacing:.3px}
+.cat{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--c-line-3);border-radius:12px;padding:10px 12px}
+.cat-tag{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap}
+.cat .hx{font:600 10px var(--font-num);color:var(--c-ink-5);text-align:right;line-height:1.5}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="ds-sec">브랜드</div>
+<div class="grid">
+  <div class="sw"><div class="box" style="background:#2B5CFF"></div><div class="meta"><div class="nm">primary</div><div class="hx">#2B5CFF</div></div></div>
+  <div class="sw"><div class="box" style="background:#1E40D8"></div><div class="meta"><div class="nm">primary-ink</div><div class="hx">#1E40D8</div></div></div>
+  <div class="sw"><div class="box" style="background:#EEF2FF"></div><div class="meta"><div class="nm">primary-soft</div><div class="hx">#EEF2FF</div></div></div>
+  <div class="sw"><div class="box" style="background:#F6F8FF"></div><div class="meta"><div class="nm">primary-soft2</div><div class="hx">#F6F8FF</div></div></div>
+  <div class="sw"><div class="box" style="background:#C9F23C"></div><div class="meta"><div class="nm">lime</div><div class="hx">#C9F23C</div></div></div>
+  <div class="sw"><div class="box" style="background:#FF6A2B"></div><div class="meta"><div class="nm">orange</div><div class="hx">#FF6A2B</div></div></div>
+</div>
+<div class="note">블루 = 주 액션·링크·활성 / 라임 = 러닝 에너지·접수중·로고 / 오렌지 = 회복 모드·찜 하트</div>
+
+<div class="ds-sec">잉크(텍스트)</div>
+<div class="grid">
+  <div class="sw"><div class="box" style="background:#15161B"></div><div class="meta"><div class="nm">ink</div><div class="hx">#15161B</div></div></div>
+  <div class="sw"><div class="box" style="background:#54565E"></div><div class="meta"><div class="nm">ink-2</div><div class="hx">#54565E</div></div></div>
+  <div class="sw"><div class="box" style="background:#71747C"></div><div class="meta"><div class="nm">ink-3</div><div class="hx">#71747C</div></div></div>
+  <div class="sw"><div class="box" style="background:#86878E"></div><div class="meta"><div class="nm">ink-4</div><div class="hx">#86878E</div></div></div>
+  <div class="sw"><div class="box" style="background:#9A9CA2"></div><div class="meta"><div class="nm">ink-5</div><div class="hx">#9A9CA2</div></div></div>
+  <div class="sw"><div class="box" style="background:#B7B9BE"></div><div class="meta"><div class="nm">ink-6·7</div><div class="hx">#AEB0B6·#B7B9BE</div></div></div>
+</div>
+
+<div class="ds-sec">표면 · 라인</div>
+<div class="grid">
+  <div class="sw"><div class="box" style="background:#fff;border-bottom:1px solid #F0F0F0"></div><div class="meta"><div class="nm">surface</div><div class="hx">#FFFFFF</div></div></div>
+  <div class="sw"><div class="box" style="background:#e7e5df"></div><div class="meta"><div class="nm">page</div><div class="hx">#E7E5DF</div></div></div>
+  <div class="sw"><div class="box" style="background:#F2F2F0"></div><div class="meta"><div class="nm">fill</div><div class="hx">#F2F2F0</div></div></div>
+  <div class="sw"><div class="box" style="background:#E9EBEF"></div><div class="meta"><div class="nm">fill-2</div><div class="hx">#E9EBEF</div></div></div>
+  <div class="sw"><div class="box" style="background:#E4E4E6"></div><div class="meta"><div class="nm">line</div><div class="hx">#E4E4E6</div></div></div>
+  <div class="sw"><div class="box" style="background:#ECECEE"></div><div class="meta"><div class="nm">line-2~4</div><div class="hx">#ECECEE~#F2F2F2</div></div></div>
+</div>
+
+<div class="ds-sec">카테고리 (배경 + 글자 — 색과 텍스트 병행: 접근성)</div>
+<div class="grid g4" style="gap:8px">
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-tour-bg);color:var(--cat-tour-fg)">관광지</span><span class="hx">#EAF1FF<br>#2B5CFF</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-food-bg);color:var(--cat-food-fg)">맛집</span><span class="hx">#FFF3CC<br>#A66A00</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-cafe-bg);color:var(--cat-cafe-fg)">카페</span><span class="hx">#F1E9FF<br>#7A4FD0</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-wellness-bg);color:var(--cat-wellness-fg)">힐링·웰니스</span><span class="hx">#E6F7EE<br>#1B8A5A</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-nature-bg);color:var(--cat-nature-fg)">자연·트레킹</span><span class="hx">#F0FAD8<br>#5A8A0A</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-history-bg);color:var(--cat-history-fg)">역사·문화</span><span class="hx">#EFEAFE<br>#6B4FBB</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-lodging-bg);color:var(--cat-lodging-fg)">숙소</span><span class="hx">#EAEFF5<br>#3E5573</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-race-bg);color:var(--cat-race-fg)">대회</span><span class="hx">#EEF2FF<br>#2B5CFF</span></div>
+  <div class="cat"><span class="cat-tag" style="background:var(--cat-recovery-bg);color:var(--cat-recovery-fg)">회복</span><span class="hx">#FFF1E9<br>#C2410C</span></div>
+</div>
+<div class="note">회복 전용 보조색: border #FFD9C2 · 본문 #7C4A2E</div>
+
+<div class="ds-sec">접수 상태</div>
+<div style="display:flex;gap:10px">
+  <span class="cat-tag" style="background:var(--chip-open-bg);color:var(--chip-open-fg);font-weight:800;padding:4px 9px">접수중</span>
+  <span class="cat-tag" style="background:var(--chip-closed-bg);color:var(--chip-closed-fg);font-weight:800;padding:4px 9px">마감</span>
+</div>
+<div class="note">접수중 = 라임 #C9F23C / #15161B · 마감 = #EFEFEF / #9A9CA2 · 마감 대회 카드는 전체 72% 불투명도</div>
+</body>
+</html>

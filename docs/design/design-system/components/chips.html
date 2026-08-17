@@ -1,0 +1,80 @@
+<!-- @dsCard group="컨트롤 · 입력" name="칩 · 세그먼트 · 토글" subtitle="필터 칩 · 테마 칩 · 종목/패턴 세그먼트 · 뷰 토글" width="400" height="880" -->
+<!-- 출처: reference-web/src/styles/base.css (.chip .tchip .seg .toggle) -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>칩 · 세그먼트 · 토글</title>
+<style>
+:root{--c-primary:#2B5CFF;--c-lime:#C9F23C;--c-ink:#15161B;--c-ink-2:#54565E;--c-ink-4:#86878E;--c-ink-5:#9A9CA2;--c-surface:#fff;--c-fill:#F2F2F0;--c-line:#E4E4E6;--font-body:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;--font-num:'Archivo','Pretendard Variable',Pretendard,sans-serif;--r-chip:13px;--r-sm:11px}
+*{box-sizing:border-box}body{margin:0;padding:20px;font-family:var(--font-body);color:var(--c-ink);background:#fff}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.ds-sec{font:800 11px var(--font-num);letter-spacing:1.2px;text-transform:uppercase;color:var(--c-ink-5);margin:22px 0 12px}
+.ds-sec:first-child{margin-top:0}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:var(--r-sm);font-size:13px;font-weight:700;border:1.5px solid var(--c-line);color:var(--c-ink-2);background:var(--c-surface);white-space:nowrap}
+.chip.active{background:var(--c-lime);color:var(--c-ink);border-color:var(--c-lime)}
+.chip.outline-ink{border-color:var(--c-ink);color:var(--c-ink)}
+.chip .x{opacity:.5}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap}
+.tchip{display:inline-flex;align-items:center;gap:7px;padding:12px 16px;border-radius:var(--r-chip);font-size:14px;font-weight:800;border:1.5px solid var(--c-line);color:var(--c-ink-2);background:var(--c-surface)}
+.tchip.active{background:var(--c-lime);color:var(--c-ink);border-color:var(--c-lime)}
+.tchip .dot{width:7px;height:7px;border-radius:50%;background:var(--c-ink);opacity:0}
+.tchip.active .dot{opacity:1}
+.seg{display:flex;gap:8px}
+.seg .opt{flex:1;text-align:center;padding:14px 0;border-radius:var(--r-chip);border:1.5px solid var(--c-line);font-size:14px;font-weight:700;color:var(--c-ink-2);background:var(--c-surface)}
+.seg .opt.active{background:var(--c-ink);color:#fff;border-color:var(--c-ink)}
+.seg .opt .sub{display:block;font-size:11px;font-weight:600;opacity:.7;margin-top:2px}
+.toggle{display:flex;background:var(--c-fill);border-radius:var(--r-chip);padding:4px}
+.toggle .opt{flex:1;text-align:center;padding:9px 0;border-radius:10px;font-size:14px;font-weight:600;color:var(--c-ink-4)}
+.toggle .opt.active{background:#fff;font-weight:700;color:var(--c-ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+svg{width:14px;height:14px}
+.note{font-size:11px;color:var(--c-ink-5);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="ds-sec">필터 칩 (복수 선택 · 활성 = 라임)</div>
+<div class="chip-row">
+  <button class="chip">접수 가능만</button>
+  <button class="chip active">하프 <span class="x">✕</span></button>
+  <button class="chip active">세종 <span class="x">✕</span></button>
+  <button class="chip">10K</button>
+  <button class="chip outline-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.4"/><circle cx="18" cy="17" r="2.4"/><path d="M6 9.4v3.6a3 3 0 0 0 3 3h6"/></svg>내 위치</button>
+</div>
+<div class="note">활성 칩엔 ✕(50% 불투명) — 탭으로 개별 해제 · outline-ink = 액션형 칩</div>
+
+<div class="ds-sec">테마 칩 (여행 취향 · 도트 + 라임)</div>
+<div class="chip-row" style="gap:9px">
+  <button class="tchip active"><span class="dot"></span>관광지</button>
+  <button class="tchip active"><span class="dot"></span>맛집</button>
+  <button class="tchip"><span class="dot"></span>카페</button>
+  <button class="tchip"><span class="dot"></span>힐링·웰니스</button>
+  <button class="tchip"><span class="dot"></span>자연·트레킹</button>
+  <button class="tchip"><span class="dot"></span>역사·문화</button>
+</div>
+
+<div class="ds-sec">종목 세그먼트 (단일 선택 · 활성 = 잉크)</div>
+<div class="seg">
+  <button class="opt">5K</button>
+  <button class="opt">10K</button>
+  <button class="opt active">하프</button>
+  <button class="opt">풀</button>
+</div>
+
+<div class="ds-sec">패턴 세그먼트 (서브 텍스트 포함)</div>
+<div class="seg">
+  <button class="opt active">전후로<span class="sub">2박3일</span></button>
+  <button class="opt">당일치기<span class="sub">대회 당일</span></button>
+</div>
+
+<div class="ds-sec">뷰 토글 (트랙형 · 단일 선택)</div>
+<div class="toggle">
+  <button class="opt active">리스트</button>
+  <button class="opt">캘린더</button>
+</div>
+<div style="height:10px"></div>
+<div class="toggle">
+  <button class="opt active">내 주변</button>
+  <button class="opt">지역별</button>
+</div>
+</body>
+</html>
