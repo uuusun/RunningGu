@@ -298,7 +298,7 @@ root
 - **숙소 = 카카오 로컬 API** 🆕회의: **AD5(숙박)** 카테고리, 대회장 중심 최대 8건 거리순 — 백엔드 POI API 경유 🔒확정 + KTO 32 서버 폴백(§8.1) + 소스 배지.
 - 검색 인풋 "숙소 검색 · 카카오 로컬" — 최초에는 대회장 주변 추천 8건을 조회한다. 검색어가 2자 이상이면 입력 후 **500ms debounce**로 같은 서버 POI API의 `query` 검색을 호출한다.
 - 항목: 썸네일 · 숙소명 · "{주소} · {설명}" · [선택](재선택 교체).
-- CTA: 선택 "이 숙소로 동선 추천받기" / 미선택 "숙소 없이 추천받기" / 생성 중 "동선 짜는 중…"+비활성 → 엔진(§5.6) 실행 → Content면 S7 첫 일자 활성, 정상 0건이면 S7 Empty, 네트워크·timeout·4xx/5xx면 S7 Error.
+- CTA: 선택 "이 숙소로 동선 추천받기" / 미선택 "숙소 없이 추천받기" / 생성 중 "동선 짜는 중…"+비활성 → `POST /api/itineraries/generate` 1회 호출로 서버 엔진(§5.6) 실행 → Content면 S7 첫 일자 활성, 정상 0건이면 S7 Empty, 네트워크·timeout·4xx/5xx면 S7 Error.
 
 ### 4.10 S7 추천 동선 결과
 
@@ -401,9 +401,11 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 크롤 스냅샷은 stale — **오늘(Asia/Seoul) 기준 재계산**: `regEnd < 오늘 → 마감` / `오늘 < regStart → 접수전` / 그 사이 → 접수중 / 정보 없으면 원본 값(없으면 '미정').
 
-### 5.6 동선 생성 엔진 `buildItinerary` — v2 확정판 (산책 블록 제거 🆕회의)
+### 5.6 서버 동선 생성 엔진 `buildItinerary` — v2 확정판 (산책 블록 제거 🆕회의)
 
-입력 `{race, stay, event, themes, start, end}` → `{days, sources, recovery}`. **UI·지도 비의존 순수 모듈** (suspend 함수 🔧정책).
+**P0 운영 실행 주체는 백엔드 하나뿐이다** 🔒확정(결정-41). 앱은 대회·숙소·종목·취향·기간을 `POST /api/itineraries/generate`로 보내고, 서버가 KTO·카카오 POI 조회·캐시·폴백과 아래 조립 규칙을 한 요청에서 수행한다. 앱은 응답 DTO를 표시하고 저장 전 USER 블록만 로컬 편집하며, 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않는다.
+
+입력 `{race, stay, event, themes, start, end}` → `{days, sources, recovery}`. 서버 구현은 HTTP·DB·외부 API 어댑터와 분리된 **순수 규칙 모듈**로 두고 단위 테스트한다.
 
 1. 회복 룰 결정(§5.1).
 2. 카테고리 풀: `{food, tour} ∪ themes` — **noHard면 wellness, 아니면 cafe 추가.**
@@ -665,11 +667,11 @@ app/src/main/java/com/runninggu/app/
 ├── ui/          # Compose 화면 + 화면별 ViewModel(StateFlow<UiState>)
 │   ├── auth/ home/ calendar/ course/ my/ wizard/
 │   └── (공통: 지도 래퍼 §3-8 · 스낵바 · 배지 · 카드)
-├── domain/      # §5 전체 — 순수 Kotlin (Android 의존 금지): ItineraryEngine ·
-│                #   CourseBuilder · RaceNormalizer · Recovery/Cats/Patterns 상수 · 편집 연산
+├── domain/      # 앱에서 실행하는 §5 순수 Kotlin: CourseBuilder · RaceNormalizer ·
+│                #   Recovery/Cats/Patterns 상수 · 저장 전 편집 연산 (동선 생성 엔진은 서버 §5.6)
 ├── data/
 │   ├── remote/  # Retrofit: RunningguApi(자체 백엔드 단일 창구 — 인증·마이
-│   │            #   ·POI/축제/지오코딩/이동시간 조회) · DTO→도메인 매퍼(좌표 변환은 여기서만)
+│   │            #   ·동선 생성/POI/축제/지오코딩/이동시간 조회) · DTO→도메인 매퍼(좌표 변환은 여기서만)
 │   │            #   ※ KTO·카카오 REST 직호출 없음 🔒확정 — 키가 앱에 없다
 │   ├── local/   # assets 초기/GPX 폴백 · Room 읽기 캐시·GPS 임시기록 · DataStore(세션)
 │   └── model/   # 계약 데이터 클래스 (§6)
@@ -687,7 +689,7 @@ app/src/main/java/com/runninggu/app/
 - 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(Access JWT + Refresh JWT, HS256, 액세스 30분·리프레시 14일, 회전 발급·DB 해시 저장 🔒확정).
 - 테스트: JUnit 5 + Testcontainers(PostgreSQL 통합 테스트) 🔒확정.
 - 외부 API TTL 캐시는 단일 서버 MVP에서 Spring Cache + Caffeine을 사용하고 Redis는 사용하지 않는다 🔒확정.
-- 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ P0 마이(동선·저장 코스)·찜 SSOT, P1 러닝 기록 ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타 동기화+GPX 결합. 프록시에는 서버 캐싱·레이트리밋을 둔다.
+- 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ **P0 동선 생성 규칙 엔진** + 마이(동선·저장 코스)·찜 SSOT, P1 러닝 기록 ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타 동기화+GPX 결합. 프록시에는 서버 캐싱·레이트리밋을 둔다.
 - **API 계약은 springdoc-openapi로 확정** 🔒확정(결정-18) — 컨트롤러 코드에서 Swagger UI 자동 생성, 앱 팀은 그 문서 기준으로 Retrofit DTO 작성. §9.3 초안이 시드.
 
 ### 9.3 서버 API 초안 🔧정책 (springdoc-openapi로 문서화 🔒확정)
@@ -696,7 +698,8 @@ app/src/main/java/com/runninggu/app/
 |---|---|
 | 인증 | `POST /auth/signup` · `/auth/email/send-code` · `/auth/email/verify` · `/auth/login` · `/auth/password/reset-request` · `/auth/password/reset` · `/auth/kakao`(SDK 토큰 검증→세션 발급) |
 | 회원 | `GET/PATCH /me` · `PATCH /me/agreements` · `PUT /me/password` · `GET/POST/DELETE /me/identities/**` · `DELETE /me` |
-| 마이·찜 | `/itineraries` · `/me/courses` · `/me/favorites` — 서버 SSOT, Room은 읽기 캐시. `/runs`는 P1 |
+| 동선 | `POST /itineraries/generate` — 게스트 허용·무상태 서버 생성 🔒(결정-41) · 저장/조회/편집 `/itineraries/**`는 인증 필요 |
+| 마이·찜 | `/me/courses` · `/me/favorites` — 서버 SSOT, Room은 읽기 캐시. `/runs`는 P1 |
 | 대회 | `GET /contests` · `/daily-counts` · `/closing-soon` · `/{id}` — canonical 조회 전용, 관리자/배치만 갱신 |
 | 코스 | `GET /courses/near`(두루누비 메타+GPX 경로와 카카오 걷기 스팟 통합) · `/courses` · `/courses/regions` |
 | **외부 API 프록시** 🔒확정 | `GET /pois?category=&lat=&lng=&radius=`(숙소 AD5 포함) · `GET /contests/{id}/festivals` · `GET /festivals` · `GET /geocode?query=` — 서버 캐싱 🔧정책. 카카오 걷기 스팟 조회는 `/courses/near`의 서버 내부 소스이며 독립 앱 API로 노출하지 않는다 |
@@ -774,17 +777,17 @@ app/src/main/java/com/runninggu/app/
 | AP-01 | Android Studio 프로젝트 생성 — 패키지 `com.runninggu.app`, JDK 21, BuildConfig 키 주입(local.properties), **minSdk 26** 🔒확정(결정-17) | README·§9.4 |
 | AP-02 | 카카오 콘솔 Android 플랫폼 등록 (패키지명+디버그/릴리스 키 해시) + 네이티브 앱 키 발급 | §7.4-10 (구 G-06 대체) |
 | AP-03 | 카카오맵 SDK 연동 — §3-8 지도 계약 구현 (번호 핀·폴리라인·bounds·활성 이동·실패 격리) | §3-8 |
-| AP-04 | **domain 포팅** — normalize·events·dates(KST)·RECOVERY/CATS/PATTERNS·regStatusOf·엔진 v2(산책 제거)·편집 연산·코스 빌더·걷기 스팟 필터 (원본: reference-web, 부록 D) + 단위 테스트 | §5 |
+| AP-04 | **앱 domain 포팅** — normalize·events·dates(KST)·RECOVERY/CATS/PATTERNS·regStatusOf·저장 전 편집 연산·코스 빌더·걷기 스팟 필터 (원본: reference-web, 부록 D) + 단위 테스트. PR #22 앱 `ItineraryEngine`은 서버 이식의 참고 구현·테스트 기준이며 운영 UI에 연결하지 않는다(결정-41) | §5 |
 | AP-05 | 데이터 폴백·로더 — 대회 초기본·GPX 축약본·kotlinx.serialization 파서·Room 읽기 캐시 | §6.1 |
 | AP-06 | **4탭** 내비게이션(홈·캘린더·러닝코스·마이) + wizard 그래프 + back 규칙 | §2 |
-| AP-07 | **백엔드 구축 — Spring Boot + PostgreSQL** 🔒확정: USER+LOGIN_IDENTITY 인증·canonical 대회·P0 마이/찜·외부 API 프록시·두루누비 동기화 + springdoc (GPS 기록은 AP-22 P1) | §9.2·9.3 |
+| AP-07 | **백엔드 구축 — Spring Boot + PostgreSQL** 🔒확정: USER+LOGIN_IDENTITY 인증·canonical 대회·**§5.6 동선 생성 엔진**·P0 마이/찜·외부 API 프록시·두루누비 동기화 + springdoc (GPS 기록은 AP-22 P1) | §9.2·9.3 |
 | AP-08 | 인증 화면 A1~A3 (이메일 가입+인증, 카카오 로그인 SDK, **재설정 링크** 🔒확정, 게스트 둘러보기) | §4.1~4.3 |
 | AP-09 | S1 홈 (검색→캘린더 연결·아이콘·마감임박·축제 — 인기 섹션 없음 🔒확정) | §4.4 |
 | AP-10 | S2 캘린더 (리스트+캘린더 뷰·검색·**필터 모달 F1**·카드) | §4.5 |
 | AP-11 | S3~S7 상세+위저드+결과 (편집·후보 시트·저장, **산책 섹션 제거+S8 연계 카드**) | §4.6~4.10 |
 | AP-12 | S8 러닝코스 (위치 권한 플로우·빌더·걷기 스팟·지역별) | §4.11 |
 | AP-13 | S10 마이 (프로필·정보수정·계정 연결 + 동선/저장 러닝코스/**찜한 대회** 세그먼트·서버 SSOT, ran은 P1) | §4.13 |
-| AP-14 | data/remote — **백엔드 API 클라이언트(Retrofit)** + ProblemDetail/Enum/페이징 DTO 매퍼 + 제한적 폴백 | §8.1·§9.3 |
+| AP-14 | data/remote — **백엔드 API 클라이언트(Retrofit)** + `POST /itineraries/generate` 요청/응답·ProblemDetail/Enum/페이징 DTO 매퍼 + 제한적 폴백 | §8.1·§9.3 |
 | ~~AP-20~~ | ~~전 대회 POI 사전수집~~ — 운영 오프라인 동선 생성 제외 결정으로 **MVP 제외**, SAMPLE은 목업/데모만 유지 | §8.1 · NFR-1 |
 | AP-21 | **대회 찜(B2)** 🔒확정 — 카드·상세 하트 토글 + 마이 세그먼트 + `/me/favorites` 동기화 | §4.5·4.13 |
 | AP-23 | **두루누비 동기화** — 시작 시+하루 1회 courseList 메타 수집, GPX courseId 결합, fail-open·매칭 통계 | §5.8·§8.4 |
@@ -866,6 +869,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-38 | EMAIL 계정만 Android 비밀번호 변경 메뉴를 보이고, 성공 시 기존 refresh token 전부 revoke 후 현재 기기 토큰을 재발급 | 카카오 전용 계정에는 비밀번호가 없으며 토큰 처리까지 하나의 계약으로 고정해야 한다 | §4.13 |
 | 결정-39 | 대회 데이터는 **Python이 정규화·중복 병합한 서버용 대회 스냅샷**을 생성하고, 백엔드는 이를 검증해 PostgreSQL에 멱등 적재한다 | Python과 Java에 병합 규칙을 중복 구현해 canonical 결과가 갈라지는 것을 막는다. 현재 목업용 `races.json`은 서버 스냅샷으로 그대로 사용하지 않는다 | §8.2 · AP-07 · AP-24 |
 | 결정-40 | P0 대회 전달은 **Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL**로 하고, 향후 내부 수집 API 또는 스테이징 승격으로 자동화한다 | 초기에는 검토·재현·롤백이 쉬운 파일 계약을 사용하고, 운영 자동화 이후에도 Python의 핵심 테이블 직접 쓰기를 금지해 DB 소유권과 검증 경계를 유지한다 | §8.2 · AP-07 · AP-24 |
+| 결정-41 | P0 동선 생성의 운영 주체는 **백엔드 `POST /itineraries/generate` 하나**로 고정하고 앱은 생성 응답 표시·저장 전 편집만 한다 | 외부 POI 키·캐시·폴백·부분 실패와 생성 규칙을 서버 한 곳에서 관리해 앱 버전별 결과 차이와 다중 POI 요청 조율을 막는다. PR #22 앱 엔진은 서버 이식의 참고 구현일 뿐 런타임 계약이 아니다 | §4.9 · §5.6 · §9.2~9.3 · AP-04·07·14 |
 
 ### 12.5 남은 미결
 
@@ -947,7 +951,7 @@ app/src/main/java/com/runninggu/app/
 | `map/MapView.jsx` (카카오 JS SDK + SVG 폴백) | 카카오맵 **Android SDK** 래퍼 | SVG 폴백 폐기 — 실패 격리로 대체 (§3-8) |
 | `lib/runninggu/constants.js` (RECOVERY·CATS·PATTERNS) | `domain/` 상수 | 값 변경 금지 (§5.1~5.3) |
 | `lib/runninggu/events.js` · `dates.js` · `normalize.js` | `domain/` 표준화·날짜(KST)·정규화 | §5.4~5.5 · §6.6 |
-| `lib/runninggu/engine.js` `buildItinerary` | `domain/ItineraryEngine` | **walk 블록 제거 반영** (§5.6) — 원본과 다름 주의 |
+| `lib/runninggu/engine.js` `buildItinerary` | 백엔드 `ItineraryGenerationService` | `POST /itineraries/generate`의 서버 규칙 엔진. **walk 블록 제거 반영** (§5.6). PR #22 앱 `ItineraryEngine`은 이식 참고·테스트 기준이며 운영 UI에 연결하지 않음(결정-41) |
 | `lib/runninggu/edits.js` | `domain/` 편집 연산 (불변) | §5.7 |
 | `lib/runninggu/courses.js` (빌더) | 서버 course API + 앱 오프라인 CourseBuilder | §5.8 |
 | `lib/runninggu/tourapi.js` (프록시 fetch) | 백엔드 축제·지오코딩·걷기 스팟 API + `data/remote` 클라이언트 | 키는 서버 보관 🔒확정 (§8.3) |

@@ -68,7 +68,7 @@
 ```
 android/app/src/main/java/com/runninggu/app/
 ├── ui/        Compose 화면 + 화면별 ViewModel(StateFlow<UiState>)
-├── domain/    §5 전체. 순수 Kotlin — Android import 금지
+├── domain/    앱에서 실행하는 §5 순수 로직. 동선 생성 §5.6은 서버 전용 — Android import 금지
 ├── data/      remote(Retrofit·매퍼) · local(assets·Room·DataStore) · model(§6 계약)
 └── util/
 ```
@@ -84,6 +84,7 @@ android/app/src/main/java/com/runninggu/app/
    영역 단위 부분 실패가 가능하다 — 홈의 마감임박과 축제는 따로 실패할 수 있다.
 6. **기존 패턴을 먼저 쓴다.** 네이밍은 `XxxScreen` · `XxxUiState` · `XxxViewModel` · `XxxDto` ·
    `toDomain()` / `toDto()`. 서버 오류는 RFC 9457 `problem+json` 의 `code` 로 분기한다.
+7. **P0 동선 생성은 서버 단일 주체다.** 앱은 `POST /itineraries/generate` 응답을 표시·저장 전 편집만 한다. 앱 `ItineraryEngine`을 운영 화면에 연결하거나 앱과 서버에서 둘 다 생성하지 않는다(SPEC 결정-41).
 
 ---
 

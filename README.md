@@ -61,7 +61,7 @@ runninggu/
 │       │   │   ├── remote/  # Retrofit (자체 백엔드 단일 창구)
 │       │   │   ├── local/   # Room 읽기 캐시·DataStore
 │       │   │   └── model/
-│       │   ├── domain/      # 추천 엔진·코스 빌더 로직 (웹 engine.js 재구현)
+│       │   ├── domain/      # 앱 순수 로직·저장 전 편집·코스 빌더 (동선 생성 엔진은 서버)
 │       │   └── util/
 │       ├── res/            # 레이아웃·문자열·아이콘·테마
 │       └── assets/         # races.json·durunubi_courses.json 번들

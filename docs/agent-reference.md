@@ -112,7 +112,7 @@ JDK 는 **21** (`android/gradle/gradle-daemon-jvm.properties` 의 `toolchainVers
 ```
 android/app/src/main/java/com/runninggu/app/
 ├── ui/        Compose 화면 + 화면별 ViewModel(StateFlow<UiState>)
-├── domain/    §5 전체. 순수 Kotlin — Android import 금지
+├── domain/    앱에서 실행하는 §5 순수 로직. 동선 생성 §5.6은 서버 전용 — Android import 금지
 ├── data/
 │   ├── remote/  Retrofit. 자체 백엔드 단일 창구 + DTO→도메인 매퍼
 │   ├── local/   assets 폴백 · Room 읽기 캐시 · DataStore(세션)
