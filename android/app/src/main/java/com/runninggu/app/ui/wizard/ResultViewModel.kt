@@ -125,6 +125,6 @@ private fun WizardUiState.toRequestOrNull(): GenerateItineraryRequest? {
         endDate = end,
         event = event,
         themes = themes,
+        hotel = stay,
     )
-    // TODO(AP-11): S6 숙소 선택이 붙으면 hotel 을 함께 보낸다. null 이면 대회장 중심이다(§4.9).
 }

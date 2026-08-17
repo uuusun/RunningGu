@@ -21,6 +21,8 @@ import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
 import com.runninggu.app.ui.wizard.ResultScreen
 import com.runninggu.app.ui.wizard.ResultViewModel
+import com.runninggu.app.ui.wizard.StayScreen
+import com.runninggu.app.ui.wizard.StayViewModel
 import com.runninggu.app.ui.wizard.WizardViewModel
 
 /**
@@ -123,10 +125,22 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
 
             PrefsScreen(
                 onBack = { navController.popBackStack() },
-                // TODO(AP-11): S6 숙소 선택이 생기면 S5 → S6 → S7 사이에 끼운다.
-                //  지금은 S6이 없어 바로 결과로 간다 — 숙소는 null(대회장 중심)로 처리된다(§4.9).
-                onNext = { navController.navigate(Routes.RESULT) },
+                onNext = { navController.navigate(Routes.STAY) },
                 viewModel = wizardViewModel,
+            )
+        }
+        composable(Routes.STAY) { entry ->
+            val graphEntry = remember(entry) {
+                navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
+            }
+            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val stayViewModel: StayViewModel = viewModel(entry)
+
+            StayScreen(
+                onBack = { navController.popBackStack() },
+                onNext = { navController.navigate(Routes.RESULT) },
+                wizardViewModel = wizardViewModel,
+                viewModel = stayViewModel,
             )
         }
         composable(Routes.RESULT) { entry ->

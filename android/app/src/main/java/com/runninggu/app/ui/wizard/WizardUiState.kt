@@ -33,6 +33,11 @@ data class WizardUiState(
     val event: EventType = EventType.HALF,
     /** S5 여행 취향(복수). 0개면 CTA 를 막는다. (SPEC §4.8) */
     val themes: List<PoiCategory> = PoiCategory.DEFAULT_THEMES,
+    /**
+     * S6 숙소. **선택 사항**이라 null 이 정상이다 — 건너뛰면 서버가 대회장 중심으로
+     * 슬롯을 채운다. (SPEC §4.9)
+     */
+    val stay: PoiItem? = null,
 ) {
     /** 기간 일수. 당일치기는 1. */
     val dayCount: Int

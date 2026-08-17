@@ -57,6 +57,11 @@ class WizardViewModel : ViewModel() {
         }
     }
 
+    /** 숙소 선택·해제. 같은 숙소를 다시 누르면 해제된다(재선택 교체). (SPEC §4.9) */
+    fun onStaySelect(stay: PoiItem?) {
+        _uiState.update { it.copy(stay = if (it.stay == stay) null else stay) }
+    }
+
     /** 패턴 칩 선택. 직접 선택은 날짜를 비우고 사용자 입력을 기다린다. (SPEC §4.7) */
     fun onPatternSelect(pattern: TripPattern) {
         _uiState.update { it.withPattern(pattern) }
