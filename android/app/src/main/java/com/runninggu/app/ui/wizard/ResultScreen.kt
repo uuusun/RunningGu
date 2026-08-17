@@ -17,6 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,18 +45,20 @@ import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.ItineraryDay
+import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 
 /**
- * S7 추천 동선 결과 — 조회 모드. (SPEC §4.10 · AP-11)
+ * S7 추천 동선 결과. (SPEC §4.10 · AP-11)
  *
- * 위저드에서 고른 조건으로 만든 동선을 일자별로 보여준다.
+ * 서버가 만든 동선을 일자별로 보여주고(조회), 저장 전 USER 블록을 로컬 편집한다(편집 모드).
+ * 동선 생성은 서버 몫이다(결정-41).
  *
- * 이번 범위는 **조회**다. 아래 셋은 후속 작업에서 붙인다.
+ * 아래 셋은 후속 작업에서 붙인다.
  * - 상단 지도(번호 핀·폴리라인) — AP-03 카카오맵이 필요하다
- * - 편집 모드와 후보 시트 — `ItineraryEdits`(§5.7)는 준비돼 있다
+ * - 후보 시트(교체·추가) — `ItineraryEdits.replacePlace`·`addBlock`은 준비돼 있다
  * - 저장 CTA 의 실제 저장 — `POST /api/itineraries`(AP-14)
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +115,9 @@ fun ResultScreen(
                     state = state,
                     onDaySelect = viewModel::onDaySelect,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
+                    onToggleEdit = viewModel::onToggleEdit,
+                    onRemoveBlock = viewModel::onRemoveBlock,
+                    onMoveBlock = viewModel::onMoveBlock,
                 )
             }
         }
@@ -121,6 +129,9 @@ private fun Content(
     state: ResultUiState,
     onDaySelect: (Int) -> Unit,
     onOpenCourses: () -> Unit,
+    onToggleEdit: () -> Unit,
+    onRemoveBlock: (String) -> Unit,
+    onMoveBlock: (Int, Int) -> Unit,
 ) {
     Column(
         Modifier
@@ -131,9 +142,9 @@ private fun Content(
         MapPlaceholder()
 
         Column(Modifier.padding(horizontal = 20.dp)) {
-            state.itinerary?.recovery?.let {
+            state.result?.recovery?.let {
                 Spacer(Modifier.height(16.dp))
-                RecoveryBadge(label = it.label, text = it.text)
+                RecoveryBadge(label = it.label, text = it.note)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -144,14 +155,25 @@ private fun Content(
 
             state.activeDay?.let { day ->
                 Spacer(Modifier.height(18.dp))
-                DayNote(day.note)
+                DayHeader(label = day.label, isEditing = state.isEditing, onToggleEdit = onToggleEdit)
 
-                Spacer(Modifier.height(12.dp))
-                Timeline(day)
+                Spacer(Modifier.height(10.dp))
+                if (state.isEditing) {
+                    EditNotice()
+                    Spacer(Modifier.height(10.dp))
+                    EditList(day = day, onRemove = onRemoveBlock, onMove = onMoveBlock)
+                } else {
+                    DayNote(day.note)
+                    Spacer(Modifier.height(12.dp))
+                    Timeline(day)
+                }
             }
 
-            Spacer(Modifier.height(20.dp))
-            CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
+            // 연계 카드는 조회 모드에만 둔다 (SPEC §4.10 — "조회 모드 하단 연계 카드").
+            if (!state.isEditing) {
+                Spacer(Modifier.height(20.dp))
+                CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
+            }
 
             Spacer(Modifier.height(24.dp))
         }
@@ -219,7 +241,7 @@ private fun DayTabs(state: ResultUiState, onSelect: (Int) -> Unit) {
                 selected = index == state.activeDayIndex,
                 onClick = { onSelect(index) },
                 label = { Text("${day.label} · ${day.dateLabel}") },
-                leadingIcon = if (state.isRecoveryDay(day)) {
+                leadingIcon = if (state.isRecoveryDay(index)) {
                     { RecoveryDot() }
                 } else {
                     null
@@ -238,6 +260,124 @@ private fun RecoveryDot() {
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.tertiary),
     )
+}
+
+/** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
+@Composable
+private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        TextButton(onClick = onToggleEdit) {
+            Text(if (isEditing) "완료" else "편집")
+        }
+    }
+}
+
+/** 편집 모드 안내. 대회 일정을 왜 못 바꾸는지 미리 알린다. (SPEC §4.10) */
+@Composable
+private fun EditNotice() {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+    }
+}
+
+/**
+ * 편집 목록. (SPEC §4.10 · §5.7)
+ *
+ * 행 종류가 둘이다.
+ * - USER: 번호 + 제목 + "{시간}·{장소}·{카테고리}" + 순서·삭제 버튼
+ * - RACE: 잠금 아이콘과 "관리자 업데이트". **순서·교체·삭제 버튼을 아예 그리지 않는다.**
+ *
+ * 버튼을 숨기는 게 본 방어선이고, [ItineraryEdits]의 거부는 그래도 새어 들어온 경우를 막는
+ * 안전망이다 — 목업은 이 방어가 없어 대회 블록이 삭제됐다(대조표 B4).
+ */
+@Composable
+private fun EditList(
+    day: ItineraryDay,
+    onRemove: (String) -> Unit,
+    onMove: (Int, Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        day.blocks.forEachIndexed { index, block ->
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.medium,
+                tonalElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NumberRail(index + 1)
+                    Spacer(Modifier.width(10.dp))
+
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = block.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = if (ItineraryEdits.canEdit(block)) {
+                                listOfNotNull(block.time, block.place?.name, block.catKey.label)
+                                    .joinToString(" · ")
+                            } else {
+                                "관리자 업데이트"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    if (ItineraryEdits.canEdit(block)) {
+                        // TODO(AP-11): 그립 드래그로 바꾼다. 지금은 한 칸씩 옮기는 버튼이다.
+                        IconButton(
+                            onClick = { onMove(index, index - 1) },
+                            enabled = index > 0,
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "위로")
+                        }
+                        IconButton(
+                            onClick = { onMove(index, index + 1) },
+                            enabled = index < day.blocks.lastIndex,
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "아래로")
+                        }
+                        IconButton(onClick = { onRemove(block.id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "삭제")
+                        }
+                    } else {
+                        // 잠금만 보이고 조작 버튼은 없다 (SPEC §4.10 "그립·교체·삭제 미노출").
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "변경할 수 없는 일정",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** 일자 노트. 회복 룰의 dday·dplus 문구가 그대로 온다. (SPEC §5.1) */
