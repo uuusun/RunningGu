@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.sample
 
+import com.runninggu.app.domain.today
 import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.NearbyFestival
 import com.runninggu.app.ui.model.RaceSummary
@@ -13,7 +14,7 @@ import java.time.LocalDate
  */
 object SampleData {
 
-    private val today: LocalDate = LocalDate.now()
+    private val today: LocalDate = today()
 
     private fun race(
         id: String,

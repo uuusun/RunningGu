@@ -43,6 +43,16 @@ fun offLabel(off: Int): String = when {
 /** 대회일까지 남은 일수. 오늘이 대회일이면 0. */
 fun dDay(raceDate: LocalDate, from: LocalDate = today()): Int = diffDays(from, raceDate)
 
+/**
+ * 대회 카드·히어로의 D-day 표기. `D-18` · `D-day` · `D+2` (SPEC §4.6)
+ *
+ * [offLabel] 과 같은 표기인데 입력 방향이 반대다 — [offLabel] 은 대회일 기준 오프셋을 받고,
+ * 이쪽은 대회일과 오늘을 받는다. 남은 일수가 곧 "오늘이 대회일 기준 몇 오프셋에 있는가" 의
+ * 부호 반대이므로 그대로 넘긴다.
+ */
+fun dDayLabel(raceDate: LocalDate, from: LocalDate = today()): String =
+    offLabel(-dDay(raceDate, from))
+
 /** start~end 를 양끝 포함해 하루씩. */
 fun dateRange(start: LocalDate, end: LocalDate): List<LocalDate> {
     if (end.isBefore(start)) return emptyList()
