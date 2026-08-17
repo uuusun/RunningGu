@@ -1,0 +1,66 @@
+# scripts/osm — OSM 기반 러닝코스 생성 PoC
+
+두루누비·산림청 데이터로는 **도시에서 러닝코스가 나오지 않는다**(실측: 수원·성남·청주·대전 반경
+8km 내 0건). OpenStreetMap 보행로를 GraphHopper 로 라우팅해 코스를 **생성**할 수 있는지 검증한
+기록이다. 결과는 [`docs/osm-routing-poc.md`](../../docs/osm-routing-poc.md).
+
+**아직 도입 결정 전이다.** 이 폴더는 재현용이며 앱·서버 빌드와 무관하다.
+
+## 준비물
+
+| | |
+|---|---|
+| JDK | 21 (`/usr/libexec/java_home -v 21`) |
+| 디스크 | 약 1GB (OSM 272MB + 그래프 캐시 514MB + SRTM 44MB) |
+| 메모리 | 빌드 시 `-Xmx6g` 권장 |
+| 네트워크 | 최초 1회 다운로드 · SRTM 타일 자동 수신 |
+
+## 실행
+
+```bash
+# 1. 작업 폴더 (저장소 밖에 두는 것을 권장 — 1GB 가 넘는다)
+mkdir -p ~/osm-poc && cd ~/osm-poc
+
+# 2. GraphHopper 와 한국 OSM 내려받기 (합쳐서 약 320MB)
+curl -L -o gh.jar https://github.com/graphhopper/graphhopper/releases/download/11.0/graphhopper-web-11.0.jar
+curl -L -o korea.osm.pbf https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
+
+# 3. 설정 복사
+cp <저장소>/scripts/osm/graphhopper.yml config.yml
+
+# 4. 그래프 빌드 + 서버 기동 (최초 3~4분, 이후 재기동은 30초)
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)      # Windows 는 JDK 21 경로를 직접 지정
+"$JAVA_HOME/bin/java" -Xmx6g -jar gh.jar server config.yml
+
+# 5. 다른 터미널에서 검증
+python <저장소>/scripts/osm/roundtrip.py --preset metro
+```
+
+## 프로파일 두 개
+
+| 프로파일 | 용도 |
+|---|---|
+| `foot` | GraphHopper 기본 보행 경로. **비교용** |
+| `run` | 러닝 친화 가중치. 큰 도로를 강하게 회피한다 |
+
+`foot` 은 "보행자가 A→B 가는 최적 경로"를 찾기 때문에 큰 도로 보도를 그냥 쓴다. 실측에서 여의도
+5km 코스의 **28% 가 `primary`(왕복 대로)** 였다. `run` 은 아래 가중치로 이를 0% 까지 낮춘다.
+
+```
+보행로·산책로·보행자전용   ×1.00      주택가 골목        ×0.50
+자전거도로·임도           ×0.95      이면도로·주차장     ×0.25
+                                    일반도로(tertiary) ×0.20
+                                    큰 도로(primary 등) ×0.05
+```
+
+## 알아둘 것
+
+- **`round_trip` 은 목표 거리를 정확히 맞추지 않는다.** 요청값의 1.1~1.5배로 나온다.
+  `roundtrip.py` 는 목표의 78% 로 요청한 뒤 여러 seed 중 가장 가까운 것을 고른다.
+- **seed 마다 다른 경로가 나온다.** 5ms 짜리 호출이므로 16개를 돌려도 0.1초다.
+  이상치(목표 대비 ±25% 초과)는 버린다.
+- **고도는 OSM 에 없다.** `graph.elevation.provider: srtm` 이 위성 고도를 자동으로 받아 붙인다.
+  이 값이 있어야 `build_courses.py` 와 같은 기준(m/km)으로 난이도를 매길 수 있다.
+- **라이선스는 ODbL.** 출처표시(`© OpenStreetMap contributors`) 의무가 있고, share-alike 는
+  파생 **데이터베이스를 배포할 때** 발동한다. 서버에서 경로만 응답하는 구조는 해당하지 않는다.
+  공공누리 4유형(변경금지)인 서울둘레길과 달리 가공에 제약이 없다.
