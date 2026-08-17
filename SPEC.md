@@ -623,12 +623,18 @@ emailAuth     { email, purpose: SIGNUP|RESET, tokenHash, expiresAt, attempts, ve
 ### 8.2 M2 대회 데이터
 
 ```
-크롤 원천 271행 → CONTEST_SOURCE(원본·출처·수집시각 보존)
-  → 관리자 배치(정규화·region 보정·중복 병합)
-  → canonical CONTEST 153건 + CONTEST_EVENT
+크롤 원천 271행
+  → Python 데이터 파이프라인(정규화·region/좌표 보정·중복 병합)
+  → P0 서버용 결정적 JSON 스냅샷(canonical 153건 + 원천 sources + 표준 events)
+  → 백엔드 Importer 검증·트랜잭션 멱등 적재
+  → CONTEST_SOURCE + canonical CONTEST + CONTEST_EVENT
   → 공개 API → 앱 Room 캐시 / 릴리스용 초기 번들
 ```
 
+- **대회 병합 책임은 Python 데이터 파이프라인에 둔다** 🔒확정(결정-39). 백엔드는 같은 병합 알고리즘을 Java로 중복 구현하지 않고, 서버용 대회 스냅샷의 스키마·UTF-8·유일키·좌표·집계를 검증한 뒤 PostgreSQL에 멱등 적재한다.
+- 현재 `reference-web/public/data/races.json`은 실제 크롤 원천을 병합한 **목업용 대표 목록**이며 서버용 대회 스냅샷이 아니다. 서버용 스냅샷은 `CONTEST_SOURCE`를 복원할 수 있도록 canonical별 원천 `sources[]`와 표준 `events[]`를 포함하는 별도 계약으로 구현한다.
+- **P0 전달 경로는 `Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL`** 로 고정한다 🔒확정(결정-40). Python은 운영 핵심 테이블을 직접 수정하지 않으며, 백엔드가 전체 검증·원자적 승격·실패 롤백을 담당한다. 최초 파일은 초기 시드, 이후 주간 파일은 갱신 스냅샷이다.
+- 향후 자동화는 `Python → 인증된 내부 수집 API` 또는 `Python → 스테이징 테이블 → 백엔드 승격`으로 전환한다. 두 후보 중 하나는 자동화 착수 시 운영 환경과 배포 방식을 보고 확정하며, 어느 경우에도 Python이 `CONTEST*` 핵심 테이블에 직접 쓰지 않는다.
 - 현재 생성본의 종목 미표기 26건 🔧정책: 트레일·걷기는 캘린더 노출, 위저드 종목은 5K 폴백 + "종목 정보 없음". 필수값 누락 원천 1행은 경고 후 제외한다.
 - 사용자는 canonical 대회 레코드를 생성·수정·삭제할 수 없다. 관리자/배치만 갱신한다.
 - 재수집 주기 주 1회 🔧정책. 접수상태는 서버 공통 정책으로 조회 시점 파생하고 목록·월 집계·마감 임박에서 같은 함수를 사용한다(§5.5).
@@ -858,6 +864,8 @@ app/src/main/java/com/runninggu/app/
 | 결정-36 | GPS 기록·`ran` 목록과 saved/ran 통합 계약은 **P1** | P0에는 저장 코스만 있어 통합 정렬·페이징을 미리 추측하지 않는다 | §4.11 · §4.13 · AP-22 |
 | 결정-37 | 시스템 Splash + `core-splashscreen` 호환 레이어와 Startup Gate 사용, 별도 splash route 없음 | minSdk 26과 Android 12+를 한 시작 흐름으로 지원한다 | §9.1 |
 | 결정-38 | EMAIL 계정만 Android 비밀번호 변경 메뉴를 보이고, 성공 시 기존 refresh token 전부 revoke 후 현재 기기 토큰을 재발급 | 카카오 전용 계정에는 비밀번호가 없으며 토큰 처리까지 하나의 계약으로 고정해야 한다 | §4.13 |
+| 결정-39 | 대회 데이터는 **Python이 정규화·중복 병합한 서버용 대회 스냅샷**을 생성하고, 백엔드는 이를 검증해 PostgreSQL에 멱등 적재한다 | Python과 Java에 병합 규칙을 중복 구현해 canonical 결과가 갈라지는 것을 막는다. 현재 목업용 `races.json`은 서버 스냅샷으로 그대로 사용하지 않는다 | §8.2 · AP-07 · AP-24 |
+| 결정-40 | P0 대회 전달은 **Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL**로 하고, 향후 내부 수집 API 또는 스테이징 승격으로 자동화한다 | 초기에는 검토·재현·롤백이 쉬운 파일 계약을 사용하고, 운영 자동화 이후에도 Python의 핵심 테이블 직접 쓰기를 금지해 DB 소유권과 검증 경계를 유지한다 | §8.2 · AP-07 · AP-24 |
 
 ### 12.5 남은 미결
 
