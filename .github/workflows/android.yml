@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "android/**"
+      - "scripts/check_spec_drift.py"
       - ".github/workflows/android.yml"
   push:
     branches: [develop, main]
     paths:
       - "android/**"
+      - "scripts/check_spec_drift.py"
       - ".github/workflows/android.yml"
 
 # 같은 브랜치에 연달아 push 하면 앞의 실행은 취소한다.
@@ -17,6 +19,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 바뀐 코드가 인용한 SPEC 절을 짚어 준다. 막지 않고 알려만 준다. (AGENTS.md §7)
+  spec-drift:
+    name: Spec sync check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check SPEC references in changed code
+        run: |
+          python3 scripts/check_spec_drift.py \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   unit-test:
     name: Unit tests and debug build
     runs-on: ubuntu-latest
