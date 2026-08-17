@@ -270,7 +270,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 3-4 `GET /api/contests/{id}` — 상세
 
-3-1 카드 필드 + `applyStart, host, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
+3-1 카드 필드 + `applyStart, organizer, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
 `404 CONTEST_NOT_FOUND`. 좌표는 배치 지오코딩 확보분(지도·인근 축제·동선 위저드의 기준점).
 
 ### 3-5 `GET /api/contests/{id}/festivals` — 인근 축제 (M3 프록시) 🔒

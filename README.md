@@ -42,6 +42,7 @@
 ```
 runninggu/
 ├── README.md            # 이 문서
+├── AGENTS.md            # Codex·Claude Code 공통 작업 지침
 ├── CONVENTION.md        # Git 브랜치·커밋·PR 규칙 (팀 필독)
 ├── SPEC.md              # 최종 통합 명세 (단일 기준, SSOT)
 ├── .gitignore
@@ -105,10 +106,11 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 
 ## 🌱 협업 규칙 (요약)
 
-전체 규칙은 [`CONVENTION.md`](./CONVENTION.md) 참고. 핵심만:
+공통 작업 지침은 [`AGENTS.md`](./AGENTS.md), Git 상세 규칙은 [`CONVENTION.md`](./CONVENTION.md) 참고. 핵심만:
 
-- **브랜치 전략: GitHub Flow** — `main`에 직접 push 금지. `main`에서 브랜치를 따서 작업 후 PR.
-- **브랜치 이름**: `feat/home-screen`, `fix/calendar-filter` 처럼 `<종류>/<설명>`.
+- **브랜치 전략: Git Flow** — 최신 `develop`에서 작업 브랜치를 만들고 `develop` 대상으로 PR. `main`은 릴리스 전용.
+- **직접 push 금지**: `main`·`develop`에는 직접 push하지 않고 작업 브랜치 → PR → 리뷰 → 머지.
+- **브랜치 이름**: `feature/home-screen`, `fix/calendar-filter`처럼 `<종류>/<설명>`.
 - **커밋 메시지**: `feat(home): 홈 화면 구성` 처럼 `<종류>(<범위>): <설명>`.
 - **PR**: 기능 하나 = 브랜치 하나 = PR 하나. 최소 1명 리뷰 승인 후 머지, 머지된 브랜치는 삭제.
 - **금지**: `local.properties`·API 키·`/build`·`.gradle`·`.idea` 커밋.
@@ -120,6 +122,7 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 | 문서 | 내용 |
 |---|---|
 | [SPEC.md](./SPEC.md) | 서비스 최종 명세 (화면·기능·데이터 계약) — **작업 전 필독** |
+| [AGENTS.md](./AGENTS.md) | Codex·Claude Code 공통 작업 지침 |
 | [CONVENTION.md](./CONVENTION.md) | Git 브랜치·커밋·PR 규칙 |
 
 ---
@@ -132,4 +135,4 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 | **이건모** | **앱 코어** — 프로젝트 셋업·Retrofit/Room·공통 ProblemDetail/Enum/페이징 계약·카카오맵·두루누비+GPX 코스·GPS 기록·UTF-8 데이터 CI |
 | **김민지** | **앱 UI** — Compose 테마·4탭 내비게이션·인증/홈/캘린더/위저드/결과/마이 정보수정·찜 UI·Loading/Content/Empty/Error |
 
-상세 백로그 매핑은 [SPEC.md §11](./SPEC.md), 협업 규칙은 [CONVENTION.md](./CONVENTION.md) (GitHub Flow · PR 상호 리뷰).
+상세 백로그 매핑은 [SPEC.md §11](./SPEC.md), 공통 작업 지침은 [AGENTS.md](./AGENTS.md), Git 협업 규칙은 [CONVENTION.md](./CONVENTION.md) (Git Flow · PR 상호 리뷰).
