@@ -31,7 +31,12 @@ object Routes {
      * (SPEC §2.4 위저드 공유 상태).
      */
     const val WIZARD_GRAPH_PATTERN = "wizard/{$ARG_RACE_ID}"
+
+    /** S4 일정 선택. (SPEC §4.7) */
     const val PLAN = "plan"
+
+    /** S5 종목·취향. (SPEC §4.8) */
+    const val PREFS = "prefs"
 
     fun wizard(raceId: String): String = "wizard/${Uri.encode(raceId)}"
 

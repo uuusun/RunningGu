@@ -18,6 +18,7 @@ import androidx.navigation.compose.navigation
 import com.runninggu.app.ui.my.MyScreen
 import com.runninggu.app.ui.racedetail.RaceDetailScreen
 import com.runninggu.app.ui.wizard.PlanScreen
+import com.runninggu.app.ui.wizard.PrefsScreen
 import com.runninggu.app.ui.wizard.WizardViewModel
 
 /**
@@ -46,8 +47,7 @@ fun RunningGuNavHost(
                 onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
                 onOpenCourses = { navController.navigate(Routes.COURSES) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
-                // TODO(AP-11): S4 일정 선택이 생기면 연결한다.
-                onStartWizard = {},
+                onStartWizard = { raceId -> navController.navigate(Routes.wizard(raceId)) },
             )
         }
         composable(
@@ -109,7 +109,19 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             PlanScreen(
                 raceId = graphEntry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
                 onBack = { navController.popBackStack() },
-                // TODO(AP-11): S5 종목·취향이 생기면 연결한다.
+                onNext = { navController.navigate(Routes.PREFS) },
+                viewModel = wizardViewModel,
+            )
+        }
+        composable(Routes.PREFS) { entry ->
+            val graphEntry = remember(entry) {
+                navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
+            }
+            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+
+            PrefsScreen(
+                onBack = { navController.popBackStack() },
+                // TODO(AP-11): S6 숙소 선택이 생기면 연결한다.
                 onNext = {},
                 viewModel = wizardViewModel,
             )
