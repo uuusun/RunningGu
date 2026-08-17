@@ -83,7 +83,7 @@ runninggu/
 
 ### 사전 준비
 - Android Studio (최신 안정판)
-- JDK 17
+- JDK 21
 - 카카오 · 한국관광공사 API 키
 
 ### 실행
