@@ -23,6 +23,8 @@ data class ResultUiState(
     val region: String = "",
     /** 일자 탭에서 고른 일자. 지도와 타임라인이 이 값을 본다. (SPEC §4.10) */
     val activeDayIndex: Int = 0,
+    /** 편집 모드. [편집]↔[완료]로 오간다. (SPEC §4.10) */
+    val isEditing: Boolean = false,
     val errorMessage: String? = null,
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
