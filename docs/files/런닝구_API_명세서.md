@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.0
+# 런닝구 백엔드 API 명세서 v2.2
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v3 + ERD·DFD 수정안
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine
@@ -22,12 +22,12 @@
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
-- 인증 방식: `Authorization: Bearer {accessToken}`. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 서명 키는 서버 환경변수로만 관리한다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 회전(rotate) + 서버 저장(SHA-256 해시) — 로그아웃·비밀번호 재설정 시 전체 무효화한다(NFR-11). 🔒
+- 인증 방식: `Authorization: Bearer {accessToken}`. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 서명 키는 서버 환경변수로만 관리한다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 회전(rotate) + 서버 저장(SHA-256 해시) — 비밀번호 변경·재설정·탈퇴 시 전체 무효화한다(NFR-11). 🔒
 - 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
 |---|---|
-| 인증(`/auth/**`) · 대회(`/contests/**`) · 축제(`/festivals`) · POI(`/pois`, `/walk-spots`, `/geocode`) · 러닝코스(`/courses/**`) · **동선 생성**(`/itineraries/generate` — 무상태) | 회원(`/me`) · 동선 저장/조회/편집(`/itineraries/**`) · 저장 코스(`/me/courses/**`) · 러닝 기록(`/runs/**`) · 찜(`/me/favorites/**`) |
+| 인증(`/auth/**`) · 대회(`/contests/**`) · 축제(`/festivals`) · POI(`/pois`, `/geocode`) · 러닝코스(`/courses/**`) · **동선 생성**(`/itineraries/generate` — 무상태) | 회원(`/me`) · 동선 저장/조회/편집(`/itineraries/**`) · 저장 코스(`/me/courses/**`) · 러닝 기록(`/runs/**`, P1) · 찜(`/me/favorites/**`) |
 
 ### 0-3. 에러 응답 — RFC 9457 Problem Details 확장
 
@@ -203,11 +203,12 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | GET | `/me` | 내 정보 — `{id, email, nickname, identities[], agreements, createdAt}` (앱 시작 세션 검증 겸용) |
 | PATCH | `/me` | 닉네임 변경 `{"nickname": "..."}` — `409 NICKNAME_DUPLICATED` |
 | PATCH | `/me/agreements` | 선택 약관 변경 `{"marketing": true}`. 필수 약관 철회는 탈퇴 절차로 안내 |
-| PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경 `{"currentPassword":"...","newPassword":"..."}`. 변경 후 다른 리프레시 토큰 revoke |
+| PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경. 성공 시 기존 refresh token 전부 revoke 후 현재 기기용 token pair 재발급 |
 | GET | `/me/identities` | 연결된 로그인 수단 조회 — `{items:[{provider, linkedAt}]}` |
 | POST | `/me/identities/kakao` | 로그인된 계정에 카카오 수단 연결 `{"kakaoAccessToken":"..."}` |
 | DELETE | `/me/identities/kakao` | 카카오 연결 해제. 마지막 로그인 수단이면 `409 LAST_IDENTITY_REQUIRED` |
-| DELETE | `/me` | 탈퇴 — 동의·찜·동선·코스·기록 연쇄 삭제 🔒(NFR-12 최소 수집·탈퇴 시 삭제), `204` |
+| POST | `/me/reauth` | 탈퇴용 재인증 토큰 발급 |
+| DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스·기록 연쇄 삭제, `204` |
 
 연결 정책:
 
@@ -216,6 +217,42 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - 동일 이메일만으로 자동 연결하지 않는다. 반드시 로그인된 세션에서 사용자가 직접 연결한다.
 - EMAIL 추가 연결은 이메일 인증·비밀번호 설정 UX까지 필요하므로 MVP에서는 기존 EMAIL 계정의 카카오 연결만 제공한다.
 - 이메일 주소 변경은 MVP 범위 밖이다.
+
+### 2-1 `PUT /api/me/password` — EMAIL 비밀번호 변경
+
+`GET /api/me/identities`의 `items[].provider`에 `EMAIL`이 있는 계정에서만 사용한다. Android는 EMAIL이 없으면 비밀번호 변경 메뉴를 노출하지 않는다.
+
+```json
+{ "currentPassword": "run4life1", "newPassword": "newRun4life2" }
+```
+
+`200` — 한 트랜잭션에서 비밀번호를 변경하고 해당 사용자의 기존 refresh token hash를 전부 revoke한 뒤, 현재 기기용 새 token pair를 발급한다. 앱은 두 토큰을 원자적으로 교체한다.
+
+```json
+{ "accessToken": "eyJhbGciOi...", "refreshToken": "eyJhbGciOi..." }
+```
+
+오류: `400 CURRENT_PASSWORD_MISMATCH` · `400 INVALID_PASSWORD` · `409 EMAIL_IDENTITY_REQUIRED`.
+
+### 2-2 `POST /api/me/reauth` · `DELETE /api/me` — 탈퇴 재인증
+
+재인증은 계정에 연결된 수단 중 하나를 사용한다. EMAIL은 현재 비밀번호, KAKAO는 Android SDK가 방금 발급한 액세스 토큰을 보낸다.
+
+```json
+{ "provider": "EMAIL", "password": "run4life1" }
+```
+
+또는
+
+```json
+{ "provider": "KAKAO", "kakaoAccessToken": "카카오 SDK 토큰" }
+```
+
+`200 {"reauthToken":"...","expiresInSec":300}`. `reauthToken`은 현재 사용자와 `DELETE_ACCOUNT` 목적에만 유효한 5분 토큰이며 로그에 남기지 않는다.
+
+`DELETE /api/me`는 `X-Reauth-Token: {reauthToken}` 헤더를 요구한다. 성공 시 `204`, 사용자의 모든 refresh token을 revoke하고 USER에 종속된 동의·찜·동선·저장 코스·러닝 기록을 삭제한다. 앱은 성공 후 Access/Refresh Token과 사용자 Room 캐시를 삭제한다.
+
+오류: `401 REAUTH_FAILED` · `401 INVALID_REAUTH_TOKEN` · `409 REAUTH_PROVIDER_NOT_LINKED`.
 
 ---
 
@@ -245,6 +282,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
       "contestDate": "2026-08-22", "startTime": "08:00",
       "events": ["FULL", "HALF", "K10"],
       "regStatus": "OPEN", "applyEnd": "2026-08-10",
+      "imageUrl": "https://...",
       "sources": ["MARATHON_ONLINE", "MARATHON_GO"],
       "checkedAt": "2026-07-15T04:30:00Z",
       "favorite": false
@@ -259,6 +297,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - `regStatus`는 **저장값이 아니라 공통 함수로 조회 시점 파생** 🔒: `applyEnd != null && applyEnd < 오늘 → CLOSED` / `applyStart != null && 오늘 < applyStart → BEFORE` / 시작일을 지났거나 종료일이 아직 남은 등 **하나 이상의 날짜로 현재 접수 가능함을 판단할 수 있으면 `OPEN`** / 날짜만으로 판단할 수 없으면 최신 원본 상태 / 그것도 없으면 `UNKNOWN`.
 - `events`가 빈 배열이면 클라가 "종목 미표기" 배지 표시.
 - `favorite`: 로그인 시 실제 찜 여부, 게스트는 항상 `false`.
+- `imageUrl`은 nullable이며 없으면 앱이 기본 placeholder를 표시한다.
 
 ### 3-2 `GET /api/contests/daily-counts` — 월간 뷰 점 집계 🔒(정리본 확정 6)
 
@@ -267,13 +306,13 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 3-3 `GET /api/contests/closing-soon` — 홈 마감 임박
 
-`?limit=4` 🔧(목업 기준 4 — SPEC 6건은 🔧정책이므로 limit으로 흡수) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
+`?limit=4` 🔒(홈 기본 4건 확정) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
 응답 항목 = 3-1 카드 + `"dDayApply": 11` (applyEnd − 오늘, "마감 D-n" 배지용).
 
 ### 3-4 `GET /api/contests/{id}` — 상세
 
 3-1 카드 필드 + `applyStart, organizer, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
-`404 CONTEST_NOT_FOUND`. 좌표는 배치 지오코딩 확보분(지도·인근 축제·동선 위저드의 기준점).
+`404 CONTEST_NOT_FOUND`. `organizer`, `officialUrl`, `imageUrl`, `lat`, `lng`는 nullable이다. 현재 원천 271건과 canonical 153건은 좌표 누락 0건이다. 좌표는 지도·인근 축제·동선 위저드의 기준점이며, 앱은 좌표가 없으면 P0에서 동선 만들기 CTA를 비활성화한다.
 
 ### 3-5 `GET /api/contests/{id}/festivals` — 인근 축제 (M3 프록시) 🔒
 
@@ -294,7 +333,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
   ]
 }
 ```
-빈 배열 = 목업 빈 상태("대회 기간에 열리는 인근 축제가 없어요") · `502` = 로딩 실패 상태 매핑. 출처 표기 "한국관광공사"는 클라 고정 문구(NFR-7).
+빈 배열 = 목업 빈 상태("대회 기간에 열리는 인근 축제가 없어요") · `502` = 로딩 실패 상태 매핑. 출처 표기 "한국관광공사"는 클라 고정 문구(NFR-7). 대회 좌표가 없으면 외부 API를 호출하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
 
 ---
 
@@ -305,11 +344,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 파라미터 | 설명 |
 |---|---|
 | `yearMonth` | `2026-08` 🔧 기본 = 이번 달 (정리본 "조회 월 기준") |
-| `lat` `lng` | *(선택)* 있으면 거리순 재정렬 + `distanceKm` 포함 (SPEC §4.4 위치 기반안 수용) |
 | `size` | 기본 6 🔧 |
 
 응답 항목: `{contentId, name, startDate, endDate, region, imageUrl, inProgress}` — `inProgress` = start ≤ 오늘 ≤ end (진행중 배지).
-> 홈 기준(월간 vs 위치)은 두 안 모두 이 한 API로 수용 — 팀 확정 후 클라가 파라미터만 선택.
+조회 월과 겹치는 전국 축제를 진행 중 우선, 시작일 오름차순으로 반환한다. 홈에서는 위치 권한과 사용자 좌표를 사용하지 않는다. 서버가 KTO `searchFestival2`를 호출·캐시하며 앱은 우리 서버만 호출한다.
 
 ### 4-2 `GET /api/pois` — 위저드 숙소 · 동선 슬롯 · 교체/추가 시트
 
@@ -318,7 +356,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | `category` | `TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING` (부록 B 매핑) |
 | `lat` `lng` | 기준점 (숙소 선택 전 = 대회장, 이후 = 숙소·현재 블록) |
 | `radius` | 기본 8000m 🔧 · **3건 미만이면 20km 재검색** 🔒(§8.1) · 최대 20000(KTO 제약) |
-| `query` | *(선택)* 키워드 검색 — W3 숙소 검색창("숙소 검색 · 카카오 로컬") |
+| `query` | *(선택)* 키워드 검색 — W3 숙소 검색창. 공백 제거 후 2자 이상, 미만이면 `400 VALIDATION_FAILED` |
 | `size` | 기본 8 🔒(노출 8건) |
 
 ```json
@@ -336,12 +374,12 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 }
 ```
 - **숙소(LODGING) = 카카오 로컬 AD5 1순위, KTO 32 폴백** 🔒(회의 결정 7·검증리포트 D2 — TourAPI 단독이면 실측상 4건뿐).
+- Android는 최초 진입 시 query 없이 주변 8건을 조회하고, 검색어가 2자 이상일 때 500ms debounce 후 query를 보낸다. debounce는 앱 내부 정책이다.
 - 운영 응답의 `source`는 항상 `LIVE`다. `SAMPLE/SYNTH`는 목업·데모 빌드 전용이며, 운영에서 502/504를 샘플 데이터로 숨기지 않는다(NFR-2).
 
-### 4-3 `GET /api/walk-spots` — 러닝코스 "걷기 좋은 곳"
+### 4-3 걷기 스팟 — `/courses/near` 내부 조회원
 
-`?lat=&lng=&size=12` → 카카오 키워드 4종(공원·산책로·둘레길·하천) × 반경 3km, §5.9 포함/제외 필터 + 이름+주소 중복 제거, 거리순 🔒.
-응답 항목: `{name, category, address, lat, lng, distanceM, url}` — `url`은 카카오 장소 페이지(탭 시 Custom Tabs).
+독립 `GET /api/walk-spots` 앱 API는 제공하지 않는다(이슈 #19 결정). 서버가 카카오 키워드 6종(공원·산책로·둘레길·하천·한강공원·생태공원)을 반경 3km에서 조회하고, SPEC §5.9 포함/제외·중복 제거 규칙을 적용한 거리순 12곳을 `GET /api/courses/near`의 `PLACE` 후보로 합친다. 카카오 조회 캐시는 두루누비 코스 캐시와 분리해도 되지만 앱에는 6-1의 단일 응답만 노출한다.
 
 ### 4-4 `GET /api/geocode` — 출발지 검색
 
@@ -364,6 +402,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ```
 - `hotel`은 `null` 허용("숙소 없이 추천받기" → 대회장 중심으로 슬롯 채움 🔒 §4.9).
 - `themes`는 1개 이상(§4.8 — 0개면 클라 CTA 비활성) · `event`는 대회 종목에 없어도 선택 가능(§4.8).
+- `startDate/endDate`는 역순을 허용하지 않으며 시작·종료일 포함 최대 7일, 해당 대회일을 반드시 포함한다. 위반 시 `400 INVALID_TRAVEL_PERIOD`.
+- canonical 대회의 `lat/lng`가 없으면 생성하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
 
 응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
 
@@ -394,6 +434,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - `recovery`는 하프/풀만, D+ 없으면 `"D-day 회복 모드"` 🔒(§5.6-6). 회복일 day는 `recovery=true`.
 - 외부 POI 실패 시 해당 블록 `placeName/lat/lng=null` 강등, **생성은 실패하지 않음** 🔒(NFR-3).
 - 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (noHard면 WELLNESS, 아니면 CAFE) 🔒(§5.6-2).
+- 정상 처리됐지만 표시 가능한 블록이 없으면 `200`에서 `days: []`를 반환하고 앱은 S7 Empty로 표시한다. 네트워크·timeout·4xx/5xx는 Error이며 Empty로 강등하지 않는다.
 
 ### 5-2 `POST /api/itineraries` — 저장 (인증, 트리 1회 cascade) 🔒
 
@@ -417,9 +458,11 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
 | 5-6 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-7 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-7 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-8 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
-| 5-9 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 시 USER 블록 순서만 멱등 갱신 |
+| 5-9 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
+
+5-7의 block 응답은 5-4 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
 
 ---
 
@@ -427,29 +470,43 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 > 원천: 두루누비 API `courseList`의 최신 메타데이터와 GPX 파싱본 261코스의 경로 좌표를 **동시에 사용**한다. 서버 시작 시와 하루 1회 메타데이터를 동기화하고 `courseId`로 GPX와 결합한다. API 장애·미매칭 때는 마지막 성공 캐시 또는 GPX fallback 메타로 fail-open하며, GPX 경로가 없는 `API_ONLY` 항목은 지도·추천·뛰기 응답에서 제외한다.
 
-### 6-1 `GET /api/courses/near` — 내 주변 (왕복 코스 빌더)
+### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
-`?lat=&lng=&targetKm=5&radiusKm=8&size=12` (targetKm 1~21, 0.5 단위 — 슬라이더)
+`?lat=&lng=&targetKm=5&radiusKm=8&size=12` (targetKm 1~21, 0.5 단위 — 슬라이더, size는 통합 결과의 최대 항목 수)
 
 ```json
 {
   "items": [
     {
-      "courseId": "T_CRS_MNG0000005117",
-      "courseName": "남파랑길 2코스", "sido": "부산", "sigun": "부산 중구",
+      "kind": "ROUTE",
+      "name": "남파랑길 2코스",
+      "distanceM": 420,
+      "lat": 35.11454, "lng": 129.04076,
+      "courseId": "T_CRS_MNG0000005117", "sido": "부산", "sigun": "부산 중구",
       "difficulty": "NORMAL", "fullDistanceKm": 19.0,
-      "accessM": 420, "routeKm": 5.1, "durationMin": 47, "shortfall": false,
-      "entry": { "lat": 35.11454, "lng": 129.04076 },
-      "pathPolyline": "인코딩된 왕복 경로",
-      "dataSource": "API_GPX",
-      "syncedAt": "2026-07-30T01:00:00Z"
+      "routeKm": 5.1, "durationMin": 47, "shortfall": false,
+      "pathPolyline": "인코딩된 왕복 경로"
+    },
+    {
+      "kind": "PLACE",
+      "name": "용두산공원",
+      "distanceM": 650,
+      "lat": 35.1007, "lng": 129.0325,
+      "category": "공원",
+      "address": "부산 중구 용두산길 37-55",
+      "placeUrl": "https://place.map.kakao.com/..."
     }
   ]
 }
 ```
-규칙 🔒(§5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로 · 분당 110m로 `durationMin` · `accessM` 오름차순 · `shortfall` = 왕복이 목표−300m 미만(짧은 코스 경고 배너). 첫 항목 = 추천 코스, 나머지 = "다른 코스 N개".
-`dataSource`는 `API_GPX` 또는 `GPX_ONLY`이며 내부 동기화 작업은 매칭 통계(`API_GPX`, `GPX_ONLY`, `API_ONLY`)와 실패 원인을 기록한다.
-빈 배열 → 걷기 스팟만 보강(4-3)하는 목업 상태 매핑.
+- 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 출발지에서 경로 진입점 또는 장소까지의 거리다.
+- `ROUTE` 전용: `courseId`, `sido`, `sigun`, `difficulty`, `fullDistanceKm`, `routeKm`, `durationMin`, `shortfall`, `pathPolyline`.
+- `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
+- 경로 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로 · 분당 110m로 `durationMin` · `shortfall` = 왕복이 목표−300m 미만.
+- 장소 규칙 🔒(SPEC §5.9): 4-3의 카카오 후보를 포함/제외·중복 제거한 뒤 합친다.
+- 서버가 `ROUTE`와 `PLACE`를 `distanceM` 오름차순으로 합쳐 최대 `size`건을 반환한다. 앱은 받은 순서를 다시 정렬하지 않는다.
+- 원천별 캐시와 `API_GPX`/`GPX_ONLY` 매칭 통계는 서버 내부 운영 정보다. 통합 응답에는 `dataSource`와 `syncedAt`을 노출하지 않는다.
+- 두 종류가 모두 0건이면 `200 {"items": []}`이며, 화면은 S8 빈 상태로 매핑한다.
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
@@ -465,12 +522,16 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId, courseName, region, distanceKm, durationMin, difficulty, entryLat, entryLng, pathPolyline}` → `201 {id}` |
+| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId, courseName, region, distanceKm, durationMin, difficulty, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
-### 7-B 러닝 기록 `/api/runs`
+서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
+
+### 7-B 러닝 기록 `/api/runs` — P1 예약
+
+GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함은 7-A 저장 코스만 조회하며 saved/ran 통합 정렬·페이징 API는 두지 않는다. 아래 계약은 P1 구현 시 재검토할 예약 초안이다.
 
 **`POST /api/runs`** — GPS 기록 저장
 
@@ -521,16 +582,16 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 6 동선 결과 | 저장 / 빈 상태 재추천 | 5-2 / 5-1 |
 | 6 편집(저장 후) | 순서·교체·삭제·추가 / 후보 시트 | 5-9·5-7·5-8·5-6 / 4-2 |
 | 6 연계 카드 | 숙소 주변에서 뛰기 | →S8 진입(6-1, 출발지=숙소·목표 min(walk,5)km — walk는 5-4의 `event`로 파생) |
-| 7 러닝코스 내 주변 | 내 위치/출발지 검색/프리셋 / 코스 / 걷기 좋은 곳 | (GPS 클라)·4-4·(클라 상수) / 6-1 / 4-3 |
+| 7 러닝코스 내 주변 | 내 위치/출발지 검색/프리셋 / 경로·장소 통합 목록 | (GPS 클라)·4-4·(클라 상수) / 6-1 |
 | 7 러닝코스 지역별 | 지역 칩 / 목록 | 6-3 / 6-2 |
-| 7 코스 저장·뛰기 | 저장 / 뛰기 | 7-A POST / (GPS 기록 클라 → 종료 시 7-B) |
-| 8 GPS 기록/요약 | 저장 / 삭제 | 7-B POST / 7-B DELETE |
+| 7 코스 저장·뛰기 | 저장(P0) / 뛰기(P1) | 7-A POST / (GPS 기록 클라 → 종료 시 7-B) |
+| 8 GPS 기록/요약(P1) | 저장 / 삭제 | 7-B POST / 7-B DELETE |
 | 9 마이 동선 | 목록 / 열기 / 삭제 | 5-3 / 5-4 / 5-5 |
-| 9 마이 코스 | saved / ran | 7-A GET / 7-B GET |
+| 9 마이 코스 | P0 saved / P1 ran | 7-A GET / 7-B GET(P1) |
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
-| 9 마이 계정 | 카카오 연결·해제 / 로그아웃 / 탈퇴 | 2-POST·DELETE `/identities/kakao` / 1-10 / 2-DELETE |
-| 10 코스 상세 | 점선(예정) / 실선(뛴 기록) | 7-A GET {id} / 7-B GET {id} |
+| 9 마이 계정 | 카카오 연결·해제 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-POST·DELETE `/identities/kakao` / 1-10 / 2-2 POST·DELETE |
+| 10 코스 상세 | 점선(예정, P0) / 실선(뛴 기록, P1) | 7-A GET {id} / 7-B GET {id} |
 | 공통 | 앱 시작 세션 확인 / 재발급 / 로그아웃 | 2-GET / 1-9 / 1-10 |
 
 > 정리본의 모든 "액션" 항목이 매핑됨 — 누락 없음 확인(2026-07-30).
@@ -570,6 +631,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 |---|---|---|
 | `VALIDATION_FAILED` | 400 | 공통 요청 값 오류 (필드별 상세는 `errors[]` 🔧) |
 | `INVALID_PASSWORD` | 400 | 8자 이상 영문+숫자 위반 |
+| `CURRENT_PASSWORD_MISMATCH` | 400 | 비밀번호 변경의 현재 비밀번호 불일치 |
+| `INVALID_TRAVEL_PERIOD` | 400 | CUSTOM 기간이 7일 초과·역순·대회일 미포함 |
 | `AGREEMENT_REQUIRED` | 400 | 필수 약관 미동의 |
 | `INVALID_CODE` / `CODE_EXPIRED` | 400 | 인증 코드 불일치 / 만료(10분) |
 | `INVALID_RESET_TOKEN` | 400 | 재설정 토큰 만료·사용됨 |
@@ -578,12 +641,15 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | `LOGIN_FAILED` | 401 | 이메일/비밀번호 불일치 (존재 비노출) |
 | `UNAUTHORIZED` | 401 | 토큰 없음·만료 (게스트 쓰기 → 로그인 모달) |
 | `INVALID_KAKAO_TOKEN` / `INVALID_REFRESH_TOKEN` | 401 | 카카오 토큰 검증 실패 / 리프레시 무효 |
+| `REAUTH_FAILED` / `INVALID_REAUTH_TOKEN` | 401 | 탈퇴 재인증 실패 / 탈퇴 전용 토큰 만료·불일치 |
 | `EMAIL_NOT_VERIFIED` | 403 | 인증 미완료 상태로 가입 시도 |
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
 | `IDENTITY_ALREADY_LINKED` | 409 | 카카오 로그인 수단이 다른 계정에 연결됨 |
 | `LAST_IDENTITY_REQUIRED` | 409 | 마지막 로그인 수단 해제 시도 |
+| `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_NOT_LINKED` | 409 | EMAIL 없는 계정의 비밀번호 변경 / 연결되지 않은 수단으로 재인증 |
+| `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
@@ -607,7 +673,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | API | 용도 |
 |---|---|
 | `GET /api/directions?points=` | 블록 간 이동시간 라벨(A5, 카카오모빌리티 — waypoints ≤5 · **자동차 전용, 도보 없음**) |
-| 대회 `imageUrl` 응답 필드 활성화 | AP-19 — 카드 썸네일·상세 히어로(ERD 수정안에 컬럼 선반영) |
+| `/api/runs/**` | GPS 기록·ran 목록(AP-22). saved/ran 통합 정렬·페이징은 P1 착수 시 결정 |
 | (서버 불필요) 카톡 공유 A4 · 카카오내비 A6 | Android SDK 직접 — 백엔드 무관 |
 
 ## 부록 G. 구현 노트 (Java · Spring)

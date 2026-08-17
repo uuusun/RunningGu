@@ -98,9 +98,9 @@ SPEC §4.11(a)가 두 목록을 **하나로 합쳐 거리순으로** 보여주�
 
 ```
 GET /courses/near?lat=&lng=&targetKm=&radiusKm=
-→ items[]: { kind: ROUTE | PLACE, name, distanceM, ... }
-   ROUTE 이면  routeKm · minutes · level · routePoints · shortfall
-   PLACE 이면  category · placeUrl
+→ items[] 공통: kind(ROUTE | PLACE) · name · distanceM · lat · lng
+   ROUTE 이면  courseId · sido · sigun · difficulty · fullDistanceKm · routeKm · durationMin · shortfall · pathPolyline
+   PLACE 이면  category · address · placeUrl
 ```
 
 앱은 받은 순서대로 그리기만 한다.
