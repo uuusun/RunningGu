@@ -393,6 +393,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 5-1 `POST /api/itineraries/generate` — 생성 (무상태 · **게스트 허용**) 🔒(정리본 확정 5)
 
+**생성 권한 🔒(결정-41)**: P0 운영 동선은 이 서버 API만 생성한다. 앱은 카테고리별 POI를 조회해 자체 `ItineraryEngine`으로 새 동선을 조립하지 않고, 이 응답을 표시·저장 전 편집한다. 서버 엔진은 외부 POI 어댑터와 §5.6 순수 규칙 모듈을 분리해 테스트한다.
+
 ```json
 {
   "contestId": 153,

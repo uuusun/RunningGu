@@ -272,9 +272,9 @@ Compose 화면
 | 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items, 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
 | 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | POI items | Android 500ms debounce, 2자 미만은 호출 안 함 |
 | 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
-| 동선 생성 | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
+| 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
 
-`generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다.
+`generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다. 앱은 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않으며, 서버 응답 표시와 저장 전 USER 블록 편집만 담당한다(SPEC 결정-41).
 
 ### S7 결과·편집·저장
 
@@ -474,6 +474,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-25 | GPS 기록·ran은 P1, P0 보관함은 saved만 구현 |
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
+| SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 
 ### P1 착수 시 재논의
 
