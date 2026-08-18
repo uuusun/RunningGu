@@ -1,8 +1,8 @@
 # 안드로이드 포팅 계획 — 웹 로직을 앱으로 옮기기
 
-작성 2026-08-14 · 2026-08-17 서버 생성 결정 반영 · 대상 AP-04(domain 포팅) · 관련 SPEC §5 · §9.1 · §2.4 · 부록 D
+작성 2026-08-14 · 2026-08-18 서버 동선·OSM 코스 생성 결정 반영 · 대상 AP-04(domain 포팅) · 관련 SPEC §5 · §9.1 · §2.4 · 부록 D
 
-> **결정-41**: P0 새 동선의 운영 생성 주체는 백엔드 `POST /itineraries/generate` 하나다. PR #22로 머지된 앱 `ItineraryEngine`은 서버 이식의 참고 구현·테스트 기준이며 운영 화면에 연결하지 않는다. 이 결정이 아래 포팅 항목의 기존 앱 엔진 계획을 대체한다.
+> **결정-41·42**: P0 새 동선은 백엔드 `POST /itineraries/generate`만 생성하고, 목표 거리·난이도에 맞는 큐레이션 경로가 없는 도시 러닝코스는 서버 GraphHopper가 생성한다. 앱 `ItineraryEngine`과 OSM 라우팅은 운영 화면에서 실행하지 않고 서버 응답 표시·저장 전 편집·GPX 오프라인 폴백만 담당한다.
 
 SPEC이 폴더 구조(§9.1)와 파일 매핑(부록 D)은 이미 정해 두었다. 이 문서는 그걸
 **"무슨 파일을 어떤 순서로 만드는가"** 로 바꾸고, [도메인 로직 대조](domain-logic-audit.md)에서
@@ -70,33 +70,37 @@ PR #22의 Kotlin `ItineraryEngine`과 단위 테스트는 서버 이식 시 동�
 | **새 동선 생성** | 서버 규칙 엔진 → KTO·카카오 POI 조립 | `POST /itineraries/generate` |
 | 인근 축제 | 서버 → KTO | `GET /contests/{id}/festivals` |
 | 출발지 검색(지오코딩) | 서버 → 카카오 | `GET /geocode` |
-| **근처에서 뛸 만한 곳** | 서버 (두루누비 GPX + 카카오 걷기 스팟을 **서버에서 합쳐** 거리순으로) | `GET /courses/near` — 아래 참고 |
+| **근처에서 뛸 만한 곳** | 서버 (목표 거리·난이도 큐레이션 경로 우선, 적합 경로가 없으면 OSM/GraphHopper 생성 1건 + 카카오 걷기 스팟을 **서버에서 합쳐** 거리순으로) | `GET /courses/near` — 아래 참고 |
 | 코스 목록(지역별) | 서버 (두루누비 메타 + GPX) | `GET /courses` · `/courses/regions` |
 | 대회·찜·동선·기록 | 서버 (SSOT) | `GET /contests` · `/me/**` · `/itineraries` · `/runs` |
 
 **앱에 남는 계산은 이것뿐이다.** 서버가 생성한 동선을 저장 전에 편집하고, 회복 안내를 미리 표시하고,
 종목을 표준화하는 일. 그리고 오프라인일 때 번들된 GPX 축약본으로 코스를 자르는 일. 새 동선 조립은 서버만 한다.
 
-### 3.1 근처 코스와 걷기 스팟은 서버가 합쳐서 준다
+### 3.1 근처 큐레이션·OSM 코스와 걷기 스팟은 서버가 합쳐서 준다
 
-SPEC §4.11(a)가 두 목록을 **하나로 합쳐 거리순으로** 보여주기로 바뀌었다(사용자에게 데이터
-출처를 노출하지 않는다). 그러면 앱이 `/courses/near` 와 `/walk-spots` 를 따로 부르고 직접
-섞는 방식은 맞지 않는다.
+SPEC §4.11(a)는 경로와 장소를 **하나로 합쳐 거리순으로** 보여준다. 항목 카드에 원천 이름을 붙이지
+않되 실제 사용 원천은 응답 `attributions[]`로 목록 하단에 표시한다. 앱이 `/courses/near`·
+`/walk-spots`·GraphHopper를 따로 부르고 직접 섞는 방식은 맞지 않는다.
 
 - 두 번 부르면 **둘 다 도착해야 정렬이 확정**된다 → 목록이 늦게 뜨거나 순서가 튄다
 - 섞고 정렬하는 규칙이 앱과 서버에 두 벌로 갈라진다
 
-그래서 `GET /courses/near` 하나가 **경로와 장소를 섞어 거리순으로** 반환한다. 항목마다
-경로 유무를 구분하는 필드를 둔다.
+그래서 `GET /courses/near` 하나가 목표 거리·난이도에 맞는 큐레이션 경로를 먼저 찾고, 0건이면 OSM 경로를 최대 1건 생성한
+뒤 장소와 섞어 거리순으로 반환한다. 항목마다 경로 유무와 경로 원천을 구분하는 필드를 둔다.
 
 ```
-GET /courses/near?lat=&lng=&targetKm=&radiusKm=
+GET /courses/near?lat=&lng=&targetKm=&difficulty=&radiusKm=
 → items[] 공통: kind(ROUTE | PLACE) · name · distanceM · lat · lng
-   ROUTE 이면  courseId · sido · sigun · difficulty · fullDistanceKm · routeKm · durationMin · shortfall · pathPolyline
+   ROUTE 이면  routeId · dataSource · difficulty · routeKm · durationMin · gainM · elevationProfileM · shortfall · pathPolyline
+                 (큐레이션만 sourceCourseId · sido · sigun · fullDistanceKm)
    PLACE 이면  category · address · placeUrl
+  degradedSources[] · attributions[]
 ```
 
-앱은 받은 순서대로 그리기만 한다.
+앱은 받은 순서대로 그린다. 직접 진입 난이도는 `EASY`, S7 연계는 `K5/K10→EASY`,
+`HALF→NORMAL`, `FULL/TRAIL→HARD`를 기본값으로 받고 사용자가 칩으로 변경한다. 항목이 있으면
+`degradedSources`를 비차단 안내로, 항목 없이 원천 실패면 Error로 매핑한다.
 
 ---
 
@@ -166,7 +170,8 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 지금 있는 Composable 에 ViewModel 을 붙인다. 네 가지 상태(로딩/내용/빈/오류)를 다 만든다.
 
 **5단계 · 지도와 코스** (지도 SDK 필요)
-카카오맵 Android SDK 를 붙이고 `CourseBuilder` 를 연결한다.
+카카오맵 Android SDK와 `/courses/near` DTO를 연결한다. 온라인 경로는 서버 응답만 표시하고,
+`CourseBuilder`는 번들 GPX 오프라인 폴백에만 사용한다. 난이도 칩·고도 스트립·동적 출처 문구를 포함한다.
 
 **6단계 · GPS 기록** (5단계 필요, P1)
 포그라운드 서비스 + 위치 수집. MVP 범위 밖이라 마지막이다.
@@ -175,31 +180,18 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 
 ## 7. 아직 안 정한 것
 
-- **걷기 좋은 곳 필터를 고칠지** — 지금 규칙대로면 공원 안 시설물(방문자센터·게양대)이
-  목록의 절반을 먹는다. 개선안은 실제 API 로 검증해 뒀다. SPEC §5.9 문장을 고치는 일이다.
-- **수도권 기본 화면** — 두루누비 코스가 없는 지역에서 걷기 좋은 곳이 기본이 된다.
-  목표 거리는 "오늘 뛸 목표" 로 유지하고 기록 화면에서 진행률로 보여주기로 했다(목업 반영 완료).
 - **Hilt 를 쓸지** — SPEC 은 "선택" 으로 열어 두었다. 화면 수가 적어 수동 주입으로도 된다.
 
 ---
 
-## 8. 백로그 — 수도권에서도 경로를 만들려면
+## 8. P0 확정 — OSM 도시 러닝코스
 
-수도권에는 따라갈 경로가 없어 "장소만" 나온다. 경로까지 만들려면 도보 길찾기가 필요한데,
-조사 결과는 이렇다.
+결정-42에 따라 수도권·평지 도시의 큐레이션 공백은 서버 GraphHopper가 OSM 순환 경로를 생성해
+채운다. 카카오모빌리티·TMAP 보행자 A→B 우회안은 폐기한다.
 
-| 후보 | 상태 |
-|---|---|
-| 카카오모빌리티 도보 길찾기 | **제휴 파트너 전용** — 사전 계약 필요. 쓸 수 없다 |
-| TMAP 보행자 경로안내 (`apis.openapi.sk.com/tmap/routes/pedestrian`) | 공개 API. 국내 보행자 길찾기는 사실상 여기뿐 |
-
-다만 길찾기는 **A→B** 를 준다. 우리가 필요한 건 "목표 거리만큼 뛰고 제자리로 돌아오는 코스" 다.
-우회 방법은 있다 — 이미 갖고 있는 걷기 스팟 목록을 쓰면 된다.
-
-1. 출발지에서 **목표의 절반쯤 떨어진 스팟**을 고른다 (5km 목표 → 2.5km 지점)
-2. 출발지 → 그 스팟 도보 경로를 받는다
-3. 왕복하면 목표 거리에 근접한다 (두루누비 `buildRouteNear` 와 같은 원리)
-
-**MVP 에는 넣지 않는다.** 외부 API 의존이 하나 늘고(키·프록시·장애 대응), 무료 한도와 상업적
-이용 조건을 아직 확인하지 못했으며, 보행자 길찾기는 도로 기준이라 하천변·공원 안 산책로를
-제대로 못 잡을 수 있다. 지금 폴백만으로도 "수도권에서 뛰고 기록한다" 는 충족된다.
+- 앱은 `difficulty`와 출발지·목표 거리만 우리 API에 전달한다.
+- GraphHopper 주소·OSM 그래프·SRTM은 앱에 포함하지 않는다.
+- 목표 거리·난이도에 맞는 큐레이션이 0건일 때만 OSM 생성 경로 최대 1건을 받는다.
+- `sourceCourseId`가 없는 OSM 경로도 경로 snapshot으로 저장한다.
+- `degradedSources=OSM`과 장소가 함께 오면 Content+안내, 항목도 없으면 Error다.
+- `© OpenStreetMap contributors`는 서버가 준 `attributions[]`를 그대로 표시한다.

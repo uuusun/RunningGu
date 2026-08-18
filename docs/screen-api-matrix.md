@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.2
+# 런닝구 화면–API 매핑표 v1.3
 
-> 갱신일: 2026-08-17
+> 갱신일: 2026-08-18
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.2(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v2.3(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -18,7 +18,8 @@ Compose 화면
   → 우리 백엔드 /api (JSON)
      ├─ PostgreSQL 서버 SSOT
      ├─ 한국관광공사·두루누비 REST API
-     └─ 카카오 REST API
+     ├─ 카카오 REST API
+     └─ GraphHopper 내부 프로세스 ← 대한민국 OSM PBF + SRTM
 
 기기 내부
   ├─ DataStore: 세션 토큰·게스트 여부·설정
@@ -51,6 +52,7 @@ Compose 화면
 | `KTO_LIVE` | 한국관광공사 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
 | `KAKAO_LIVE` | 카카오 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
 | `KTO_SYNC_GPX` | 두루누비 최신 메타 동기화 + GPX 경로 결합 | 마지막 성공 메타·GPX 기준 데이터 보관 |
+| `OSM_GRAPH` | 서버 내부 GraphHopper가 OSM+SRTM으로 순환 경로 생성 | 원천 그래프는 영속 캐시, 응답은 임시 DTO·사용자 저장 시 snapshot만 보관 |
 | `LOCAL_STATE` | 화면·ViewModel 메모리 상태 | 저장하지 않음 |
 | `LOCAL_CACHE` | Room·DataStore·임시 GPS | 제한적 로컬 보관 |
 | `ANDROID_SDK` | 위치·지도·카카오 로그인 등 Android SDK | 기능별 최소 상태만 보관 |
@@ -93,7 +95,7 @@ Compose 화면
 | S6 숙소 | 주변 숙소·검색 결과 | POI DTO | `KAKAO_LIVE`, KTO 숙박 폴백 | 영구 저장 없음 | 서버 5분 캐시 |
 | S7 새 동선 | recovery, days, blocks | 생성 DTO | 서버 규칙 엔진 + KTO/카카오 POI | 저장 전 없음 | Result ViewModel 임시 DTO |
 | S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | Room 읽기 캐시 |
-| S8 내 주변 통합 목록 | 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items | `KTO_SYNC_GPX` + `KAKAO_LIVE` | 코스 메타·경로만 기준 데이터 보관, 장소 영구 저장 없음 | GPX 축약 폴백·Room·서버 TTL 캐시 |
+| S8 내 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 GraphHopper 그래프 캐시, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
 | S8 지역 코스 | 지역·코스 수·목록 | regions + page | `KTO_SYNC_GPX` | 최신 메타·경로 기준 데이터 | Room 읽기 캐시 |
 | R1 GPS 기록 | timestamp, lat, lng, distance | 위치 point stream | `ANDROID_SDK` | 저장 전 없음 | 전송 전 임시 기록 |
 | R2 러닝 요약 | 거리·시간·평균 페이스·경로 | local summary / run DTO | `LOCAL_STATE` + `SERVER_DB` | RUN·RUN_TRACK | 저장 전 임시 기록 |
@@ -291,7 +293,7 @@ Compose 화면
 | 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409 |
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
 | Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
-| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
+| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5),difficulty=event 기본값)` | LOCAL_STATE | `K5/K10→EASY`, `HALF→NORMAL`, `FULL/TRAIL→HARD`; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
 
 ---
 
@@ -305,17 +307,20 @@ Compose 화면
 | 출발지 검색 | `GET /api/geocode` | query | name,address,lat,lng / KAKAO_LIVE | `NO_RESULT` |
 | 프리셋 | 앱 상수 | 5개 좌표 | start point | API 없음 |
 | 거리 슬라이더 | 로컬 | 1~21km, 0.5 단위 | targetKm | 드래그 종료 후 조회 권장 |
-| 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,radiusKm=8,size=12 | 공통 kind,name,distanceM,lat,lng + ROUTE 경로 필드 / PLACE 장소 필드 | 서버가 거리순 통합, 둘 다 0건이면 Empty, 호출 실패면 Error |
+| 난이도 칩 | 로컬+S7 전달 | `EASY\|NORMAL\|HARD` | 직접 진입 EASY, S7 `K5/K10→EASY`, `HALF→NORMAL`, `FULL/TRAIL→HARD`; 사용자 변경 가능 | 단일 선택, 변경 시 near 재조회 |
+| 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,difficulty,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·난이도에 맞는 큐레이션 0건이면 OSM 최대 1건 생성 후 거리순 통합 |
+| 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | Content+비차단 안내, OSM 실패 시 주변 장소 유지 |
+| 전체 Empty/Error | 같은 near 응답 | 없음 | 모든 원천 정상+items=[] / 원천 실패+표시 항목 없음 | 전자는 Empty, 후자는 `503 COURSE_SOURCES_UNAVAILABLE` Error |
 | 지역 칩 | `GET /api/courses/regions` | 없음 | region,count | 실패 시 Error |
-| 지역 목록 | `GET /api/courses` | region?,page,size | course page | 지역 0건 Empty |
-| 코스 저장 | `POST /api/me/courses` | course snapshot | 신규 201 / fingerprint 중복 200 기존 id | 서버가 routeFingerprint 재계산, 게스트 modal |
+| 지역 목록 | `GET /api/courses` | region?,page,size | 큐레이션 course page(OSM 미포함) | 지역 0건 Empty |
+| 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버가 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved/Ran` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 
 ### S8-D 코스 상세
 
 | 종류 | 조회 | 필요한 필드 | 행동 |
 |---|---|---|---|
-| near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | courseId,pathPolyline,routeKm,durationMin,difficulty,lat,lng | 저장(P0)·뛰기(P1) |
+| near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | routeId,dataSource,pathPolyline,routeKm,durationMin,difficulty,gainM,elevationProfileM,lat,lng | 저장(P0)·뛰기(P1) |
 | saved 저장 코스 | `courseDetail/saved/{savedCourseId}` + `GET /api/me/courses/{id}` | 목록 필드 + pathPolyline | 삭제 확인(P0)·뛰기(P1) |
 | ran 러닝 기록(P1) | `courseDetail/ran/{runId}` + `GET /api/runs/{id}` | ranAt, distanceKm, durationSec, avgPaceSec, encodedPolyline, pointCount | 삭제 확인 |
 
@@ -403,7 +408,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 홈 영역별 상태 | 110~116 | closing-soon과 festivals를 독립 Loading/Empty/Error로 관리, offline은 Room |
 | 캘린더 부분 실패 | 120~125 | 목록 실패와 daily-counts 실패를 분리, 검색/day/month Empty 구분 |
 | 보관함 부분 실패 | 130~133 | 동선·코스·찜 segment 오류 분리, offline은 읽기 전용 |
-| 서울 코스 기본 상태 | 140 | 두루누비 경로 0 + Kakao 걷기 장소가 정상 Content |
+| 서울 코스 기본 상태 | 140 교체 필요 | 선택 거리·난이도 큐레이션 0건 → OSM 생성 경로+Kakao 장소가 정상 Content. GraphHopper 실패 변형은 장소 Content+비차단 안내 |
 
 ### 확인된 플로우 연결
 
@@ -426,7 +431,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 대회 상세 인근 축제 | `GET /api/contests/{id}/festivals` | `searchFestival2` 후 날짜 겹침·40km 필터 | 대회별 1일 캐시 | Loading/Empty/Error 포함 독립 영역 |
 | 동선 관광·역사 POI | `GET /api/pois?category=TOUR/HISTORY` | `locationBasedList2` | 5분 캐시 | 결과·POI 추가/교체 시트 |
 | 동선 웰니스 POI | `GET /api/pois?category=WELLNESS` | WellnessTursmService | 5분 캐시 | 위저드 취향→동선 결과 |
-| 러닝코스 | `GET /api/courses/**` | Durunubi `courseList` | 시작 시+하루 1회 동기화, GPX 결합 | 코스 목록·상세·출처 문구 |
+| 러닝코스 큐레이션 | `GET /api/courses/**` | Durunubi `courseList` | 시작 시+하루 1회 동기화, GPX 결합 | 지역 목록·near 우선 경로·한국관광공사 출처. OSM fallback은 KTO 증빙을 대체하지 않음 |
 
 숙소는 카카오 AD5가 1순위이고 KTO 32는 폴백이므로 숙소 화면 하나만으로 KTO 사용을 증명하지 않는다. 공모전 실시간 API 증빙의 주 기능은 **S3 인근 축제**, 보조 기능은 홈 축제와 TOUR/HISTORY/WELLNESS POI로 삼는다.
 
@@ -464,7 +469,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-12 | 숙소 검색은 2자 이상·500ms debounce 후 서버 query 호출 |
 | D-13(개정) | 정상 0건은 S7 Empty, 네트워크·timeout·4xx/5xx는 S7 Error. 구 "모든 실패=Empty" 결정 폐기 |
 | D-14 | block PATCH는 갱신 block 전체, order PUT은 해당 일자 blocks 전체를 `200`으로 반환 |
-| D-15 | S7→S8은 `CourseLaunchContext`를 SavedStateHandle/그래프 상태로 전달, 좌표를 route에 넣지 않음 |
+| D-15 | S7→S8은 출발지·목표거리·EventType 기본 난이도의 `CourseLaunchContext`를 SavedStateHandle/그래프 상태로 전달, 좌표를 route에 넣지 않음 |
 | D-16 | Empty는 입력 유지 후 위저드 복귀·조건 수정, Error는 같은 요청 재시도 |
 | D-18 | 서버 계산 `routeFingerprint` 기준 사용자별 멱등 저장. 신규 201, 중복 200 기존 id |
 | D-20 | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved/ran 분리 route |
@@ -475,6 +480,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
+| SPEC 결정-42 | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 목표 거리·난이도 큐레이션 0건 fallback 1건, 난이도 칩+EventType 기본값 사용 |
 
 ### P1 착수 시 재논의
 
@@ -494,6 +500,7 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 - `POST /api/itineraries/generate`의 최대 7일·대회일 포함·좌표 없음·Empty/Error 구분
 - block PATCH와 order PUT의 `200` 갱신 응답
 - `POST /api/me/courses`의 fingerprint 멱등 저장
+- `GET /api/courses/near`의 난이도 입력·큐레이션 우선/OSM fallback·생성 경로 DTO·부분 실패·출처 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 
