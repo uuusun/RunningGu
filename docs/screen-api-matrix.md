@@ -1,6 +1,6 @@
-# 런닝구 화면–API 매핑표 v1.3
+# 런닝구 화면–API 매핑표 v1.4
 
-> 갱신일: 2026-08-18
+> 갱신일: 2026-08-19
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
@@ -293,7 +293,7 @@ Compose 화면
 | 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409 |
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
 | Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
-| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5),difficulty=event 기본값)` | LOCAL_STATE | `K5/K10→EASY`, `HALF→NORMAL`, `FULL/TRAIL→HARD`; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
+| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
 
 ---
 
@@ -307,9 +307,10 @@ Compose 화면
 | 출발지 검색 | `GET /api/geocode` | query | name,address,lat,lng / KAKAO_LIVE | `NO_RESULT` |
 | 프리셋 | 앱 상수 | 5개 좌표 | start point | API 없음 |
 | 거리 슬라이더 | 로컬 | 1~21km, 0.5 단위 | targetKm | 드래그 종료 후 조회 권장 |
-| 난이도 칩 | 로컬+S7 전달 | `EASY\|NORMAL\|HARD` | 직접 진입 EASY, S7 `K5/K10→EASY`, `HALF→NORMAL`, `FULL/TRAIL→HARD`; 사용자 변경 가능 | 단일 선택, 변경 시 near 재조회 |
-| 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,difficulty,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·난이도에 맞는 큐레이션 0건이면 OSM 최대 1건 생성 후 거리순 통합 |
-| 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | Content+비차단 안내, OSM 실패 시 주변 장소 유지 |
+| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty=EASY\|NORMAL`, `gainM`, 고도 스트립 | P0 내 주변 난이도 칩 없음; HARD는 서버 자동 추천 제외, 지역별 큐레이션에는 유지 |
+| 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·상승 상한에 맞는 큐레이션 0건이면 거리·상승·차도·회전 상한을 통과한 OSM 최대 1건 생성 후 거리순 통합 |
+| OSM 품질 상한 | 서버 내부 | seed 0~15 | 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km | 하나라도 초과하면 후보 제외, 상한 완화 금지; AP-25 전 차도 거리 가중 PoC 재검증 |
+| 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | 호출 실패만 Content+비차단 안내; 품질 상한 통과 후보 0건은 정상 결과 |
 | 전체 Empty/Error | 같은 near 응답 | 없음 | 모든 원천 정상+items=[] / 원천 실패+표시 항목 없음 | 전자는 Empty, 후자는 `503 COURSE_SOURCES_UNAVAILABLE` Error |
 | 지역 칩 | `GET /api/courses/regions` | 없음 | region,count | 실패 시 Error |
 | 지역 목록 | `GET /api/courses` | region?,page,size | 큐레이션 course page(OSM 미포함) | 지역 0건 Empty |
@@ -408,7 +409,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 홈 영역별 상태 | 110~116 | closing-soon과 festivals를 독립 Loading/Empty/Error로 관리, offline은 Room |
 | 캘린더 부분 실패 | 120~125 | 목록 실패와 daily-counts 실패를 분리, 검색/day/month Empty 구분 |
 | 보관함 부분 실패 | 130~133 | 동선·코스·찜 segment 오류 분리, offline은 읽기 전용 |
-| 서울 코스 기본 상태 | 140 교체 필요 | 선택 거리·난이도 큐레이션 0건 → OSM 생성 경로+Kakao 장소가 정상 Content. GraphHopper 실패 변형은 장소 Content+비차단 안내 |
+| 서울 코스 기본 상태 | 140 교체 필요 | 목표 거리·상승 상한 적격 큐레이션 0건 → 품질 상한 OSM 생성 경로+Kakao 장소가 정상 Content. GraphHopper 실패 변형은 장소 Content+비차단 안내 |
 
 ### 확인된 플로우 연결
 
@@ -469,7 +470,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-12 | 숙소 검색은 2자 이상·500ms debounce 후 서버 query 호출 |
 | D-13(개정) | 정상 0건은 S7 Empty, 네트워크·timeout·4xx/5xx는 S7 Error. 구 "모든 실패=Empty" 결정 폐기 |
 | D-14 | block PATCH는 갱신 block 전체, order PUT은 해당 일자 blocks 전체를 `200`으로 반환 |
-| D-15 | S7→S8은 출발지·목표거리·EventType 기본 난이도의 `CourseLaunchContext`를 SavedStateHandle/그래프 상태로 전달, 좌표를 route에 넣지 않음 |
+| D-15(개정) | S7→S8은 출발지·`min(RECOVERY.walk,5)` 목표거리만 `CourseLaunchContext`로 전달. 종목·난이도는 전달하지 않고 좌표를 route 문자열에 넣지 않음 |
 | D-16 | Empty는 입력 유지 후 위저드 복귀·조건 수정, Error는 같은 요청 재시도 |
 | D-18 | 서버 계산 `routeFingerprint` 기준 사용자별 멱등 저장. 신규 201, 중복 200 기존 id |
 | D-20 | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved/ran 분리 route |
@@ -480,7 +481,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
-| SPEC 결정-42 | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 목표 거리·난이도 큐레이션 0건 fallback 1건, 난이도 칩+EventType 기본값 사용 |
+| SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
 
 ### P1 착수 시 재논의
 
@@ -500,7 +501,7 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 - `POST /api/itineraries/generate`의 최대 7일·대회일 포함·좌표 없음·Empty/Error 구분
 - block PATCH와 order PUT의 `200` 갱신 응답
 - `POST /api/me/courses`의 fingerprint 멱등 저장
-- `GET /api/courses/near`의 난이도 입력·큐레이션 우선/OSM fallback·생성 경로 DTO·부분 실패·출처 계약
+- `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·표시 난이도 DTO·정상 0건/부분 실패·출처 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 

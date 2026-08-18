@@ -1,8 +1,8 @@
 # 안드로이드 포팅 계획 — 웹 로직을 앱으로 옮기기
 
-작성 2026-08-14 · 2026-08-18 서버 동선·OSM 코스 생성 결정 반영 · 대상 AP-04(domain 포팅) · 관련 SPEC §5 · §9.1 · §2.4 · 부록 D
+작성 2026-08-14 · 2026-08-19 서버 동선·OSM 코스 품질 상한 결정 반영 · 대상 AP-04(domain 포팅) · 관련 SPEC §5 · §9.1 · §2.4 · 부록 D
 
-> **결정-41·42**: P0 새 동선은 백엔드 `POST /itineraries/generate`만 생성하고, 목표 거리·난이도에 맞는 큐레이션 경로가 없는 도시 러닝코스는 서버 GraphHopper가 생성한다. 앱 `ItineraryEngine`과 OSM 라우팅은 운영 화면에서 실행하지 않고 서버 응답 표시·저장 전 편집·GPX 오프라인 폴백만 담당한다.
+> **결정-41·42**: P0 새 동선은 백엔드 `POST /itineraries/generate`만 생성하고, 목표 거리와 상승 상한에 맞는 큐레이션 경로가 없는 도시 러닝코스는 서버 GraphHopper가 생성한다. P0 난이도 입력은 없고 서버가 HARD·고차도·과다 회전 경로를 제외한다. 앱 `ItineraryEngine`과 OSM 라우팅은 운영 화면에서 실행하지 않고 서버 응답 표시·저장 전 편집·GPX 오프라인 폴백만 담당한다.
 
 SPEC이 폴더 구조(§9.1)와 파일 매핑(부록 D)은 이미 정해 두었다. 이 문서는 그걸
 **"무슨 파일을 어떤 순서로 만드는가"** 로 바꾸고, [도메인 로직 대조](domain-logic-audit.md)에서
@@ -70,7 +70,7 @@ PR #22의 Kotlin `ItineraryEngine`과 단위 테스트는 서버 이식 시 동�
 | **새 동선 생성** | 서버 규칙 엔진 → KTO·카카오 POI 조립 | `POST /itineraries/generate` |
 | 인근 축제 | 서버 → KTO | `GET /contests/{id}/festivals` |
 | 출발지 검색(지오코딩) | 서버 → 카카오 | `GET /geocode` |
-| **근처에서 뛸 만한 곳** | 서버 (목표 거리·난이도 큐레이션 경로 우선, 적합 경로가 없으면 OSM/GraphHopper 생성 1건 + 카카오 걷기 스팟을 **서버에서 합쳐** 거리순으로) | `GET /courses/near` — 아래 참고 |
+| **근처에서 뛸 만한 곳** | 서버 (목표 거리·HARD 제외 큐레이션 경로 우선, 적합 경로가 없으면 품질 상한 OSM/GraphHopper 생성 1건 + 카카오 걷기 스팟을 **서버에서 합쳐** 거리순으로) | `GET /courses/near` — 아래 참고 |
 | 코스 목록(지역별) | 서버 (두루누비 메타 + GPX) | `GET /courses` · `/courses/regions` |
 | 대회·찜·동선·기록 | 서버 (SSOT) | `GET /contests` · `/me/**` · `/itineraries` · `/runs` |
 
@@ -86,11 +86,11 @@ SPEC §4.11(a)는 경로와 장소를 **하나로 합쳐 거리순으로** 보�
 - 두 번 부르면 **둘 다 도착해야 정렬이 확정**된다 → 목록이 늦게 뜨거나 순서가 튄다
 - 섞고 정렬하는 규칙이 앱과 서버에 두 벌로 갈라진다
 
-그래서 `GET /courses/near` 하나가 목표 거리·난이도에 맞는 큐레이션 경로를 먼저 찾고, 0건이면 OSM 경로를 최대 1건 생성한
+그래서 `GET /courses/near` 하나가 목표 거리에 맞고 HARD가 아닌 큐레이션 경로를 먼저 찾고, 0건이면 품질 상한을 통과한 OSM 경로를 최대 1건 생성한
 뒤 장소와 섞어 거리순으로 반환한다. 항목마다 경로 유무와 경로 원천을 구분하는 필드를 둔다.
 
 ```
-GET /courses/near?lat=&lng=&targetKm=&difficulty=&radiusKm=
+GET /courses/near?lat=&lng=&targetKm=&radiusKm=
 → items[] 공통: kind(ROUTE | PLACE) · name · distanceM · lat · lng
    ROUTE 이면  routeId · dataSource · difficulty · routeKm · durationMin · gainM · elevationProfileM · shortfall · pathPolyline
                  (큐레이션만 sourceCourseId · sido · sigun · fullDistanceKm)
@@ -98,9 +98,9 @@ GET /courses/near?lat=&lng=&targetKm=&difficulty=&radiusKm=
   degradedSources[] · attributions[]
 ```
 
-앱은 받은 순서대로 그린다. 직접 진입 난이도는 `EASY`, S7 연계는 `K5/K10→EASY`,
-`HALF→NORMAL`, `FULL/TRAIL→HARD`를 기본값으로 받고 사용자가 칩으로 변경한다. 항목이 있으면
-`degradedSources`를 비차단 안내로, 항목 없이 원천 실패면 Error로 매핑한다.
+앱은 받은 순서대로 그리고 응답 `difficulty`를 표시만 한다. P0 내 주변에는 난이도 칩과
+`CourseLaunchContext.difficulty`가 없다. 항목이 있으면 호출 실패 `degradedSources`를 비차단 안내로,
+항목 없이 원천 실패면 Error로 매핑한다. 품질 상한 통과 후보 0건은 degraded가 아닌 정상 결과다.
 
 ---
 
@@ -171,7 +171,7 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 
 **5단계 · 지도와 코스** (지도 SDK 필요)
 카카오맵 Android SDK와 `/courses/near` DTO를 연결한다. 온라인 경로는 서버 응답만 표시하고,
-`CourseBuilder`는 번들 GPX 오프라인 폴백에만 사용한다. 난이도 칩·고도 스트립·동적 출처 문구를 포함한다.
+`CourseBuilder`는 번들 GPX 오프라인 폴백에만 사용한다. 표시용 난이도·고도 스트립·동적 출처 문구를 포함하며 P0 난이도 칩은 만들지 않는다.
 
 **6단계 · GPS 기록** (5단계 필요, P1)
 포그라운드 서비스 + 위치 수집. MVP 범위 밖이라 마지막이다.
@@ -189,9 +189,10 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 결정-42에 따라 수도권·평지 도시의 큐레이션 공백은 서버 GraphHopper가 OSM 순환 경로를 생성해
 채운다. 카카오모빌리티·TMAP 보행자 A→B 우회안은 폐기한다.
 
-- 앱은 `difficulty`와 출발지·목표 거리만 우리 API에 전달한다.
+- 앱은 출발지·목표 거리만 우리 API에 전달한다. S7 연계도 `min(RECOVERY.walk,5)` 목표 거리만 넘긴다.
 - GraphHopper 주소·OSM 그래프·SRTM은 앱에 포함하지 않는다.
-- 목표 거리·난이도에 맞는 큐레이션이 0건일 때만 OSM 생성 경로 최대 1건을 받는다.
+- 목표 거리·상승 `<50m/km`에 맞는 큐레이션이 0건일 때만 OSM 생성 경로 최대 1건을 받는다.
+- OSM은 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km를 모두 통과해야 하며 상한을 완화하지 않는다.
 - `sourceCourseId`가 없는 OSM 경로도 경로 snapshot으로 저장한다.
-- `degradedSources=OSM`과 장소가 함께 오면 Content+안내, 항목도 없으면 Error다.
+- `degradedSources=OSM`과 장소가 함께 오면 Content+안내, 항목도 없으면 Error다. 적격 후보 0건은 degraded가 아니다.
 - `© OpenStreetMap contributors`는 서버가 준 `attributions[]`를 그대로 표시한다.

@@ -85,6 +85,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 타임아웃 | 경로 후보 16건 전체 3초 🔧, 초과 시 `OSM` degraded 처리 |
 | 기동 | readiness 완료 전 OSM 생성 비활성, Spring Boot 기동과 분리 |
 | 그래프 | 고정 GraphHopper+대한민국 PBF로 배포 단계에서 생성, 그래프 약 514MB+SRTM 캐시를 영속 볼륨에서 재사용 |
+| 품질 | 거리 75~125%·상승 <50m/km·실거리 가중 차도 ≤10%·실제 방향 전환 ≤6회/km를 모두 만족한 후보만 허용, 상한 완화 금지 |
 | 장애 | 다른 경로·장소가 있으면 `200`+`degradedSources`, 표시 항목도 없으면 `503 COURSE_SOURCES_UNAVAILABLE` |
 | 저장 | OSM 원천 그래프는 DB에 복제하지 않고 생성 경로 snapshot만 사용자 저장 시 PostgreSQL에 보관 |
 
@@ -485,16 +486,16 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 6. 러닝코스 API `/api/courses` (공개)
 
-> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 산림청 등 큐레이션 GPX를 우선한다. 내 주변에서 목표 거리·난이도에 맞는 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 순환 경로를 최대 1건 생성한다(결정-42). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 산림청 등 큐레이션 GPX를 우선한다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
-`?lat=&lng=&targetKm=5&difficulty=EASY&radiusKm=8&size=12`
+`?lat=&lng=&targetKm=5&radiusKm=8&size=12`
 
 - `targetKm`: 1~21, 0.5 단위.
-- `difficulty`: `EASY|NORMAL|HARD`, 필수. S8 직접 진입은 `EASY`; S7 연계 기본값은 `K5/K10→EASY`, `HALF→NORMAL`, `FULL/TRAIL→HARD`이며 앱에서 변경 가능하다.
 - `radiusKm`: 기본 8. 큐레이션 진입점 조회 반경이며 GraphHopper는 입력 출발점에서 순환 경로를 만든다.
 - `size`: 큐레이션/OSM 경로와 PLACE를 합친 최대 항목 수, 기본·최대 12.
+- P0 내 주변 요청에는 난이도 파라미터가 없다. 서버가 `HARD(≥50m/km)`를 자동 추천에서 제외하며 응답 `difficulty`는 표시용이다.
 
 ```json
 {
@@ -532,13 +533,14 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
 - `routeId`는 near snapshot 내부 식별용 불투명 문자열이다. 저장·중복 판정에는 사용하지 않고 서버가 경로 snapshot으로 `routeFingerprint`를 다시 계산한다.
-- 큐레이션 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로. 조각의 `cumGainM`으로 계산한 난이도가 요청값과 같은 큐레이션 경로가 1건 이상이면 GraphHopper를 호출하지 않는다.
-- OSM 규칙 🔒(SPEC §5.8): 목표 거리·난이도에 맞는 큐레이션 경로가 0건일 때 `run` 프로파일·보정 거리 0.78·seed 16개로 후보를 만들고, 목표 75~125%·선택 난이도 후보 중 차도≤5% 우선 → 거리 오차 → 방향 전환 수로 최대 1건을 고른다. 난이도 불일치 후보로 자동 강등하지 않는다.
-- 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
+- 큐레이션 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로. 조각의 `cumGainM`으로 계산한 상승이 `<50m/km`인 큐레이션 경로가 1건 이상이면 GraphHopper를 호출하지 않는다. 고도를 계산할 수 없는 조각은 내 주변 자동 추천에서 제외한다.
+- OSM 규칙 🔒(SPEC §5.8): 적격 큐레이션 경로가 0건일 때 `run` 프로파일·보정 거리 0.78·seed 16개로 후보를 만든다. 목표 75~125%·상승 `<50m/km`·차도 실제 거리 비율 `≤10%`·실제 방향 전환 `≤6회/km`를 모두 통과한 후보만 남기고, 차도 `≤5%` 그룹 우선 → 거리 오차 → 방향 전환/km → 차도 비율 순으로 최대 1건을 고른다. 통과 후보가 없으면 상한을 완화하지 않고 OSM 경로 0건으로 처리한다.
+- 차도 비율은 `PRIMARY|SECONDARY|TRUNK|TERTIARY|MOTORWAY` path detail 각 구간의 폴리라인 실거리 합으로 계산한다. `toRef-fromRef` 포인트 인덱스 개수를 거리로 사용하지 않는다. 방향 전환은 instruction sign `-98|-8|-3|-2|2|3|6|8`만 세고 직진·출발·도착·길 이름 변경은 제외한다.
+- 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 내 주변 `ROUTE`는 `EASY|NORMAL`만 나오며, 지역별 큐레이션 목록은 `HARD`도 표시와 함께 제공한다. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
 - 경로 공통 계산은 분당 110m로 `durationMin`, `shortfall = routeKm < targetKm-0.3`이다.
 - 장소 규칙 🔒(SPEC §5.9): 4-3의 카카오 후보를 포함/제외·중복 제거한 뒤 합친다.
 - 서버가 `ROUTE`와 `PLACE`를 `distanceM` 오름차순으로 합쳐 최대 `size`건을 반환한다. 앱은 받은 순서를 다시 정렬하지 않는다.
-- `degradedSources`는 실패해 제외된 `DURUNUBI|OSM|KAKAO` 원천이다. 항목이 하나라도 있으면 부분 실패도 `200`이며 앱은 Content와 비차단 안내를 함께 표시한다.
+- `degradedSources`는 호출·동기화 실패로 제외된 `DURUNUBI|OSM|KAKAO` 원천이다. 품질 상한 통과 후보 0건은 정상 결과이므로 `OSM` degraded가 아니다. 항목이 하나라도 있으면 부분 실패도 `200`이며 앱은 Content와 비차단 안내를 함께 표시한다.
 - 모든 원천이 정상 완료되고 두 종류가 모두 0건이면 `200 {"items": [], "degradedSources": [], "attributions": []}`이며 S8 Empty다. 원천 실패가 있고 항목도 0건이면 `503 COURSE_SOURCES_UNAVAILABLE`로 S8 Error다.
 - `attributions`는 실제 응답 항목에 사용된 원천만 중복 없이 `두루누비 걷기길(한국관광공사)`, `산림청 등산로`, `© OpenStreetMap contributors`, `카카오 로컬` 순서로 반환한다. 앱은 문자열을 변형하지 않고 목록 하단에 표시한다.
 
@@ -648,13 +650,13 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 
 | Enum | 값 | 표시 |
 |---|---|---|
-| EventType | `K5, K10, HALF, FULL, TRAIL` | 5K · 10K · 하프 · 풀 · 트레일 (필터 4버킷은 TRAIL 제외 🔒결정-12) |
+| EventType | `K5, K10, HALF, FULL` | 5K · 10K · 하프 · 풀. 원천의 트레일 표기는 거리 기준 `stdEventKm`으로 4종 중 하나에 정규화 🔒(SPEC §5.4) |
 | BlockCategory | `TOUR, FOOD, CAFE, WELLNESS, NATURE, HISTORY, LODGING, RACE, RECOVERY` | 관광지·맛집·카페·힐링웰니스·자연트레킹·역사문화·숙소·대회·회복 (9종 🔒) |
 | RegStatus | `OPEN, BEFORE, CLOSED, UNKNOWN` | 접수중·접수전·마감·미정 (조회 시점 파생 🔒§5.5) |
 | Region | 서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주 | 17개 시도 🔒(§6.2 — 비표준 값은 배치에서 주소로 보정) |
 | Provider | `EMAIL, KAKAO` | (구글·네이버 P2) |
 | ContestSource | `MARATHON_ONLINE, MARATHON_GO` | 마라톤 온라인 · 마라톤GO |
-| Difficulty | `EASY, NORMAL, HARD` | 평지·완만·언덕. 생성/조각 경로는 `<15`, `15~50 미만`, `≥50m/km`; 지역별 큐레이션 목록은 원본 등급을 같은 Enum으로 정규화 |
+| Difficulty | `EASY, NORMAL, HARD` | 평지·완만·언덕. 생성/조각 경로는 `<15`, `15~50 미만`, `≥50m/km`; 내 주변 자동 추천은 EASY/NORMAL만, 지역별 큐레이션 목록은 HARD도 제공 |
 | PoiSource | `LIVE, SAMPLE, SYNTH` | 서버 라이브 · 데모/캐시 샘플 · 합성 |
 | CourseDataSource | `API_GPX, GPX_ONLY, OSM_GENERATED` | API 메타+GPX 경로 · GPX fallback · 요청 시점 OSM 생성 경로 |
 | CourseDegradedSource | `DURUNUBI, OSM, KAKAO` | `/courses/near` 부분 실패 원천 |
@@ -708,6 +710,8 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 12. OSM way에는 고도가 거의 없다 — `graph.elevation.provider=srtm`과 영속 SRTM 캐시 없이 난이도를 계산하지 않는다.
 13. 기본 `foot` 프로파일은 큰 도로 보도를 우선할 수 있다 — P0 운영은 러닝 가중치 `run` 프로파일만 사용한다.
 14. OSM/GraphHopper는 서버 내부 원천이다 — 앱 직호출·OSM 그래프 번들을 금지하고 `© OpenStreetMap contributors`를 응답 출처에 포함한다.
+15. `road_class` path detail의 `fromRef/toRef`는 응답 좌표 인덱스다 — `toRef-fromRef`를 차도 거리로 계산하지 말고 각 구간의 폴리라인 실거리를 합산한다. AP-25 착수 전 PR #32 `--preset filter`를 이 방식으로 재실행한다.
+16. 품질 상한 미달 후보를 "가장 나은 후보"라는 이유로 반환하지 않는다. 적격 후보 0건은 정상 0건이며 GraphHopper 호출 장애와 구분한다.
 
 ## 부록 F. P1 예약 엔드포인트 (이번 명세 범위 밖 — 시그니처만 예약)
 
