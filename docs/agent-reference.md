@@ -36,6 +36,7 @@
 | 경로 | 역할 | 빌드 대상 |
 |---|---|---|
 | `android/` | 안드로이드 앱 — **제품** | ✅ |
+| `backend/` | Java 21 Spring Boot API 서버 — **제품** | ✅ |
 | `android/tools/codex-orchestrator/` | 개발 보조 도구 | 별도 모듈 |
 | `reference-web/` | 웹 참조 구현(JS). 로직 설계 참조용 | ❌ |
 | `docs/` | 명세 · 목업 · API 문서 | ❌ |
@@ -49,7 +50,7 @@
 
 | 구분 | 위치 | 지위 |
 |---|---|---|
-| **실제 코드** | `android/` | 빌드 · 배포 대상. 이것만 제품이다 |
+| **실제 코드** | `android/` · `backend/` | 빌드 · 배포 대상 |
 | **참조 구현** | `reference-web/` | 빌드 대상 아님. **일부가 SPEC 보다 낡다** |
 | **화면 목업** | `docs/mockup-design/` | 로직 없이 결과를 하드코딩해 보여준다 |
 
@@ -102,6 +103,17 @@ cd android
 
 JDK 는 **21** (`android/gradle/gradle-daemon-jvm.properties` 의 `toolchainVersion`).
 
+백엔드는 독립 Gradle wrapper를 사용한다. 통합 테스트 전에 Docker를 실행한다.
+
+```powershell
+# Windows
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+cd backend
+.\gradlew.bat clean test bootJar --console=plain
+```
+
+로컬 PostgreSQL과 환경변수 설정은 `backend/README.md`를 따른다.
+
 **린트 · 포맷터는 아직 없다.** ktlint · detekt · spotless 어느 것도 설정돼 있지 않으므로
 "린트 통과" 를 완료 조건으로 삼지 않는다. 도입은 별도 논의 사항이다.
 
@@ -118,6 +130,16 @@ android/app/src/main/java/com/runninggu/app/
 │   ├── local/   assets 폴백 · Room 읽기 캐시 · DataStore(세션)
 │   └── model/   §6 계약 데이터 클래스
 └── util/
+```
+
+```
+backend/src/main/java/com/runninggu/server/
+├── common/    오류·보안·OpenAPI·KST/UTC·JPA 공통 기반
+├── auth/      인증·로그인 수단 (구현 시 생성)
+├── contest/   canonical 대회·Importer·조회 (구현 시 생성)
+├── itinerary/ 동선 생성·저장·편집 (구현 시 생성)
+├── course/    두루누비·GPX·저장 코스 (구현 시 생성)
+└── external/  KTO·카카오·두루누비 리모트 어댑터 (구현 시 생성)
 ```
 
 불변 규칙은 `AGENTS.md` 4장에 있다. 아래는 그 배경이다.

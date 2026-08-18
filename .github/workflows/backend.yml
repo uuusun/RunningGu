@@ -1,0 +1,76 @@
+name: Backend build and test
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "SPEC.md"
+      - "docs/files/런닝구_API_명세서.md"
+      - "scripts/check_spec_drift.py"
+      - ".github/workflows/backend.yml"
+  push:
+    branches: [develop, main]
+    paths:
+      - "backend/**"
+      - "SPEC.md"
+      - "docs/files/런닝구_API_명세서.md"
+      - "scripts/check_spec_drift.py"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  spec-drift:
+    name: Spec sync check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check SPEC references in changed code
+        run: |
+          python3 scripts/check_spec_drift.py \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Unit, integration, and bootJar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Test and build
+        run: ./gradlew clean test bootJar --console=plain
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test/
+          retention-days: 7

@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17.10
+    environment:
+      POSTGRES_DB: ${DB_NAME:-runninggu}
+      POSTGRES_USER: ${DB_USERNAME:-runninggu}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 설정해야 합니다}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - runninggu-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  runninggu-postgres-data:
