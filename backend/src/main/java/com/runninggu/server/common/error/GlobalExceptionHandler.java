@@ -1,0 +1,95 @@
+package com.runninggu.server.common.error;
+
+import com.runninggu.server.common.error.ProblemDetailFactory.FieldViolation;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String INVALID_REQUEST_DETAIL = "요청 값을 확인해 주세요.";
+    private static final String INTERNAL_ERROR_DETAIL = "요청을 처리하지 못했습니다.";
+
+    private final ProblemDetailFactory problemDetailFactory;
+
+    public GlobalExceptionHandler(ProblemDetailFactory problemDetailFactory) {
+        this.problemDetailFactory = problemDetailFactory;
+    }
+
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ProblemDetail> handleApiException(
+            ApiException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = problemDetailFactory.create(
+                exception.errorCode(),
+                exception.getMessage(),
+                request);
+        return problemResponse(problem, exception.errorCode());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ProblemDetail> handleUnexpectedException(
+            Exception exception,
+            HttpServletRequest request) {
+        String traceId = problemDetailFactory.traceId(request);
+        log.error("처리되지 않은 서버 오류가 발생했습니다. traceId={}", traceId, exception);
+
+        ProblemDetail problem = problemDetailFactory.create(
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                INTERNAL_ERROR_DETAIL,
+                request);
+        return problemResponse(problem, ErrorCode.INTERNAL_SERVER_ERROR);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest webRequest) {
+        HttpServletRequest request = ((ServletWebRequest) webRequest).getRequest();
+        List<FieldViolation> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(this::toFieldViolation)
+                .toList();
+        ProblemDetail problem = problemDetailFactory.validation(
+                INVALID_REQUEST_DETAIL,
+                request,
+                errors);
+
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_FAILED.status())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+
+    private FieldViolation toFieldViolation(FieldError error) {
+        String reason = error.getDefaultMessage() == null
+                ? "올바르지 않은 값입니다."
+                : error.getDefaultMessage();
+        return new FieldViolation(error.getField(), reason);
+    }
+
+    private ResponseEntity<ProblemDetail> problemResponse(
+            ProblemDetail problem,
+            ErrorCode errorCode) {
+        return ResponseEntity
+                .status(errorCode.status())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+}

@@ -53,6 +53,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 404 | 리소스 없음 |
 | 409 | 유니크 충돌·로그인 수단 충돌·시스템 블록 변경 시도 |
 | 429 | 쿨다운·시도 횟수 초과 (인증 메일 60초, 코드 5회) |
+| 500 | 처리되지 않은 서버 내부 오류. 세부 예외 대신 추적 가능한 `traceId`만 응답 |
 | 502 | 외부 API가 오류/비정상 응답 반환 |
 | 503 | 내부 라우팅 원천 장애로 표시할 코스·장소가 없음 |
 | 504 | 외부 API 응답 시간 초과 |
@@ -686,6 +687,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
+| `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
 | `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
 | `EXTERNAL_API_TIMEOUT` | 504 | 외부 API 제한시간 초과(동선 생성 제외 — NFR-3) |
