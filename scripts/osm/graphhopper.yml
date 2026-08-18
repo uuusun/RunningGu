@@ -38,6 +38,10 @@ graphhopper:
             multiply_by: "0.2"
           - else_if: "road_class == PRIMARY || road_class == SECONDARY || road_class == TRUNK"
             multiply_by: "0.05"
+          # 계단은 뛰던 흐름을 끊는다. 다만 하천 진입로처럼 계단뿐인 길목이 있어
+          # 완전히 막지는 않고 차도만큼 깎는다.
+          - else_if: "road_class == STEPS"
+            multiply_by: "0.05"
         speed:
           - if: "true"
             limit_to: "foot_average_speed"

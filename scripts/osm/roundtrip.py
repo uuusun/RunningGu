@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import math
 import sys
 
 import requests
@@ -27,6 +28,8 @@ BASE = "http://127.0.0.1:8989"
 GOOD = {"footway", "path", "pedestrian", "cycleway", "track", "living_street"}
 #: 차도. 보도가 있어도 신호와 차량 옆이라 러닝 경험이 나쁘다.
 ROAD = {"primary", "secondary", "trunk", "tertiary", "motorway"}
+#: 계단. 뛰던 흐름이 끊긴다.
+STEPS = {"steps"}
 
 #: round_trip 은 요청값보다 길게 낸다. 목표 × 이 값으로 요청해 보정한다(실측 중앙값).
 DISTANCE_CORRECTION = 0.78
@@ -52,6 +55,13 @@ METRO = [
 ]
 
 
+def meters(a: list[float], b: list[float]) -> float:
+    """두 좌표([lng, lat, ele]) 사이 거리(m). haversine."""
+    la1, ln1, la2, ln2 = map(math.radians, (a[1], a[0], b[1], b[0]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((ln2 - ln1) / 2) ** 2
+    return 6371000 * 2 * math.asin(math.sqrt(h))
+
+
 def route(lat: float, lng: float, km: float, seed: int, profile: str) -> dict | None:
     r = requests.get(
         f"{BASE}/route",
@@ -67,15 +77,20 @@ def route(lat: float, lng: float, km: float, seed: int, profile: str) -> dict | 
         return None
     p = r.json()["paths"][0]
     pts = p["points"]["coordinates"]          # [lng, lat, ele]
+
+    # 길 종류별 **실제 거리**를 잰다. details 의 a·b 는 좌표점 번호라 개수로 세면
+    # 좌표가 촘촘한 굽은 길이 부풀고 곧은 차도는 줄어든다.
+    seg = [meters(pts[i - 1], pts[i]) for i in range(1, len(pts))]
     agg: collections.Counter = collections.Counter()
     for a, b, v in p.get("details", {}).get("road_class", []):
-        agg[v] += b - a
-    total = max(1, sum(agg.values()))
+        agg[v] += sum(seg[a:b])
+    total = max(1.0, sum(agg.values()))
     steps = p.get("instructions") or []
     return {
         "km": p["distance"] / 1000,
-        "good": sum(c for v, c in agg.items() if v in GOOD) * 100 // total,
-        "road": sum(c for v, c in agg.items() if v in ROAD) * 100 // total,
+        "good": sum(c for v, c in agg.items() if v in GOOD) * 100 / total,
+        "road": sum(c for v, c in agg.items() if v in ROAD) * 100 / total,
+        "stair": sum(c for v, c in agg.items() if v in STEPS) * 100 / total,
         "turns": sum(1 for s in steps if s.get("sign") in TURN_SIGNS),
         "steps": len(steps),
         "gain": sum(
@@ -107,10 +122,10 @@ def best(lat: float, lng: float, km: float, profile: str = "run", seeds: int = 1
 
 def header() -> None:
     print(
-        f"{'지점':13} {'목표':>5} {'실제':>8} {'좋은길':>6} {'차도':>5} "
+        f"{'지점':13} {'목표':>5} {'실제':>8} {'좋은길':>6} {'차도':>6} {'계단':>6} "
         f"{'턴/km':>6} {'안내/km':>8} {'상승':>7}"
     )
-    print("-" * 70)
+    print("-" * 78)
 
 
 def show(name: str, km: float, b: dict | None) -> None:
@@ -118,9 +133,9 @@ def show(name: str, km: float, b: dict | None) -> None:
         print(f"{name:13} {km:4.0f}km  실패")
         return
     print(
-        f"{name:13} {km:4.0f}km {b['km']:7.2f}km {b['good']:5}% {b['road']:4}% "
-        f"{b['turns'] / max(b['km'], 0.1):6.1f} {b['steps'] / max(b['km'], 0.1):8.1f} "
-        f"{b['gain']:5.0f}m"
+        f"{name:13} {km:4.0f}km {b['km']:7.2f}km {b['good']:5.1f}% {b['road']:5.1f}% "
+        f"{b['stair']:5.1f}% {b['turns'] / max(b['km'], 0.1):6.1f} "
+        f"{b['steps'] / max(b['km'], 0.1):8.1f} {b['gain']:5.0f}m"
     )
 
 
@@ -169,12 +184,14 @@ def filter_stats(profile: str, seeds: int) -> None:
     # 지표마다 그 지표에서 가장 좋은 후보를 본다. "어디까지 좋아질 수 있나"가
     # 곧 기준을 그을 수 있는 자리이기 때문이다.
     got = [c for _, _, c in pool if c]
-    roads = [float(min(c, key=lambda x: x["road"])["road"]) for c in got]
+    roads = [min(x["road"] for x in c) for c in got]
+    stairs = [min(x["stair"] for x in c) for c in got]
     turns = [min(x["turns"] / max(x["km"], 0.1) for x in c) for c in got]
     steps = [min(x["steps"] / max(x["km"], 0.1) for x in c) for c in got]
 
     print(f"분포 — 지점·거리 {len(got)}/{len(pool)} 건 생성 성공 (지표별 최선 후보 기준)")
     spread("차도", roads, "%")
+    spread("계단", stairs, "%")
     spread("턴/km", turns)
     spread("안내/km", steps)
     print("  ※ 안내/km 는 옛 계산(직진·도착 포함). 턴/km 와의 차이가 곧 과장분이다.")
