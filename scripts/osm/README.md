@@ -36,6 +36,18 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)      # Windows 는 JDK 21 경�
 python <저장소>/scripts/osm/roundtrip.py --preset metro
 ```
 
+## 계약 상한 회귀 (AP-25 테스트 기준)
+
+`--preset caps` 는 SPEC §5.8 품질 상한 네 개를 그대로 적용해 커버리지와 **탈락 사유**를 낸다.
+통과 0건인 지점은 어느 상한이 몇 개를 걸렀는지, 가장 아까운 후보가 무엇이었는지까지 찍는다.
+
+```bash
+python <저장소>/scripts/osm/roundtrip.py --preset caps              # 수도권 20곳 (기본)
+python <저장소>/scripts/osm/roundtrip.py --preset caps --zone all   # + 지방 10곳
+```
+
+계단은 계약 상한이 아니라 **회귀 기준**(선택된 경로 ≤1%)으로만 확인한다.
+
 ## 물길 인덱스 (골목 회피 · 하천 유도 검증용)
 
 `--preset water` 는 전국 물길 인덱스가 필요하다. PBF 에서 한 번 만들면 된다.

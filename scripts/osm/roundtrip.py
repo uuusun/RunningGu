@@ -203,6 +203,97 @@ def spread(label: str, values: list[float], unit: str = "") -> None:
     )
 
 
+# ── 계약 상한 회귀 (AP-25) ────────────────────────────────────
+
+#: SPEC §5.8 품질 상한. 이 값이 계약이며 임의로 완화하지 않는다.
+CAP_DIST = (0.75, 1.25)   # 목표 대비
+CAP_GAIN = 50.0           # m/km 미만
+CAP_ROAD = 10.0           # 실거리 가중 차도 % 이하
+CAP_TURN = 6.0            # 실제 회전 회/km 이하
+#: 회귀 테스트 기준. 계약 상한은 아니고 선택된 경로가 이 아래인지만 확인한다.
+STAIR_REGRESSION = 1.0
+
+
+def cap_flags(c: dict, km: float) -> dict[str, bool]:
+    """상한별 통과 여부. 어떤 상한에서 걸렸는지 보려고 따로 낸다."""
+    return {
+        "거리": CAP_DIST[0] * km <= c["km"] <= CAP_DIST[1] * km,
+        "상승": c["gain"] / max(c["km"], 0.1) < CAP_GAIN,
+        "차도": c["road"] <= CAP_ROAD,
+        "회전": c["turns"] / max(c["km"], 0.1) <= CAP_TURN,
+    }
+
+
+def caps_stats(seeds: int, zone: str) -> None:
+    """계약 상한을 그대로 적용한 커버리지와 **탈락 사유**.
+
+    백엔드 회귀 기준으로 쓴다. 통과 0건인 지점은 어느 상한이 몇 개를 걸렀는지,
+    가장 아까운 후보가 무엇이었는지까지 남긴다.
+    """
+    pts = []
+    if zone in ("metro", "all"):
+        pts += [(n, a, b, "수도권") for n, a, b in METRO]
+    if zone in ("local", "all"):
+        pts += [(n, a, b, "지방") for n, a, b in LOCAL]
+
+    cells, misses = [], []
+    for nm, la, lo, z in pts:
+        for km in FILTER_KMS:
+            cands = [route(la, lo, km * DISTANCE_CORRECTION, s, "run") for s in range(seeds)]
+            cands = [c for c in cands if c]
+            ok = [c for c in cands if all(cap_flags(c, km).values())]
+            cells.append((nm, z, km, cands, ok))
+            if not ok:
+                misses.append((nm, z, km, cands))
+
+    total = len(cells)
+    passed = sum(1 for *_, ok in cells if ok)
+    print(f"계약 상한 적용 — 지점·거리 {passed}/{total} 에서 경로가 나온다")
+    print(f"  거리 {CAP_DIST[0]:.2f}~{CAP_DIST[1]:.2f}배 · 상승 <{CAP_GAIN:.0f}m/km"
+          f" · 차도 ≤{CAP_ROAD:.0f}% · 회전 ≤{CAP_TURN:.0f}회/km")
+    print()
+
+    for z in ("수도권", "지방"):
+        sub = [c for c in cells if c[1] == z]
+        if sub:
+            n = sum(1 for *_, ok in sub if ok)
+            print(f"  {z:4} {n:2}/{len(sub)}")
+
+    print()
+    print("상한별 — 그 상한 하나만 봤을 때 통과하는 후보가 있는 지점·거리")
+    for key in ("거리", "상승", "차도", "회전"):
+        n = sum(1 for _, _, km, cands, _ in cells
+                if any(cap_flags(c, km)[key] for c in cands))
+        print(f"  {key}만          {n:3}/{total}")
+
+    if misses:
+        print()
+        print(f"통과 0건 — {len(misses)}건. 어느 상한 때문인지")
+        for nm, z, km, cands in misses:
+            if not cands:
+                print(f"  {nm:12}{km:3}km  후보 자체가 0개 (라우팅 실패)")
+                continue
+            cnt = {k: sum(1 for c in cands if cap_flags(c, km)[k])
+                   for k in ("거리", "상승", "차도", "회전")}
+            near = min(cands, key=lambda c: sum(not v for v in cap_flags(c, km).values()))
+            fail = [k for k, v in cap_flags(near, km).items() if not v]
+            print(f"  {nm:12}{km:3}km  후보 {len(cands):2}개 · 상한별 통과 {cnt}")
+            print(f"    └ 가장 아까운 후보: {near['km']:.2f}km · 상승 "
+                  f"{near['gain'] / max(near['km'], 0.1):.0f} · 차도 {near['road']:.1f}%"
+                  f" · 회전 {near['turns'] / max(near['km'], 0.1):.1f}  → {'·'.join(fail)} 초과")
+        print("  ※ 하나의 상한이 아니라 **동시 만족**이 안 되는 경우가 많다."
+              " 상한을 하나 풀어도 살아나지 않는다.")
+
+    print()
+    print(f"회귀 기준 — 선택된 경로의 계단 비율 ≤{STAIR_REGRESSION:.0f}%")
+    picked = [contract_pick(ok, km) for _, _, km, _, ok in cells if ok]
+    stairs = sorted(c["stair"] for c in picked)
+    over = [c for c in picked if c["stair"] > STAIR_REGRESSION]
+    print(f"  0% 인 경로 {sum(1 for v in stairs if v == 0)}/{len(stairs)}"
+          f" · 중앙 {pct(stairs, 0.5):.2f}% · 최대 {stairs[-1]:.2f}%")
+    print(f"  기준 초과 {len(over)}건 — {'없음' if not over else '확인 필요'}")
+
+
 # ── 골목 회피 · 하천 유도 ──────────────────────────────────────
 
 #: 골목 회피 프로파일. 요청 단위 custom model 로 residential/service 를 더 깎는다.
@@ -422,7 +513,10 @@ def filter_stats(profile: str, seeds: int) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="GraphHopper round_trip 검증")
-    ap.add_argument("--preset", choices=("metro", "compare", "distance", "filter", "water"))
+    ap.add_argument("--preset",
+                    choices=("metro", "compare", "distance", "filter", "caps", "water"))
+    ap.add_argument("--zone", default="metro", choices=("metro", "local", "all"),
+                    help="preset=caps 대상 (기본 수도권)")
     ap.add_argument("--waterways", default="data/waterways.json",
                     help="build_waterways.py 산출물 (preset=water)")
     ap.add_argument("--point", help="lat,lng")
@@ -465,6 +559,9 @@ def main() -> int:
 
     elif args.preset == "filter":
         filter_stats(args.profile, args.seeds)
+
+    elif args.preset == "caps":
+        caps_stats(args.seeds, args.zone)
 
     elif args.preset == "water":
         water_stats(args.seeds, args.waterways)
