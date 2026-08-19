@@ -655,10 +655,10 @@ emailAuth     { email, purpose: SIGNUP|RESET, tokenHash, expiresAt, attempts, ve
 ```
 
 - **대회 병합 책임은 Python 데이터 파이프라인에 둔다** 🔒확정(결정-39). 백엔드는 같은 병합 알고리즘을 Java로 중복 구현하지 않고, 서버용 대회 스냅샷의 스키마·UTF-8·유일키·좌표·집계를 검증한 뒤 PostgreSQL에 멱등 적재한다.
-- 현재 `reference-web/public/data/races.json`은 실제 크롤 원천을 병합한 **목업용 대표 목록**이며 서버용 대회 스냅샷이 아니다. 서버용 스냅샷은 `CONTEST_SOURCE`를 복원할 수 있도록 canonical별 원천 `sources[]`와 표준 `events[]`를 포함하는 별도 계약으로 구현한다.
+- 현재 `reference-web/public/data/races.json`은 실제 크롤 원천을 병합한 **목업용 대표 목록**이며 서버용 대회 스냅샷이 아니다. 서버용 스냅샷은 `CONTEST_SOURCE`를 복원할 수 있도록 canonical별 원천 `sources[]`와 표준 `events[]`를 포함하며, 계약은 `docs/contest-snapshot-contract.md`, 생성기는 `scripts/build_contest_snapshot.py`, 산출물은 `data/contest_snapshot.json`이다.
 - **P0 전달 경로는 `Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL`** 로 고정한다 🔒확정(결정-40). Python은 운영 핵심 테이블을 직접 수정하지 않으며, 백엔드가 전체 검증·원자적 승격·실패 롤백을 담당한다. 최초 파일은 초기 시드, 이후 주간 파일은 갱신 스냅샷이다.
 - 향후 자동화는 `Python → 인증된 내부 수집 API` 또는 `Python → 스테이징 테이블 → 백엔드 승격`으로 전환한다. 두 후보 중 하나는 자동화 착수 시 운영 환경과 배포 방식을 보고 확정하며, 어느 경우에도 Python이 `CONTEST*` 핵심 테이블에 직접 쓰지 않는다.
-- 현재 생성본의 종목 미표기 26건 🔧정책: 트레일·걷기는 캘린더 노출, 위저드 종목은 5K 폴백 + "종목 정보 없음". 필수값 누락 원천 1행은 경고 후 제외한다.
+- 현재 생성본의 종목 미표기 28건 🔧정책(종목 토큰 정규식이 15km 를 5K 로 오인하던 2건 교정으로 26→28): 트레일·걷기는 캘린더 노출, 위저드 종목은 5K 폴백 + "종목 정보 없음". 필수값 누락 원천 1행은 경고 후 제외한다.
 - 사용자는 canonical 대회 레코드를 생성·수정·삭제할 수 없다. 관리자/배치만 갱신한다.
 - 재수집 주기 주 1회 🔧정책. 접수상태는 서버 공통 정책으로 조회 시점 파생하고 목록·월 집계·마감 임박에서 같은 함수를 사용한다(§5.5).
 - 좌표 보정 도구는 `KAKAO_REST_KEY` 환경변수만 사용하고 키가 없으면 fail-fast한다. 재수집 → 좌표 보정 → 병합 후 좌표 누락 0건을 검증하며, 누락이 있으면 새 canonical로 교체하지 않고 이전 정상본을 유지한다 🔒확정.

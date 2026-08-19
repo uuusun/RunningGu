@@ -214,7 +214,7 @@ Compose 화면
 | 검색 제출 | S2 이동 | route q | 없음 | LOCAL_STATE | 빈 검색은 캘린더 기본 목록 |
 | 달력·러닝코스·관광 아이콘 | Navigation/scroll | 없음 | 없음 | LOCAL_STATE | 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
-| 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드, dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
+| 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
 | 홈 축제 | `GET /api/festivals` | yearMonth, size | contentId, name, 기간, region, imageUrl, inProgress | KTO_LIVE/TTL cache | 전국 월간, 위치 권한 없음, 영역별 Loading/Empty/502/504 |
 | 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
@@ -225,7 +225,7 @@ Compose 화면
 
 | UI/행동 | API/로컬 | 요청 | 응답 | 상태·부분 실패 |
 |---|---|---|---|---|
-| 목록·검색·필터·선택일 | `GET /api/contests` | q, events[], openOnly, regions[], date?, cursor?, size | items, nextCursor, hasNext | 정상 0건은 원인별 Empty, 오류는 Error |
+| 목록·검색·필터·선택일 | `GET /api/contests` | q, events[], openOnly, regions[], date?, cursor?, size | items(`regStatus`, nullable `applyStart/applyEnd` 포함), nextCursor, hasNext | 정상 0건은 원인별 Empty, 오류는 Error. Room 목록은 두 날짜로 오늘(KST) 기준 상태 재계산 |
 | 검색 입력 | 서버 q 검색 | q | 대회 목록 | Android 300ms debounce(조정 가능한 내부값) |
 | 리스트/월간 토글 | 로컬 ViewModel | list/calendar | 없음 | route 변경 없음 |
 | 월간 건수 | `GET /api/contests/daily-counts` | year, month + 같은 filter | counts[date,count] | 실패 시 날짜 점만 숨기고 목록 유지 |
@@ -239,7 +239,7 @@ Compose 화면
 
 | UI/행동 | API/로컬 | 응답에서 쓰는 값 | 원천·저장 | 상태 |
 |---|---|---|---|---|
-| 상세 본문 | `GET /api/contests/{contestId}` | 카드 필드, nullable imageUrl, applyStart, organizer, officialUrl, nullable lat/lng, dDay, favorite | SERVER_DB/Room | Loading/Content/Error/`CONTEST_NOT_FOUND`, 이미지 null은 placeholder |
+| 상세 본문 | `GET /api/contests/{contestId}` | 카드 필드, nullable imageUrl, organizer, officialUrl, nullable lat/lng, dDay, favorite | SERVER_DB/Room | Loading/Content/Error/`CONTEST_NOT_FOUND`, 이미지 null은 placeholder |
 | 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복 |
 | 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | 본문과 독립 Loading/Empty/502/504 |
 | 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null이면 버튼 숨김 |
@@ -497,6 +497,7 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 
 ### 이번 결정으로 확정된 계약
 
+- `GET /api/contests` 카드의 nullable `applyStart/applyEnd`와 오늘(KST) 기준 `regStatus` 재계산·원본 상태 fallback
 - `GET /api/contests/{id}`의 nullable `imageUrl/lat/lng`와 좌표 없음 처리
 - `POST /api/itineraries/generate`의 최대 7일·대회일 포함·좌표 없음·Empty/Error 구분
 - block PATCH와 order PUT의 `200` 갱신 응답

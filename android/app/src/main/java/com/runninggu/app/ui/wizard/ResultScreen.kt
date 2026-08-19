@@ -17,16 +17,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,9 +50,11 @@ import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
+import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.SourceBadge
 
 /**
  * S7 추천 동선 결과. (SPEC §4.10 · AP-11)
@@ -56,9 +62,8 @@ import com.runninggu.app.ui.common.LoadingState
  * 서버가 만든 동선을 일자별로 보여주고(조회), 저장 전 USER 블록을 로컬 편집한다(편집 모드).
  * 동선 생성은 서버 몫이다(결정-41).
  *
- * 아래 셋은 후속 작업에서 붙인다.
+ * 아래 둘은 후속 작업에서 붙인다.
  * - 상단 지도(번호 핀·폴리라인) — AP-03 카카오맵이 필요하다
- * - 후보 시트(교체·추가) — `ItineraryEdits.replacePlace`·`addBlock`은 준비돼 있다
  * - 저장 CTA 의 실제 저장 — `POST /api/itineraries`(AP-14)
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,6 +123,18 @@ fun ResultScreen(
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
                     onMoveBlock = viewModel::onMoveBlock,
+                    onReplaceBlock = viewModel::onReplaceBlock,
+                    onAddPlace = viewModel::onAddPlace,
+                )
+            }
+
+            state.sheet?.let { sheet ->
+                CandidateSheet(
+                    sheet = sheet,
+                    onDismiss = viewModel::onSheetDismiss,
+                    onCategorySelect = viewModel::onSheetCategorySelect,
+                    onSelect = viewModel::onCandidateSelect,
+                    onRetry = viewModel::onSheetRetry,
                 )
             }
         }
@@ -132,6 +149,8 @@ private fun Content(
     onToggleEdit: () -> Unit,
     onRemoveBlock: (String) -> Unit,
     onMoveBlock: (Int, Int) -> Unit,
+    onReplaceBlock: (ItineraryBlock) -> Unit,
+    onAddPlace: () -> Unit,
 ) {
     Column(
         Modifier
@@ -161,7 +180,14 @@ private fun Content(
                 if (state.isEditing) {
                     EditNotice()
                     Spacer(Modifier.height(10.dp))
-                    EditList(day = day, onRemove = onRemoveBlock, onMove = onMoveBlock)
+                    EditList(
+                        day = day,
+                        onRemove = onRemoveBlock,
+                        onMove = onMoveBlock,
+                        onReplace = onReplaceBlock,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    AddPlaceButton(onClick = onAddPlace)
                 } else {
                     DayNote(day.note)
                     Spacer(Modifier.height(12.dp))
@@ -313,6 +339,7 @@ private fun EditList(
     day: ItineraryDay,
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
+    onReplace: (ItineraryBlock) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         day.blocks.forEachIndexed { index, block ->
@@ -362,6 +389,12 @@ private fun EditList(
                         ) {
                             Icon(Icons.Default.KeyboardArrowDown, contentDescription = "아래로")
                         }
+                        // 회복 안내처럼 조회 카테고리가 없는 블록은 교체 대상이 아니다.
+                        if (block.catKey.toPoiCategoryOrNull() != null) {
+                            IconButton(onClick = { onReplace(block) }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "교체")
+                            }
+                        }
                         IconButton(onClick = { onRemove(block.id) }) {
                             Icon(Icons.Default.Delete, contentDescription = "삭제")
                         }
@@ -376,6 +409,135 @@ private fun EditList(
                     }
                 }
             }
+        }
+    }
+}
+
+/** 편집 목록 하단의 [장소 추가]. 후보 시트를 추가 모드로 연다. (SPEC §4.10) */
+@Composable
+private fun AddPlaceButton(onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("장소 추가")
+    }
+}
+
+/**
+ * 후보 시트. (SPEC §4.10 — ModalBottomSheet 📱전환)
+ *
+ * 헤더 "{카테고리} {교체|추가} · 인근" + 소스 배지. **추가 모드에만** 카테고리 칩
+ * (취향 6종+숙소)이 나온다. 후보는 8건이고 [선택]으로 교체/추가 후 닫힌다.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CandidateSheet(
+    sheet: CandidateSheetState,
+    onDismiss: () -> Unit,
+    onCategorySelect: (PoiCategory) -> Unit,
+    onSelect: (PoiItem) -> Unit,
+    onRetry: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        // 작은 화면·가로 모드에서 후보 8건이 시트 최대 높이를 넘을 수 있어 스크롤을 준다.
+        Column(
+            Modifier
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = sheet.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (sheet.source.isNotEmpty() && sheet.phase == CandidateSheetState.Phase.CONTENT) {
+                    // 데이터 출처 배지 — LIVE·SAMPLE·SYNTH. (SPEC §6.3 · NFR-2)
+                    SourceBadge(sheet.source)
+                }
+            }
+
+            if (!sheet.isReplace) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PoiCategory.entries.forEach { category ->
+                        FilterChip(
+                            selected = category == sheet.category,
+                            onClick = { onCategorySelect(category) },
+                            label = { Text(category.label) },
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            // 로딩·빈·오류는 다른 화면과 같은 공용 표시를 쓴다 (SPEC §3-5 · AGENTS 2-5).
+            when (sheet.phase) {
+                CandidateSheetState.Phase.LOADING -> LoadingState("주변 장소 찾는 중…")
+
+                CandidateSheetState.Phase.EMPTY -> EmptyState("주변에 보여드릴 곳이 없어요.")
+
+                CandidateSheetState.Phase.ERROR -> ErrorState(
+                    message = "주변 장소를 불러오지 못했어요.",
+                    onRetry = onRetry,
+                )
+
+                CandidateSheetState.Phase.CONTENT -> Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    sheet.items.forEach { item ->
+                        CandidateRow(item = item, onSelect = { onSelect(item) })
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** 후보 한 건. 이름 + 주소·설명 + [선택]. (SPEC §4.10) */
+@Composable
+private fun CandidateRow(item: PoiItem, onSelect: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                // 순서는 S6 숙소 목록과 같은 "주소 · 설명" (SPEC §4.9 표기 승계)
+                val detail = listOf(item.address, item.description)
+                    .filter { it.isNotEmpty() }
+                    .joinToString(" · ")
+                if (detail.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = onSelect) { Text("선택") }
         }
     }
 }
