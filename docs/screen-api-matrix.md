@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.4
+# 런닝구 화면–API 매핑표 v1.5
 
 > 갱신일: 2026-08-19
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.3(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v2.4(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -82,7 +82,7 @@ Compose 화면
 | 화면 | 주요 데이터 | 가져오는 형태 | 원천 | 서버 DB 저장 | 기기 저장 |
 |---|---|---|---|---|---|
 | A0 앱 시작 | access/refresh token, guest 여부 | DataStore 값 + `GET /api/me` | `LOCAL_CACHE` + `SERVER_DB` | 리프레시 토큰 해시 | DataStore 세션 |
-| A1 로그인 | token, user, identities | JSON DTO | `SERVER_DB` / 카카오 SDK | USER·LOGIN_IDENTITY·토큰 해시 | DataStore token |
+| A1 로그인 | token, user, loginProvider | JSON DTO | `SERVER_DB` / 카카오 SDK | USER·LOGIN_IDENTITY(1:1)·토큰 해시 | DataStore token |
 | A2 회원가입 | 입력값·인증 상태·가입 결과 | 로컬 폼 + JSON DTO | `LOCAL_STATE` + `SERVER_DB` | USER·LOGIN_IDENTITY·AGREEMENT | 가입 완료 전 폼 상태만 |
 | A3 비밀번호 재설정 | 이메일·reset token | JSON + 이메일 링크 웹 | `SERVER_DB` | reset token 해시 | 영구 저장 없음 |
 | S1 홈 | 히어로·마감 임박 대회 | 대회 카드 DTO | `SERVER_DB` | canonical CONTEST | Room 읽기 캐시 |
@@ -100,7 +100,7 @@ Compose 화면
 | R1 GPS 기록 | timestamp, lat, lng, distance | 위치 point stream | `ANDROID_SDK` | 저장 전 없음 | 전송 전 임시 기록 |
 | R2 러닝 요약 | 거리·시간·평균 페이스·경로 | local summary / run DTO | `LOCAL_STATE` + `SERVER_DB` | RUN·RUN_TRACK | 저장 전 임시 기록 |
 | S10 보관함 | 동선·저장 코스·러닝 기록·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | Room 읽기 캐시 |
-| M1 계정 관리 | 프로필·약관·로그인 수단 | JSON DTO | `SERVER_DB` | USER·IDENTITY·AGREEMENT | 세션만 DataStore |
+| M1 계정 관리 | 프로필·약관·가입 로그인 방식 | JSON DTO | `SERVER_DB` | USER·IDENTITY(1:1)·AGREEMENT | 세션만 DataStore |
 
 ---
 
@@ -348,7 +348,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 | segment/행동 | API | 응답에서 쓰는 값 | 상태 |
 |---|---|---|---|
-| 프로필 | `GET /api/me` | id,email,nickname,identities,agreements | 401/Error |
+| 프로필 | `GET /api/me` | id,email?,nickname,loginProvider,agreements | 401/Error |
 | 동선 목록 | `GET /api/itineraries` | id,title,region?,contestName,event,recovery,기간,placeCount,createdAt | Loading/Empty/Error/offline |
 | 동선 열기 | `GET /api/itineraries/{id}` | 전체 상세 | S7-R |
 | 동선 삭제 | `DELETE /api/itineraries/{id}` | 204 | 확인 modal, 실패 시 유지 |
@@ -368,9 +368,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 닉네임 변경 | `PATCH /api/me` | nickname | 응답 계약 보완 필요, duplicated 처리 |
 | 마케팅 동의 | `PATCH /api/me/agreements` | marketing | 응답 계약 보완 필요 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
-| 로그인 수단 | `GET /api/me/identities` | 없음 | provider,linkedAt. EMAIL 없으면 비밀번호 메뉴 숨김 |
-| 카카오 연결 | SDK→`POST /api/me/identities/kakao` | kakaoAccessToken | already linked 처리 |
-| 카카오 해제 | `DELETE /api/me/identities/kakao` | 없음 | last identity 거부 |
+| 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
 | 로그아웃 | `POST /api/auth/logout` | refreshToken | 세션 삭제→로그인 |
 | 탈퇴 재인증 | `POST /api/me/reauth` | EMAIL password 또는 KAKAO SDK token | 5분 reauthToken |
 | 회원 탈퇴 | 확인 modal→`DELETE /api/me` | `X-Reauth-Token` | 204→모든 세션·사용자 캐시 삭제→로그인 |
@@ -472,7 +470,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-14 | block PATCH는 갱신 block 전체, order PUT은 해당 일자 blocks 전체를 `200`으로 반환 |
 | D-15(개정) | S7→S8은 출발지·`min(RECOVERY.walk,5)` 목표거리만 `CourseLaunchContext`로 전달. 종목·난이도는 전달하지 않고 좌표를 route 문자열에 넣지 않음 |
 | D-16 | Empty는 입력 유지 후 위저드 복귀·조건 수정, Error는 같은 요청 재시도 |
-| D-18 | 서버 계산 `routeFingerprint` 기준 사용자별 멱등 저장. 신규 201, 중복 200 기존 id |
+| D-18(개정) | 서버가 geometry 좌표열만 정규화해 `v1:`+SHA-256 `routeFingerprint`를 계산하고 사용자별 멱등 저장. 진행 반대는 별개, 연속 중복점 제거, 신규 201·중복 200 기존 id. 좌표 정밀도는 TBD |
 | D-20 | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved/ran 분리 route |
 | D-22 | 내 정보·계정 관리는 보관함 설정에서 여는 별도 화면 |
 | D-23 | 탈퇴 전 EMAIL/KAKAO 재인증으로 5분 token 발급, DELETE 성공 후 모든 세션·캐시 삭제 |
@@ -480,6 +478,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-25 | GPS 기록·ran은 P1, P0 보관함은 saved만 구현 |
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
+| D-29 | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
 
@@ -489,7 +488,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 |---|---|---|---|
 | D-21 | saved/ran 통합 정렬·페이징 | 보관함 목록 계약 | 앱+백엔드 |
 
-P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
+P0 제품 정책 중 `TBD-DB-02` 저장 코스 attribution, `TBD-DB-04` 저장 동선 표시값 snapshot/파생, `TBD-DB-05` 대회 snapshot 누락 처리는 팀 GitHub 이슈에서 결정한다. D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
 
 ---
 
@@ -504,6 +503,7 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 - `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·구간 기준 표시 난이도·서버 생성 이름·정상 0건/부분 실패·동적 출처 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
+- `GET /api/me`의 단일 `loginProvider`와 로그인 수단 연결·해제 API 제거
 
 ### 남은 springdoc 상세화 항목
 
@@ -519,8 +519,6 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
 | `PATCH /api/me` | 성공 status와 응답 body |
 | `PATCH /api/me/agreements` | 성공 status와 응답 body |
-| `POST /api/me/identities/kakao` | 성공 status와 응답 body |
-| `DELETE /api/me/identities/kakao` | 성공 status |
 
 ---
 

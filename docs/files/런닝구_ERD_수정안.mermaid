@@ -1,66 +1,86 @@
+%% 런닝구 논리 ERD v4 — SPEC v4 · API 명세 v2.4 기준 (2026-08-19)
+%% P0: USER~SAVED_COURSE 13개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
+%% 이 문서는 논리 계약이다. 아래 남은 TBD를 확정하기 전에는 Flyway 물리 스키마로 옮기지 않는다.
+%% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
+%% TBD-DB-01 route_fingerprint 좌표 정규화 정밀도와 elevation_profile_m PostgreSQL 저장 타입
+%% TBD-DB-02 저장 코스 상세의 attributions 보존 방식
+%% 확정-DB-03 USER:LOGIN_IDENTITY=1:1, 가입 시 EMAIL/KAKAO 중 하나, P0 연결·추가·전환 미지원
+%% TBD-DB-04 ITINERARY contestName·region·recovery의 snapshot 저장 또는 조회 시 파생 정책
+%% TBD-DB-05 주간 대회 snapshot에서 사라진 canonical/source의 삭제·비활성화·유지 정책
+%% 확정-DB-06 externalId/external_id, SIGNUP/PASSWORD_RESET, fetchedAt/fetched_at, organizer 명칭 통일
+%% 확정-DB-07 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum VARCHAR+CHECK, 좌표 NUMERIC(10,7), nullable 명시
+%% DB-07 타입 규약: nickname VARCHAR(12), email VARCHAR(320), Enum VARCHAR(32), key/name/title/place VARCHAR(255), URL VARCHAR(2048), token hash VARCHAR(64), password/code hash VARCHAR(255), 거리 NUMERIC(8,3), 자유문 TEXT
+%% DB-07 null 규약: "nullable" 표기가 없는 저장 컬럼은 NOT NULL, derived는 DB 컬럼이 아님
+%% DB-07 CHECK: LOGIN_IDENTITY는 EMAIL(password_hash·email_verified_at 필수, email_snapshot null) 또는 KAKAO(password_hash·email_verified_at null)
+%% DB-07 CHECK: EMAIL_VERIFICATION은 SIGNUP(code_hash 사용) 또는 PASSWORD_RESET(token_hash 사용), 다른 hash는 null
+%% DB-07 주요 조회 인덱스: CONTEST(contest_date,id), CONTEST(region,contest_date,id), FAVORITE(user_id,created_at,id), ITINERARY(user_id,created_at,id), SAVED_COURSE(user_id,saved_at,id), RUN_RECORD(user_id,ran_at,id)
+%% TBD-P1-01 saved/ran 통합 정렬·페이징과 RUN 응답 projection (SPEC 결정-36, D-21)
+
 erDiagram
-    USER ||--o{ LOGIN_IDENTITY : "로그인 수단 (최소 1개)"
-    USER ||--o{ USER_AGREEMENT : "약관 동의 이력"
-    USER ||--o{ REFRESH_TOKEN : "세션"
-    USER ||--o{ FAVORITE : "찜"
-    USER ||--o{ ITINERARY : "저장 동선"
-    USER ||--o{ SAVED_COURSE : "저장 코스"
-    USER ||--o{ RUN_RECORD : "러닝 기록"
+    USER ||--|| LOGIN_IDENTITY : "가입 수단 1개 · CASCADE"
+    USER ||--o{ USER_AGREEMENT : "약관 동의 이력 · CASCADE"
+    USER ||--o{ REFRESH_TOKEN : "세션 · CASCADE"
+    USER ||--o{ FAVORITE : "찜 · CASCADE"
+    USER ||--o{ ITINERARY : "저장 동선 · CASCADE"
+    USER ||--o{ SAVED_COURSE : "저장 코스 · CASCADE"
+    USER ||--o{ RUN_RECORD : "P1 러닝 기록 · CASCADE"
 
-    CONTEST ||--o{ CONTEST_SOURCE : "원천 271행 병합"
-    CONTEST ||--o{ CONTEST_EVENT : "표준 종목"
-    CONTEST ||--o{ FAVORITE : "찜 대상"
-    CONTEST ||--o{ ITINERARY : "대상 대회"
-    CONTEST ||--o{ ITINERARY_BLOCK : "시스템 대회 블록"
+    CONTEST ||--|{ CONTEST_SOURCE : "canonical 원천 · CASCADE"
+    CONTEST ||--o{ CONTEST_EVENT : "표준 종목 · CASCADE"
+    CONTEST ||--o{ FAVORITE : "찜 대상 · RESTRICT"
+    CONTEST ||--o{ ITINERARY : "대상 대회 · RESTRICT"
+    CONTEST o|--o{ ITINERARY_BLOCK : "RACE 선택 참조 · RESTRICT"
 
-    ITINERARY ||--o{ ITINERARY_DAY : "일자"
-    ITINERARY_DAY ||--o{ ITINERARY_BLOCK : "일정 블록"
-    RUN_RECORD ||--|| RUN_TRACK : "궤적 필수 1:1"
+    ITINERARY ||--|{ ITINERARY_DAY : "일자 · CASCADE"
+    ITINERARY_DAY ||--o{ ITINERARY_BLOCK : "일정 블록 · CASCADE"
+    RUN_RECORD ||--|| RUN_TRACK : "P1 궤적 필수 1:1 · CASCADE"
 
     USER {
         bigint id PK
         varchar nickname UK "2~12자"
+        derived representative_email "EMAIL=subject, KAKAO=email_snapshot 또는 null"
         timestamptz created_at "UTC 저장"
         timestamptz updated_at "UTC 저장"
     }
 
     LOGIN_IDENTITY {
         bigint id PK
-        bigint user_id FK
-        varchar provider "EMAIL / KAKAO, provider_subject와 복합 UNIQUE"
-        varchar provider_subject "EMAIL=정규화 이메일, KAKAO=회원번호"
-        varchar email_snapshot "카카오 제공 이메일은 nullable 스냅샷"
-        varchar password_hash "EMAIL만 필수, KAKAO는 null"
-        timestamptz email_verified_at "EMAIL만 필수"
-        timestamptz created_at
+        bigint user_id FK, UK "USER당 정확히 1행, ON DELETE CASCADE"
+        varchar provider "CHECK EMAIL / KAKAO"
+        varchar provider_subject "UNIQUE(provider, provider_subject), EMAIL=정규화 이메일, KAKAO=회원번호"
+        varchar email_snapshot "nullable, KAKAO 제공 이메일만"
+        varchar password_hash "EMAIL 필수, KAKAO null"
+        timestamptz email_verified_at "EMAIL 필수, KAKAO null"
+        timestamptz created_at "가입 수단 생성 시각"
+        timestamptz last_login_at "nullable, 최초 로그인 전 null"
     }
 
     USER_AGREEMENT {
         bigint id PK
-        bigint user_id FK
-        varchar agreement_type "TOS / PRIVACY / MARKETING"
+        bigint user_id FK "ON DELETE CASCADE"
+        varchar agreement_type "CHECK TOS / PRIVACY / MARKETING"
         varchar version
         boolean agreed
-        timestamptz changed_at "변경 이력 append-only"
+        timestamptz changed_at "append-only"
     }
 
     EMAIL_VERIFICATION {
         bigint id PK
-        varchar email "가입 전이라 FK 없음"
-        varchar purpose "SIGNUP / PASSWORD_RESET"
-        varchar code_hash "SIGNUP 6자리 코드 해시, nullable"
-        varchar token_hash "재설정 링크 토큰 해시, nullable"
+        varchar email "가입 전이라 USER FK 없음"
+        varchar purpose "CHECK SIGNUP / PASSWORD_RESET"
+        varchar code_hash "nullable, SIGNUP 6자리 코드 해시"
+        varchar token_hash "nullable, PASSWORD_RESET 토큰 해시"
         int attempts "최대 5회"
         timestamptz sent_at "재발송 60초 판정"
         timestamptz expires_at "코드 10분 / 재설정 30분"
-        timestamptz verified_at "가입 인증 후 30분 유효 기준"
-        timestamptz consumed_at "1회 사용 시각"
+        timestamptz verified_at "nullable, 가입 인증 후 30분 유효 기준"
+        timestamptz consumed_at "nullable, 1회 사용 시각"
     }
 
     REFRESH_TOKEN {
         bigint id PK
-        bigint user_id FK
-        varchar token_hash UK "해시로만 저장"
+        bigint user_id FK "ON DELETE CASCADE"
+        varchar token_hash UK "원문 저장 금지"
         timestamptz expires_at
         timestamptz revoked_at "nullable"
         timestamptz created_at
@@ -68,100 +88,107 @@ erDiagram
 
     CONTEST {
         bigint id PK
-        varchar canonical_key UK "정규화 이름+대회일 기반"
+        varchar canonical_key UK "Python snapshot의 안정적 유일키"
         varchar name
         varchar region "17개 시도"
         varchar place
-        numeric lat "NUMERIC(10,7), WGS84"
-        numeric lng "NUMERIC(10,7), WGS84"
+        numeric lat "nullable, NUMERIC(10,7), WGS84"
+        numeric lng "nullable, NUMERIC(10,7), WGS84"
         date contest_date "KST 비즈니스 날짜"
         time start_time
-        varchar source_status "날짜 없을 때만 폴백"
+        varchar source_status "nullable, 날짜 판정 불가 시 폴백"
         date apply_start "nullable"
         date apply_end "nullable"
-        varchar host "nullable"
+        varchar organizer "nullable"
         varchar official_url "nullable"
         varchar image_url "nullable"
-        varchar category "ROAD / TRAIL / WALK / NIGHT"
+        varchar category "CHECK ROAD / TRAIL / WALK / NIGHT"
         timestamptz checked_at "원천 중 최신 확인 시각"
         timestamptz updated_at
     }
 
     CONTEST_SOURCE {
         bigint id PK
-        bigint contest_id FK
-        varchar source_type "MARATHON_ONLINE / MARATHON_GO"
-        varchar external_id "source_type과 복합 UNIQUE"
-        varchar detail_url "nullable"
-        varchar raw_status "원천 상태"
-        timestamptz checked_at
+        bigint contest_id FK "ON DELETE CASCADE"
+        varchar source_type "CHECK MARATHON_ONLINE / MARATHON_GO"
+        varchar external_id "UNIQUE(source_type, external_id)"
+        varchar source_url "nullable"
+        varchar raw_status "nullable, 원천 상태"
+        timestamptz fetched_at
         jsonb raw_payload "감사·재병합용 원천 스냅샷"
     }
 
     CONTEST_EVENT {
         bigint id PK
-        bigint contest_id FK
-        varchar event_type "K5 / K10 / HALF / FULL, 원천 트레일은 거리 버킷 정규화, contest_id와 복합 UNIQUE"
+        bigint contest_id FK "ON DELETE CASCADE"
+        varchar event_type "CHECK K5 / K10 / HALF / FULL, UNIQUE(contest_id, event_type)"
     }
 
     FAVORITE {
         bigint id PK
-        bigint user_id FK
-        bigint contest_id FK
+        bigint user_id FK "ON DELETE CASCADE"
+        bigint contest_id FK "ON DELETE RESTRICT"
         timestamptz created_at "user_id, contest_id 복합 UNIQUE"
     }
 
     ITINERARY {
         bigint id PK
-        bigint user_id FK
-        bigint contest_id FK
+        bigint user_id FK "ON DELETE CASCADE"
+        bigint contest_id FK "ON DELETE RESTRICT"
         varchar title
-        varchar event "K5 / K10 / HALF / FULL"
+        varchar event "CHECK K5 / K10 / HALF / FULL"
         jsonb themes "영문 Enum 배열 스냅샷"
         date start_date
         date end_date
         varchar hotel_name "nullable, 선택 숙소 스냅샷"
         numeric hotel_lat "nullable, NUMERIC(10,7)"
         numeric hotel_lng "nullable, NUMERIC(10,7)"
+        derived contest_name "API 필드, snapshot/CONTEST join TBD"
+        derived region "API 필드, snapshot/CONTEST join TBD"
+        derived recovery "label/note, snapshot/규칙 파생 TBD"
         timestamptz created_at
         timestamptz updated_at "user_id, contest_id, start_date, end_date 복합 UNIQUE"
     }
 
     ITINERARY_DAY {
         bigint id PK
-        bigint itinerary_id FK
+        bigint itinerary_id FK "ON DELETE CASCADE"
         int day_index "0..N, UNIQUE(itinerary_id, day_index)"
         date day_date
         boolean recovery
-        varchar note "nullable"
+        text note "nullable"
     }
 
     ITINERARY_BLOCK {
         bigint id PK
-        bigint day_id FK
-        bigint contest_id FK "RACE만 필수, USER는 null"
-        varchar block_type "USER / RACE"
-        boolean system_managed "RACE=true, 사용자 변경 불가"
-        int order_no "RACE 위치 고정"
-        time start_time "USER 스냅샷, RACE는 CONTEST에서 파생"
-        varchar title "USER 스냅샷"
-        varchar category "Enum 9종"
-        varchar place_name "USER 스냅샷"
-        varchar address "USER 스냅샷"
+        bigint day_id FK "ON DELETE CASCADE"
+        bigint contest_id FK "nullable, RACE만 사용, ON DELETE RESTRICT"
+        varchar block_type "CHECK USER / RACE"
+        boolean system_managed "RACE=true, USER=false"
+        int order_no "UNIQUE(day_id, order_no), RACE 위치 고정"
+        time start_time
+        varchar title
+        varchar category "CHECK TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING / RACE / RECOVERY"
+        varchar place_name "nullable, 외부 POI 부분 실패 허용"
+        varchar address "nullable"
         numeric lat "nullable, NUMERIC(10,7)"
         numeric lng "nullable, NUMERIC(10,7)"
-        varchar description "nullable"
+        text description "nullable"
     }
 
     SAVED_COURSE {
         bigint id PK
-        bigint user_id FK
-        varchar source_course_id "두루누비 courseId, nullable"
-        varchar course_name
-        varchar region
-        numeric distance_km
+        bigint user_id FK "ON DELETE CASCADE"
+        varchar route_fingerprint "VARCHAR(67), UNIQUE(user_id, route_fingerprint), v1: + SHA-256 lowercase hex"
+        varchar data_source "CHECK API_GPX / GPX_ONLY / OSM_GENERATED"
+        varchar source_course_id "nullable, 큐레이션 원본만 사용"
+        varchar course_name "저장 시점 이름 스냅샷"
+        varchar region "nullable, OSM_GENERATED는 생략"
+        numeric distance_km "NUMERIC(8,3)"
         int duration_min
-        varchar difficulty "EASY / NORMAL / HARD"
+        varchar difficulty "CHECK EASY / NORMAL / HARD"
+        int gain_m
+        int_array elevation_profile_m "최대 100개 논리 배열, DB 타입 TBD"
         numeric entry_lat "NUMERIC(10,7)"
         numeric entry_lng "NUMERIC(10,7)"
         text path_polyline
@@ -169,17 +196,17 @@ erDiagram
     }
 
     RUN_RECORD {
-        bigint id PK
-        bigint user_id FK
-        varchar course_name "자유 러닝은 null"
+        bigint id PK "P1 계약 초안"
+        bigint user_id FK "ON DELETE CASCADE"
+        varchar course_name "nullable, 자유 러닝은 null"
         timestamptz ran_at "UTC 저장"
-        numeric distance_km
+        numeric distance_km "NUMERIC(8,3)"
         int duration_sec
         int avg_pace_sec
     }
 
     RUN_TRACK {
-        bigint run_record_id PK "FK 겸용 공유 PK"
-        text encoded_polyline "5m 필터 후 압축"
+        bigint run_record_id PK "P1, FK 겸용 공유 PK, ON DELETE CASCADE"
+        text encoded_polyline "5m 방어 필터 후 압축"
         int point_count
     }
