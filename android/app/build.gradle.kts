@@ -23,7 +23,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 에뮬레이터에서 호스트의 localhost 는 10.0.2.2 다. 실기기 테스트는 각자 로컬 IP 로 바꾼다.
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/\"")
+        }
         release {
+            // TODO(AP-07 배포): 배포 호스트가 정해지면 채운다.
+            buildConfigField("String", "BASE_URL", "\"https://api.runninggu.example/api/\"")
             optimization {
                 enable = false
             }
@@ -35,6 +41,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
