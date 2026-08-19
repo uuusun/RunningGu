@@ -75,7 +75,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
 | 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
 | 캐시 구현 | 단일 서버 MVP는 Spring Cache + Caffeine 인메모리 캐시. Redis는 MVP에서 사용하지 않음 🔒 |
-| 예외 | **동선 생성만은 502를 내지 않는다** — POI 조회 실패 시 해당 블록 `place=null` 강등, 생성은 성공(NFR-3) |
+| 예외 | 동선 생성은 POI 조회 실패 시 해당 블록을 `place=null`로 강등하고 생성은 성공한다(NFR-3). `/courses/near`는 일부 원천 실패에도 표시 항목이 있으면 `200`+`degradedSources`, 원천 실패가 있고 표시 항목도 없으면 `503 COURSE_SOURCES_UNAVAILABLE`를 반환한다 |
 
 ### 0-6. GraphHopper 내부 라우팅 방어 정책 🔒(결정-42)
 
@@ -486,7 +486,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 6. 러닝코스 API `/api/courses` (공개)
 
-> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 산림청 등 큐레이션 GPX를 우선한다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
@@ -529,7 +529,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 }
 ```
 - 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 입력 출발지에서 실제 경로 시작점 또는 장소까지의 거리다.
-- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`.
+- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
+- `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다.
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
 - `routeId`는 near snapshot 내부 식별용 불투명 문자열이다. 저장·중복 판정에는 사용하지 않고 서버가 경로 snapshot으로 `routeFingerprint`를 다시 계산한다.
@@ -542,11 +543,11 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - 서버가 `ROUTE`와 `PLACE`를 `distanceM` 오름차순으로 합쳐 최대 `size`건을 반환한다. 앱은 받은 순서를 다시 정렬하지 않는다.
 - `degradedSources`는 호출·동기화 실패로 제외된 `DURUNUBI|OSM|KAKAO` 원천이다. 품질 상한 통과 후보 0건은 정상 결과이므로 `OSM` degraded가 아니다. 항목이 하나라도 있으면 부분 실패도 `200`이며 앱은 Content와 비차단 안내를 함께 표시한다.
 - 모든 원천이 정상 완료되고 두 종류가 모두 0건이면 `200 {"items": [], "degradedSources": [], "attributions": []}`이며 S8 Empty다. 원천 실패가 있고 항목도 0건이면 `503 COURSE_SOURCES_UNAVAILABLE`로 S8 Error다.
-- `attributions`는 실제 응답 항목에 사용된 원천만 중복 없이 `두루누비 걷기길(한국관광공사)`, `산림청 등산로`, `© OpenStreetMap contributors`, `카카오 로컬` 순서로 반환한다. 앱은 문자열을 변형하지 않고 목록 하단에 표시한다.
+- `attributions`는 실제 응답 항목에 사용된 원천만 중복 없이 큐레이션 → OSM → 카카오 순서로 반환한다. canonical 문구는 `두루누비 걷기길(한국관광공사)`, `등산로·숲길(한국등산·트레킹지원센터)`, `© OpenStreetMap contributors`, `카카오 로컬`이다. 새 큐레이션 GPX는 원본 `LICENSE.txt`를 확인해 빌드 산출물에 기록한 `attribution`을 사용하고, 출처 미확인 문구를 서버가 추측하지 않는다. 앱은 문자열을 변형하지 않고 목록 하단에 표시한다.
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=&size=` → 큐레이션 코스만 `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, gainM, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b). `OSM_GENERATED`는 포함하지 않는다.
+`?region=부산&page=&size=` → 큐레이션 코스만 `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, gainM, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b). 여기의 `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다. `OSM_GENERATED`는 포함하지 않는다.
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
 
@@ -563,7 +564,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
-`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. 서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
+`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
 
 ### 7-B 러닝 기록 `/api/runs` — P1 예약
 

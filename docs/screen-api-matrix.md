@@ -307,14 +307,14 @@ Compose 화면
 | 출발지 검색 | `GET /api/geocode` | query | name,address,lat,lng / KAKAO_LIVE | `NO_RESULT` |
 | 프리셋 | 앱 상수 | 5개 좌표 | start point | API 없음 |
 | 거리 슬라이더 | 로컬 | 1~21km, 0.5 단위 | targetKm | 드래그 종료 후 조회 권장 |
-| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty=EASY\|NORMAL`, `gainM`, 고도 스트립 | P0 내 주변 난이도 칩 없음; HARD는 서버 자동 추천 제외, 지역별 큐레이션에는 유지 |
+| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty=EASY\|NORMAL`, `gainM`, 고도 스트립 | 내 주변은 생성 왕복 구간의 상승 기준, 지역별은 전체 원본 코스 등급이라 달라도 정상. P0 내 주변 난이도 칩 없음; HARD는 자동 추천 제외 |
 | 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·상승 상한에 맞는 큐레이션 0건이면 거리·상승·차도·회전 상한을 통과한 OSM 최대 1건 생성 후 거리순 통합 |
 | OSM 품질 상한 | 서버 내부 | seed 0~15 | 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km | 하나라도 초과하면 후보 제외, 상한 완화 금지; AP-25 전 차도 거리 가중 PoC 재검증 |
 | 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | 호출 실패만 Content+비차단 안내; 품질 상한 통과 후보 0건은 정상 결과 |
 | 전체 Empty/Error | 같은 near 응답 | 없음 | 모든 원천 정상+items=[] / 원천 실패+표시 항목 없음 | 전자는 Empty, 후자는 `503 COURSE_SOURCES_UNAVAILABLE` Error |
 | 지역 칩 | `GET /api/courses/regions` | 없음 | region,count | 실패 시 Error |
 | 지역 목록 | `GET /api/courses` | region?,page,size | 큐레이션 course page(OSM 미포함) | 지역 0건 Empty |
-| 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버가 routeFingerprint 재계산, 게스트 modal |
+| 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved/Ran` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 
 ### S8-D 코스 상세
@@ -501,7 +501,7 @@ P0 제품 결정은 모두 닫혔다. D-21은 GPS 기록(AP-22) P1 착수 시 �
 - `POST /api/itineraries/generate`의 최대 7일·대회일 포함·좌표 없음·Empty/Error 구분
 - block PATCH와 order PUT의 `200` 갱신 응답
 - `POST /api/me/courses`의 fingerprint 멱등 저장
-- `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·표시 난이도 DTO·정상 0건/부분 실패·출처 계약
+- `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·구간 기준 표시 난이도·서버 생성 이름·정상 0건/부분 실패·동적 출처 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 

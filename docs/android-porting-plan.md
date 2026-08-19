@@ -80,7 +80,7 @@ PR #22의 Kotlin `ItineraryEngine`과 단위 테스트는 서버 이식 시 동�
 ### 3.1 근처 큐레이션·OSM 코스와 걷기 스팟은 서버가 합쳐서 준다
 
 SPEC §4.11(a)는 경로와 장소를 **하나로 합쳐 거리순으로** 보여준다. 항목 카드에 원천 이름을 붙이지
-않되 실제 사용 원천은 응답 `attributions[]`로 목록 하단에 표시한다. 앱이 `/courses/near`·
+않되 실제 사용 원천은 응답 `attributions[]`의 검증된 문구를 변경하지 않고 목록 하단에 표시한다. 앱이 `/courses/near`·
 `/walk-spots`·GraphHopper를 따로 부르고 직접 섞는 방식은 맞지 않는다.
 
 - 두 번 부르면 **둘 다 도착해야 정렬이 확정**된다 → 목록이 늦게 뜨거나 순서가 튄다
@@ -98,7 +98,7 @@ GET /courses/near?lat=&lng=&targetKm=&radiusKm=
   degradedSources[] · attributions[]
 ```
 
-앱은 받은 순서대로 그리고 응답 `difficulty`를 표시만 한다. P0 내 주변에는 난이도 칩과
+앱은 받은 순서대로 그리고 응답 `difficulty`를 표시만 한다. 내 주변 값은 생성된 왕복 구간의 상승 기준이고 지역별 값은 전체 원본 코스 등급이므로 달라도 정상이다. P0 내 주변에는 난이도 칩과
 `CourseLaunchContext.difficulty`가 없다. 항목이 있으면 호출 실패 `degradedSources`를 비차단 안내로,
 항목 없이 원천 실패면 Error로 매핑한다. 품질 상한 통과 후보 0건은 degraded가 아닌 정상 결과다.
 
@@ -193,6 +193,8 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 - GraphHopper 주소·OSM 그래프·SRTM은 앱에 포함하지 않는다.
 - 목표 거리·상승 `<50m/km`에 맞는 큐레이션이 0건일 때만 OSM 생성 경로 최대 1건을 받는다.
 - OSM은 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km를 모두 통과해야 하며 상한을 완화하지 않는다.
+- 계단은 런타임 필터·정렬에 추가하지 않는다. AP-25에서 PR #32 `--preset caps`로 선택 경로의 `road_class=STEPS` 실거리 비율 `≤1%`만 회귀 검증한다.
 - `sourceCourseId`가 없는 OSM 경로도 경로 snapshot으로 저장한다.
+- OSM 경로의 한국어 이름은 서버가 생성하며 앱은 재조합하지 않고 같은 이름을 snapshot에 저장한다.
 - `degradedSources=OSM`과 장소가 함께 오면 Content+안내, 항목도 없으면 Error다. 적격 후보 0건은 degraded가 아니다.
 - `© OpenStreetMap contributors`는 서버가 준 `attributions[]`를 그대로 표시한다.
