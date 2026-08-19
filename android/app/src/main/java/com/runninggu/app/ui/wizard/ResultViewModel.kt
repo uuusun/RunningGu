@@ -2,8 +2,13 @@ package com.runninggu.app.ui.wizard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.domain.BlockCategory
+import com.runninggu.app.domain.BlockType
+import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
+import com.runninggu.app.domain.Poi
+import com.runninggu.app.domain.PoiCategory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +26,7 @@ import kotlinx.coroutines.launch
  */
 class ResultViewModel(
     private val repository: ItineraryRepository = FakeItineraryRepository,
+    private val poiRepository: PoiRepository = FakePoiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ResultUiState())
@@ -29,10 +35,26 @@ class ResultViewModel(
     private var lastRequest: GenerateItineraryRequest? = null
     private var lastRegion: String = ""
 
+    /**
+     * 후보 시트의 조회 중심. 숙소 > 대회장 순서다. (SPEC §4.10)
+     *
+     * TODO(AP-14): 숙소를 안 골랐으면 `GET /contests/{id}` 의 대회장 lat/lng 를 쓴다 (API 명세 §3-4).
+     *  [RaceSummary] 에 좌표가 없어 지금은 원점이 폴백이다 — S6 StayViewModel.start 와 같은 제약.
+     */
+    private var sheetCenter: Pair<Double, Double> = 0.0 to 0.0
+
     /** 위저드 상태로 생성을 요청한다. 같은 조건이면 다시 부르지 않는다. */
     fun generate(wizard: WizardUiState) {
         val request = wizard.toRequestOrNull() ?: return
-        if (request == lastRequest && _uiState.value.phase == ResultUiState.Phase.CONTENT) return
+        // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다.
+        sheetCenter = wizard.stay?.let { it.lat to it.lng } ?: (0.0 to 0.0)
+        // LOADING 중 LaunchedEffect 재발화(회전·재진입)로 같은 요청이 두 번 나가는 것도 막는다.
+        // EMPTY·ERROR 는 재진입 시 다시 시도한다 — 기존 동작 유지.
+        if (request == lastRequest &&
+            _uiState.value.phase in setOf(ResultUiState.Phase.LOADING, ResultUiState.Phase.CONTENT)
+        ) {
+            return
+        }
         lastRequest = request
         lastRegion = wizard.race?.region.orEmpty()
         send(request)
@@ -78,6 +100,122 @@ class ResultViewModel(
             val result = state.result ?: return@update state
             state.copy(result = result.copy(days = transform(result.days, state.activeDayIndex)))
         }
+    }
+
+    // ── 후보 시트 (SPEC §4.10) ──────────────────────────────────
+    //
+    // 교체는 그 블록의 카테고리로 고정 조회하고, 추가는 칩(취향 6종+숙소)으로 바꿔 가며
+    // 조회한다. 중심은 숙소 > 대회장이다. 조회는 서버 몫이다 — 앱에 카카오 키가 없다(§9.4).
+
+    /** 편집 행의 [교체]. 그 블록의 카테고리로 후보를 조회한다. */
+    fun onReplaceBlock(block: ItineraryBlock) {
+        // 대회·회복 블록은 조회 카테고리가 없다. 화면이 버튼을 숨기지만(안전망), 관광지로
+        // 잘못 열어 카테고리를 오염시키느니 아무것도 안 하는 쪽이 맞다.
+        val category = block.catKey.toPoiCategoryOrNull() ?: return
+        openSheet(CandidateSheetState(replaceBlockId = block.id, category = category))
+    }
+
+    /** 편집 목록 하단의 [장소 추가]. */
+    fun onAddPlace() {
+        openSheet(CandidateSheetState())
+    }
+
+    /** 추가 모드의 카테고리 칩. 교체 모드에는 칩이 없다. (SPEC §4.10) */
+    fun onSheetCategorySelect(category: PoiCategory) {
+        val sheet = _uiState.value.sheet ?: return
+        if (sheet.isReplace || sheet.category == category) return
+        openSheet(sheet.copy(category = category))
+    }
+
+    fun onSheetDismiss() {
+        sheetRequestId++ // 진행 중이던 조회 응답을 무효화한다
+        _uiState.update { it.copy(sheet = null) }
+    }
+
+    fun onSheetRetry() {
+        _uiState.value.sheet?.let(::openSheet)
+    }
+
+    /**
+     * 후보 [선택]. (SPEC §4.10 · §5.7)
+     *
+     * 교체는 장소·설명·카테고리만 바뀌고 블록 id·시간이 유지된다. 추가는 13:00 새 블록으로
+     * 맨 끝에 붙는다. 어느 쪽이든 시트를 닫는다.
+     */
+    fun onCandidateSelect(item: PoiItem) {
+        val sheet = _uiState.value.sheet ?: return
+        val place = Poi(
+            name = item.name,
+            lat = item.lat,
+            lng = item.lng,
+            desc = item.description,
+            addr = item.address,
+        )
+        val catKey = BlockCategory.of(sheet.category)
+        editActiveDay { days, dayIndex ->
+            val blockId = sheet.replaceBlockId
+            if (blockId != null) {
+                ItineraryEdits.replacePlace(days, dayIndex, blockId, place, catKey)
+            } else {
+                ItineraryEdits.addBlock(
+                    days, dayIndex,
+                    ItineraryBlock(
+                        id = "", // addBlock 이 새 id 를 붙인다
+                        time = ADDED_BLOCK_TIME,
+                        title = item.name,
+                        catKey = catKey,
+                        place = place,
+                        desc = item.description,
+                        blockType = BlockType.USER,
+                    ),
+                )
+            }
+        }
+        onSheetDismiss()
+    }
+
+    /** 진행 중 조회를 구분하는 세대 토큰. 시트를 닫거나 새로 열면 이전 응답이 무효가 된다. */
+    private var sheetRequestId = 0
+
+    /** 시트 상태를 걸고 후보 8건을 조회한다. */
+    private fun openSheet(sheet: CandidateSheetState) {
+        val requestId = ++sheetRequestId
+        _uiState.update {
+            it.copy(sheet = sheet.copy(phase = CandidateSheetState.Phase.LOADING))
+        }
+        val (lat, lng) = sheetCenter
+        viewModelScope.launch {
+            val outcome = runCatching { poiRepository.search(sheet.category, lat, lng) }
+            _uiState.update { state ->
+                // 그 사이 닫혔거나 새 조회가 시작됐으면 낡은 응답을 버린다. 대상 비교가 아니라
+                // 세대 비교다 — 같은 대상을 닫았다 다시 열어도 이전 응답이 새 결과를 못 덮는다.
+                val current = state.sheet ?: return@update state
+                if (requestId != sheetRequestId) return@update state
+                state.copy(
+                    sheet = outcome.fold(
+                        onSuccess = { result ->
+                            current.copy(
+                                phase = if (result.items.isEmpty()) {
+                                    CandidateSheetState.Phase.EMPTY
+                                } else {
+                                    CandidateSheetState.Phase.CONTENT
+                                },
+                                items = result.items,
+                                source = result.source,
+                            )
+                        },
+                        onFailure = {
+                            current.copy(phase = CandidateSheetState.Phase.ERROR)
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
+    private companion object {
+        /** 추가 블록의 기본 시간. (SPEC §4.10 "추가=새 블록(13:00) 맨 끝") */
+        const val ADDED_BLOCK_TIME = "13:00"
     }
 
     private fun send(request: GenerateItineraryRequest) {

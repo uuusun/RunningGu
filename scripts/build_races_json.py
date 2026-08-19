@@ -14,6 +14,7 @@ import csv
 import json
 import re
 import sys
+import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -56,9 +57,9 @@ def std_events(row):
             ev.add("풀")
         elif re.search(r"하프|half|(^|\D)21", s):
             ev.add("하프")
-        elif re.search(r"10\s*k", s):
+        elif re.search(r"(?<![\d.])10\s*k", s):  # '110km'의 10k 오매칭 방지
             ev.add("10K")
-        elif re.search(r"5\s*k", s):
+        elif re.search(r"(?<![\d.])5\s*k", s):  # '15km'·'4.5km'의 5k 오매칭 방지
             ev.add("5K")
     return [e for e in EVENT_ORDER if e in ev]
 
@@ -80,7 +81,8 @@ def region_of(row, warnings):
 
 
 def norm_name(s):
-    return re.sub(r"[\s\W_]+", "", s or "", flags=re.UNICODE).lower()
+    """병합 그룹 키. NFC 정규화로 자모 분리형(NFD) 입력도 같은 키를 만든다."""
+    return re.sub(r"[\s\W_]+", "", unicodedata.normalize("NFC", s or ""), flags=re.UNICODE).lower()
 
 
 def merge_group(rows):

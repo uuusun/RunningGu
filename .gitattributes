@@ -1,0 +1,4 @@
+# 생성 산출물은 OS 와 무관하게 LF 고정 — 재생성 결과와 checkout 본이 바이트 단위로 같아야
+# 결정성 검증(같은 입력 → 같은 산출물, 계약 §1·AP-24)이 CRLF 변환에 깨지지 않는다.
+data/contest_snapshot.json text eol=lf
+reference-web/public/data/races.json text eol=lf
