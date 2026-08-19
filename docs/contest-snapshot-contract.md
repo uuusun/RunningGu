@@ -86,7 +86,7 @@
 | `roadAddress` | string | ✓ | 도로명 주소 |
 | `contestDate` | string | ✗ | `YYYY-MM-DD` (KST 기준 날짜) |
 | `startTime` | string | ✓ | `HH:MM`. 형식 불일치 시 null |
-| `events` | string[] | ✗(빈 배열 허용) | `FULL·HALF·K10·K5` (API 명세 부록 enum). 순서는 이 고정 순서. 빈 배열 = 종목 미표기(§8.2 28건 정책) → `CONTEST_EVENT` 행 없음 |
+| `events` | string[] | ✗(빈 배열 허용) | `FULL·HALF·K10·K5` (API 명세 부록 enum). 순서는 이 고정 순서. 빈 배열 = 종목 미표기(§8.2 정책, 현재 2건) → `CONTEST_EVENT` 행 없음 |
 | `category` | string | ✗ | `로드·트레일·걷기·야간` (SPEC §6.2) |
 | `applyStart` | string | ✓ | `YYYY-MM-DD`. 형식 불일치 시 null |
 | `applyEnd` | string | ✓ | `YYYY-MM-DD`. 형식 불일치 시 null |
