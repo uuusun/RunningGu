@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.SourceBadge
 
 /**
  * S6 숙소 선택. (SPEC §4.9 · AP-11)
@@ -186,22 +187,6 @@ private fun StayRow(item: PoiItem, selected: Boolean, onSelect: () -> Unit) {
                 TextButton(onClick = onSelect) { Text("선택") }
             }
         }
-    }
-}
-
-/** 소스 배지. 어디서 온 데이터인지 보여준다. (SPEC §3-6 · NFR-2) */
-@Composable
-private fun SourceBadge(source: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.extraSmall,
-    ) {
-        Text(
-            text = source,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-        )
     }
 }
 
