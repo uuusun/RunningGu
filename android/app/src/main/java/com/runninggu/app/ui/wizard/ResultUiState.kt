@@ -1,8 +1,10 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
+import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
 
 /**
@@ -25,6 +27,8 @@ data class ResultUiState(
     val activeDayIndex: Int = 0,
     /** 편집 모드. [편집]↔[완료]로 오간다. (SPEC §4.10) */
     val isEditing: Boolean = false,
+    /** 후보 시트. null 이면 닫힌 상태다. (SPEC §4.10) */
+    val sheet: CandidateSheetState? = null,
     val errorMessage: String? = null,
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
@@ -64,3 +68,36 @@ data class ResultUiState(
     val recoveryFlags: List<Boolean>
         get() = result?.recoveryFlags.orEmpty()
 }
+
+/**
+ * 후보 시트(교체·추가)의 UI 계약. (SPEC §4.10)
+ *
+ * - 교체: [replaceBlockId] 블록의 장소·설명·카테고리를 바꾼다. 블록 id·시간은 유지된다.
+ * - 추가: 카테고리 칩(취향 6종+숙소)으로 조회를 바꿔 가며 고르고, 13:00 새 블록으로 맨 끝에 붙는다.
+ */
+data class CandidateSheetState(
+    /** null 이면 추가 모드, 값이 있으면 그 블록의 장소 교체 모드다. */
+    val replaceBlockId: String? = null,
+    val category: PoiCategory = PoiCategory.TOUR,
+    val phase: Phase = Phase.LOADING,
+    val items: List<PoiItem> = emptyList(),
+    /** `LIVE` · `SAMPLE` · `SYNTH` 소스 배지. (NFR-2) */
+    val source: String = "",
+) {
+    enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
+
+    val isReplace: Boolean get() = replaceBlockId != null
+
+    /** "{카테고리} {교체|추가} · 인근" — 시트 헤더. (SPEC §4.10) */
+    val title: String
+        get() = "${category.label} ${if (isReplace) "교체" else "추가"} · 인근"
+}
+
+/**
+ * 표시 분류 → 조회 카테고리. [BlockCategory.of] 의 역방향이다.
+ *
+ * 대회·회복 블록은 조회 카테고리가 없어 null — 화면은 이 값으로 교체 버튼을 숨기고,
+ * ViewModel 은 그래도 들어온 요청을 거부한다.
+ */
+fun BlockCategory.toPoiCategoryOrNull(): PoiCategory? =
+    PoiCategory.entries.firstOrNull { BlockCategory.of(it) == this }
