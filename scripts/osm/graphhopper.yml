@@ -1,0 +1,69 @@
+graphhopper:
+  datareader.file: korea.osm.pbf
+  graph.location: graph-cache
+
+  # 보행 전용이므로 자동차 전용도로는 아예 읽지 않는다. 그래프가 작아지고 빌드가 빨라진다.
+  import.osm.ignored_highways: motorway,trunk
+
+  # GraphHopper 9+ 는 vehicle 대신 custom model 을 쓴다.
+  # foot_access/foot_average_speed 인코딩 값을 켜야 보행 프로파일이 만들어진다.
+  graph.encoded_values: foot_access, foot_priority, foot_average_speed, average_slope, hike_rating, road_class, road_environment, surface
+
+  profiles:
+    - name: foot
+      custom_model:
+        priority:
+          - if: "!foot_access"
+            multiply_by: "0"
+        speed:
+          - if: "true"
+            limit_to: "foot_average_speed"
+
+    # 러닝 친화 프로파일. 기본 foot 는 "보행자 최적 경로"라 큰 도로를 그냥 쓴다.
+    # 뛰는 사람 기준으로 보행로·자전거도로를 우대하고 차도를 강하게 깎는다.
+    - name: run
+      custom_model:
+        priority:
+          - if: "!foot_access"
+            multiply_by: "0"
+          - if: "road_class == FOOTWAY || road_class == PATH || road_class == PEDESTRIAN"
+            multiply_by: "1.0"
+          - else_if: "road_class == CYCLEWAY || road_class == TRACK"
+            multiply_by: "0.95"
+          - else_if: "road_class == RESIDENTIAL || road_class == LIVING_STREET"
+            multiply_by: "0.5"
+          - else_if: "road_class == SERVICE"
+            multiply_by: "0.25"
+          - else_if: "road_class == TERTIARY"
+            multiply_by: "0.2"
+          - else_if: "road_class == PRIMARY || road_class == SECONDARY || road_class == TRUNK"
+            multiply_by: "0.05"
+          # 계단은 뛰던 흐름을 끊는다. 다만 하천 진입로처럼 계단뿐인 길목이 있어
+          # 완전히 막지는 않고 차도만큼 깎는다.
+          - else_if: "road_class == STEPS"
+            multiply_by: "0.05"
+        speed:
+          - if: "true"
+            limit_to: "foot_average_speed"
+
+  profiles_ch: []
+  # round_trip 은 CH 를 못 쓴다. LM 이 있어야 실용 속도가 나온다.
+  profiles_lm:
+    - profile: foot
+    - profile: run
+
+  # OSM 에는 고도가 없다. SRTM 위성 고도를 받아 붙인다.
+  graph.elevation.provider: srtm
+  graph.elevation.cache_dir: ./srtm-cache/
+
+  routing.non_ch.max_waypoint_distance: 1000000
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: 127.0.0.1
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: 127.0.0.1
