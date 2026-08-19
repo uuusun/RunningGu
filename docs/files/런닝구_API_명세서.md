@@ -297,7 +297,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
       "region": "세종", "place": "세종중앙공원",
       "contestDate": "2026-08-22", "startTime": "08:00",
       "events": ["FULL", "HALF", "K10"],
-      "regStatus": "OPEN", "applyEnd": "2026-08-10",
+      "regStatus": "CLOSED",
+      "applyStart": "2026-04-01", "applyEnd": "2026-08-10",
       "imageUrl": "https://...",
       "sources": ["MARATHON_ONLINE", "MARATHON_GO"],
       "checkedAt": "2026-07-15T04:30:00Z",
@@ -310,7 +311,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ```
 
 - 대회는 관리 배치가 `CONTEST_SOURCE` 원본을 정규화·중복 제거해 `CONTEST` canonical 레코드로 만든다. 공개 API는 canonical만 읽고 사용자는 생성·수정·삭제할 수 없다.
-- `regStatus`는 **저장값이 아니라 공통 함수로 조회 시점 파생** 🔒: `applyEnd != null && applyEnd < 오늘 → CLOSED` / `applyStart != null && 오늘 < applyStart → BEFORE` / 시작일을 지났거나 종료일이 아직 남은 등 **하나 이상의 날짜로 현재 접수 가능함을 판단할 수 있으면 `OPEN`** / 날짜만으로 판단할 수 없으면 최신 원본 상태 / 그것도 없으면 `UNKNOWN`.
+- `applyStart`와 `applyEnd`는 nullable이다. 앱은 Room에 캐시한 목록을 오프라인에서 표시할 때 두 날짜를 오늘(KST) 기준 접수상태 재계산 근거로 사용한다(SPEC §5.5).
+- `regStatus`는 **저장값이 아니라 공통 함수로 조회 시점 파생** 🔒: `applyEnd != null && applyEnd < 오늘 → CLOSED` / `applyStart != null && 오늘 < applyStart → BEFORE` / `applyStart != null && applyStart <= 오늘 → OPEN` / **`applyEnd`만 알고 아직 지나지 않았으면 날짜만으로 `OPEN`을 단정하지 않고 최신 원본 상태** / 그 밖에 날짜만으로 판단할 수 없으면 최신 원본 상태 / 그것도 없으면 `UNKNOWN`.
 - `events`가 빈 배열이면 클라가 "종목 미표기" 배지 표시.
 - `favorite`: 로그인 시 실제 찜 여부, 게스트는 항상 `false`.
 - `imageUrl`은 nullable이며 없으면 앱이 기본 placeholder를 표시한다.
@@ -327,7 +329,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 3-4 `GET /api/contests/{id}` — 상세
 
-3-1 카드 필드 + `applyStart, organizer, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
+3-1 카드 필드 + `organizer, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
 `404 CONTEST_NOT_FOUND`. `organizer`, `officialUrl`, `imageUrl`, `lat`, `lng`는 nullable이다. 현재 원천 271건과 canonical 153건은 좌표 누락 0건이다. 좌표는 지도·인근 축제·동선 위저드의 기준점이며, 앱은 좌표가 없으면 P0에서 동선 만들기 CTA를 비활성화한다.
 
 ### 3-5 `GET /api/contests/{id}/festivals` — 인근 축제 (M3 프록시) 🔒
