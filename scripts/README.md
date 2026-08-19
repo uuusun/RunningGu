@@ -10,6 +10,7 @@
 | `count_races.py` | 수집 통계 확인 |
 | `build_races_json.py` | `data/races_sample.csv` → 병합 153건 `races.json` (목업·앱 초기 폴백용) |
 | `build_contest_snapshot.py` | `data/races_sample.csv` → 서버용 대회 스냅샷 `data/contest_snapshot.json` (계약: `docs/contest-snapshot-contract.md`) |
+| `test_races_pipeline.py` | 종목 정규식·NFC 병합 키 회귀 테스트 (`python -m unittest test_races_pipeline`) |
 | `geocode.py` | 장소명→좌표 단건 조회 (카카오, `geocode_cache.json` 캐시) |
 | `build_courses.py` | 러닝코스 소스(두루누비 API+GPX · 로컬 GPX 폴더) → 정규화 `data/courses.json`. 어댑터는 `courses/sources/` |
 

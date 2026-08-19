@@ -15,9 +15,37 @@
 | 주기 | 최초 파일 = 초기 시드. 이후 주 1회 재크롤 후 **같은 경로를 재생성**(SPEC §8.2) |
 | 결정성 | 같은 입력 CSV → 바이트 단위로 같은 산출물. 타임스탬프는 전부 입력에서 파생하며 생성 시각(wall-clock)을 쓰지 않는다 |
 
-스냅샷은 **전체 상태(full state)이며 증분이 아니다.** Importer는 `canonicalKey` 기준으로
-upsert하고, 스냅샷에 없는 기존 canonical은 **삭제하지 않는다**(과거 대회는 크롤 범위 밖이지만
-저장 동선이 참조할 수 있다). 명시적 삭제는 P0 범위 밖이다.
+### 1.1 백엔드 전달·실행 (PR #41 리뷰 반영)
+
+- 스냅샷 파일은 백엔드 `bootJar` **리소스에 포함하지 않는다.** 저장소 커밋본이 검토·재현의
+  기준이고, 서버에는 배포 파이프라인이 외부 파일(경로 또는 볼륨)로 전달한다.
+- Importer는 서버 시작 시 자동 실행이 아니라 **명시적 실행**이다 — 별도 명령(CLI 러너·배치·
+  관리자 트리거 중 백엔드 재량)으로 파일 경로를 **인자로** 받는다. 인자가 없으면 저장소 루트
+  상대 `data/contest_snapshot.json`을 기본값으로 본다.
+- 초기 시드와 주간 갱신은 **같은 명령**이다. 적재는 멱등이므로 같은 파일을 두 번 실행해도
+  결과가 같다.
+
+### 1.2 동기화 규칙 — canonical 승계와 하위 테이블 (PR #41 리뷰 반영)
+
+스냅샷은 **전체 상태(full state)이며 증분이 아니다.** Importer의 동기화 규칙:
+
+1. **canonical 식별(승계 포함).** 대회명·일정이 바뀌면 `canonicalKey`도 바뀌지만, 크롤 원천의
+   `(sourceType, externalId)`는 재수집 간 안정적이다. 그래서 identity는 소스 키로 잇는다:
+   - ① 스냅샷 canonical의 `canonicalKey`가 DB에 있으면 → 그 행을 갱신한다.
+   - ② 없으면, 그 canonical의 `sources[]` 키 중 하나라도 DB의 기존 canonical에 붙어 있으면 →
+     **신규 insert가 아니라 그 기존 canonical을 갱신**한다(`canonicalKey` 포함 전 필드 교체).
+     DB PK(id)가 유지되므로 찜·저장 동선의 참조가 깨지지 않는다. 여러 기존 canonical과 겹치면
+     (재병합) 겹치는 소스가 가장 많은 것을 본체로 갱신하고, 나머지 겹친 canonical의 소스는
+     본체로 옮긴 뒤 소스가 0개가 된 canonical만 삭제 후보로 로깅한다(자동 삭제는 하지 않는다).
+   - ③ 둘 다 없으면 신규 insert.
+   - 별도 승계 필드를 스냅샷에 넣지 않는 이유: 생성기는 DB 이전 상태를 모르므로 승계는
+     소비자(Importer)만 판정할 수 있다.
+2. **갱신된 canonical의 하위는 완전 대체다.** `CONTEST_EVENT`·`CONTEST_SOURCE`는 스냅샷의
+   `events[]`·`sources[]`로 교체한다 — 사라진 행은 삭제한다. 소스가 다른 canonical로 재병합돼
+   왔으면 `contest_id`를 옮긴다(전역 유일키라 충돌하지 않는다).
+3. **스냅샷에 없는 기존 canonical은 하위 포함 그대로 둔다**(과거 대회는 크롤 범위 밖이지만
+   저장 동선이 참조할 수 있다). 취소된 것으로 보이는 미래 대회의 비활성화·명시적 삭제는
+   P0 범위 밖이며, 공개 API는 지금처럼 `contest_date >= 오늘` 필터만 적용한다.
 
 ## 2. 최상위 구조
 
@@ -38,6 +66,7 @@ upsert하고, 스냅샷에 없는 기존 canonical은 **삭제하지 않는다**
 | `sourceRowCount` | int | 입력 CSV 데이터 행 수 (헤더 제외) |
 | `canonicalCount` | int | `contests[]` 길이 |
 | `sourceRecordCount` | int | 모든 `sources[]` 길이 합 = `sourceRowCount − len(skipped)` |
+| `eventRecordCount` | int | 모든 `events[]` 길이 합 — `CONTEST_EVENT` 적재 행 수 검증용 |
 | `skipped` | array | 제외된 원천 행 `{ "externalId", "reason" }`. reason: `MISSING_REQUIRED` |
 | `checkedAtMax` | string | 전체 원천 `fetchedAt`의 최댓값 (UTC `Z`) — 스냅샷의 데이터 기준 시각 |
 
@@ -100,7 +129,12 @@ upsert하고, 스냅샷에 없는 기존 canonical은 **삭제하지 않는다**
 2. `canonicalKey` 유일 · `(sourceType, externalId)` 유일
 3. 필수 필드 non-null · `region`/`events`/`category`/`regStatusFallback` enum 값
 4. `lat/lng` 존재와 위경도 범위 (대한민국 개략 범위 33≤lat≤39, 124≤lng≤132)
-5. `meta` 집계 = 실제 배열 길이
+5. `meta` 집계 일치 (PR #41 리뷰 반영):
+   - `canonicalCount` = `contests[]` 길이
+   - `sourceRecordCount` = 모든 `sources[]` 길이 합 = `sourceRowCount − skipped.length`
+   - `eventRecordCount` = 모든 `events[]` 길이 합
+   - `checkedAtMax` = 전체 `sources[].fetchedAt` 최댓값, canonical별 `checkedAt` = 해당
+     `sources[].fetchedAt` 최댓값
 6. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical 유지 (SPEC §8.2)
 
 적재는 멱등이다: 같은 스냅샷을 두 번 적재해도 결과가 같다.
@@ -108,6 +142,8 @@ upsert하고, 스냅샷에 없는 기존 canonical은 **삭제하지 않는다**
 ## 5. 버전 규칙
 
 - 하위 호환 추가(선택 필드 추가)는 `schemaVersion` 유지, 필드 삭제·의미 변경은 +1.
+- **Importer는 알 수 없는 필드를 무시한다**(PR #41 리뷰 반영). 선택 필드 추가가 버전을
+  올리지 않는 것과 한 쌍인 규칙이다 — unknown 필드를 오류로 거부하지 않는다.
 - `schemaVersion`이 올라가면 Importer가 지원 버전을 확인하고 미지원 시 적재를 거부한다.
 
 ## 6. 향후 자동화 (참고, P0 범위 밖)

@@ -202,6 +202,7 @@ def main():
             "sourceRowCount": len(rows),
             "canonicalCount": len(contests),
             "sourceRecordCount": sum(len(c["sources"]) for c in contests),
+            "eventRecordCount": sum(len(c["events"]) for c in contests),
             "skipped": [
                 {"externalId": r.get("race_id") or "", "reason": "MISSING_REQUIRED"} for r in skipped
             ],
