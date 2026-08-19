@@ -42,3 +42,19 @@ jobs:
         shell: pwsh
         run: |
           python -c "import json,pathlib; a=pathlib.Path('.ci/races-1.json').read_bytes(); b=pathlib.Path('.ci/races-2.json').read_bytes(); assert a==b, 'non-deterministic output'; rows=json.loads(a.decode('utf-8')); assert len(rows)==153, len(rows); assert sum(bool(r.get('imageUrl')) for r in rows)==133; print('OK: UTF-8, deterministic, 153 contests, 133 images')"
+
+      # 종목 정규식·NFC 병합 키 회귀 테스트 (PR #41 리뷰 반영)
+      # discover 를 쓰지 않는다 — scripts/courses 패키지가 requests 를 import 해서 CI 에 없는
+      # 의존성까지 끌려온다. 테스트 모듈을 직접 지정한다.
+      - name: Pipeline regression tests
+        shell: pwsh
+        working-directory: scripts
+        run: python -m unittest test_races_pipeline -v
+
+      # 서버용 대회 스냅샷 — 결정성과 meta 집계 (docs/contest-snapshot-contract.md §2.1·§4)
+      - name: Contest snapshot determinism and aggregates
+        shell: pwsh
+        run: |
+          python scripts/build_contest_snapshot.py --out .ci/snap-1.json
+          python scripts/build_contest_snapshot.py --out .ci/snap-2.json
+          python -c "import json,pathlib; a=pathlib.Path('.ci/snap-1.json').read_bytes(); b=pathlib.Path('.ci/snap-2.json').read_bytes(); assert a==b, 'non-deterministic snapshot'; s=json.loads(a.decode('utf-8')); m=s['meta']; cs=s['contests']; assert m['canonicalCount']==len(cs); assert m['sourceRecordCount']==sum(len(c['sources']) for c in cs); assert m['eventRecordCount']==sum(len(c['events']) for c in cs); assert m['sourceRowCount']==m['sourceRecordCount']+len(m['skipped']); print('OK: snapshot deterministic,', len(cs), 'contests')"

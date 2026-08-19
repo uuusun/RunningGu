@@ -272,7 +272,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 3. 대회 API `/api/contests` (공개)
 
-**데이터 적재 계약 🔒(결정-39·40)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다.
+**데이터 적재 계약 🔒(결정-39·40)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다. **스냅샷 파일 계약(경로 `data/contest_snapshot.json`·스키마·유일키·Importer 검증 의무)은 `docs/contest-snapshot-contract.md`가 SSOT다.**
 
 ### 3-1 `GET /api/contests` — 목록 (커서 페이징) 🔒
 
