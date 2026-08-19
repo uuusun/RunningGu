@@ -6,8 +6,10 @@
 |---|---|
 | `marathon_crawler.py` | 마라톤온라인·마라톤GO 크롤 → 실행 위치의 `./output/`에 CSV·JSON (재크롤 주기: 주 1회, SPEC §8.2) |
 | `add_coordinates.py` | 크롤 결과에 좌표 보정 |
+| `fix_event_types.py` | 기존 크롤 산출물의 `event_types`를 distances 기준으로 재생성 (풀/하프 + `Nkm` 라벨, 멱등) |
 | `count_races.py` | 수집 통계 확인 |
-| `build_races_json.py` | `data/races_sample.csv` → 병합 153건 `races.json` |
+| `build_races_json.py` | `data/races_sample.csv` → 병합 153건 `races.json` (목업·앱 초기 폴백용) |
+| `build_contest_snapshot.py` | `data/races_sample.csv` → 서버용 대회 스냅샷 `data/contest_snapshot.json` (계약: `docs/contest-snapshot-contract.md`) |
 | `geocode.py` | 장소명→좌표 단건 조회 (카카오, `geocode_cache.json` 캐시) |
 | `build_courses.py` | 러닝코스 소스(두루누비 API+GPX · 로컬 GPX 폴더) → 정규화 `data/courses.json`. 어댑터는 `courses/sources/` |
 
@@ -25,18 +27,17 @@ python build_races_json.py
 python build_races_json.py --out ../android/app/src/main/assets/races.json
 ```
 
-## 서버용 대회 스냅샷 계약 (결정-39·40 — 구현 전)
+## 서버용 대회 스냅샷 (결정-39·40)
 
-대회 정규화·region/좌표 보정·중복 병합은 Python 데이터 파이프라인이 단일 책임을 갖는다. P0에서는 Python이 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 PostgreSQL에 트랜잭션으로 멱등 적재한다. 최초 산출물은 초기 시드, 이후 주간 재수집 산출물은 갱신 스냅샷이다.
+대회 정규화·region/좌표 보정·중복 병합은 Python 데이터 파이프라인이 단일 책임을 갖는다. P0에서는 `build_contest_snapshot.py`가 서버용 JSON 스냅샷 `data/contest_snapshot.json`을 생성하고, 백엔드 Importer가 이를 검증해 PostgreSQL에 트랜잭션으로 멱등 적재한다. 최초 산출물은 초기 시드, 이후 주간 재수집 산출물은 갱신 스냅샷이다.
 
-- 현재 `reference-web/public/data/races.json`은 목업용 대표 목록이며 **서버용 대회 스냅샷이 아니다**.
-- 서버용 스냅샷은 canonical 대회별 표준 필드와 `events[]`, 병합 전 원천을 보존하는 `sources[]`를 포함해야 한다.
-- `canonicalKey`와 `(sourceType, externalId)`는 재수집 시 upsert 가능한 안정적 유일키여야 한다.
-- 같은 입력은 두 번 실행해도 같은 UTF-8 산출물을 만들어야 한다.
-- 백엔드는 스키마·유일키·필수값·좌표·집계를 전부 검증하고, 하나라도 실패하면 전체 적재를 롤백해 이전 정상 canonical을 유지한다.
-- 구체적인 파일 경로와 JSON 스키마는 데이터 생산자와 백엔드가 첫 계약 PR에서 확정한다. 확정 전에는 현재 `races.json`을 서버 DB에 직접 적재하지 않는다.
-- Python은 `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT` 운영 핵심 테이블에 직접 쓰지 않는다.
-- 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 적재 후 백엔드 승격 방식 중 하나로 전환한다. 구체적인 방식은 자동화 착수 시 별도로 확정한다.
+**파일 경로·JSON 스키마·유일키·Importer 검증 의무는 [`docs/contest-snapshot-contract.md`](../docs/contest-snapshot-contract.md)가 SSOT다.** 요점만 남기면:
+
+- 병합 규칙은 `build_races_json.py`가 소유하고 스냅샷 생성기는 이를 import 한다 — 규칙이 두 벌로 갈라지지 않는다.
+- `canonicalKey`(= 날짜|정규화 이름)와 `(sourceType, externalId)`는 재수집 시 upsert 가능한 안정적 유일키다.
+- 같은 입력은 두 번 실행해도 같은 UTF-8 산출물을 만든다. 타임스탬프는 전부 입력에서 파생한다.
+- 현재 `reference-web/public/data/races.json`은 목업용 대표 목록이며 서버용 스냅샷이 아니다.
+- Python은 `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT` 운영 핵심 테이블에 직접 쓰지 않는다. 향후 자동화 방식은 계약 문서 §6.
 
 - 입력 경로는 저장소 루트 `data/races_sample.csv`다. 모든 입출력과 콘솔은 UTF-8로 처리한다.
 - `durunubi_courses.json`은 두루누비 GPX 파싱본 261코스다. 서버 경로 리소스의 원천으로 보존하고, 앱에는 축약본을 생성해 번들한다. 최신 이름·난이도 등 메타데이터는 서버가 두루누비 API에서 시작 시+하루 1회 동기화한다.
