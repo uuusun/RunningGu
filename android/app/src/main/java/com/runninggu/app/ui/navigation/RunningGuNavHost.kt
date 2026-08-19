@@ -10,6 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
+import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,7 +70,12 @@ fun RunningGuNavHost(
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.COURSES) { CourseScreen(Modifier.statusBarsPadding()) }
+        composable(Routes.COURSES) {
+            CourseScreen(
+                viewModel = viewModel(factory = CourseViewModel.factory()),
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
         composable(Routes.MY) { MyScreen(Modifier.statusBarsPadding()) }
 
         // S3 대회 상세 — 최상위 화면이 아니므로 탭바는 자동으로 숨는다 (SPEC §2.1).
