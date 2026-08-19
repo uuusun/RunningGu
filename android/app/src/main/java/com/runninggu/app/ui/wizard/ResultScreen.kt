@@ -15,13 +15,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,11 +44,27 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
@@ -328,8 +349,12 @@ private fun EditNotice() {
  * 편집 목록. (SPEC §4.10 · §5.7)
  *
  * 행 종류가 둘이다.
- * - USER: 번호 + 제목 + "{시간}·{장소}·{카테고리}" + 순서·삭제 버튼
- * - RACE: 잠금 아이콘과 "관리자 업데이트". **순서·교체·삭제 버튼을 아예 그리지 않는다.**
+ * - USER: 번호 + 제목 + "{시간}·{장소}·{카테고리}" + 교체 · 휴지통 + **오른쪽 끝 그립**.
+ *   순서 변경은 그립을 **길게 눌러 끄는** 드래그 — 이웃 행의 절반을 넘을 때마다
+ *   실제 목록을 한 칸씩 옮기므로 놓는 순간 이미 반영돼 있다.
+ *   삭제는 두 길이다 — 휴지통 탭, 또는 행을 **왼쪽으로 스와이프**하면 나타나는
+ *   빨간 [삭제] 버튼.
+ * - RACE: 잠금 아이콘과 "관리자 업데이트". **그립·교체·스와이프를 아예 주지 않는다.**
  *
  * 버튼을 숨기는 게 본 방어선이고, [ItineraryEdits]의 거부는 그래도 새어 들어온 경우를 막는
  * 안전망이다 — 목업은 이 방어가 없어 대회 블록이 삭제됐다(대조표 B4).
@@ -341,76 +366,204 @@ private fun EditList(
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
 ) {
+    // 드래그 제스처 코루틴이 여러 리컴포지션에 걸쳐 살아 있으므로 최신 목록을 State 로 읽는다.
+    val blocks by rememberUpdatedState(day.blocks)
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val rowHeights = remember { mutableStateMapOf<String, Int>() }
+    val rowSpacing = with(LocalDensity.current) { 8.dp.toPx() }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         day.blocks.forEachIndexed { index, block ->
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = MaterialTheme.shapes.medium,
-                tonalElevation = 1.dp,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            // key 로 행 컴포지션을 id 에 묶는다 — 드래그 중 목록이 재정렬돼도
+            // 그립의 제스처 코루틴이 끊기지 않고 행을 따라간다.
+            key(block.id) {
+                val isDragging = block.id == draggingId
+                val editable = ItineraryEdits.canEdit(block)
+                val scope = rememberCoroutineScope()
+                // 왼쪽 스와이프로 여는 삭제 버튼의 노출량. 0(닫힘) ~ -deleteWidthPx(열림).
+                val deleteWidthPx = with(LocalDensity.current) { DELETE_REVEAL_WIDTH.toPx() }
+                val reveal = remember(block.id) { Animatable(0f) }
+
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { rowHeights[block.id] = it.height }
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer { translationY = if (isDragging) dragOffsetY else 0f },
                 ) {
-                    NumberRail(index + 1)
-                    Spacer(Modifier.width(10.dp))
-
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = block.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = if (ItineraryEdits.canEdit(block)) {
-                                listOfNotNull(block.time, block.place?.name, block.catKey.label)
-                                    .joinToString(" · ")
-                            } else {
-                                "관리자 업데이트"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    if (ItineraryEdits.canEdit(block)) {
-                        // TODO(AP-11): 그립 드래그로 바꾼다. 지금은 한 칸씩 옮기는 버튼이다.
-                        IconButton(
-                            onClick = { onMove(index, index - 1) },
-                            enabled = index > 0,
+                    // 닫혀 있을 때는 그리지 않는다 — 행 모서리(둥근 부분) 틈으로 빨강이 비친다.
+                    if (editable && reveal.value < -0.5f) {
+                        // 행 뒤에 숨어 있다가 왼쪽 스와이프로 드러나는 삭제 버튼 (SPEC §4.10 삭제).
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.error),
+                            contentAlignment = Alignment.CenterEnd,
                         ) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "위로")
-                        }
-                        IconButton(
-                            onClick = { onMove(index, index + 1) },
-                            enabled = index < day.blocks.lastIndex,
-                        ) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "아래로")
-                        }
-                        // 회복 안내처럼 조회 카테고리가 없는 블록은 교체 대상이 아니다.
-                        if (block.catKey.toPoiCategoryOrNull() != null) {
-                            IconButton(onClick = { onReplace(block) }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "교체")
+                            Box(
+                                Modifier
+                                    .width(DELETE_REVEAL_WIDTH)
+                                    .fillMaxHeight()
+                                    .clickable { onRemove(block.id) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "삭제",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onError,
+                                )
                             }
                         }
-                        IconButton(onClick = { onRemove(block.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "삭제")
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = MaterialTheme.shapes.medium,
+                        tonalElevation = if (isDragging) 6.dp else 1.dp,
+                        shadowElevation = if (isDragging) 6.dp else 0.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset { IntOffset(reveal.value.roundToInt(), 0) }
+                            .then(
+                                if (editable) {
+                                    Modifier.pointerInput(block.id) {
+                                        detectHorizontalDragGestures(
+                                            onHorizontalDrag = { change, dx ->
+                                                change.consume()
+                                                scope.launch {
+                                                    reveal.snapTo(
+                                                        (reveal.value + dx).coerceIn(-deleteWidthPx, 0f),
+                                                    )
+                                                }
+                                            },
+                                            // 절반 넘게 열었으면 완전히 열고, 아니면 도로 닫는다.
+                                            onDragEnd = {
+                                                scope.launch {
+                                                    reveal.animateTo(
+                                                        if (reveal.value < -deleteWidthPx / 2f) {
+                                                            -deleteWidthPx
+                                                        } else {
+                                                            0f
+                                                        },
+                                                    )
+                                                }
+                                            },
+                                            onDragCancel = { scope.launch { reveal.animateTo(0f) } },
+                                        )
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            NumberRail(index + 1)
+                            Spacer(Modifier.width(10.dp))
+
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = block.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (editable) {
+                                        listOfNotNull(block.time, block.place?.name, block.catKey.label)
+                                            .joinToString(" · ")
+                                    } else {
+                                        "관리자 업데이트"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
+                            if (editable) {
+                                // 회복 안내처럼 조회 카테고리가 없는 블록은 교체 대상이 아니다.
+                                if (block.catKey.toPoiCategoryOrNull() != null) {
+                                    IconButton(onClick = { onReplace(block) }) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "교체")
+                                    }
+                                }
+                                // 삭제는 두 길이다 — 휴지통 탭, 또는 행을 왼쪽으로 스와이프.
+                                IconButton(onClick = { onRemove(block.id) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "삭제")
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                DragGrip(
+                                    modifier = Modifier.pointerInput(block.id) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                draggingId = block.id
+                                                dragOffsetY = 0f
+                                            },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                dragOffsetY += amount.y
+                                                val from = blocks.indexOfFirst { it.id == block.id }
+                                                if (from == -1) return@detectDragGesturesAfterLongPress
+                                                // 이웃 행의 절반을 넘으면 실제로 한 칸 옮긴다. 옮긴 만큼
+                                                // 시각 오프셋을 되돌려 행이 손가락 밑에 그대로 남는다.
+                                                val below = blocks.getOrNull(from + 1)?.let { rowHeights[it.id] }
+                                                if (below != null && dragOffsetY > (below + rowSpacing) / 2f) {
+                                                    onMove(from, from + 1)
+                                                    dragOffsetY -= below + rowSpacing
+                                                    return@detectDragGesturesAfterLongPress
+                                                }
+                                                val above = blocks.getOrNull(from - 1)?.let { rowHeights[it.id] }
+                                                if (above != null && dragOffsetY < -(above + rowSpacing) / 2f) {
+                                                    onMove(from, from - 1)
+                                                    dragOffsetY += above + rowSpacing
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                draggingId = null
+                                                dragOffsetY = 0f
+                                            },
+                                            onDragCancel = {
+                                                draggingId = null
+                                                dragOffsetY = 0f
+                                            },
+                                        )
+                                    },
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            } else {
+                                // 잠금만 보이고 조작은 없다 (SPEC §4.10 "그립·교체·삭제 미노출").
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "변경할 수 없는 일정",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                    } else {
-                        // 잠금만 보이고 조작 버튼은 없다 (SPEC §4.10 "그립·교체·삭제 미노출").
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "변경할 수 없는 일정",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
         }
     }
+}
+
+/** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
+private val DELETE_REVEAL_WIDTH = 84.dp
+
+/** 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립") */
+@Composable
+private fun DragGrip(modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = Icons.Default.Menu,
+        contentDescription = "길게 눌러 순서 변경",
+        modifier = modifier.size(20.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** 편집 목록 하단의 [장소 추가]. 후보 시트를 추가 모드로 연다. (SPEC §4.10) */
