@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -55,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -171,10 +173,23 @@ private fun Content(
     onReplaceBlock: (ItineraryBlock) -> Unit,
     onAddPlace: () -> Unit,
 ) {
+    // 스와이프로 삭제 버튼을 연 행. 화면에 하나만 열려 있고, 바깥을 건드리면 닫힌다.
+    var openedBlockId by remember(state.isEditing) { mutableStateOf<String?>(null) }
+
     Column(
         Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .pointerInput(openedBlockId) {
+                if (openedBlockId == null) return@pointerInput
+                awaitPointerEventScope {
+                    // Final 패스라 버튼(clickable)이 이미 가져간 터치는 보이지 않는다 —
+                    // 열린 행의 [삭제]를 누른 것까지 닫아버리면 삭제가 실행되지 않는다.
+                    // 아무도 가져가지 않은 터치 = 빈 곳·다른 행·스크롤이므로 그때 닫는다.
+                    awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Final)
+                    openedBlockId = null
+                }
+            },
     ) {
         // TODO(AP-03): 상단 지도. 활성 일자의 번호 핀·폴리라인 (SPEC §3-8 · §4.10).
         MapPlaceholder()
@@ -201,6 +216,8 @@ private fun Content(
                     Spacer(Modifier.height(10.dp))
                     EditList(
                         day = day,
+                        openedId = openedBlockId,
+                        onOpenedChange = { openedBlockId = it },
                         onRemove = onRemoveBlock,
                         onMove = onMoveBlock,
                         onReplace = onReplaceBlock,
@@ -351,7 +368,7 @@ private fun EditNotice() {
  *   순서 변경은 그립을 **길게 눌러 끄는** 드래그 — 이웃 행의 절반을 넘을 때마다
  *   실제 목록을 한 칸씩 옮기므로 놓는 순간 이미 반영돼 있다.
  *   삭제는 두 길이다 — 휴지통 탭, 또는 행을 **왼쪽으로 스와이프**하면 나타나는
- *   빨간 [삭제] 버튼.
+ *   빨간 [삭제] 버튼. 열린 행은 화면에 하나뿐이고([openedId]), 바깥을 건드리면 닫힌다.
  * - RACE: 잠금 아이콘과 "관리자 업데이트". **그립·교체·스와이프를 아예 주지 않는다.**
  *
  * 버튼을 숨기는 게 본 방어선이고, [ItineraryEdits]의 거부는 그래도 새어 들어온 경우를 막는
@@ -360,6 +377,8 @@ private fun EditNotice() {
 @Composable
 private fun EditList(
     day: ItineraryDay,
+    openedId: String?,
+    onOpenedChange: (String?) -> Unit,
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
@@ -384,6 +403,10 @@ private fun EditList(
                 val reveal = remember(block.id) { Animatable(0f) }
                 // 열린 만큼 행의 오른쪽을 깎는다. reveal 은 0(닫힘) ~ 음수(열림).
                 val revealWidth = with(LocalDensity.current) { (-reveal.value).toDp() }
+                // 다른 행이 열렸거나 바깥을 터치해 닫혔으면 이 행도 제자리로 돌아간다.
+                LaunchedEffect(openedId) {
+                    if (openedId != block.id && reveal.value != 0f) reveal.animateTo(0f)
+                }
 
                 Box(
                     Modifier
@@ -406,7 +429,10 @@ private fun EditList(
                                 Modifier
                                     .width(DELETE_REVEAL_WIDTH)
                                     .fillMaxHeight()
-                                    .clickable { onRemove(block.id) },
+                                    .clickable {
+                                        onOpenedChange(null)
+                                        onRemove(block.id)
+                                    },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
@@ -444,17 +470,22 @@ private fun EditList(
                                             },
                                             // 절반 넘게 열었으면 완전히 열고, 아니면 도로 닫는다.
                                             onDragEnd = {
+                                                val opened = reveal.value < -deleteWidthPx / 2f
+                                                // 애니메이션보다 상태를 먼저 알린다 — 그래야 앞서
+                                                // 열려 있던 다른 행이 곧바로 닫히기 시작한다.
+                                                if (opened) {
+                                                    onOpenedChange(block.id)
+                                                } else if (openedId == block.id) {
+                                                    onOpenedChange(null)
+                                                }
                                                 scope.launch {
-                                                    reveal.animateTo(
-                                                        if (reveal.value < -deleteWidthPx / 2f) {
-                                                            -deleteWidthPx
-                                                        } else {
-                                                            0f
-                                                        },
-                                                    )
+                                                    reveal.animateTo(if (opened) -deleteWidthPx else 0f)
                                                 }
                                             },
-                                            onDragCancel = { scope.launch { reveal.animateTo(0f) } },
+                                            onDragCancel = {
+                                                if (openedId == block.id) onOpenedChange(null)
+                                                scope.launch { reveal.animateTo(0f) }
+                                            },
                                         )
                                     }
                                 } else {
