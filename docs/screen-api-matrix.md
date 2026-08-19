@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.5
+# 런닝구 화면–API 매핑표 v1.6
 
-> 갱신일: 2026-08-19
+> 갱신일: 2026-08-20
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.4(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v2.5(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -348,7 +348,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 | segment/행동 | API | 응답에서 쓰는 값 | 상태 |
 |---|---|---|---|
-| 프로필 | `GET /api/me` | id,email?,nickname,loginProvider,agreements | 401/Error |
+| 프로필 | `GET /api/me` | id,email(`string|null`),nickname,loginProvider,agreements | `email=null`이면 이메일 행·placeholder 없이 숨김. 401/Error |
 | 동선 목록 | `GET /api/itineraries` | id,title,region?,contestName,event,recovery,기간,placeCount,createdAt | Loading/Empty/Error/offline |
 | 동선 열기 | `GET /api/itineraries/{id}` | 전체 상세 | S7-R |
 | 동선 삭제 | `DELETE /api/itineraries/{id}` | 204 | 확인 modal, 실패 시 유지 |
@@ -478,7 +478,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-25 | GPS 기록·ran은 P1, P0 보관함은 saved만 구현 |
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
-| D-29 | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음 |
+| D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
 
@@ -488,7 +488,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 |---|---|---|---|
 | D-21 | saved/ran 통합 정렬·페이징 | 보관함 목록 계약 | 앱+백엔드 |
 
-P0 제품 정책 중 `TBD-DB-02` 저장 코스 attribution, `TBD-DB-04` 저장 동선 표시값 snapshot/파생, `TBD-DB-05` 대회 snapshot 누락 처리는 팀 GitHub 이슈에서 결정한다. D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
+P0 화면·기능의 제품 결정은 모두 닫혔다. `TBD-DB-02` 저장 코스 attribution, `TBD-DB-04` 저장 동선 표시값 snapshot/파생, `TBD-DB-05` 대회 snapshot 누락 처리는 Android 착수를 막는 제품 미결이 아니라 백엔드 물리 스키마·Importer 구현 전 결정이며 팀 GitHub 이슈에서 정한다. D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
 
 ---
 
@@ -514,6 +514,7 @@ P0 제품 정책 중 `TBD-DB-02` 저장 코스 attribution, `TBD-DB-04` 저장 �
 | `GET /api/festivals` | 카드 tap 없음 명시, KTO 원천·fetchedAt/cachedAt 추적 필드 |
 | `GET /api/contests/{id}/festivals` | KTO 원천·fetchedAt/cachedAt 추적 필드 |
 | `GET /api/pois` | 항목별 provider(KTO/KAKAO), fetchedAt/cachedAt, 안정적 placeId 필요 여부 |
+| `GET /api/courses` | 지역별 목록 하단에 표시할 `attributions`의 응답 위치·Page 예시. 이는 저장 코스 상세의 보존 방식을 정하는 `TBD-DB-02`와 별도 API 계약이지만 하나의 러닝코스 출처 이슈에서 함께 추적 가능 |
 | `GET /api/itineraries` | 보관함 카드의 region 필드 |
 | `GET /api/me/courses` | saved 목록 projection의 정확한 필드와 page 예시 |
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |

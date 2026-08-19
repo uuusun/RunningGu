@@ -1,7 +1,7 @@
-# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4
+# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.1
 
-> **검증일**: 2026-08-19
-> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-43 포함) · API 명세 v2.4 · 화면–API 매핑표 v1.5 · 논리 ERD v4 · 수정 DFD
+> **검증일**: 2026-08-20
+> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-43 포함) · API 명세 v2.5 · 화면–API 매핑표 v1.6 · 논리 ERD v4 · 수정 DFD
 > **판정**: P0+P1 논리 모델과 확정된 DB-01·03·06·07 계약은 정렬됐다. 남은 `TBD-DB-01·02·04·05`와 `TBD-P1-01`을 닫기 전에는 Flyway 물리 스키마로 확정하지 않는다.
 
 ---
@@ -25,7 +25,7 @@
 
 - `USER 1:1 LOGIN_IDENTITY`이며 가입 시 EMAIL/KAKAO 중 정확히 한 수단만 선택한다.
 - `UNIQUE(user_id)`와 `UNIQUE(provider, provider_subject)`를 적용하고 P0 연결·추가·해제·전환을 제공하지 않는다.
-- 대표 이메일은 EMAIL의 `provider_subject`, KAKAO의 nullable `email_snapshot`에서 파생한다.
+- 대표 이메일은 EMAIL의 `provider_subject`, KAKAO의 nullable `email_snapshot`에서 파생한다. `GET /me.email`은 항상 포함하는 `string|null`이며, KAKAO가 이메일을 제공하지 않으면 앱이 이메일 행을 숨긴다.
 - EMAIL은 `password_hash`·`email_verified_at`이 필수이고 KAKAO는 둘 다 null이며, nullable `last_login_at`을 유지한다.
 - 약관은 `USER_AGREEMENT`에 append-only 이력으로 저장한다.
 - 인증 코드·재설정 토큰과 refresh token은 원문이 아니라 hash만 저장한다.
@@ -119,6 +119,8 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 | `TBD-DB-04` | 동선의 contestName·region·recovery snapshot/파생 정책 |
 | `TBD-DB-05` | 새 대회 snapshot에서 사라진 canonical/source의 처리 |
 | `TBD-P1-01` | saved/ran 통합 정렬·페이징과 RUN projection |
+
+위 `TBD-DB-02·04·05`는 P0 화면·기능 결정을 다시 연 항목이 아니라 백엔드 저장·Importer 구현 전 결정이다. 현재 확정된 Android A1~A3·S10 화면과 `GET /me` DTO의 구현 착수를 막지 않는다. 또한 지역별 코스 목록의 출처 응답 누락은 `GET /api/courses` API 상세화 항목이며, 저장 코스 상세의 attribution 보존 방식을 다루는 `TBD-DB-02`와 구분한다.
 
 확정되어 위 표에서 제거한 항목은 다음과 같다.
 

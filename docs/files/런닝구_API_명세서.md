@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.4
+# 런닝구 백엔드 API 명세서 v2.5
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -216,7 +216,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/me` | 내 정보 — `{id, email?, nickname, loginProvider, agreements, createdAt}` (앱 시작 세션 검증 겸용). `email`은 EMAIL의 정규화 이메일 또는 KAKAO의 nullable 이메일 스냅샷 |
+| GET | `/me` | 내 정보 — `{id, email, nickname, loginProvider, agreements, createdAt}` (앱 시작 세션 검증 겸용). `email` 키는 항상 포함하는 `string|null`: EMAIL은 정규화 이메일, KAKAO는 카카오가 제공한 이메일 스냅샷 또는 `null`. KAKAO 가입자에게 별도 이메일 입력·인증을 요구하지 않으며, 앱은 `null`이면 이메일 행을 숨기고 placeholder를 두지 않음 |
 | PATCH | `/me` | 닉네임 변경 `{"nickname": "..."}` — `409 NICKNAME_DUPLICATED` |
 | PATCH | `/me/agreements` | 선택 약관 변경 `{"marketing": true}`. 필수 약관 철회는 탈퇴 절차로 안내 |
 | PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경. 성공 시 기존 refresh token 전부 revoke 후 현재 기기용 token pair 재발급 |

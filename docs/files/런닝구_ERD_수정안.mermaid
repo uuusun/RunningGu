@@ -1,4 +1,4 @@
-%% 런닝구 논리 ERD v4 — SPEC v4 · API 명세 v2.4 기준 (2026-08-19)
+%% 런닝구 논리 ERD v4 — SPEC v4 · API 명세 v2.5 기준 (2026-08-20)
 %% P0: USER~SAVED_COURSE 13개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
 %% 이 문서는 논리 계약이다. 아래 남은 TBD를 확정하기 전에는 Flyway 물리 스키마로 옮기지 않는다.
 %% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
@@ -38,7 +38,7 @@ erDiagram
     USER {
         bigint id PK
         varchar nickname UK "2~12자"
-        derived representative_email "EMAIL=subject, KAKAO=email_snapshot 또는 null"
+        derived representative_email "EMAIL=subject, KAKAO=snapshot|null; null이면 UI 행 숨김"
         timestamptz created_at "UTC 저장"
         timestamptz updated_at "UTC 저장"
     }
