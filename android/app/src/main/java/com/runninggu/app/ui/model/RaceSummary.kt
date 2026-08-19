@@ -1,5 +1,7 @@
 package com.runninggu.app.ui.model
 
+import com.runninggu.app.domain.RegistrationStatus
+import com.runninggu.app.domain.regStatusOf
 import com.runninggu.app.domain.today
 import java.time.LocalDate
 import com.runninggu.app.domain.dDay as domainDDay
@@ -24,8 +26,8 @@ data class RaceSummary(
     val source: String,
     /** 원본 스냅샷을 확인한 날짜. 카드에 "{source} · 확인 MM.DD"로 표기한다. */
     val checked: LocalDate?,
-    /** 크롤 스냅샷의 접수 상태 원본. 날짜 정보가 없을 때만 쓴다. */
-    val rawRegStatus: String? = null,
+    /** 원본 스냅샷의 접수 상태. 날짜 정보가 없을 때만 쓴다. (서버 `regStatusFallback`) */
+    val regStatusFallback: RegistrationStatus? = null,
     /**
      * 아래 두 필드는 S3 상세에만 나온다. 카드(S1·S2)는 쓰지 않으므로 없을 수 있다.
      * (API 명세 §3-4 — 상세 응답에서만 내려온다)
@@ -47,33 +49,10 @@ fun RaceSummary.dDayLabel(today: LocalDate = today()): String = domainDDayLabel(
 /**
  * 접수 상태. (SPEC §5.5)
  *
- * TODO(AP-04): §5.5 는 도메인 규칙이므로 `domain/` 으로 옮긴다. 화면 8곳이 import 하고 있어
- *  이번 변경 범위 밖으로 뒀다 — 옮길 때 [registrationStatus] 와 함께 통째로 간다.
+ * 규칙은 `domain` 이 갖는다 — dDay 와 같은 이유로, 기본값이 KST 기준 오늘이라야 어긋나지 않는다.
  */
-enum class RegistrationStatus(val label: String) {
-    BEFORE("접수전"),
-    OPEN("접수중"),
-    CLOSED("마감"),
-    UNKNOWN("미정"),
-}
-
-/**
- * 접수 상태를 **오늘 기준으로 재계산**한다. (SPEC §5.5)
- *
- * 크롤 스냅샷의 상태값은 stale하므로 날짜가 있으면 항상 다시 계산하고,
- * 날짜 정보가 없을 때만 원본 값을, 그것도 없으면 '미정'을 쓴다.
- */
-fun RaceSummary.registrationStatus(today: LocalDate = today()): RegistrationStatus = when {
-    regEnd != null && regEnd.isBefore(today) -> RegistrationStatus.CLOSED
-    regStart != null && today.isBefore(regStart) -> RegistrationStatus.BEFORE
-    regStart != null || regEnd != null -> RegistrationStatus.OPEN
-    else -> when (rawRegStatus) {
-        "접수중" -> RegistrationStatus.OPEN
-        "접수전" -> RegistrationStatus.BEFORE
-        "마감" -> RegistrationStatus.CLOSED
-        else -> RegistrationStatus.UNKNOWN
-    }
-}
+fun RaceSummary.registrationStatus(today: LocalDate = today()): RegistrationStatus =
+    regStatusOf(regStart, regEnd, regStatusFallback, today)
 
 /**
  * S3 대회 인근 축제. (SPEC §4.6 M3 · API 명세 §3-5)

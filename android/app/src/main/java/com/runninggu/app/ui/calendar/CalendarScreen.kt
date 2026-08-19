@@ -50,7 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
 import java.time.LocalDate
 import java.time.format.TextStyle

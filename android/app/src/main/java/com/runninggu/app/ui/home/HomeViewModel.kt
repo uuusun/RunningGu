@@ -2,7 +2,7 @@ package com.runninggu.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
 import com.runninggu.app.ui.sample.SampleData
 import kotlinx.coroutines.delay

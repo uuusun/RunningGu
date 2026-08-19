@@ -56,7 +56,7 @@ import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
 import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
 import com.runninggu.app.domain.today
 import kotlinx.coroutines.launch
