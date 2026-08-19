@@ -20,7 +20,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -60,11 +59,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
@@ -384,6 +382,8 @@ private fun EditList(
                 // 왼쪽 스와이프로 여는 삭제 버튼의 노출량. 0(닫힘) ~ -deleteWidthPx(열림).
                 val deleteWidthPx = with(LocalDensity.current) { DELETE_REVEAL_WIDTH.toPx() }
                 val reveal = remember(block.id) { Animatable(0f) }
+                // 열린 만큼 행의 오른쪽을 깎는다. reveal 은 0(닫힘) ~ 음수(열림).
+                val revealWidth = with(LocalDensity.current) { (-reveal.value).toDp() }
 
                 Box(
                     Modifier
@@ -426,7 +426,10 @@ private fun EditList(
                         shadowElevation = if (isDragging) 6.dp else 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .offset { IntOffset(reveal.value.roundToInt(), 0) }
+                            // 삭제 버튼 자리를 행을 **옆으로 밀어서** 내면 제목이 화면 밖으로
+                            // 잘려 어떤 일정을 지우는지 안 보인다. 그래서 미는 대신 **오른쪽을 깎는다** —
+                            // 행의 왼쪽 끝은 제자리에 있고 깎인 만큼 빨간 버튼이 드러난다.
+                            .padding(end = revealWidth)
                             .then(
                                 if (editable) {
                                     Modifier.pointerInput(block.id) {
@@ -467,10 +470,14 @@ private fun EditList(
                             Spacer(Modifier.width(10.dp))
 
                             Column(Modifier.weight(1f)) {
+                                // 스와이프로 폭이 줄어들 때 줄바꿈이 생기면 행 높이가 튀고,
+                                // 그 높이로 판정하는 그립 드래그까지 흔들린다. 그래서 한 줄로 고정한다.
                                 Text(
                                     text = block.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
@@ -482,6 +489,8 @@ private fun EditList(
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
 
