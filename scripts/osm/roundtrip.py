@@ -19,17 +19,36 @@ import argparse
 import collections
 import math
 import sys
+from pathlib import Path
 
 import requests
 
 BASE = "http://127.0.0.1:8989"
 
 #: 러닝에 좋은 길. 보행로·산책로·자전거도로 계열.
-GOOD = {"footway", "path", "pedestrian", "cycleway", "track", "living_street"}
+GOOD = {"footway", "path", "pedestrian", "cycleway", "track"}
 #: 차도. 보도가 있어도 신호와 차량 옆이라 러닝 경험이 나쁘다.
 ROAD = {"primary", "secondary", "trunk", "tertiary", "motorway"}
+#: 주택가 골목·이면도로. 차도도 아니고 보행로도 아니라 예전엔 어디에도 안 잡혔다.
+#: 실측에서 수도권 5km 경로의 중앙 15%, 서울 강서는 73% 가 이것이었다.
+ALLEY = {"residential", "living_street", "service"}
 #: 계단. 뛰던 흐름이 끊긴다.
 STEPS = {"steps"}
+
+#: 길 종류별 러닝 품질. **graphhopper.yml 의 run 프로파일 가중치와 같은 값**이다.
+#: 측정과 라우팅이 다른 잣대를 쓰면 "좋다고 재놓고 나쁜 길을 고르는" 일이 생긴다.
+#: living_street 은 라우팅 기준(0.5)에 맞춘다 — 예전엔 측정에서만 좋은길이었다.
+QUALITY = {
+    "footway": 1.00, "path": 1.00, "pedestrian": 1.00,
+    "cycleway": 0.95, "track": 0.95,
+    "residential": 0.50, "living_street": 0.50,
+    "service": 0.25,
+    "tertiary": 0.20,
+    "primary": 0.05, "secondary": 0.05, "trunk": 0.05, "motorway": 0.05,
+    "steps": 0.05,
+}
+#: 표에 없는 값(unclassified 등)의 기본 점수.
+QUALITY_DEFAULT = 0.40
 
 #: round_trip 은 요청값보다 길게 낸다. 목표 × 이 값으로 요청해 보정한다(실측 중앙값).
 DISTANCE_CORRECTION = 0.78
@@ -54,6 +73,15 @@ METRO = [
     ("김포 장기", 37.6400, 126.7150), ("남양주 다산", 37.6100, 127.1600),
 ]
 
+#: 수도권 밖. 계약 커버리지가 수도권 기준으로만 잡혀 있어 대조군으로 둔다.
+LOCAL = [
+    ("부산 해운대", 35.1631, 129.1636), ("부산 서면", 35.1578, 129.0594),
+    ("대구 수성", 35.8580, 128.6300), ("광주 상무", 35.1520, 126.8500),
+    ("대전 유성", 36.3620, 127.3560), ("울산 남구", 35.5384, 129.3114),
+    ("청주 흥덕", 36.6300, 127.4300), ("전주 덕진", 35.8420, 127.1300),
+    ("창원 성산", 35.2280, 128.6810), ("강릉 교동", 37.7700, 128.8900),
+]
+
 
 def meters(a: list[float], b: list[float]) -> float:
     """두 좌표([lng, lat, ele]) 사이 거리(m). haversine."""
@@ -75,7 +103,11 @@ def route(lat: float, lng: float, km: float, seed: int, profile: str) -> dict | 
     )
     if r.status_code != 200:
         return None
-    p = r.json()["paths"][0]
+    return _parse(r.json()["paths"][0], seed)
+
+
+def _parse(p: dict, seed: int) -> dict:
+    """GraphHopper path 하나를 지표로 환산한다."""
     pts = p["points"]["coordinates"]          # [lng, lat, ele]
 
     # 길 종류별 **실제 거리**를 잰다. details 의 a·b 는 좌표점 번호라 개수로 세면
@@ -91,6 +123,9 @@ def route(lat: float, lng: float, km: float, seed: int, profile: str) -> dict | 
         "good": sum(c for v, c in agg.items() if v in GOOD) * 100 / total,
         "road": sum(c for v, c in agg.items() if v in ROAD) * 100 / total,
         "stair": sum(c for v, c in agg.items() if v in STEPS) * 100 / total,
+        "alley": sum(c for v, c in agg.items() if v in ALLEY) * 100 / total,
+        # 0~100 점. 모든 구간이 들어가므로 좋은길·차도처럼 빠지는 몫이 없다.
+        "qual": sum(QUALITY.get(v, QUALITY_DEFAULT) * c for v, c in agg.items()) * 100 / total,
         "turns": sum(1 for s in steps if s.get("sign") in TURN_SIGNS),
         "steps": len(steps),
         "gain": sum(
@@ -122,10 +157,10 @@ def best(lat: float, lng: float, km: float, profile: str = "run", seeds: int = 1
 
 def header() -> None:
     print(
-        f"{'지점':13} {'목표':>5} {'실제':>8} {'좋은길':>6} {'차도':>6} {'계단':>6} "
-        f"{'턴/km':>6} {'안내/km':>8} {'상승':>7}"
+        f"{'지점':13} {'목표':>5} {'실제':>8} {'품질':>5} {'좋은길':>6} {'골목':>6} {'차도':>6} "
+        f"{'계단':>6} {'턴/km':>6} {'상승':>7}"
     )
-    print("-" * 78)
+    print("-" * 84)
 
 
 def show(name: str, km: float, b: dict | None) -> None:
@@ -133,9 +168,9 @@ def show(name: str, km: float, b: dict | None) -> None:
         print(f"{name:13} {km:4.0f}km  실패")
         return
     print(
-        f"{name:13} {km:4.0f}km {b['km']:7.2f}km {b['good']:5.1f}% {b['road']:5.1f}% "
-        f"{b['stair']:5.1f}% {b['turns'] / max(b['km'], 0.1):6.1f} "
-        f"{b['steps'] / max(b['km'], 0.1):8.1f} {b['gain']:5.0f}m"
+        f"{name:13} {km:4.0f}km {b['km']:7.2f}km {b['qual']:4.0f}  {b['good']:5.1f}% "
+        f"{b['alley']:5.1f}% {b['road']:5.1f}% {b['stair']:5.1f}% "
+        f"{b['turns'] / max(b['km'], 0.1):6.1f} {b['gain']:5.0f}m"
     )
 
 
@@ -147,6 +182,8 @@ FILTER_KMS = (5, 10, 21)
 ROAD_CAPS = (5, 10, 15, 20, 30)
 #: 훑어볼 km 당 방향 전환 상한 후보.
 TURN_CAPS = (3, 4, 6, 8, 10)
+#: 훑어볼 골목 비율 상한 후보(%).
+ALLEY_CAPS = (20, 30, 40, 50)
 #: 난이도 경계(m/km). SPEC §5.8 — EASY <15 · NORMAL 15~50 · HARD ≥50.
 EASY, HARD = 15, 50
 
@@ -164,6 +201,135 @@ def spread(label: str, values: list[float], unit: str = "") -> None:
         f"  {label:10} 최소 {min(values):5.1f}{unit} · 중앙 {pct(values, 0.5):5.1f}{unit} · "
         f"상위10% {pct(values, 0.9):5.1f}{unit} · 최대 {max(values):5.1f}{unit}"
     )
+
+
+# ── 골목 회피 · 하천 유도 ──────────────────────────────────────
+
+#: 골목 회피 프로파일. 요청 단위 custom model 로 residential/service 를 더 깎는다.
+#: 라우팅 프로파일은 이미 0.5/0.25 를 주고 있으므로 실효 0.15/0.075 가 된다.
+ALLEY_PEN = "0.3"
+#: 하천 버퍼 밖 가중치. 0.25~0.6 을 훑어 0.4 가 가장 나았다(차이는 작다).
+RIVER_PEN = "0.4"
+#: 하천이 이보다 멀면 강변 진입점으로 출발점을 옮긴다(m).
+SEED_SHIFT = 800.0
+#: 진입점까지 걸어갈 수 있는 상한(m).
+MAX_ACCESS = 1200.0
+
+
+def route_cm(lat, lng, km, seed, feats=None, avoid_alley=False):
+    """custom model 을 실어 보내는 round_trip. GET 으로는 못 보내 POST 를 쓴다."""
+    body = {
+        "points": [[lng, lat]], "profile": "run", "algorithm": "round_trip",
+        "round_trip.distance": int(km * 1000), "round_trip.seed": seed,
+        "points_encoded": False, "elevation": True, "instructions": True,
+        "details": ["road_class"],
+    }
+    pri, cm = [], {}
+    if feats:
+        pri.append({"if": " && ".join(f"!in_{f['id']}" for f in feats), "multiply_by": RIVER_PEN})
+        cm["areas"] = {"type": "FeatureCollection", "features": feats}
+    if avoid_alley:
+        pri.append({"if": "road_class == RESIDENTIAL || road_class == SERVICE",
+                    "multiply_by": ALLEY_PEN})
+    if pri:
+        cm["priority"] = pri
+        body["custom_model"] = cm
+    r = requests.post(f"{BASE}/route", json=body, timeout=60)
+    if r.status_code != 200:
+        return None
+    return _parse(r.json()["paths"][0], seed)
+
+
+def contract_pick(cands: list[dict], km: float) -> dict | None:
+    """지금 계약의 선택 규칙 — 차도 ≤5% 우선 → 거리 오차 → 회전/km → 차도."""
+    if not cands:
+        return None
+    clean = [c for c in cands if c["road"] <= 5] or cands
+    return min(clean, key=lambda c: (abs(c["km"] - km),
+                                     c["turns"] / max(c["km"], 0.1), c["road"]))
+
+
+def run_score(c: dict, km: float, access_m: float = 0.0) -> float:
+    """**뛰기 좋은 정도**. 계약 규칙은 거리를 먼저 보므로 품질이 밀린다.
+
+    물가 비율은 넣지 않는다 — 물가가 좋은 이유는 물이 아니라 신호·차가 없어서다.
+    그 조건(길품질·회전)을 직접 재면 동네가 좋을 때는 동네가 이긴다.
+    """
+    return (c["qual"]
+            - max(0.0, c["turns"] / max(c["km"], 0.1) - 3.0) * 3.0
+            - max(0.0, c["gain"] / max(c["km"], 0.1) - 15.0) * 0.5
+            - access_m / 100.0
+            - abs(c["km"] - km) * 1000 * 0.01)
+
+
+def passes_caps(c: dict, km: float) -> bool:
+    """SPEC §5.8 품질 상한 네 개."""
+    return (km * 0.75 <= c["km"] <= km * 1.25
+            and c["gain"] / max(c["km"], 0.1) < 50
+            and c["road"] <= 10
+            and c["turns"] / max(c["km"], 0.1) <= 6)
+
+
+def water_stats(seeds: int, index_path: str) -> None:
+    """골목 회피와 하천 유도가 실제로 코스를 낫게 하는지 — 수도권·지방 대조."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import waterways as W
+
+    idx = W.load(index_path)
+    pts = [(n, a, b, "수도권") for n, a, b in METRO] + [(n, a, b, "지방") for n, a, b in LOCAL]
+    rows = []
+    for nm, la, lo, zone in pts:
+        rv = W.near(idx, la, lo)
+        fs = W.features(rv)
+        ent = None
+        if rv and rv[0]["eff"] > SEED_SHIFT:
+            p = W.entry_point(rv[0], la, lo)
+            if p[2] <= MAX_ACCESS:
+                ent = p
+        for km in (5, 10):
+            def gen(alat, alng, feats=None, avoid=False):
+                out = []
+                for s in range(seeds):
+                    g = route_cm(alat, alng, km * DISTANCE_CORRECTION, s, feats, avoid)
+                    if g and passes_caps(g, km):
+                        out.append(g)
+                return out
+
+            plain = gen(la, lo)
+            alley = gen(la, lo, None, True)
+            water = []
+            if rv and rv[0]["eff"] <= SEED_SHIFT:
+                water = gen(la, lo, fs) + gen(la, lo, fs, True)
+            elif ent:
+                water = gen(ent[0], ent[1], fs) + gen(ent[0], ent[1], fs, True)
+            pool = plain + alley + water
+            best_score = max(pool, key=lambda c: run_score(c, km)) if pool else None
+            rows.append((nm, zone, km,
+                         contract_pick(plain, km),
+                         contract_pick(plain + alley, km),
+                         contract_pick(pool, km),
+                         best_score))
+
+    def rep(label: str, i: int, zone: str | None) -> None:
+        v = [(r[i], r[2]) for r in rows if r[i] and (zone is None or r[1] == zone)]
+        tot = len([r for r in rows if zone is None or r[1] == zone])
+        if not v:
+            print(f"  {label:24} 경로 0/{tot}")
+            return
+        print(f"  {label:24} 경로 {len(v):2}/{tot}"
+              f" · 품질 {pct([x['qual'] for x, _ in v], 0.5):3.0f}"
+              f" · 골목 {pct([x['alley'] for x, _ in v], 0.5):4.1f}%"
+              f" · 골목>40% {sum(1 for x, _ in v if x['alley'] > 40):2}건"
+              f" · 차도 {pct([x['road'] for x, _ in v], 0.5):4.1f}%"
+              f" · 거리오차 {pct([abs(x['km'] - k) for x, k in v], 0.5) * 1000:4.0f}m")
+
+    for zone in (None, "수도권", "지방"):
+        print(f"[{zone or '전체'}]")
+        rep("A 현행 계약", 3, zone)
+        rep("B +골목 회피", 4, zone)
+        rep("C +골목+하천 · 계약규칙", 5, zone)
+        rep("D +골목+하천 · 점수", 6, zone)
+        print()
 
 
 def filter_stats(profile: str, seeds: int) -> None:
@@ -185,12 +351,16 @@ def filter_stats(profile: str, seeds: int) -> None:
     # 곧 기준을 그을 수 있는 자리이기 때문이다.
     got = [c for _, _, c in pool if c]
     roads = [min(x["road"] for x in c) for c in got]
+    alleys = [min(x["alley"] for x in c) for c in got]
+    quals = [max(x["qual"] for x in c) for c in got]
     stairs = [min(x["stair"] for x in c) for c in got]
     turns = [min(x["turns"] / max(x["km"], 0.1) for x in c) for c in got]
     steps = [min(x["steps"] / max(x["km"], 0.1) for x in c) for c in got]
 
     print(f"분포 — 지점·거리 {len(got)}/{len(pool)} 건 생성 성공 (지표별 최선 후보 기준)")
     spread("차도", roads, "%")
+    spread("골목", alleys, "%")
+    spread("길품질", quals)
     spread("계단", stairs, "%")
     spread("턴/km", turns)
     spread("안내/km", steps)
@@ -201,6 +371,11 @@ def filter_stats(profile: str, seeds: int) -> None:
     for cap in ROAD_CAPS:
         n = sum(1 for _, _, c in pool if any(x["road"] <= cap for x in c))
         print(f"  차도 ≤ {cap:2}%              {n:3}/{total} ({n * 100 // total}%)")
+    print()
+    for cap in ALLEY_CAPS:
+        n = sum(1 for _, _, c in pool if any(x["alley"] <= cap for x in c))
+        print(f"  골목 ≤ {cap:2}%              {n:3}/{total} ({n * 100 // total}%)")
+    print("  ※ 골목은 상한을 걸면 커버리지가 무너진다 — 거르지 말고 고르는 문제다.")
     print()
     for cap in TURN_CAPS:
         n = sum(
@@ -247,7 +422,9 @@ def filter_stats(profile: str, seeds: int) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="GraphHopper round_trip 검증")
-    ap.add_argument("--preset", choices=("metro", "compare", "distance", "filter"))
+    ap.add_argument("--preset", choices=("metro", "compare", "distance", "filter", "water"))
+    ap.add_argument("--waterways", default="data/waterways.json",
+                    help="build_waterways.py 산출물 (preset=water)")
     ap.add_argument("--point", help="lat,lng")
     ap.add_argument("--km", type=float, default=5)
     ap.add_argument("--profile", default="run", choices=("run", "foot"))
@@ -288,6 +465,9 @@ def main() -> int:
 
     elif args.preset == "filter":
         filter_stats(args.profile, args.seeds)
+
+    elif args.preset == "water":
+        water_stats(args.seeds, args.waterways)
 
     elif args.point:
         la, lo = (float(x) for x in args.point.split(","))
