@@ -43,6 +43,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    sourceSets {
+        // 단위 테스트가 **실제 번들**(assets/races.json)을 읽게 한다. 복사본을 두면
+        // 스크립트가 만드는 모양이 바뀌어도 테스트가 안 깨져 드리프트를 놓친다.
+        getByName("test") {
+            resources.srcDir("src/main/assets")
+        }
+    }
 }
 
 dependencies {
