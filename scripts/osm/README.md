@@ -36,6 +36,19 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)      # Windows 는 JDK 21 경�
 python <저장소>/scripts/osm/roundtrip.py --preset metro
 ```
 
+## 물길 인덱스 (골목 회피 · 하천 유도 검증용)
+
+`--preset water` 는 전국 물길 인덱스가 필요하다. PBF 에서 한 번 만들면 된다.
+
+```bash
+pip install osmium
+python <저장소>/scripts/osm/build_waterways.py ~/osm-poc/korea.osm.pbf -o data/waterways.json
+python <저장소>/scripts/osm/roundtrip.py --preset water --waterways data/waterways.json
+```
+
+산출물은 10.8MB(물길 16,736개 · 44,442km)이고 빌드에 18~70초 걸린다. 조회는 격자라
+지점당 1.5ms 다. 운영에서는 그래프 캐시와 같이 배포 단계에서 만들어 영속 볼륨에 둔다.
+
 ## 프로파일 두 개
 
 | 프로파일 | 용도 |

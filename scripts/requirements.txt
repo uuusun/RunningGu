@@ -1,1 +1,2 @@
 requests
+osmium   # scripts/osm/build_waterways.py — OSM PBF 에서 물길 추출
