@@ -53,22 +53,64 @@ class RegistrationStatusTest {
     }
 
     @Test
-    fun `날짜가 한쪽만 있어도 재계산한다`() {
+    fun `시작일만 알아도 단정할 수 있으면 재계산한다`() {
+        // 시작일을 지났다 → 접수는 시작됐다
         assertEquals(
             RegistrationStatus.OPEN,
             regStatusOf(LocalDate.of(2026, 5, 1), null, today = today),
         )
+        // 시작일이 아직 안 됐다
         assertEquals(
-            RegistrationStatus.OPEN,
-            regStatusOf(null, LocalDate.of(2026, 6, 30), today = today),
+            RegistrationStatus.BEFORE,
+            regStatusOf(LocalDate.of(2026, 6, 2), null, today = today),
         )
+        // 마감일이 지났다
         assertEquals(
             RegistrationStatus.CLOSED,
             regStatusOf(null, LocalDate.of(2026, 5, 31), today = today),
         )
+    }
+
+    @Test
+    fun `마감일만 알고 아직 안 지났으면 단정하지 않는다`() {
+        // 마감일이 미래라는 것만으로는 접수중이라고 할 수 없다 — 아직 접수 시작 전일 수 있다.
+        // API 명세 §3-1 목록 응답에 applyStart 가 없어 실제로 생기는 상황이다.
         assertEquals(
             RegistrationStatus.BEFORE,
-            regStatusOf(LocalDate.of(2026, 6, 2), null, today = today),
+            regStatusOf(
+                null,
+                LocalDate.of(2026, 6, 30),
+                fallback = RegistrationStatus.BEFORE,
+                today = today,
+            ),
+        )
+        assertEquals(
+            RegistrationStatus.OPEN,
+            regStatusOf(
+                null,
+                LocalDate.of(2026, 6, 30),
+                fallback = RegistrationStatus.OPEN,
+                today = today,
+            ),
+        )
+        // 서버 값도 없으면 미정이다 — 접수중이라고 넘겨짚지 않는다
+        assertEquals(
+            RegistrationStatus.UNKNOWN,
+            regStatusOf(null, LocalDate.of(2026, 6, 30), today = today),
+        )
+    }
+
+    @Test
+    fun `마감일이 지났으면 서버 값보다 우선한다`() {
+        // 캐시된 응답이 "접수중" 이어도 오늘 기준으로 마감이면 마감이다
+        assertEquals(
+            RegistrationStatus.CLOSED,
+            regStatusOf(
+                null,
+                LocalDate.of(2026, 5, 31),
+                fallback = RegistrationStatus.OPEN,
+                today = today,
+            ),
         )
     }
 
