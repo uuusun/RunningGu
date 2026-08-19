@@ -41,7 +41,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.dDayLabel
 import com.runninggu.app.ui.model.registrationStatus
 import com.runninggu.app.ui.theme.Archivo

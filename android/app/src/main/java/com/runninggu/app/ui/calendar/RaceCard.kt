@@ -39,7 +39,7 @@ import com.runninggu.app.ui.theme.NumeralLabel
 import com.runninggu.app.ui.theme.NumeralLarge
 import com.runninggu.app.ui.theme.Orange
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
 import java.time.format.TextStyle
 import java.util.Locale

@@ -1,7 +1,7 @@
 package com.runninggu.app.ui.calendar
 
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.model.RegistrationStatus
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
 import java.time.LocalDate
 import java.time.YearMonth
