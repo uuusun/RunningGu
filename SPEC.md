@@ -1,14 +1,15 @@
 # 런닝구(區) — 최종 통합 명세서 (SPEC v4 · 안드로이드)
 
-> **기준일 2026-07-30** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
+> **기준일 2026-08-19** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
 > v3의 안드로이드 전환안에 서버 중심 데이터·계정 연결·대회/코스 관리 정책을 확정 반영한 판이다. 내용이 충돌하면 **번호가 빠른 쪽이 우선**한다.
 >
 > | 우선 | 원천 | 처리 |
 > |---|---|---|
 > | ① | **코딩 착수 결정 (2026-07-16, §12.1)** — 런닝구 표기 확정 · Jetpack Compose · Spring Boot+PostgreSQL · 게스트 범위 · 커뮤니티 MVP 이후 · 재설정 링크 · **REST 키 서버 전용** + 안드로이드 전환·README·CONVENTION | 본 문서 전체에 반영 (🔒확정 표기) |
 > | ② | **팀 추가 결정 (2026-07-30, §12.2)** — 4탭·마이 정보수정·다중 로그인 수단·canonical 대회·시스템 RACE·공통 API 계약·두루누비 동기화·UTF-8 CI | 전부 반영 |
-> | ③ | `reference-web/` 목업 (구 design/, 07-08 머지 상태) | UX·도메인 로직의 **참조 구현** — 포팅 매핑은 부록 D |
-> | ④ | REQUIREMENTS.md(07-08) · SPEC v1(07-02) · SPEC v2(07-16 웹 기준) | 본 문서로 **대체** (이력: git) |
+> | ③ | **OSM 도시 러닝코스 P0 결정 (2026-08-18, 08-19 개정, 결정-42)** — GraphHopper 서버 생성·큐레이션 우선·서버 품질 상한 | §4.11·§5.8·§6.4·§8.4·§9.2~9.3에 반영 |
+> | ④ | `reference-web/` 목업 (구 design/, 07-08 머지 상태) | UX·도메인 로직의 **참조 구현** — 포팅 매핑은 부록 D |
+> | ⑤ | REQUIREMENTS.md(07-08) · SPEC v1(07-02) · SPEC v2(07-16 웹 기준) | 본 문서로 **대체** (이력: git) |
 >
 > ⚠️ 목업의 카카오맵 **JS SDK** 연동·SVG 폴백 지도·vite 프록시는 **웹 전용 장치**다 — 참고만 하고 안드로이드 SDK로 재구현한다(README 경고와 동일).
 
@@ -78,7 +79,7 @@
 | M1 | 종목·상황별 맞춤 동선 추천 | S4→S7 위저드 | 백엔드 KTO+카카오 라이브 프록시 | 목업 검증 → AP-04·11 (**산책 블록 제거 반영** 🆕회의) |
 | M2 | 전국 마라톤 통합 캘린더 | S2 | 서버 canonical `CONTEST` 153건 + 앱 초기 번들 | 목업 검증 → AP-10 (**필터 모달 개편** 🆕회의) |
 | M3 | 대회 인근 축제 | S3·S1 | KTO `searchFestival2` — **백엔드 경유** 🔒확정 | 목업 검증 → AP-14 |
-| M4 | 러닝·산책 코스 추천 | S8 | 두루누비 API 메타 + GPX 261코스 경로 + 카카오 걷기 스팟 | 목업 검증 → AP-12 |
+| M4 | 러닝·산책 코스 추천 | S8 | 두루누비 API+GPX·산림청 큐레이션 + **OSM/GraphHopper 생성** + 카카오 걷기 스팟 | **P0** → AP-12·25 🔒확정(결정-42) |
 | A1 | 동선 편집 (D2) | S7 | — | 목업 완성 → AP-11 |
 | A2 | 동선 저장·복원 | S10 | 서버 SSOT + Room 읽기 캐시 📱전환 | AP-13 |
 | A3 | 출처·최근확인일 표시 | S2·S3 | `source`/`checked` | 목업 완성 → AP-10 |
@@ -145,7 +146,7 @@ root
         S3 ──"이 대회로 동선 만들기"──▶ S4 일정 ─▶ S5 종목·취향 ─▶ S6 숙소 ─▶ S7 결과
         S7 ──저장──▶ S10 마이[동선]   /   S7 ──"숙소 주변에서 뛰기"──▶ S8 (출발지=숙소) 🔧정책
 
-[코스]  S8 내 주변: 위치 권한/검색/프리셋 + 목표거리 ──▶ 두루누비 왕복 경로 + 걷기 스팟
+[코스]  S8 내 주변: 위치 권한/검색/프리셋 + 목표거리 ──▶ 품질 상한을 통과한 큐레이션 왕복 경로 / OSM 생성 경로 + 걷기 스팟
         S8 [이 코스 뛰기] ──▶ GPS 기록 (시작/종료) ──▶ S10 마이[러닝코스]에 ran 저장 (P1)
 [찜]    S2 카드·S3 상세 하트 ──▶ 찜 토글 ──▶ S10 마이[찜한 대회]
 ```
@@ -181,7 +182,7 @@ root
 - 모든 비동기 화면은 네 상태를 구분한다. 조회 중에는 문구 + 버튼 비활성으로 중복 실행을 막는다: "숙소를 찾는 중…" · "동선 짜는 중…" · "불러오는 중…" · "축제를 찾는 중…" · "위치를 확인하는 중…".
 - 정상 빈 결과는 Empty로, 네트워크·서버·외부 API 오류는 Error로 표시한다. 오류를 빈 상태나 무한 Loading으로 강등하지 않는다.
 - Error에는 재시도 액션과 사용자 문구를 제공하고, 개발 로그에는 공통 `ProblemDetail.code`와 `traceId`를 남긴다.
-- 외부 POI 실패를 허용하는 동선 생성만 예외로 `place=null` 블록으로 강등한다(NFR-3).
+- 부분 실패 예외는 두 가지다. 동선 생성은 외부 POI 실패를 `place=null` 블록으로 강등하고(NFR-3), `/courses/near`는 일부 원천 실패에도 표시 항목이 있으면 `200`과 `degradedSources`를 반환한다. 후자는 원천 실패가 있고 표시 항목도 없을 때만 `503 COURSE_SOURCES_UNAVAILABLE`다.
 - 동선 생성도 같은 원칙을 따른다. 정상 처리됐지만 표시할 결과가 없으면 S7 Empty, 네트워크·timeout·4xx/5xx는 S7 Error다. Empty는 입력을 유지한 채 위저드로 돌아가 조건을 수정하고, Error는 같은 요청을 재시도한다(2026-08-17 D-13 개정·D-16).
 
 ### 3-6. 소스 배지
@@ -308,7 +309,7 @@ root
 - **지도 ↔ 타임라인 동기화** 📱전환: 카드 탭→핀 카메라 이동 / 핀 탭→카드로 스크롤 / **LazyList 스크롤 중앙 밴드(상하 45% 제외)에 든 카드 자동 활성**(목업 IntersectionObserver 계약 승계). 편집 모드 중 동기화 중단.
 - **편집 모드** — [편집]↔[완료]. 안내 "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요." USER 행: 그립+번호+제목+"{시간}·{장소}·{카테고리}"+교체·삭제 버튼. RACE 행: 잠금 아이콘과 "관리자 업데이트" 표시, 그립·교체·삭제 미노출. RACE 블록은 사용자가 수정·삭제·이동할 수 없고, 서버는 위반 요청에 `409 SYSTEM_BLOCK_IMMUTABLE`을 반환한다. 대회 원본 변경은 관리자/배치가 canonical `CONTEST`를 갱신하고 저장 동선 조회 시 반영한다. 🆕 구현 추가 요구사항
 - **후보 시트** — ModalBottomSheet 📱전환. "{카테고리} {교체|추가} · 인근" + 소스 배지. 추가 모드만 카테고리 칩(취향 6종+숙소). POI 8건(중심: 숙소>대회장). [선택]: 교체=장소·설명·카테고리 교체(블록 id·시간 유지) / 추가=새 블록(13:00) 맨 끝 → 닫기.
-- ~~숙소 주변 산책 코스 섹션~~ — **삭제** 🆕회의. 대체 🔧정책: 조회 모드 하단 **연계 카드** "숙소 주변에서 뛰기·걷기 → 러닝코스에서 보기" → S8 내 주변(출발지=숙소, 목표 기본 min(RECOVERY.walk, 5)km 전달).
+- ~~숙소 주변 산책 코스 섹션~~ — **삭제** 🆕회의. 대체 🔧정책: 조회 모드 하단 **연계 카드** "숙소 주변에서 뛰기·걷기 → 러닝코스에서 보기" → `CourseLaunchContext`로 S8 내 주변에 출발지=숙소와 목표 기본 `min(RECOVERY.walk, 5)km`만 전달한다. 종목·난이도는 전달하지 않는다 🔒확정(결정-42 개정).
 - **저장 CTA** — "이 동선 저장하기": `(user, contestId, startDate, endDate)`가 같으면 서버가 기존 동선을 교체 → **마이[동선]** → "마이에 저장했어요". Room은 성공 응답을 읽기 캐시로 저장한다.
 - **빈 상태** — "동선이 아직 없어요." + [조건 바꾸기]. 입력을 유지한 채 위저드로 돌아간다.
 - **오류 상태** — 오류 안내 + [다시 시도]. 기존 입력으로 같은 생성 요청을 재시도한다.
@@ -319,18 +320,18 @@ root
 
 **(a) 내 주변 — 위치 기반 코스 빌더**
 1. **출발지**: ① GPS "내 위치" — **런타임 위치 권한**(FINE/COARSE) 요청 📱전환, FusedLocationProvider, 타임아웃 6초. **거부 시에도 동작**: 검색·프리셋 폴백(NFR-15). ② 출발지 검색(백엔드 지오코딩 API — 카카오 키워드, 첫 결과 적용) ③ 프리셋 칩 5(부산 해운대·여수·강릉·인천 강화·서울시청). S7 연계 진입 시 출발지=숙소 프리필 🔧정책.
-2. **목표 거리 슬라이더** — 1~21km, 0.5 단위, 기본 5km.
-3. **경로 생성**(§5.8 `buildRouteNear`): 반경 8km 내 두루누비 코스 진입점 → 목표/2 편도(더 길게 뻗는 방향) → **왕복 경로**. 진입점 거리순 12건.
+2. **목표 거리** — 거리 슬라이더 1~21km, 0.5 단위, 기본 5km. P0 내 주변에는 난이도 선택·종목 기반 기본값을 두지 않는다. 서버가 자동 추천에서 `HARD(≥50m/km)`를 제외하고 응답의 `difficulty`는 `평지(EASY) · 완만(NORMAL)` 표시용으로만 사용한다. 내 주변의 값은 **생성된 왕복 구간의 실제 상승고도 기준**, 지역별 큐레이션의 값은 **전체 원본 코스의 정규화 등급**이며 서로 달라도 정상이다. 지역별 탐색은 `HARD`도 표시와 함께 유지한다 🔒확정(결정-42 개정).
+3. **경로 생성**(§5.8): 서버가 반경 8km의 두루누비·라이선스 검증 완료 큐레이션 GPX에서 목표 거리에 맞고 상승고도 `50m/km` 미만인 경로를 먼저 `buildCuratedRouteNear`로 만든다. 적격 큐레이션 경로가 **0건일 때만** GraphHopper `generateOsmRoundTrip`으로 거리·상승·차도·방향 전환 상한을 모두 통과한 OSM 순환 경로를 최대 1건 생성한다. 앱은 GraphHopper를 직접 호출하지 않는다.
 4. **지도** — 선택 항목이 경로면 왕복 폴리라인(경로 bounds), 그 외 번호 핀(잇지 않음, 리스트 번호 일치).
-5. **단일 목록 "이 근처에서 뛸 만한 곳"** 🔧정책 — 두루누비 경로와 걷기 스팟을 **한 목록에 거리 오름차순으로 섞어** 보여준다. 출처(두루누비/카카오)는 사용자에게 노출하지 않는다 — 데이터 출처는 우리 사정이지 사용자의 판단 기준이 아니다. 대신 **"따라갈 경로가 있는가"** 를 항목 단위로 표시한다.
-   - 앱은 `GET /api/courses/near`를 한 번만 호출한다. 서버가 두루누비 경로와 카카오 걷기 스팟을 합쳐 반환하며, 독립 `GET /api/walk-spots` 앱 계약은 두지 않는다(이슈 #19 결정).
-   - 경로 있음 — `경로` 태그 · "{왕복 km}·약 {분}분·난이도" · 고도 스트립. 탭하면 선택(지도 폴리라인 갱신). 목표 미달 시 "이 근처 경로가 짧아 목표({n}km)보다 짧게 짜였어요."
+5. **단일 목록 "이 근처에서 뛸 만한 곳"** 🔧정책 — 큐레이션 또는 OSM 경로와 걷기 스팟을 **한 목록에 `distanceM` 오름차순으로 섞어** 보여준다. 항목 카드에는 원천 이름 대신 **"따라갈 경로가 있는가"** 만 표시하고, 사용된 원천은 목록 하단 출처에 표시한다.
+   - 앱은 `GET /api/courses/near`를 한 번만 호출한다. 서버가 큐레이션 경로 또는 OSM 생성 경로와 카카오 걷기 스팟을 합쳐 반환하며, 독립 `GET /api/walk-spots`·GraphHopper 앱 계약은 두지 않는다(결정-27·42).
+   - 경로 있음 — `경로` 태그 · "{왕복 km}·약 {분}분·난이도·상승 {m}m" · 고도 스트립. 탭하면 선택(지도 폴리라인 갱신). 목표 미달 시 "이 근처 경로가 짧아 목표({n}km)보다 짧게 짜였어요." OSM 경로의 한국어 `name`은 서버가 생성하며, 저장할 때 같은 이름을 snapshot에 보존한다.
    - 경로 없음 — "{카테고리} · {거리}". 탭하면 카카오 장소 페이지(Custom Tabs 📱전환).
-   - 목록 하단에 출처 한 줄: "출처 · 두루누비 걷기길(한국관광공사) · 카카오 로컬" (공공누리 출처표시 의무).
+   - 목록 하단에는 응답 `attributions[]`을 순서·문구 변경 없이 표시한다. canonical 문구는 `두루누비 걷기길(한국관광공사)` · `등산로·숲길(한국등산·트레킹지원센터)` · `© OpenStreetMap contributors` · `카카오 로컬`이며 실제 응답에 포함된 원천만 노출한다. 새 큐레이션 GPX를 추가할 때는 원본 `LICENSE.txt`를 확인해 빌드 산출물에 기록한 `attribution`을 사용하고, 검증되지 않은 고정 문구를 서버가 추측하지 않는다.
 6. **액션** — `[저장]` · `[뛰기]` 두 버튼으로 통일. 경로가 하나도 없으면 버튼 아래 "이 근처엔 따라갈 경로가 없어요. 자유롭게 뛰어도 기록은 그대로 남습니다."
-7. **빈 상태** — 경로·스팟 둘 다 0건 → "이 근처엔 걸을 곳을 못 찾았어요." + 프리셋 안내 / 위치 미정 → "위치를 확인하는 중… / 출발지를 정해주세요."
+7. **상태** — 모든 원천이 정상 완료됐지만 경로·스팟이 0건이면 Empty("이 근처엔 걸을 곳을 못 찾았어요."). 품질 상한을 통과한 경로가 없는 것은 정상 0건이며 `degradedSources`에 넣지 않는다. 일부 원천 실패에도 항목이 있으면 Content와 비차단 안내를 함께 표시한다. 원천 실패가 있고 표시할 항목도 없으면 Error와 재시도를 제공한다. GraphHopper 자체가 실패하고 장소가 있으면 "자동 경로를 만들지 못해 주변 장소를 보여드려요."를 표시한다. 위치 미정은 "위치를 확인하는 중… / 출발지를 정해주세요."
 
-> 📌 두루누비는 코리아둘레길 4개 노선(261코스)뿐이라 **서울 반경 8km 내 코스가 0건**이다(실측 — [도메인 로직 대조](docs/domain-logic-audit.md) §C). 수도권에서는 5의 "경로 없음" 항목만 나오는 것이 정상 동작이며, 예외 화면이 아니라 **기본 화면**으로 설계한다.
+> 📌 두루누비는 코리아둘레길 4개 노선(261코스)뿐이라 **서울 반경 8km 내 코스가 0건**이다(실측 — [도메인 로직 대조](docs/domain-logic-audit.md) §C). 결정-42에 따라 이 도시 공백은 서버 OSM 생성 경로가 채우며, GraphHopper 실패 때만 걷기 스팟 중심 화면으로 강등한다.
 
 **(b) 지역별** — 시도 칩(코스 수 내림차순, 단일·재탭 해제) · "{지역|전국} 코스 N" 거리 오름차순 · 카드: 코스명·"{시군}·{km}·{난이도}·약 {분}분" · 목록 하단 출처 한 줄 · 빈 상태 "이 지역엔 코스가 없어요."
 
@@ -428,14 +429,29 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 불변(immutable) 조작, 지도 핀·폴리라인·장소 수는 파생 재계산: USER 블록에만 `updateBlock` · `removeBlock` · `replacePlace`(블록 id 유지) · `addBlock`(새 id) · `moveBlock`(같은 일자 내) 허용. RACE 블록은 모든 변경 연산에서 거부하며 파생 `dayPins`/`countPlaces`에는 포함한다.
 
-### 5.8 러닝코스 빌더 (원본: courses.js) 🧩목업
+### 5.8 러닝코스 빌더 — 큐레이션 우선 + OSM 도시 공백 보강 🔒확정(결정-42)
 
-- 서버 시작 시 + 하루 1회 두루누비 `courseList` 메타데이터를 동기화하고, GPX 파싱본 261코스의 경로를 `courseId`로 결합한다. API 실패 시 마지막 성공 캐시 → GPX fallback 메타 순으로 fail-open한다.
-- `API_GPX`와 `GPX_ONLY`만 지도·추천·뛰기에 제공한다. 경로가 없는 `API_ONLY`는 매칭 통계와 운영 로그에만 남긴다.
-- 앱은 GPX 기반 축약 경로를 번들해 오프라인 코스 탐색을 제공하되, 온라인에서는 서버 응답이 SSOT다.
-- `browseCourses({region, minKm, maxKm, level})` — 필터 + 거리 오름차순.
-- `buildRouteNear({lat, lng, targetKm, radiusKm=8, limit=12})` — **왕복 경로**: ① 코스별 최근접 진입점(반경 초과 제외) ② 진입점에서 앞/뒤 중 `targetKm/2`에 **더 길게 뻗는 방향**의 편도 ③ 편도+역방향 복귀 = `routePoints`, `routeKm`(왕복 실거리)·`minutes`(분당 110m)·`accessM`·`shortfall`(목표-300m 미만) ④ `accessM` 오름차순 limit.
-- `sliceCoursesNear` — 편도 구간 추출. `courseRegions` — 시도별 코스 수 내림차순.
+**큐레이션 경로**
+
+- 서버 시작 시 + 하루 1회 두루누비 `courseList` 메타데이터를 동기화하고, GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX 경로를 `courseId`로 결합한다. API 실패 시 마지막 성공 캐시 → GPX fallback 메타 순으로 fail-open한다.
+- P0 운영 빌드는 소스 어댑터의 `attribution`·`license`·`derivable` 메타를 검증하고 `derivable=false` 소스를 완전히 제외한다. 운영 데이터 생성에는 `--include-nonderivable`을 사용하지 않으며, 출처가 비어 있거나 원본 배포처를 확인하지 못한 소스도 적재하지 않는다.
+- `한국등산트레킹지원센터_국가숲길 코스_20230825`와 `한국등산트레킹지원센터_산림청 100대명산_20220112`는 제공기관이 **한국등산·트레킹지원센터**이고 이용허락범위 제한이 없으므로 `derivable=true`다. 두 데이터셋의 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`를 사용한다.
+- `API_GPX`와 `GPX_ONLY`만 지도·추천·뛰기에 제공한다. 경로가 없는 `API_ONLY`는 매칭 통계와 운영 로그에만 남긴다. 앱은 GPX 축약 경로를 번들해 오프라인 코스 탐색을 제공하되 온라인에서는 서버 응답이 SSOT다.
+- `browseCourses({region, minKm, maxKm, level})` — 큐레이션 코스만 필터 + 거리 오름차순. OSM 즉시 생성 경로는 지역별 목록에 영구 적재하지 않는다.
+- `buildCuratedRouteNear({lat, lng, targetKm, radiusKm=8, limit=12})` — ① 코스별 최근접 진입점(반경 초과 제외) ② 진입점에서 앞/뒤 중 `targetKm/2`에 더 길게 뻗는 방향의 편도 ③ 편도+역방향 복귀 = `routePoints`, `routeKm`·`minutes`(분당 110m)·`accessM`·`shortfall`(목표-300m 미만) ④ 조각의 `cumGainM` 차이로 `gainM/routeKm`를 계산해 `50m/km` 미만인 경로만 `accessM` 오름차순 limit. 고도를 계산할 수 없는 조각은 내 주변 자동 추천에서 제외하되 지역별 큐레이션 목록에는 유지한다. 이 `difficulty`는 조각 경로 기준이며, `browseCourses`가 보여주는 전체 코스 원천 등급과 달라도 정상이다.
+
+**OSM 생성 경로**
+
+- 적격 `buildCuratedRouteNear` 결과가 0건일 때만 서버가 별도 GraphHopper 프로세스의 `run` 프로파일을 호출한다. 앱은 GraphHopper·OSM 원천을 직접 호출하거나 OSM 그래프를 번들하지 않는다.
+- `generateOsmRoundTrip({lat, lng, targetKm})` — GraphHopper `round_trip`에 목표의 `0.78`배 거리와 seed `0..15`를 요청한다. 후보는 ① 목표 거리 `75%~125%` ② 상승고도 `<50m/km` ③ 차도 실제 거리 비율 `≤10%` ④ 실제 방향 전환 `≤6회/km`를 **모두** 만족해야 한다. 하나라도 넘으면 버리고, 상한을 완화해 나쁜 후보를 반환하지 않는다.
+- 차도는 `PRIMARY|SECONDARY|TRUNK|TERTIARY|MOTORWAY` 구간의 폴리라인 실거리 합을 전체 경로 실거리로 나눈 값이다. GraphHopper path detail의 포인트 인덱스 개수(`toRef-fromRef`)를 거리로 사용하지 않는다. AP-25 착수 전 PR #32의 `--preset filter`를 거리 가중 방식으로 재실행해 상한 회귀 테스트를 고정한다.
+- 방향 전환은 GraphHopper instruction 중 실제 회전 sign `-98, -8, -3, -2, 2, 3, 6, 8`만 센다. 직진·출발·도착·길 이름 변경 안내는 제외한다.
+- 통과 후보는 차도 `≤5%` 그룹 우선 → `|routeKm-targetKm|` → 방향 전환/km → 차도 비율 오름차순으로 최대 1건을 고른다.
+- 난이도는 SRTM 상승고도 `gainM/routeKm`로 계산한다: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 내 주변 자동 추천은 `EASY|NORMAL`만 반환하며 `HARD`는 상한 초과로 제외한다. P0에는 난이도 입력·자동 강등 개념이 없다.
+- 응답은 입력 좌표에서 실제 경로 시작점까지 `accessM`, 실거리 `routeKm`, 분당 110m 기준 `minutes`, `gainM`, 최대 100개로 균등 축약한 `elevationProfileM`, `routePoints`, `shortfall`을 계산한다. OSM 경로의 한국어 `name`도 서버가 생성하고, 사용자가 저장하면 그 값을 경로 snapshot에 그대로 보존한다.
+- GraphHopper 실패는 큐레이션·카카오 걷기 스팟과 격리한다. 사용 가능한 다른 항목이 있으면 부분 성공으로 반환하고, 실패한 원천 때문에 항목이 하나도 없으면 Error로 처리한다.
+
+`sliceCoursesNear`는 큐레이션 편도 구간 추출, `courseRegions`는 큐레이션 시도별 코스 수 내림차순이다. OSM 생성 결과는 요청·저장 스냅샷일 뿐 지역 코스 수에 포함하지 않는다.
 
 ### 5.9 걷기 스팟 필터 (원본: tourapi.js) 🧩목업
 
@@ -501,17 +517,20 @@ trip  { id: '{contestId}-{start}-{end}', contestId, contestName, region, event, 
 
 ```
 course      { id, dataSource: API_GPX|GPX_ONLY, name, sido, sigun, distKm,
-              difficulty: EASY|NORMAL|HARD, minutes, syncedAt, points[[lat,lng]…] }
-builtRoute  { id, parentName, sido, sigun, levelLabel, fullDistKm,
-              accessM, routeKm, minutes, shortfall, start, routePoints }
+              difficulty: EASY|NORMAL|HARD, gainM, minutes, syncedAt, points[[lat,lng,ele?]…] }
+builtRoute  { routeId, sourceCourseId?, dataSource: API_GPX|GPX_ONLY|OSM_GENERATED,
+              name, sido?, sigun?, difficulty, fullDistKm?, accessM, routeKm, minutes,
+              gainM, elevationProfileM[], shortfall, start, routePoints }
 walkSpot    { name, category, addr, lat, lng, distM, url }
 savedCourse { userId, kind: saved|ran, routeFingerprint, course|builtRoute 스냅샷, savedAt,
               run?: { points[[lat,lng]…], distKm, durationMin, ranAt } }   // ran = GPS 기록 🔒확정
 favoriteContest { userId, contestId, savedAt }                               // 찜 🔒확정(결정-16)
 ```
 
+- `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
+- `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
 - **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)와 GPS 전송 전 임시 기록만 둔다. 서버 ID·버전·`cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
-- 저장 코스는 서버가 정규화 snapshot으로 `routeFingerprint`를 계산하고 `(userId, routeFingerprint)` 중복 저장을 멱등 처리한다 🔒확정.
+- 저장 코스는 서버가 원천 ID가 아니라 정규화한 경로·거리·진입점 snapshot으로 `routeFingerprint`를 계산하고 `(userId, routeFingerprint)` 중복 저장을 멱등 처리한다. 따라서 `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정.
 
 ### 6.5 회원 계약 🆕회의 (**Spring Boot + PostgreSQL** 🔒확정 — 구현 시 테이블 상세화)
 
@@ -647,9 +666,16 @@ emailAuth     { email, purpose: SIGNUP|RESET, tokenHash, expiresAt, attempts, ve
 - **백엔드 라이브 프록시 유지** 🔒확정: 앱 → `GET /contests/{id}/festivals` → 서버가 `searchFestival2`를 조회, 날짜 겹침 + Haversine 반경 40km 필터 후 거리순 6건 반환. **서버 TTL 캐시(대회별 1일 🔧정책)** 로 중복 호출을 억제한다.
 - 축제를 영구 마스터 DB로 복제하지 않는다. 캐시는 성능·쿼터 방어용이며 원천은 KTO다.
 
-### 8.4 M4 두루누비 — **API 메타 + GPX 경로 결합**
+### 8.4 M4 러닝코스 — **큐레이션 + OSM/GraphHopper 생성** 🔒확정(결정-42)
 
-서버 시작 시 + 하루 1회 `courseList` 메타데이터를 동기화하고 GPX 파싱본 261코스의 points를 `courseId`로 결합한다. API 실패 시 마지막 성공 캐시 또는 GPX fallback 메타로 코스 기능을 유지한다. 앱 번들은 오프라인용 GPX 축약본이며 온라인 응답을 대체하는 마스터가 아니다. 도시 공백은 §5.9 걷기 스팟으로 보강한다.
+**큐레이션**: 서버 시작 시 + 하루 1회 두루누비 `courseList` 메타데이터를 동기화하고 GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX points를 `courseId`로 결합한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이며 통합 출처 문구 `등산로·숲길(한국등산·트레킹지원센터)`를 사용한다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. API 실패 시 마지막 성공 캐시 또는 GPX fallback 메타로 코스 기능을 유지한다. 앱 번들은 오프라인용 GPX 축약본이며 온라인 응답을 대체하는 마스터가 아니다.
+
+**OSM 생성**: 목표 거리에 맞고 `HARD`가 아닌 큐레이션 경로가 없는 위치는 대한민국 OSM PBF를 적재한 GraphHopper `run` 프로파일로 요청 시점에 품질 상한을 통과한 순환 경로를 최대 1건 만든다. GraphHopper는 Spring Boot와 분리된 서버 내부 프로세스로 실행하고 외부 포트를 공개하지 않는다. Spring Boot만 내부 HTTP로 호출하며 앱에는 OSM 그래프·GraphHopper 주소를 제공하지 않는다.
+
+- GraphHopper와 대한민국 PBF 버전을 배포 단위로 고정한다. 그래프(실측 약 514MB)와 SRTM 캐시는 배포 단계에서 만든 뒤 영속 볼륨에 보관하고 재기동·재배포 시 재사용한다. Spring Boot 시작 과정에서 그래프를 다시 만들지 않는다.
+- readiness 완료 전 또는 라우팅 장애에는 OSM 생성만 제외하고 큐레이션 경로·카카오 걷기 스팟을 계속 제공한다. OSM 장애를 SAMPLE/SYNTH 경로로 숨기지 않는다.
+- OSM 생성 결과는 Produced Work로 응답·저장 스냅샷만 제공하고 원본/파생 그래프 DB를 앱에 배포하지 않는다. 화면에 `© OpenStreetMap contributors`를 표시한다(ODbL).
+- P0 OSM PBF 갱신은 릴리스 시 수동 검증·교체한다. 자동 주기 갱신은 운영 지표와 배포 환경을 확인한 뒤 별도 작업으로 둔다.
 
 ### 8.5 이동시간(A5)·지오코딩
 
@@ -684,12 +710,12 @@ app/src/main/java/com/runninggu/app/
 
 ### 9.2 백엔드 — **Spring Boot + PostgreSQL** 🔒확정
 
-회원(U1~U3)·canonical 대회·마이/찜·동선·**외부 API 프록시(REST 키 격리 🔒확정)** ·두루누비 동기화를 서버가 담당한다. 러닝 기록(R1)은 AP-22 P1에서 추가한다.
+회원(U1~U3)·canonical 대회·마이/찜·동선·**외부 API 프록시(REST 키 격리 🔒확정)** ·큐레이션 코스 동기화·OSM 경로 생성을 서버가 담당한다. 러닝 기록(R1)은 AP-22 P1에서 추가한다.
 
-- 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(Access JWT + Refresh JWT, HS256, 액세스 30분·리프레시 14일, 회전 발급·DB 해시 저장 🔒확정).
+- 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(Access JWT + Refresh JWT, HS256, 액세스 30분·리프레시 14일, 회전 발급·DB 해시 저장 🔒확정) + 서버 내부 **GraphHopper 별도 프로세스** 🔒확정(결정-42).
 - 테스트: JUnit 5 + Testcontainers(PostgreSQL 통합 테스트) 🔒확정.
 - 외부 API TTL 캐시는 단일 서버 MVP에서 Spring Cache + Caffeine을 사용하고 Redis는 사용하지 않는다 🔒확정.
-- 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ **P0 동선 생성 규칙 엔진** + 마이(동선·저장 코스)·찜 SSOT, P1 러닝 기록 ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타 동기화+GPX 결합. 프록시에는 서버 캐싱·레이트리밋을 둔다.
+- 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ **P0 동선 생성 규칙 엔진** + 마이(동선·저장 코스)·찜 SSOT, P1 러닝 기록 ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타+큐레이션 GPX 결합 ⑥ 적격 큐레이션 경로가 없는 위치의 OSM 순환 경로 생성·품질 상한 적용. 프록시에는 서버 캐싱·레이트리밋을 둔다.
 - **API 계약은 springdoc-openapi로 확정** 🔒확정(결정-18) — 컨트롤러 코드에서 Swagger UI 자동 생성, 앱 팀은 그 문서 기준으로 Retrofit DTO 작성. §9.3 초안이 시드.
 
 ### 9.3 서버 API 초안 🔧정책 (springdoc-openapi로 문서화 🔒확정)
@@ -701,7 +727,7 @@ app/src/main/java/com/runninggu/app/
 | 동선 | `POST /itineraries/generate` — 게스트 허용·무상태 서버 생성 🔒(결정-41) · 저장/조회/편집 `/itineraries/**`는 인증 필요 |
 | 마이·찜 | `/me/courses` · `/me/favorites` — 서버 SSOT, Room은 읽기 캐시. `/runs`는 P1 |
 | 대회 | `GET /contests` · `/daily-counts` · `/closing-soon` · `/{id}` — canonical 조회 전용, 관리자/배치만 갱신 |
-| 코스 | `GET /courses/near`(두루누비 메타+GPX 경로와 카카오 걷기 스팟 통합) · `/courses` · `/courses/regions` |
+| 코스 | `GET /courses/near`(목표 거리·`HARD` 제외 큐레이션 우선, 적격 경로가 없으면 품질 상한 OSM/GraphHopper 생성 1건, 카카오 걷기 스팟 통합) · `/courses` · `/courses/regions`(큐레이션 전용) |
 | **외부 API 프록시** 🔒확정 | `GET /pois?category=&lat=&lng=&radius=`(숙소 AD5 포함) · `GET /contests/{id}/festivals` · `GET /festivals` · `GET /geocode?query=` — 서버 캐싱 🔧정책. 카카오 걷기 스팟 조회는 `/courses/near`의 서버 내부 소스이며 독립 앱 API로 노출하지 않는다 |
 
 공통 API 계약 🆕 구현 추가 요구사항: RFC 9457 `application/problem+json` + 안정적 `code`; Enum 대문자; 대회만 불투명 cursor, 개인 목록은 Pageable; 비즈니스 날짜는 KST, timestamp는 UTC `Z`; 앱은 Loading/Content/Empty/Error를 구분한다. 상세 계약은 `docs/files/런닝구_API_명세서.md`.
@@ -730,8 +756,8 @@ app/src/main/java/com/runninggu/app/
 
 | ID | 요구사항 |
 |---|---|
-| NFR-1 📱전환 | **제한적 오프라인 폴백**: 마지막 성공 대회/마이 읽기, GPX 축약 코스, GPS 전송 전 임시 기록만 지원한다. 인증·외부 조회·새 동선 생성·저장 변경은 온라인 필요. 지도 SDK 실패 시 지도 영역만 안내로 대체하고 리스트는 유지 |
-| NFR-2 | 폴백 투명성 — 소스 Enum/배지(`LIVE, SAMPLE, SYNTH`; 코스 `API_GPX, GPX_ONLY`) 노출 |
+| NFR-1 📱전환 | **제한적 오프라인 폴백**: 마지막 성공 대회/마이 읽기, GPX 축약 코스, GPS 전송 전 임시 기록만 지원한다. 인증·외부 조회·새 동선/OSM 코스 생성·저장 변경은 온라인 필요. 지도 SDK 실패 시 지도 영역만 안내로 대체하고 리스트는 유지 |
+| NFR-2 | 폴백 투명성 — 소스 Enum/배지(`LIVE, SAMPLE, SYNTH`; 코스 `API_GPX, GPX_ONLY, OSM_GENERATED`)를 DTO에서 추적하고 실제 사용 원천의 출처 문구를 노출 |
 | NFR-3 | 에러 격리 — 외부 API 실패는 해당 블록 place=null 강등, 동선 생성 자체는 실패하지 않음 |
 | NFR-4 | KTO 응답 방어 — resultCode≠0000·XML 오류·401/403/500 구분 처리·로깅 |
 | NFR-5 | 429 대응 — 카카오 1회 재시도 후 폴백 |
@@ -747,6 +773,7 @@ app/src/main/java/com/runninggu/app/
 | NFR-15 📱전환 | **위치 권한** — 러닝코스는 권한 거부 시에도 검색·프리셋으로 완전 동작. 권한 요청은 기능 사용 시점에(홈 진입 시 선요청 금지) 🔧정책 |
 | NFR-16 🆕 구현 추가 요구사항 | **UTF-8 강제** — 데이터 생성 스크립트는 stdout/stderr UTF-8을 명시하고, CI는 `PYTHONUTF8=1`에서 JSON 생성·UTF-8 디코딩·결정적 출력·153건/이미지 집계를 검증 |
 | NFR-17 🆕 구현 추가 요구사항 | **공통 API 오류·시간 규약** — ProblemDetail, Enum 대문자, KST 비즈니스 날짜, UTC timestamp, 대회 cursor/개인 Pageable을 전 API에서 일관 적용 |
+| NFR-18 🔒확정 | **OSM 라우팅 격리·품질** — GraphHopper는 서버 내부 별도 프로세스와 영속 그래프 캐시로 운영하고, 큐레이션·카카오 결과와 장애를 격리한다. 거리 75~125%·상승 <50m/km·실거리 가중 차도 ≤10%·실제 방향 전환 ≤6회/km를 모두 통과한 경로만 응답하고 상한을 완화하지 않으며 `© OpenStreetMap contributors`를 표시한다(결정-42) |
 
 ---
 
@@ -758,7 +785,7 @@ app/src/main/java/com/runninggu/app/
 
 | 팀원 | 영역 | 담당 백로그 |
 |---|---|---|
-| **유선경** | **백엔드 전담** — 인증/계정 연결·canonical 대회·외부 프록시·두루누비 동기화·마이 영속화·springdoc·배포 | AP-02 · AP-07 · AP-23 · AP-24(서버 계약) |
+| **유선경** | **백엔드 전담** — 인증/계정 연결·canonical 대회·외부 프록시·큐레이션 동기화·OSM 라우팅·마이 영속화·springdoc·배포 | AP-02 · AP-07 · AP-23 · AP-24(서버 계약) · AP-25 |
 | **이건모** | **앱 UI** — Compose 테마·4탭·인증/홈/캘린더/위저드/결과/마이 정보수정·찜·공통 UI 상태 | AP-06 · 08 · 09 · 10 · 11 · 13 · 21 |
 | **김민지** | **앱 코어** — 프로젝트·도메인/데이터 레이어·카카오맵·러닝코스/GPX 폴백·GPS 기록·공통 API 계약 + scripts/CI | AP-01 · 03 · 04 · 05 · 12 · 14 · 22 · AP-24(앱/데이터) |
 
@@ -785,13 +812,14 @@ app/src/main/java/com/runninggu/app/
 | AP-09 | S1 홈 (검색→캘린더 연결·아이콘·마감임박·축제 — 인기 섹션 없음 🔒확정) | §4.4 |
 | AP-10 | S2 캘린더 (리스트+캘린더 뷰·검색·**필터 모달 F1**·카드) | §4.5 |
 | AP-11 | S3~S7 상세+위저드+결과 (편집·후보 시트·저장, **산책 섹션 제거+S8 연계 카드**) | §4.6~4.10 |
-| AP-12 | S8 러닝코스 (위치 권한 플로우·빌더·걷기 스팟·지역별) | §4.11 |
+| AP-12 | S8 러닝코스 (위치 권한·목표거리·표시용 난이도·큐레이션/OSM 경로·걷기 스팟·지역별; P0 난이도 칩 없음) | §4.11 |
 | AP-13 | S10 마이 (프로필·정보수정·계정 연결 + 동선/저장 러닝코스/**찜한 대회** 세그먼트·서버 SSOT, ran은 P1) | §4.13 |
-| AP-14 | data/remote — **백엔드 API 클라이언트(Retrofit)** + `POST /itineraries/generate` 요청/응답·ProblemDetail/Enum/페이징 DTO 매퍼 + 제한적 폴백 | §8.1·§9.3 |
+| AP-14 | data/remote — **백엔드 API 클라이언트(Retrofit)** + 동선·POI·`GET /courses/near`(OSM 원천·표시 난이도·부분 실패) 요청/응답·ProblemDetail/Enum/페이징 DTO 매퍼 + 제한적 폴백 | §8.1·§9.3 |
 | ~~AP-20~~ | ~~전 대회 POI 사전수집~~ — 운영 오프라인 동선 생성 제외 결정으로 **MVP 제외**, SAMPLE은 목업/데모만 유지 | §8.1 · NFR-1 |
 | AP-21 | **대회 찜(B2)** 🔒확정 — 카드·상세 하트 토글 + 마이 세그먼트 + `/me/favorites` 동기화 | §4.5·4.13 |
 | AP-23 | **두루누비 동기화** — 시작 시+하루 1회 courseList 메타 수집, GPX courseId 결합, fail-open·매칭 통계 | §5.8·§8.4 |
 | AP-24 | **계약·인코딩 CI** — API DTO 계약 테스트 + races JSON UTF-8·결정성·집계 검증 | NFR-16·17 |
+| AP-25 | **OSM 도시 러닝코스 생성(P0)** — GraphHopper 별도 프로세스·버전 고정 PBF/SRTM 영속 캐시·`run` 프로파일·거리/상승/실거리 차도/실제 회전 hard cap·`/courses/near` 적격 큐레이션 경로 0건 fallback·부분 실패·PR #32 `--preset caps` 회귀 검증. 계단은 런타임 필터·정렬에 추가하지 않고 선택 경로 `road_class=STEPS` 실거리 비율 `≤1%`를 회귀 테스트로만 확인·단위/통합 테스트 | §4.11·§5.8·§8.4·NFR-18 |
 
 **P1**
 
@@ -803,6 +831,7 @@ app/src/main/java/com/runninggu/app/
 | AP-18 | 이동시간 라벨 (모빌리티 §8.5) |
 | AP-19 | 이미지 커버리지·품질 고도화 — KTO 상세 enrich (P0는 기존 nullable `imageUrl` 133건 + placeholder 사용, 구 G-11·12) |
 | AP-22 | **GPS 러닝 기록(R1)** 🔒확정(결정-14) — 기록 모드(포그라운드 서비스)·요약·마이 ran 저장 | §4.11(c) |
+| P1 후보 | **수변·공원 선호 OSM 라우팅 PoC** — 하천·공원 인접 보행로를 선호하는 경로 생성의 커버리지·진입 거리·상승·성능 검증 |
 
 **P2**: 구글·네이버 로그인(U4) · 카카오내비 연발(A6) · 반려동물 필터(A7) · 다국어(A8) · (로드맵 ②) 커뮤니티 재검토.
 
@@ -850,9 +879,9 @@ app/src/main/java/com/runninggu/app/
 
 | # | 결정 | 이유 | 반영 위치 |
 |---|---|---|---|
-| 결정-27 | S8 앱은 **`GET /courses/near` 한 번만 호출**하고, 서버가 두루누비 경로와 카카오 걷기 스팟을 거리순 통합 반환한다. 독립 `/walk-spots` 앱 API는 두지 않는다 | 두 요청의 완료 시점에 따른 목록 순서 변경을 막고 통합·정렬 규칙을 서버 한 곳에 둔다(이슈 #19) | §4.11 · §9.3 |
+| 결정-27 | S8 앱은 **`GET /courses/near` 한 번만 호출**하고, 서버가 경로(큐레이션 우선·OSM fallback)와 카카오 걷기 스팟을 거리순 통합 반환한다. 독립 `/walk-spots` 앱 API는 두지 않는다 | 여러 원천의 완료 시점에 따른 목록 순서 변경을 막고 통합·정렬 규칙을 서버 한 곳에 둔다(이슈 #19, 결정-42로 원천 확장) | §4.11 · §9.3 |
 
-### 12.4 확정 — 2026-08-17 화면·API 계약
+### 12.4 확정 — 2026-08-17~19 화면·API 계약
 
 | # | 결정 | 이유 | 반영 위치 |
 |---|---|---|---|
@@ -870,6 +899,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-39 | 대회 데이터는 **Python이 정규화·중복 병합한 서버용 대회 스냅샷**을 생성하고, 백엔드는 이를 검증해 PostgreSQL에 멱등 적재한다 | Python과 Java에 병합 규칙을 중복 구현해 canonical 결과가 갈라지는 것을 막는다. 현재 목업용 `races.json`은 서버 스냅샷으로 그대로 사용하지 않는다 | §8.2 · AP-07 · AP-24 |
 | 결정-40 | P0 대회 전달은 **Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL**로 하고, 향후 내부 수집 API 또는 스테이징 승격으로 자동화한다 | 초기에는 검토·재현·롤백이 쉬운 파일 계약을 사용하고, 운영 자동화 이후에도 Python의 핵심 테이블 직접 쓰기를 금지해 DB 소유권과 검증 경계를 유지한다 | §8.2 · AP-07 · AP-24 |
 | 결정-41 | P0 동선 생성의 운영 주체는 **백엔드 `POST /itineraries/generate` 하나**로 고정하고 앱은 생성 응답 표시·저장 전 편집만 한다 | 외부 POI 키·캐시·폴백·부분 실패와 생성 규칙을 서버 한 곳에서 관리해 앱 버전별 결과 차이와 다중 POI 요청 조율을 막는다. PR #22 앱 엔진은 서버 이식의 참고 구현일 뿐 런타임 계약이 아니다 | §4.9 · §5.6 · §9.2~9.3 · AP-04·07·14 |
+| 결정-42(08-19 개정) | **OSM·GraphHopper 도시 러닝코스 생성을 P0에 포함**한다. GraphHopper는 서버 내부 별도 프로세스와 영속 그래프 캐시로 운영한다. P0 내 주변은 난이도 칩(a)과 `EventType` 기본값(c)을 모두 제거하고 S7이 출발지·회복 목표거리만 전달한다. 서버는 `HARD`와 거리·차도·실제 회전 상한 초과 경로를 자동 추천하지 않으며 상한을 완화하지 않는다 | 초기 `(a)+(c)` 매핑은 §5.1 회복 룰과 충돌하고 `EASY` 한정 시 PoC 커버리지가 42/60으로 감소했다. PR #32 `a4587ef`의 수도권 20곳×5·10·21km 후보 실측은 `HARD` 제외·실제 회전 6회/km 상한에서도 경로 후보가 남음을 보였다. 사용자 입력을 늘리지 않고 산악·고차도·과다 회전 경로를 서버에서 차단하며, 차도 상한은 포인트 수가 아닌 실거리 가중 회귀 테스트로 검증한다 | §4.10~4.11 · §5.8 · §6.4 · §8.4 · §9.2~9.3 · AP-12·14·25 · NFR-18 |
 
 ### 12.5 남은 미결
 
@@ -953,7 +983,8 @@ app/src/main/java/com/runninggu/app/
 | `lib/runninggu/events.js` · `dates.js` · `normalize.js` | `domain/` 표준화·날짜(KST)·정규화 | §5.4~5.5 · §6.6 |
 | `lib/runninggu/engine.js` `buildItinerary` | 백엔드 `ItineraryGenerationService` | `POST /itineraries/generate`의 서버 규칙 엔진. **walk 블록 제거 반영** (§5.6). PR #22 앱 `ItineraryEngine`은 이식 참고·테스트 기준이며 운영 UI에 연결하지 않음(결정-41) |
 | `lib/runninggu/edits.js` | `domain/` 편집 연산 (불변) | §5.7 |
-| `lib/runninggu/courses.js` (빌더) | 서버 course API + 앱 오프라인 CourseBuilder | §5.8 |
+| `lib/runninggu/courses.js` (빌더) | 서버 큐레이션 course API + 앱 오프라인 CourseBuilder | §5.8 큐레이션 규칙 |
+| 이슈 #33·PR #32 OSM PoC (`scripts/osm/`) | 서버 GraphHopper 별도 프로세스 + OSM 라우팅 어댑터 | §5.8 OSM 규칙 · §8.4 · AP-25 |
 | `lib/runninggu/tourapi.js` (프록시 fetch) | 백엔드 축제·지오코딩·걷기 스팟 API + `data/remote` 클라이언트 | 키는 서버 보관 🔒확정 (§8.3) |
 | `lib/runninggu/poi.js` (JS services 검색+폴백) | 백엔드 POI API + Repository 폴백 체인 | §8.1 |
 | `lib/runninggu/sampleData.js` (PRESAMPLED·synth) | 목업/데모용 SAMPLE·SYNTH 폴백 | §8.1 |

@@ -101,7 +101,7 @@ erDiagram
     CONTEST_EVENT {
         bigint id PK
         bigint contest_id FK
-        varchar event_type "K5 / K10 / HALF / FULL / TRAIL, contest_id와 복합 UNIQUE"
+        varchar event_type "K5 / K10 / HALF / FULL, 원천 트레일은 거리 버킷 정규화, contest_id와 복합 UNIQUE"
     }
 
     FAVORITE {

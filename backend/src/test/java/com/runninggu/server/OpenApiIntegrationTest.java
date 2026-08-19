@@ -23,7 +23,7 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("런닝구 API"))
-                .andExpect(jsonPath("$.info.version").value("v2.2"))
+                .andExpect(jsonPath("$.info.version").value("v2.3"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type")
                         .value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")

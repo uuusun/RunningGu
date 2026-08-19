@@ -1,10 +1,10 @@
-# 런닝구 백엔드 API 명세서 v2.2
+# 런닝구 백엔드 API 명세서 v2.3
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v3 + ERD·DFD 수정안
-> **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine
+> **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
-> **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · EMAIL/KAKAO 다중 로그인 수단 · 시스템 관리 RACE 블록 · 두루누비 API+GPX 결합
+> **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · EMAIL/KAKAO 다중 로그인 수단 · 시스템 관리 RACE 블록 · 큐레이션 API+GPX 결합 · **OSM/GraphHopper 도시 경로 생성(P0)**
 
 ---
 
@@ -55,6 +55,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 429 | 쿨다운·시도 횟수 초과 (인증 메일 60초, 코드 5회) |
 | 500 | 처리되지 않은 서버 내부 오류. 세부 예외 대신 추적 가능한 `traceId`만 응답 |
 | 502 | 외부 API가 오류/비정상 응답 반환 |
+| 503 | 내부 라우팅 원천 장애로 표시할 코스·장소가 없음 |
 | 504 | 외부 API 응답 시간 초과 |
 
 클라이언트는 `Loading / Content / Empty / Error`를 구분한다. 정상 빈 결과는 `200`의 빈 배열이며, 502/504를 Empty나 Loading으로 강등하지 않는다. 전체 에러 코드 → **부록 D**.
@@ -74,7 +75,19 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
 | 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
 | 캐시 구현 | 단일 서버 MVP는 Spring Cache + Caffeine 인메모리 캐시. Redis는 MVP에서 사용하지 않음 🔒 |
-| 예외 | **동선 생성만은 502를 내지 않는다** — POI 조회 실패 시 해당 블록 `place=null` 강등, 생성은 성공(NFR-3) |
+| 예외 | 동선 생성은 POI 조회 실패 시 해당 블록을 `place=null`로 강등하고 생성은 성공한다(NFR-3). `/courses/near`는 일부 원천 실패에도 표시 항목이 있으면 `200`+`degradedSources`, 원천 실패가 있고 표시 항목도 없으면 `503 COURSE_SOURCES_UNAVAILABLE`를 반환한다 |
+
+### 0-6. GraphHopper 내부 라우팅 방어 정책 🔒(결정-42)
+
+| 정책 | 값 |
+|---|---|
+| 접근 | Spring Boot만 내부 HTTP로 호출, GraphHopper 포트 외부 비공개 |
+| 타임아웃 | 경로 후보 16건 전체 3초 🔧, 초과 시 `OSM` degraded 처리 |
+| 기동 | readiness 완료 전 OSM 생성 비활성, Spring Boot 기동과 분리 |
+| 그래프 | 고정 GraphHopper+대한민국 PBF로 배포 단계에서 생성, 그래프 약 514MB+SRTM 캐시를 영속 볼륨에서 재사용 |
+| 품질 | 거리 75~125%·상승 <50m/km·실거리 가중 차도 ≤10%·실제 방향 전환 ≤6회/km를 모두 만족한 후보만 허용, 상한 완화 금지 |
+| 장애 | 다른 경로·장소가 있으면 `200`+`degradedSources`, 표시 항목도 없으면 `503 COURSE_SOURCES_UNAVAILABLE` |
+| 저장 | OSM 원천 그래프는 DB에 복제하지 않고 생성 경로 snapshot만 사용자 저장 시 PostgreSQL에 보관 |
 
 ---
 
@@ -473,49 +486,68 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 6. 러닝코스 API `/api/courses` (공개)
 
-> 원천: 두루누비 API `courseList`의 최신 메타데이터와 GPX 파싱본 261코스의 경로 좌표를 **동시에 사용**한다. 서버 시작 시와 하루 1회 메타데이터를 동기화하고 `courseId`로 GPX와 결합한다. API 장애·미매칭 때는 마지막 성공 캐시 또는 GPX fallback 메타로 fail-open하며, GPX 경로가 없는 `API_ONLY` 항목은 지도·추천·뛰기 응답에서 제외한다.
+> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
-`?lat=&lng=&targetKm=5&radiusKm=8&size=12` (targetKm 1~21, 0.5 단위 — 슬라이더, size는 통합 결과의 최대 항목 수)
+`?lat=&lng=&targetKm=5&radiusKm=8&size=12`
+
+- `targetKm`: 1~21, 0.5 단위.
+- `radiusKm`: 기본 8. 큐레이션 진입점 조회 반경이며 GraphHopper는 입력 출발점에서 순환 경로를 만든다.
+- `size`: 큐레이션/OSM 경로와 PLACE를 합친 최대 항목 수, 기본·최대 12.
+- P0 내 주변 요청에는 난이도 파라미터가 없다. 서버가 `HARD(≥50m/km)`를 자동 추천에서 제외하며 응답 `difficulty`는 표시용이다.
 
 ```json
 {
   "items": [
     {
       "kind": "ROUTE",
-      "name": "남파랑길 2코스",
-      "distanceM": 420,
-      "lat": 35.11454, "lng": 129.04076,
-      "courseId": "T_CRS_MNG0000005117", "sido": "부산", "sigun": "부산 중구",
-      "difficulty": "NORMAL", "fullDistanceKm": 19.0,
-      "routeKm": 5.1, "durationMin": 47, "shortfall": false,
+      "routeId": "osm:2e808bd75c4a",
+      "dataSource": "OSM_GENERATED",
+      "name": "내 주변 5km 평지 러닝코스",
+      "distanceM": 12,
+      "lat": 37.52461, "lng": 126.92028,
+      "difficulty": "EASY",
+      "routeKm": 5.02, "durationMin": 46,
+      "gainM": 38,
+      "elevationProfileM": [12, 14, 17, 15, 19, 18],
+      "shortfall": false,
       "pathPolyline": "인코딩된 왕복 경로"
     },
     {
       "kind": "PLACE",
-      "name": "용두산공원",
+      "name": "여의도공원",
       "distanceM": 650,
-      "lat": 35.1007, "lng": 129.0325,
+      "lat": 37.5264, "lng": 126.9227,
       "category": "공원",
-      "address": "부산 중구 용두산길 37-55",
+      "address": "서울 영등포구 여의공원로 68",
       "placeUrl": "https://place.map.kakao.com/..."
     }
-  ]
+  ],
+  "degradedSources": [],
+  "attributions": ["© OpenStreetMap contributors", "카카오 로컬"]
 }
 ```
-- 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 출발지에서 경로 진입점 또는 장소까지의 거리다.
-- `ROUTE` 전용: `courseId`, `sido`, `sigun`, `difficulty`, `fullDistanceKm`, `routeKm`, `durationMin`, `shortfall`, `pathPolyline`.
+- 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 입력 출발지에서 실제 경로 시작점 또는 장소까지의 거리다.
+- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
+- `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다.
+- 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
-- 경로 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로 · 분당 110m로 `durationMin` · `shortfall` = 왕복이 목표−300m 미만.
+- `routeId`는 near snapshot 내부 식별용 불투명 문자열이다. 저장·중복 판정에는 사용하지 않고 서버가 경로 snapshot으로 `routeFingerprint`를 다시 계산한다.
+- 큐레이션 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로. 조각의 `cumGainM`으로 계산한 상승이 `<50m/km`인 큐레이션 경로가 1건 이상이면 GraphHopper를 호출하지 않는다. 고도를 계산할 수 없는 조각은 내 주변 자동 추천에서 제외한다.
+- OSM 규칙 🔒(SPEC §5.8): 적격 큐레이션 경로가 0건일 때 `run` 프로파일·보정 거리 0.78·seed 16개로 후보를 만든다. 목표 75~125%·상승 `<50m/km`·차도 실제 거리 비율 `≤10%`·실제 방향 전환 `≤6회/km`를 모두 통과한 후보만 남기고, 차도 `≤5%` 그룹 우선 → 거리 오차 → 방향 전환/km → 차도 비율 순으로 최대 1건을 고른다. 통과 후보가 없으면 상한을 완화하지 않고 OSM 경로 0건으로 처리한다.
+- 차도 비율은 `PRIMARY|SECONDARY|TRUNK|TERTIARY|MOTORWAY` path detail 각 구간의 폴리라인 실거리 합으로 계산한다. `toRef-fromRef` 포인트 인덱스 개수를 거리로 사용하지 않는다. 방향 전환은 instruction sign `-98|-8|-3|-2|2|3|6|8`만 세고 직진·출발·도착·길 이름 변경은 제외한다.
+- 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 내 주변 `ROUTE`는 `EASY|NORMAL`만 나오며, 지역별 큐레이션 목록은 `HARD`도 표시와 함께 제공한다. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
+- 경로 공통 계산은 분당 110m로 `durationMin`, `shortfall = routeKm < targetKm-0.3`이다.
 - 장소 규칙 🔒(SPEC §5.9): 4-3의 카카오 후보를 포함/제외·중복 제거한 뒤 합친다.
 - 서버가 `ROUTE`와 `PLACE`를 `distanceM` 오름차순으로 합쳐 최대 `size`건을 반환한다. 앱은 받은 순서를 다시 정렬하지 않는다.
-- 원천별 캐시와 `API_GPX`/`GPX_ONLY` 매칭 통계는 서버 내부 운영 정보다. 통합 응답에는 `dataSource`와 `syncedAt`을 노출하지 않는다.
-- 두 종류가 모두 0건이면 `200 {"items": []}`이며, 화면은 S8 빈 상태로 매핑한다.
+- `degradedSources`는 호출·동기화 실패로 제외된 `DURUNUBI|OSM|KAKAO` 원천이다. 품질 상한 통과 후보 0건은 정상 결과이므로 `OSM` degraded가 아니다. 항목이 하나라도 있으면 부분 실패도 `200`이며 앱은 Content와 비차단 안내를 함께 표시한다.
+- 모든 원천이 정상 완료되고 두 종류가 모두 0건이면 `200 {"items": [], "degradedSources": [], "attributions": []}`이며 S8 Empty다. 원천 실패가 있고 항목도 0건이면 `503 COURSE_SOURCES_UNAVAILABLE`로 S8 Error다.
+- `attributions`는 실제 응답 항목에 사용된 원천만 중복 없이 큐레이션 → OSM → 카카오 순서로 반환한다. canonical 문구는 `두루누비 걷기길(한국관광공사)`, `등산로·숲길(한국등산·트레킹지원센터)`, `© OpenStreetMap contributors`, `카카오 로컬`이다. 새 큐레이션 GPX는 원본 `LICENSE.txt`를 확인해 빌드 산출물에 기록한 `attribution`을 사용하고, 출처 미확인 문구를 서버가 추측하지 않는다. 앱은 문자열을 변형하지 않고 목록 하단에 표시한다.
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=&size=` → `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b).
+`?region=부산&page=&size=` → 큐레이션 코스만 `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, gainM, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b). 여기의 `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다. `OSM_GENERATED`는 포함하지 않는다.
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
 
@@ -527,12 +559,12 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId, courseName, region, distanceKm, durationMin, difficulty, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` |
+| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId?, dataSource, courseName, region?, distanceKm, durationMin, difficulty, gainM, elevationProfileM, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
-서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
+`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
 
 ### 7-B 러닝 기록 `/api/runs` — P1 예약
 
@@ -619,15 +651,16 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 
 | Enum | 값 | 표시 |
 |---|---|---|
-| EventType | `K5, K10, HALF, FULL, TRAIL` | 5K · 10K · 하프 · 풀 · 트레일 (필터 4버킷은 TRAIL 제외 🔒결정-12) |
+| EventType | `K5, K10, HALF, FULL` | 5K · 10K · 하프 · 풀. 원천의 트레일 표기는 거리 기준 `stdEventKm`으로 4종 중 하나에 정규화 🔒(SPEC §5.4) |
 | BlockCategory | `TOUR, FOOD, CAFE, WELLNESS, NATURE, HISTORY, LODGING, RACE, RECOVERY` | 관광지·맛집·카페·힐링웰니스·자연트레킹·역사문화·숙소·대회·회복 (9종 🔒) |
 | RegStatus | `OPEN, BEFORE, CLOSED, UNKNOWN` | 접수중·접수전·마감·미정 (조회 시점 파생 🔒§5.5) |
 | Region | 서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주 | 17개 시도 🔒(§6.2 — 비표준 값은 배치에서 주소로 보정) |
 | Provider | `EMAIL, KAKAO` | (구글·네이버 P2) |
 | ContestSource | `MARATHON_ONLINE, MARATHON_GO` | 마라톤 온라인 · 마라톤GO |
-| Difficulty | `EASY, NORMAL, HARD` | 하·중·상 (두루누비 crsLevel 1·2·3) |
+| Difficulty | `EASY, NORMAL, HARD` | 평지·완만·언덕. 생성/조각 경로는 `<15`, `15~50 미만`, `≥50m/km`; 내 주변 자동 추천은 EASY/NORMAL만, 지역별 큐레이션 목록은 HARD도 제공 |
 | PoiSource | `LIVE, SAMPLE, SYNTH` | 서버 라이브 · 데모/캐시 샘플 · 합성 |
-| CourseDataSource | `API_GPX, GPX_ONLY` | API 메타+GPX 경로 · GPX fallback |
+| CourseDataSource | `API_GPX, GPX_ONLY, OSM_GENERATED` | API 메타+GPX 경로 · GPX fallback · 요청 시점 OSM 생성 경로 |
+| CourseDegradedSource | `DURUNUBI, OSM, KAKAO` | `/courses/near` 부분 실패 원천 |
 | BlockType | `USER, RACE` | 사용자 편집 가능 · 시스템 관리 |
 
 ## 부록 D. 에러 코드 총람
@@ -658,6 +691,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
+| `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
 | `EXTERNAL_API_TIMEOUT` | 504 | 외부 API 제한시간 초과(동선 생성 제외 — NFR-3) |
 
@@ -673,6 +707,12 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 8. 웰니스 — data.go.kr **페어 키 전용**(구 hex 키 403) · 좌표 필드 **대문자** `mapX/mapY` · 이미지는 `firstimage`.
 9. KorService1 금지 — HTTP 500(폐기).
 10. 키 격리 🔒 — KTO·카카오 REST 키는 서버 환경변수 전용, 저장소·앱 포함 금지(NFR-14).
+11. GraphHopper `round_trip`은 목표보다 길게 나올 수 있다 — 목표의 0.78배 요청+seed 16개 후보 필터를 생략하지 않는다(SPEC §5.8).
+12. OSM way에는 고도가 거의 없다 — `graph.elevation.provider=srtm`과 영속 SRTM 캐시 없이 난이도를 계산하지 않는다.
+13. 기본 `foot` 프로파일은 큰 도로 보도를 우선할 수 있다 — P0 운영은 러닝 가중치 `run` 프로파일만 사용한다.
+14. OSM/GraphHopper는 서버 내부 원천이다 — 앱 직호출·OSM 그래프 번들을 금지하고 `© OpenStreetMap contributors`를 응답 출처에 포함한다.
+15. `road_class` path detail의 `fromRef/toRef`는 응답 좌표 인덱스다 — `toRef-fromRef`를 차도 거리로 계산하지 말고 각 구간의 폴리라인 실거리를 합산한다. AP-25 착수 전 PR #32 `--preset filter`를 이 방식으로 재실행한다.
+16. 품질 상한 미달 후보를 "가장 나은 후보"라는 이유로 반환하지 않는다. 적격 후보 0건은 정상 0건이며 GraphHopper 호출 장애와 구분한다.
 
 ## 부록 F. P1 예약 엔드포인트 (이번 명세 범위 밖 — 시그니처만 예약)
 
