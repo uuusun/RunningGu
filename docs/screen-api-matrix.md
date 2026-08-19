@@ -307,7 +307,7 @@ Compose 화면
 | 출발지 검색 | `GET /api/geocode` | query | name,address,lat,lng / KAKAO_LIVE | `NO_RESULT` |
 | 프리셋 | 앱 상수 | 5개 좌표 | start point | API 없음 |
 | 거리 슬라이더 | 로컬 | 1~21km, 0.5 단위 | targetKm | 드래그 종료 후 조회 권장 |
-| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty=EASY\|NORMAL`, `gainM`, 고도 스트립 | 내 주변은 생성 왕복 구간의 상승 기준, 지역별은 전체 원본 코스 등급이라 달라도 정상. P0 내 주변 난이도 칩 없음; HARD는 자동 추천 제외 |
+| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty`, `gainM`, 고도 스트립 (`difficultyBasis` 없음) | 내 주변 카드는 생성 왕복 구간 기준 `EASY\|NORMAL` 배지 옆에 **"이 구간 기준"** 표시. 지역별 목록은 전체 원본 코스 등급 배지만 기존대로 표시하고 보조 문구를 붙이지 않으며 `HARD` 허용. P0 내 주변 난이도 칩 없음 |
 | 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·상승 상한에 맞는 큐레이션 0건이면 거리·상승·차도·회전 상한을 통과한 OSM 최대 1건 생성 후 거리순 통합 |
 | OSM 품질 상한 | 서버 내부 | seed 0~15 | 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km | 하나라도 초과하면 후보 제외, 상한 완화 금지; AP-25 전 차도 거리 가중 PoC 재검증 |
 | 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | 호출 실패만 Content+비차단 안내; 품질 상한 통과 후보 0건은 정상 결과 |
