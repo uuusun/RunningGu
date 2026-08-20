@@ -59,9 +59,10 @@
    - DB의 기존 source가 첫 번째 승인 스냅샷에서 보이지 않으면
      `consecutive_missing_count=1`, `active=true`로 유지한다. 다음 **서로 다른 승인 스냅샷**에도
      연속 누락되면 count를 2로 고정하고 `active=false`로 바꾼다.
-   - 같은 스냅샷을 재적재해도 누락 횟수를 다시 올리지 않는다. Importer는
-     `meta.sourceSha256 + meta.checkedAtMax`로 이미 적용한 스냅샷을 식별하고, 이전 스냅샷을
-     다시 적용한 누락 상태 후퇴도 금지한다. 물리 판정 규칙은 1.3을 따른다.
+   - 같은 스냅샷을 재적재해도 누락 횟수를 다시 올리지 않는다. Importer는 읽은 snapshot 파일
+     바이트의 SHA-256과 `meta.checkedAtMax`로 이미 적용한 스냅샷을 식별하고, 이전 스냅샷을
+     다시 적용한 누락 상태 후퇴도 금지한다. `meta.sourceSha256`은 입력 CSV 해시이므로 snapshot
+     식별에 쓰지 않는다. 물리 판정 규칙은 1.3을 따른다.
    - `CONTEST.active`는 연결된 source 중 하나라도 active면 true, 모두 inactive면 false다.
      비활성 canonical과 과거 대회, 이를 참조하는 찜·저장 동선은 물리 삭제하지 않는다.
      공개 목록·검색·월간 건수·마감 임박만 active 대회로 제한하고 id 상세 조회는 유지한다.
@@ -74,15 +75,16 @@ Importer는 성공적으로 적용한 snapshot을 다음 물리 계약으로 기
 |---|---|---|
 | `id` | `BIGINT` | PK |
 | `schema_version` | `INTEGER` | snapshot 최상위 `schemaVersion`, NOT NULL |
-| `source_sha256` | `VARCHAR(64)` | `meta.sourceSha256`, NOT NULL |
+| `snapshot_sha256` | `VARCHAR(64)` | Importer가 읽은 snapshot 파일 바이트의 SHA-256, NOT NULL |
+| `source_sha256` | `VARCHAR(64)` | `meta.sourceSha256`, NOT NULL. 출처 추적용이며 식별·UNIQUE에 쓰지 않음 |
 | `checked_at_max` | `TIMESTAMPTZ` | `meta.checkedAtMax`, NOT NULL, UTC 저장 |
 | `applied_at` | `TIMESTAMPTZ` | 서버 적용 완료 시각, NOT NULL, UTC 저장 |
 
-- `(source_sha256, checked_at_max)`와 `checked_at_max`는 각각 UNIQUE다. 같은 기준 시각에
+- `(snapshot_sha256, checked_at_max)`와 `checked_at_max`는 각각 UNIQUE다. 같은 기준 시각에
   서로 다른 snapshot을 둘 수 없다.
 - 같은 쌍이 이미 있으면 성공 no-op로 끝내며 canonical·누락 횟수·`active`를 변경하지 않는다.
 - `checked_at_max`가 마지막 성공 이력보다 이르면 거부한다. 마지막 성공 이력과 시각은 같지만
-  `source_sha256`이 다를 때도 순서를 판정할 수 없으므로 거부한다.
+  `snapshot_sha256`이 다를 때도 순서를 판정할 수 없으므로 거부한다.
 - 전체 검증과 `CONTEST`·`CONTEST_SOURCE`·`CONTEST_EVENT` 갱신, 이력 insert는 한 트랜잭션이다.
   검증·적재·이력 기록 중 하나라도 실패하면 모두 롤백한다.
 - 동시 Importer 실행은 `CONTEST_SNAPSHOT_IMPORT` 잠금 또는 동등한 DB 잠금으로 직렬화해
@@ -105,7 +107,7 @@ Importer는 성공적으로 적용한 snapshot을 다음 물리 계약으로 기
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `source` | string | 입력 파일 저장소 상대 경로 (`data/races_sample.csv`) |
-| `sourceSha256` | string | 입력 CSV 파일 바이트의 SHA-256 (hex) |
+| `sourceSha256` | string | 입력 CSV 파일 바이트의 SHA-256 (hex). 출처 추적용이며 snapshot 식별자가 아님 — 식별은 snapshot 파일 바이트 해시로 함(1.3) |
 | `sourceRowCount` | int | 입력 CSV 데이터 행 수 (헤더 제외) |
 | `canonicalCount` | int | `contests[]` 길이 |
 | `sourceRecordCount` | int | 모든 `sources[]` 길이 합 = `sourceRowCount − len(skipped)` |

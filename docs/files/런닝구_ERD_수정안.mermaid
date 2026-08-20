@@ -133,8 +133,9 @@ erDiagram
     CONTEST_SNAPSHOT_IMPORT {
         bigint id PK
         int schema_version
-        varchar source_sha256 "VARCHAR(64), UNIQUE(source_sha256, checked_at_max)"
-        timestamptz checked_at_max UK "UTC, 과거·동일 시각 다른 hash 거부"
+        varchar snapshot_sha256 "VARCHAR(64), UNIQUE(snapshot_sha256, checked_at_max)"
+        varchar source_sha256 "VARCHAR(64), 입력 CSV 출처 추적용"
+        timestamptz checked_at_max UK "UTC, 과거·동일 시각 다른 snapshot hash 거부"
         timestamptz applied_at "UTC, 성공 트랜잭션 완료 시각"
     }
 
