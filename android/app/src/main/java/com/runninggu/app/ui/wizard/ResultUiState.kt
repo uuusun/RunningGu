@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.ItineraryDay
