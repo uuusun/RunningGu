@@ -608,6 +608,37 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline`, `attributions[]` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
+**목록 응답** `GET /me/courses` — Pageable(§0-4), `savedAt DESC, id DESC`.
+
+```json
+{
+  "content": [
+    {
+      "id": 42,
+      "courseName": "해파랑길 1코스",
+      "distanceKm": 17.8,
+      "durationMin": 162,
+      "gainM": 312,
+      "difficulty": "NORMAL",
+      "dataSource": "API_GPX",
+      "region": "부산",
+      "savedAt": "2026-08-19T15:30:00Z"
+    }
+  ],
+  "page": { "number": 0, "size": 20, "totalElements": 3, "hasNext": false }
+}
+```
+
+| 필드 | 필수 | 비고 |
+|---|---|---|
+| `id` · `courseName` · `distanceKm` · `durationMin` · `gainM` · `savedAt` | ✅ | `savedAt`은 UTC `Z`, 앱이 KST 날짜로 접어 카드에 쓴다 |
+| `difficulty` | ✗ | 원본 등급이 없으면 `null` — 배지를 그리지 않는다 |
+| `dataSource` | ✗ | `API_GPX\|GPX_ONLY\|OSM_GENERATED` |
+| `region` | ✗ | 큐레이션만. `OSM_GENERATED`는 `null` |
+| `pathPolyline` · `elevationProfileM` · `attributions` | — | **목록에는 없다**(LOB 제외 프로젝션 🔧). 목록 카드는 지도를 그리지 않는다 |
+
+**상세 응답** `GET /me/courses/{id}` — 목록 필드 + `elevationProfileM`(최대 100, 없으면 `[]`) · `pathPolyline`(경로가 없으면 `null`) · `attributions[]`(없으면 `[]`).
+
 `sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 `pathPolyline`의 geometry만 사용해 `routeFingerprint`를 계산한다. 좌표를 확정 정밀도로 정규화하고 연속 중복 좌표만 제거하되 진행 순서는 유지하며, 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. 좌표 정밀도는 GraphHopper 실제 응답 확인 후 고정한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다.
 
 저장 시 서버는 `sourceCourseId`와 원천 메타데이터 또는 서버가 생성한 OSM 원천 정보를 기준으로 attribution 완성 문구를 확정한다. 요청에 attribution을 받지 않으며 클라이언트가 보내더라도 무시한다. `SAVED_COURSE.attributions`는 PostgreSQL `JSONB NOT NULL DEFAULT '[]'` snapshot이고, 외부 라이선스 문구가 바뀌어도 기존 값을 소급 변경하지 않는다. 상세 응답의 `attributions`는 `List<String>`이며 출처가 없으면 `[]`이다. 목록 응답에는 이 필드를 포함하지 않고, 상세에서 앱이 배열 순서대로 `" · "`로 연결한다. attribution은 `routeFingerprint` 입력에서 제외한다(결정-44, 이슈 #54).
