@@ -53,7 +53,10 @@ def std_event_km(km):
 
 
 def std_events(row):
-    """SPEC §5.4 `eventsFromContest` — ① has_* 플래그 → ② distances 버킷 → ③ event_types 토큰.
+    """SPEC §5.4 `eventsFromContest` — ① has_* 플래그 ∪ ② distances 버킷 ∪ ③ event_types 토큰.
+
+    셋은 우선순위가 아니라 합집합이다. 앞 단계가 뒤를 가리면 has_5k=true 인 대회의
+    distances=[42,21,10,5] 가 5K 하나로 줄어든다.
 
     ② 를 빼면 `15km` 같은 토큰이 어느 종목인지 알 수 없다. 문자열 패턴만으로는
     `15km` 의 `5k`, `110km` 의 `10k` 를 오매칭하거나(구 동작) 아무것도 못 잡는다.
