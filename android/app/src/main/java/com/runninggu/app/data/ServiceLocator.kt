@@ -3,6 +3,10 @@ package com.runninggu.app.data
 import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiClient
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.remote.RefreshOutcome
+import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.asRefreshFailure
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
@@ -58,18 +62,32 @@ object ServiceLocator {
      */
     private val tokenAuthenticator by lazy {
         TokenAuthenticator(
+            currentAccessToken = { SessionStore.tokens?.accessToken },
             currentRefreshToken = { SessionStore.tokens?.refreshToken },
-            refresh = { token ->
-                // OkHttp Authenticator 는 블로킹 호출이다 — 자기 스레드에서 기다린다
-                runCatching { runBlocking { tokenApi.refresh(RefreshRequestDto(token)) } }.getOrNull()
-            },
-            onRefreshed = { renewed: RefreshResponseDto ->
+            refresh = ::refreshTokens,
+            onRefreshed = { renewed ->
                 // 리프레시가 회전한다 — 둘 다 갈아끼운다 (§1-9)
                 SessionStore.updateTokens(AuthTokens(renewed.accessToken, renewed.refreshToken))
             },
-            // 리프레시까지 만료·revoked 면 재로그인이다
+            // 리프레시까지 만료·revoked 일 때만 재로그인이다
             onGiveUp = { SessionStore.signOut() },
         )
+    }
+
+    /**
+     * 재발급 한 번. **실패를 구분해서 돌려준다.** (§1-9)
+     *
+     * `401` 만 재로그인 신호다. 네트워크가 끊긴 것까지 로그아웃으로 처리하면 지하철에서
+     * 앱을 켰다가 세션과 찜 캐시를 잃는다(#74 리뷰 · §4.13 오프라인 규칙).
+     *
+     * `Authenticator` 는 블로킹 계약이라 여기서 기다린다.
+     */
+    private fun refreshTokens(refreshToken: String): RefreshOutcome = try {
+        val renewed = runBlocking { apiCall { tokenApi.refresh(RefreshRequestDto(refreshToken)) } }
+        RefreshOutcome.Renewed(renewed)
+    } catch (e: ApiException) {
+        // 401 만 재로그인이다. 네트워크·5xx 는 이번 요청만 실패시키고 세션은 지킨다
+        e.asRefreshFailure()
     }
 
     val contestApi: ContestApi by lazy { retrofit.create() }
