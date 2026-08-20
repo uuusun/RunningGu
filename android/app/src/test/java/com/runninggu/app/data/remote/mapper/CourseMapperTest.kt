@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiJson
+import com.runninggu.app.data.remote.dto.CoursePageDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
 import com.runninggu.app.data.remote.dto.CoursesNearDto
 import org.junit.Assert.assertEquals
@@ -157,6 +158,24 @@ class CourseMapperTest {
         assertNull(route.difficulty)
         assertNull(route.dataSource)
         assertTrue(near.degradedSources.isEmpty())
+    }
+
+    @Test
+    fun `지역별 응답의 출처 문구를 잃지 않는다`() {
+        // 최상위 attributions 다 — 공용 PageDto 로 받으면 조용히 버려진다 (§6-2 · 결정-44)
+        val raw = """
+            {"content":[{"courseId":"durunubi-001","courseName":"해파랑길 1코스",
+              "sido":"부산","sigun":"남구","distanceKm":17.8,"difficulty":"NORMAL",
+              "gainM":312,"durationMin":162,"dataSource":"API_GPX"}],
+             "page":{"number":0,"size":20,"totalElements":27,"hasNext":true},
+             "attributions":["두루누비 걷기길(한국관광공사)"]}
+        """.trimIndent()
+
+        val dto = ApiJson.decodeFromString(CoursePageDto.serializer(), raw)
+
+        assertEquals(listOf("두루누비 걷기길(한국관광공사)"), dto.attributions)
+        assertEquals(27L, dto.page.totalElements)
+        assertEquals("해파랑길 1코스", dto.content.single().toSummary().courseName)
     }
 
     @Test

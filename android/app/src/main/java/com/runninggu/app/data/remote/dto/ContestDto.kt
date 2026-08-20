@@ -20,6 +20,13 @@ import java.time.LocalTime
 data class ContestDto(
     // ── 카드 공통 (§3-1) ──
     val id: Long,
+    /**
+     * 원천이 사라져 비활성화된 대회. (결정-46)
+     *
+     * 공개 목록·검색·월간 건수·마감 임박에는 안 나오지만, **찜·저장 동선에서 진입한
+     * 상세는 `active=false` 로 온다** — 404 로 숨기지 않는다.
+     */
+    val active: Boolean = true,
     val name: String,
     val region: String = "",
     val place: String = "",

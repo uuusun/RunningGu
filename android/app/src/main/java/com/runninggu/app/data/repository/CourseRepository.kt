@@ -53,6 +53,12 @@ data class CoursePage(
      * `courses.size` 로 세면 21건 이상인 지역에서 N 이 틀어진다.
      */
     val totalElements: Long = 0,
+    /**
+     * 목록 하단 출처 한 줄. (SPEC §4.11-b · 결정-44)
+     *
+     * 공공누리·ODbL 출처표시 의무라 **문구를 변형하지 않고 그대로** 표시한다.
+     */
+    val attributions: List<String> = emptyList(),
 )
 
 /** 서버 구현. */
@@ -81,6 +87,7 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
             courses = dto.content.map { it.toSummary() },
             hasNext = dto.page.hasNext,
             totalElements = dto.page.totalElements,
+            attributions = dto.attributions,
         )
     }
 

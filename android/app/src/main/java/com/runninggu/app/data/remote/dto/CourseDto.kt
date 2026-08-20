@@ -92,6 +92,20 @@ data class CourseDto(
     @Contextual val syncedAt: Instant? = null,
 )
 
+/**
+ * 지역별 목록 응답. (§6-2 · API v2.7)
+ *
+ * 일반 [PageDto] 와 달리 **최상위에 `attributions` 가 붙는다** — 목록 하단 출처 한 줄에
+ * 쓴다(SPEC §4.11-b · 결정-44). 공용 PageDto 로 받으면 이 필드가 조용히 버려진다.
+ */
+@Serializable
+data class CoursePageDto(
+    val content: List<CourseDto> = emptyList(),
+    val page: PageDto.PageMeta = PageDto.PageMeta(),
+    /** 실제 사용된 원천의 **검증 완료 문구**. 앱은 순서·문구를 바꾸지 않는다. */
+    val attributions: List<String> = emptyList(),
+)
+
 /** 지역 칩. (§6-3) */
 @Serializable
 data class CourseRegionsDto(

@@ -2,6 +2,7 @@ package com.runninggu.app.data.remote.mapper
 
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.ClosingSoonDto
+import com.runninggu.app.data.remote.dto.ContestDto
 import com.runninggu.app.data.remote.dto.ContestListDto
 import com.runninggu.app.data.remote.dto.DailyCountsDto
 import com.runninggu.app.data.repository.toServerName
@@ -79,6 +80,29 @@ class ContestMapperTest {
         assertEquals(153L, contest.serverId)
         assertEquals("153", contest.id)
         assertTrue(contest.isServerBacked)
+    }
+
+    @Test
+    fun `비활성 대회 상세는 404 가 아니라 active false 로 온다`() {
+        // 찜·저장 동선에서 진입한 상세는 삭제하지 않고 돌려준다 (결정-46)
+        val contest = ApiJson.decodeFromString(
+            ContestDto.serializer(),
+            """{"id":153,"name":"n","region":"서울","venue":"v",
+               "contestDate":"2026-09-04","active":false}""",
+        ).toContest()
+
+        assertEquals(false, contest.active)
+        assertEquals(153L, contest.serverId)
+    }
+
+    @Test
+    fun `active 를 안 주면 서비스 중으로 본다`() {
+        val contest = ApiJson.decodeFromString(
+            ContestDto.serializer(),
+            """{"id":153,"name":"n","region":"서울","venue":"v","contestDate":"2026-09-04"}""",
+        ).toContest()
+
+        assertEquals(true, contest.active)
     }
 
     @Test
