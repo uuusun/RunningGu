@@ -109,3 +109,18 @@ data class CourseSummary(
 
 /** 지역 칩. 코스 수 내림차순. (§6-3 · SPEC §5.8 `courseRegions`) */
 data class CourseRegion(val region: String, val count: Int)
+
+/**
+ * 목표 거리 계약. 🔒 SPEC §4.11-2 · API 명세 §6-1.
+ *
+ * 슬라이더(ui)와 쿼리 파라미터(data)가 같은 값을 봐야 한다 — 양쪽에 따로 두면
+ * 한쪽만 고쳤을 때 조용히 어긋난다. **여기가 유일한 출처다.**
+ */
+object CourseTargetKm {
+    const val MIN = 1.0
+    const val MAX = 21.0
+
+    /** 슬라이더 눈금 단위. */
+    const val STEP = 0.5
+    const val DEFAULT = 5.0
+}

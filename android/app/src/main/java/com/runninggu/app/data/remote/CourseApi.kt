@@ -53,10 +53,5 @@ interface CourseApi {
 
         /** 큐레이션 진입점 조회 반경(km) 🔒(SPEC §5.8). */
         const val NEAR_RADIUS_KM = 8.0
-
-        /** 목표 거리 슬라이더 범위와 기본값 🔒(SPEC §4.11). */
-        const val MIN_TARGET_KM = 1.0
-        const val MAX_TARGET_KM = 21.0
-        const val DEFAULT_TARGET_KM = 5.0
     }
 }

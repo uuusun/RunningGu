@@ -2,6 +2,7 @@ package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.CourseSummary
+import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.apiCall
@@ -26,7 +27,7 @@ interface CourseRepository {
     suspend fun near(
         lat: Double,
         lng: Double,
-        targetKm: Double = CourseApi.DEFAULT_TARGET_KM,
+        targetKm: Double = CourseTargetKm.DEFAULT,
         radiusKm: Double = CourseApi.NEAR_RADIUS_KM,
         size: Int = CourseApi.NEAR_SIZE,
     ): NearbyCourses
@@ -45,6 +46,13 @@ interface CourseRepository {
 data class CoursePage(
     val courses: List<CourseSummary> = emptyList(),
     val hasNext: Boolean = false,
+    /**
+     * 조건에 맞는 전체 코스 수. **이 페이지의 개수가 아니다.**
+     *
+     * 지역별 화면이 "{지역} 코스 N" 을 그린다(SPEC §4.11-b) — 20건씩 끊어 받으므로
+     * `courses.size` 로 세면 21건 이상인 지역에서 N 이 틀어진다.
+     */
+    val totalElements: Long = 0,
 )
 
 /** 서버 구현. */
@@ -61,7 +69,7 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
             lat = lat,
             lng = lng,
             // 슬라이더가 0.5 단위라 계약 범위를 벗어난 값이 나가지 않게 여기서 한 번 막는다
-            targetKm = targetKm.coerceIn(CourseApi.MIN_TARGET_KM, CourseApi.MAX_TARGET_KM),
+            targetKm = targetKm.coerceIn(CourseTargetKm.MIN, CourseTargetKm.MAX),
             radiusKm = radiusKm,
             size = size,
         ).toNearbyCourses()
@@ -72,6 +80,7 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
         CoursePage(
             courses = dto.content.map { it.toSummary() },
             hasNext = dto.page.hasNext,
+            totalElements = dto.page.totalElements,
         )
     }
 
