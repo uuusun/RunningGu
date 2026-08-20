@@ -49,7 +49,7 @@ class LoginViewModel(
             val outcome = repository.login(state.email.trim(), state.password)
             _uiState.update {
                 outcome.fold(
-                    onSuccess = { _ ->
+                    onSuccess = { tokens ->
                         // TODO(AP-14): 로그인 응답의 user 로 채운다 (명세 §1-6). 지금은 이메일에서 파생.
                         SessionStore.signIn(
                             SessionProfile(
@@ -57,13 +57,20 @@ class LoginViewModel(
                                 email = state.email.trim(),
                                 loginProvider = LoginProvider.EMAIL,
                             ),
+                            tokens = tokens,
                         )
                         it.copy(isSubmitting = false, loggedIn = true)
                     },
-                    onFailure = { _ ->
+                    onFailure = { cause ->
                         it.copy(
                             isSubmitting = false,
-                            errorMessage = "이메일 또는 비밀번호를 확인해 주세요",
+                            // 인증 실패는 사유를 감추지만(§4.1), 통신 실패까지 같은 문구로
+                            // 덮으면 사용자가 비밀번호를 계속 고쳐 입력하게 된다.
+                            errorMessage = if (cause.isNetworkFailure()) {
+                                "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+                            } else {
+                                "이메일 또는 비밀번호를 확인해 주세요"
+                            },
                         )
                     },
                 )

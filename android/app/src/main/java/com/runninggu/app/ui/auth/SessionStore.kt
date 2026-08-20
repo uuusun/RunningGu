@@ -15,6 +15,14 @@ data class SessionProfile(
     val nickname: String,
     val email: String?,
     val loginProvider: LoginProvider,
+    /**
+     * 마케팅 수신 동의. `GET /me` 의 `agreements.marketing` 자리다 (API 명세 §2).
+     *
+     * 계정 관리 화면의 토글 초기값이라 세션에 함께 들고 있는다 — 기본값 false 로 두면
+     * **가입 때 동의한 사용자에게도 꺼진 것으로 보이고**, 토글을 한 번 눌러야 맞춰지는데
+     * 그러면 실제로는 철회가 된다.
+     */
+    val marketingAgreed: Boolean = false,
 )
 
 /** 가입 로그인 방식. (API 명세 §2 `loginProvider` · 결정-22 개정) */
@@ -38,14 +46,32 @@ object SessionStore {
     private val _session = MutableStateFlow<SessionProfile?>(null)
     val session: StateFlow<SessionProfile?> = _session.asStateFlow()
 
+    /**
+     * 발급받은 토큰. `ApiClient.TokenProvider` 가 읽어 `Authorization` 헤더를 붙일 자리다(#43).
+     *
+     * TODO(AP-14): DataStore 영속으로 옮기고 `TokenProvider` 에 연결한다. **연결 전까지는
+     *  보관만 하므로 모든 API 호출이 게스트로 나간다.**
+     */
+    @Volatile
+    var tokens: AuthTokens? = null
+        private set
+
     val isLoggedIn: Boolean get() = _session.value != null
 
-    fun signIn(profile: SessionProfile) {
+    /**
+     * 로그인·가입 성공, 또는 프로필 변경(닉네임 등)을 반영한다.
+     *
+     * [tokens] 를 넘기지 않으면 기존 토큰을 유지한다 — 프로필만 갱신하는 호출에서
+     * 세션이 끊기면 안 된다.
+     */
+    fun signIn(profile: SessionProfile, tokens: AuthTokens? = null) {
+        if (tokens != null) this.tokens = tokens
         _session.value = profile
     }
 
-    /** 로그아웃·탈퇴 공용. 세션만 지운다 — 서버 revoke 는 AP-14 에서 붙는다. */
+    /** 로그아웃·탈퇴 공용. 서버 revoke 는 AP-14 에서 붙는다. */
     fun signOut() {
+        tokens = null
         _session.value = null
     }
 }
