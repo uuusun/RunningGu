@@ -49,6 +49,26 @@ class ContestBundleTest {
     }
 
     @Test
+    fun `종목 미표기는 2건뿐이다`() {
+        // 번들이 낡으면 이 수가 늘어난다 — PR #47 리뷰에서 실제로 26건짜리 옛 산출물이
+        // 들어올 뻔했다. 스크립트를 고쳐 값이 바뀌면 여기도 **의도적으로** 갱신한다.
+        val contests = ContestBundle.parse(bundleText()).contests
+        val missing = contests.filter { it.eventTypes.isEmpty() }
+
+        assertEquals("종목 미표기: ${missing.map { it.name }}", 2, missing.size)
+    }
+
+    @Test
+    fun `거리만 있는 트레일 대회도 종목이 채워져 있다`() {
+        // SPEC §5.4 ② 거리 버킷(이슈 #48). 토큰 "15km" 는 예전에 5K 로 오분류됐고,
+        // 그 값이 번들에 박제되면 오프라인 폴백이 틀린 종목을 보여준다.
+        val contests = ContestBundle.parse(bundleText()).contests
+        val trail = contests.first { it.name == "경주 남산트레일런" }
+
+        assertEquals(listOf(EventType.TEN_K), trail.eventTypes)
+    }
+
+    @Test
     fun `지역은 17개 시도 안에 있다`() {
         val regions = ContestBundle.parse(bundleText()).contests.map { it.region }.toSet()
         val sido = setOf(
