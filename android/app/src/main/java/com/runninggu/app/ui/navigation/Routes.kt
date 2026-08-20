@@ -9,6 +9,23 @@ import android.net.Uri
  * 아직 만들지 않은 화면(raceDetail·wizard·result·auth)은 해당 작업에서 추가한다.
  */
 object Routes {
+    /**
+     * auth 그래프(A1~A3). 탭바 없는 별도 그래프다 (SPEC §2.2).
+     *
+     * 로그인 성공·게스트 둘러보기·가입 완료는 전부 이 그래프를 백스택에서 지우고
+     * `home` 으로 나간다 — 홈에서 뒤로가기가 로그인으로 돌아가면 안 된다.
+     */
+    const val AUTH_GRAPH = "auth"
+
+    /** A1 로그인. (SPEC §4.1) */
+    const val LOGIN = "login"
+
+    /** A2 회원가입. (SPEC §4.2) */
+    const val SIGNUP = "signup"
+
+    /** A3 비밀번호 찾기. (SPEC §4.3) */
+    const val RESET = "reset"
+
     const val HOME = "home"
     const val CALENDAR = "calendar"
     const val COURSES = "courses"
