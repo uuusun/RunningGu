@@ -1,25 +1,25 @@
 flowchart TD
 
 U(["📱 사용자 앱"])
-A(["🛠 관리자·배치"])
+A(["🛠 관리자·데이터 승인자"])
 
 subgraph SRV["Spring Boot 백엔드 — 온라인 SSOT"]
   direction TB
-  AUTH["인증 API<br/>EMAIL·KAKAO 로그인 수단<br/>명시적 연결·해제 · 토큰 회전"]
+  AUTH["인증 API<br/>EMAIL·KAKAO 중 단일 가입 수단<br/>연결·전환 없음 · 토큰 회전"]
   PROFILE["마이·회원 API<br/>프로필 · 약관 · 비밀번호 · 탈퇴"]
   CONTEST["대회 API<br/>canonical 153건 · 검색/필터/커서<br/>날짜별 집계 · 파생 접수상태"]
-  MY["마이 API<br/>동선 · 저장 코스 · 러닝 기록 · 찜"]
+  MY["마이 API<br/>동선 · 저장 코스 · 찜<br/>P1 러닝 기록"]
   GEN["동선 생성 API (무상태)<br/>날짜→고정 RACE→피로도→회복→POI 슬롯"]
-  ITIN["동선 저장·편집 API<br/>RACE 블록 시스템 관리<br/>사용자 교체·삭제·순서변경 금지"]
-  COURSE["코스 API<br/>두루누비 메타 + GPX 경로 결합<br/>장애 시 GPX 메타데이터 폴백"]
-  RUN["러닝 기록 API<br/>5m 재필터 → polyline 압축"]
+  ITIN["동선 저장·편집 API<br/>RACE 블록 시스템 관리<br/>RACE 교체·삭제·순서변경 금지"]
+  COURSE["코스 API<br/>큐레이션 우선<br/>적격 0건이면 OSM 경로 최대 1건"]
+  RUN["P1 러닝 기록 API<br/>5m 재필터 → polyline 압축"]
   POIP["외부 POI 프록시<br/>축제(searchFestival2) · 숙소(AD5)<br/>POI · 걷기 스팟 · 지오코딩"]
-  RACEBATCH["대회 canonical 병합 배치<br/>271 원천 → 153 대회<br/>지오코딩 → upsert"]
-  COURSESYNC["두루누비 동기화<br/>서버 시작 시 + 하루 1회<br/>courseId 매칭 · fail-open"]
+  RACEBATCH["대회 snapshot Importer<br/>스키마·유일키·좌표·집계 검증<br/>원자적 upsert · 실패 전체 롤백"]
+  COURSESYNC["큐레이션 동기화<br/>두루누비 메타 + 라이선스 검증 GPX<br/>courseId 매칭 · fail-open"]
 end
 
 subgraph CACHE["단기 캐시 — 외부 API 영구 마스터 저장 금지"]
-  LIVE[("Caffeine/Redis TTL<br/>숙소·POI 5분<br/>인근 축제 1일<br/>두루누비 메타 24시간")]
+  LIVE[("Caffeine TTL<br/>숙소·POI 5분<br/>인근 축제 1일<br/>큐레이션 메타 24시간")]
 end
 
 subgraph DBX["PostgreSQL — 자체·사용자·대회 canonical 데이터"]
@@ -28,12 +28,17 @@ subgraph DBX["PostgreSQL — 자체·사용자·대회 canonical 데이터"]
   TF[("FAVORITE")]
   TI[("ITINERARY · DAY · BLOCK<br/>RACE=system_managed")]
   TS[("SAVED_COURSE")]
-  TR[("RUN_RECORD · RUN_TRACK 1:1")]
+  TR[("P1 RUN_RECORD · RUN_TRACK 1:1")]
 end
 
 subgraph RES["버전 관리 정적 리소스"]
-  GPX[("두루누비 GPX 파싱본 261코스<br/>courseId · 경로 좌표 · fallback 메타")]
+  GPX[("두루누비 261코스 + 라이선스 검증 GPX<br/>courseId · 경로·고도 · attribution")]
   APP[("앱 오프라인 번들<br/>대회 초기본 · GPX 축약본")]
+end
+
+subgraph ROUTING["서버 내부 라우팅 — 외부 포트 비공개"]
+  GH["GraphHopper 별도 프로세스<br/>run 프로파일 · seed 16개<br/>거리·상승·차도·회전 상한"]
+  OSMGRAPH[("대한민국 OSM 그래프 + SRTM<br/>배포 단계 생성 · 영속 볼륨 재사용")]
 end
 
 subgraph LIVEEXT["실시간 외부 시스템"]
@@ -44,19 +49,20 @@ subgraph LIVEEXT["실시간 외부 시스템"]
   KAKAOAUTH["카카오 인증 서버<br/>SDK 토큰 검증"]
 end
 
-subgraph INGEST["허가 확인 대상 원천"]
+subgraph INGEST["대회 데이터 파이프라인 — 원천 이용 허가 확인 필요"]
   MARA["마라톤온라인 · 마라톤GO HTML"]
+  RACEPIPE["Python 데이터 파이프라인<br/>정규화·좌표 보정·중복 병합<br/>결정적 서버 JSON snapshot"]
 end
 
 %% 사용자 요청
 U -->|"이메일/비밀번호 · 카카오 토큰"| AUTH
-U -->|"프로필·동의·로그인 수단"| PROFILE
+U -->|"프로필·동의·가입 로그인 방식"| PROFILE
 U -->|"검색·필터·불투명 커서"| CONTEST
 U -->|"찜·마이 조회·저장"| MY
 U -->|"기간·종목·themes·숙소 스냅샷"| GEN
 U -->|"동선 저장·USER 블록 편집"| ITIN
 U -->|"출발지·목표거리"| COURSE
-U -->|"GPS 궤적 + 요약"| RUN
+U -->|"P1 GPS 궤적 + 요약"| RUN
 U -->|"축제·숙소·POI"| POIP
 
 %% 자체 DB
@@ -66,16 +72,16 @@ CONTEST --> TC
 MY --> TF
 MY --> TI
 MY --> TS
-MY --> TR
+MY -.->|"P1"| TR
 ITIN --> TI
-RUN --> TR
+RUN -->|"P1"| TR
 
 %% 생성·대회 보호
 CONTEST -->|"대회·좌표·고정 RACE 정보"| GEN
 GEN -->|"취향·숙소/대회장 반경"| POIP
 GEN -.->|"동선 DTO만 반환"| U
 ITIN -->|"RACE 필드는 CONTEST 최신값으로 조합"| CONTEST
-A -->|"대회 수정은 관리자·배치만"| CONTEST
+A -->|"승인된 snapshot만 적재"| RACEBATCH
 
 %% 외부 실시간 프록시와 캐시
 TOUR -->|"축제·관광지·웰니스"| POIP
@@ -85,17 +91,22 @@ POIP -->|"가공 응답, 영구 마스터 저장 없음"| U
 KAKAOAUTH -->|"회원번호 검증"| AUTH
 AUTH -->|"인증 코드·재설정 링크"| SMTP
 
-%% 대회 수집
-MARA -->|"원천 HTML"| RACEBATCH
-RACEBATCH -->|"장소명"| KAKAO
-RACEBATCH -->|"CONTEST + CONTEST_SOURCE upsert"| TC
+%% 대회 수집 — Python은 운영 DB를 직접 수정하지 않는다
+MARA -->|"원천 HTML"| RACEPIPE
+RACEPIPE -->|"좌표 보정"| KAKAO
+RACEPIPE -->|"canonical + events + sources JSON"| RACEBATCH
+RACEBATCH -->|"CONTEST + SOURCE + EVENT upsert"| TC
 
-%% 두루누비 API + GPX 결합
+%% 큐레이션 API + GPX 결합, 적격 0건의 OSM fallback
 DURU -->|"메타데이터"| COURSESYNC
 COURSESYNC <--> LIVE
-GPX -->|"경로 좌표·진입점·fallback"| COURSE
+GPX -->|"경로·고도·진입점·fallback"| COURSE
 LIVE -->|"최신 메타데이터"| COURSE
-COURSE -->|"courseId 결합 결과"| U
+COURSE -->|"적격 큐레이션 0건일 때만"| GH
+GH <--> OSMGRAPH
+GH -->|"품질 상한 통과 경로 최대 1건"| COURSE
+COURSE -->|"카카오 걷기 스팟 내부 조회"| POIP
+COURSE -->|"큐레이션/OSM 경로 + 카카오 장소"| U
 GPX --> APP
 APP -.->|"네트워크 불가 시 읽기 폴백"| U
 
@@ -104,8 +115,8 @@ classDef ext fill:#FFF3CC,stroke:#A66A00,color:#15161B
 classDef proc fill:#FFFFFF,stroke:#15161B,color:#15161B
 classDef user fill:#C9F23C,stroke:#15161B,color:#15161B
 classDef resource fill:#E6F7EE,stroke:#1B8A5A,color:#15161B
-class TU,TC,TF,TI,TS,TR,LIVE store
+class TU,TC,TF,TI,TS,TR,LIVE,OSMGRAPH store
 class MARA,TOUR,DURU,KAKAO,SMTP,KAKAOAUTH ext
-class AUTH,PROFILE,CONTEST,MY,GEN,ITIN,COURSE,RUN,POIP,RACEBATCH,COURSESYNC proc
+class AUTH,PROFILE,CONTEST,MY,GEN,ITIN,COURSE,RUN,POIP,RACEBATCH,COURSESYNC,RACEPIPE,GH proc
 class U,A user
 class GPX,APP resource
