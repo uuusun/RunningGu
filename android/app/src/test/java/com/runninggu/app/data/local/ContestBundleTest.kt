@@ -79,10 +79,42 @@ class ContestBundleTest {
         assertEquals(LocalTime.of(9, 0), c.startTime)
         assertEquals(listOf(EventType.TEN_K, EventType.FIVE_K), c.eventTypes)
         assertEquals(RegistrationStatus.CLOSED, c.regStatusFallback)
-        assertEquals(listOf("마라톤온라인"), c.sources)
+        // 번들의 한국어 라벨을 서버와 같은 토큰으로 옮긴다 (스냅샷 계약 §2.3)
+        assertEquals(listOf("MARATHON_ONLINE"), c.sources)
         // 빈 문자열은 null 로 — 화면이 placeholder 를 쓸 수 있어야 한다(§6.2)
         assertNull(c.imageUrl)
         assertNotNull(c.officialUrl)
+    }
+
+    @Test
+    fun `병합된 대회의 출처는 서버와 같은 토큰 배열이 된다`() {
+        // 번들은 "마라톤GO·마라톤온라인" 한 문자열, 서버는 토큰 두 개다 — 같은 값이어야 한다
+        val raw = """
+            [{"id":"x","name":"n","date":"2026-09-01","source":"마라톤GO·마라톤온라인"}]
+        """.trimIndent()
+
+        val c = ContestBundle.parse(raw).contests.single()
+
+        assertEquals(listOf("MARATHON_GO", "MARATHON_ONLINE"), c.sources)
+    }
+
+    @Test
+    fun `모르는 출처 라벨은 버리지 않는다`() {
+        // 원천이 늘었을 때 조용히 사라지는 것보다 낯선 값이 보이는 편이 낫다
+        val raw = """
+            [{"id":"x","name":"n","date":"2026-09-01","source":"마라톤GO·새원천"}]
+        """.trimIndent()
+
+        val c = ContestBundle.parse(raw).contests.single()
+
+        assertEquals(listOf("MARATHON_GO", "새원천"), c.sources)
+    }
+
+    @Test
+    fun `출처가 비면 빈 목록이다`() {
+        val raw = """[{"id":"x","name":"n","date":"2026-09-01"}]"""
+
+        assertEquals(emptyList<String>(), ContestBundle.parse(raw).contests.single().sources)
     }
 
     @Test
