@@ -49,6 +49,13 @@ data class Contest(
     val category: String?,
     /** 원본 스냅샷을 확인한 날짜. 카드에 "{출처} · 확인 MM.DD" 로 쓴다(A3). */
     val checked: LocalDate?,
+    /**
+     * 서비스 중인 대회인가. (결정-46)
+     *
+     * false 면 화면이 흐리게 그리고 "정보 제공 종료" 를 붙이며, 동선 만들기 CTA 를 막고
+     * 인근 축제를 부르지 않는다(§4.6). 번들에는 이 개념이 없어 항상 true 다.
+     */
+    val active: Boolean = true,
     val sources: List<String>,
 ) {
     /** 좌표가 없으면 지도·인근 축제·동선 생성을 쓸 수 없다. (§6.2) */
