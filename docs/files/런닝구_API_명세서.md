@@ -1,10 +1,10 @@
-# 런닝구 백엔드 API 명세서 v2.3
+# 런닝구 백엔드 API 명세서 v2.5
 
-> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v3 + ERD·DFD 수정안
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
-> **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · EMAIL/KAKAO 다중 로그인 수단 · 시스템 관리 RACE 블록 · 큐레이션 API+GPX 결합 · **OSM/GraphHopper 도시 경로 생성(P0)**
+> **핵심 결정**: 서버 중심 온라인 SSOT · 제한적 오프라인 폴백 · canonical 대회 · 사용자당 EMAIL/KAKAO 단일 가입 수단 · 시스템 관리 RACE 블록 · 큐레이션 API+GPX 결합 · **OSM/GraphHopper 도시 경로 생성(P0)**
 
 ---
 
@@ -19,6 +19,7 @@
 | 날짜/시간 | 비즈니스 날짜 `YYYY-MM-DD`와 오늘·D-day·접수상태 판정은 `Asia/Seoul`. timestamp는 PostgreSQL `timestamptz` UTC 저장, JSON ISO-8601 `Z` |
 | 좌표 | `lat`/`lng` Double(WGS84, DECIMAL(10,7)) — 외부 API의 x/y·mapx/mapy 변환은 서버 리모트 매퍼에서만 🔒(NFR-8) |
 | 명명 | JSON 필드 camelCase / DB snake_case |
+| 대회 원천 ID | JSON·데이터 계약 `externalId` / DB `external_id`, `(sourceType, externalId)` UNIQUE |
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
@@ -51,7 +52,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 401 | 미인증·토큰 만료 (게스트의 쓰기 시도 포함) |
 | 403 | 권한 없음 (남의 리소스 접근 — 소유자 검증) 🔧 |
 | 404 | 리소스 없음 |
-| 409 | 유니크 충돌·로그인 수단 충돌·시스템 블록 변경 시도 |
+| 409 | 유니크 충돌·현재 계정 방식과 맞지 않는 작업·시스템 블록 변경 시도 |
 | 429 | 쿨다운·시도 횟수 초과 (인증 메일 60초, 코드 5회) |
 | 500 | 처리되지 않은 서버 내부 오류. 세부 예외 대신 추적 가능한 `traceId`만 응답 |
 | 502 | 외부 API가 오류/비정상 응답 반환 |
@@ -157,7 +158,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
     "id": 1,
     "email": "runner@test.com",
     "nickname": "김러너",
-    "identities": ["EMAIL", "KAKAO"]
+    "loginProvider": "EMAIL"
   }
 }
 ```
@@ -169,10 +170,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 { "kakaoAccessToken": "카카오 SDK가 발급한 액세스 토큰" }
 ```
 서버가 카카오 API(`/v2/user/me`)로 토큰 검증 → `(provider=KAKAO, providerSubject=카카오 회원번호)`로 `LOGIN_IDENTITY`를 조회한다.
-- 기존 연동 계정: `200` — 1-6과 동일 응답
+- 기존 KAKAO 가입 계정: `200` — 1-6과 동일 응답
 - 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명", "email": null}}` → 앱은 약관 동의 화면으로 → 1-8 호출
 
-카카오 이메일은 동의 항목에 따라 없을 수 있는 **nullable 프로필 스냅샷**일 뿐 로그인 식별자가 아니다. 동일 이메일의 EMAIL 계정이 있어도 자동 병합하지 않고, 로그인 후 회원 API의 명시적 연결 절차만 허용한다.
+카카오 이메일은 동의 항목에 따라 없을 수 있는 **nullable 프로필 스냅샷**일 뿐 로그인 식별자가 아니다. 동일 이메일의 EMAIL 계정이 있어도 자동 병합하지 않는다. 한 USER는 가입 시 선택한 EMAIL 또는 KAKAO 수단 하나만 가지며 P0에서는 연결·추가·전환을 지원하지 않는다(결정-22 개정).
 
 오류: `401 INVALID_KAKAO_TOKEN`
 
@@ -187,6 +188,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ```
 `201` — 1-6과 동일 응답. **이메일 인증 생략** 🔒(§4.2 카카오 가입). KAKAO 로그인 수단에는 비밀번호를 저장하지 않는다.
 구현은 `USER`와 `LOGIN_IDENTITY(provider=KAKAO)`를 한 트랜잭션에서 생성한다. 비밀번호는 USER가 아니라 EMAIL 로그인 수단에만 존재한다.
+`LOGIN_IDENTITY.user_id`와 `(provider, provider_subject)`는 각각 UNIQUE다. EMAIL은 `password_hash`·`email_verified_at`이 필수이고, KAKAO는 둘 다 null이다.
 
 ### 1-9 ~ 1-10 토큰 관리
 
@@ -214,27 +216,23 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/me` | 내 정보 — `{id, email, nickname, identities[], agreements, createdAt}` (앱 시작 세션 검증 겸용) |
+| GET | `/me` | 내 정보 — `{id, email, nickname, loginProvider, agreements, createdAt}` (앱 시작 세션 검증 겸용). `email` 키는 항상 포함하는 `string|null`: EMAIL은 정규화 이메일, KAKAO는 카카오가 제공한 이메일 스냅샷 또는 `null`. KAKAO 가입자에게 별도 이메일 입력·인증을 요구하지 않으며, 앱은 `null`이면 이메일 행을 숨기고 placeholder를 두지 않음 |
 | PATCH | `/me` | 닉네임 변경 `{"nickname": "..."}` — `409 NICKNAME_DUPLICATED` |
 | PATCH | `/me/agreements` | 선택 약관 변경 `{"marketing": true}`. 필수 약관 철회는 탈퇴 절차로 안내 |
 | PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경. 성공 시 기존 refresh token 전부 revoke 후 현재 기기용 token pair 재발급 |
-| GET | `/me/identities` | 연결된 로그인 수단 조회 — `{items:[{provider, linkedAt}]}` |
-| POST | `/me/identities/kakao` | 로그인된 계정에 카카오 수단 연결 `{"kakaoAccessToken":"..."}` |
-| DELETE | `/me/identities/kakao` | 카카오 연결 해제. 마지막 로그인 수단이면 `409 LAST_IDENTITY_REQUIRED` |
 | POST | `/me/reauth` | 탈퇴용 재인증 토큰 발급 |
 | DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스·기록 연쇄 삭제, `204` |
 
-연결 정책:
+가입 수단 정책:
 
-- 한 `USER`가 EMAIL과 KAKAO를 동시에 보유할 수 있다.
-- 카카오 회원번호가 다른 USER에 연결돼 있으면 `409 IDENTITY_ALREADY_LINKED`.
-- 동일 이메일만으로 자동 연결하지 않는다. 반드시 로그인된 세션에서 사용자가 직접 연결한다.
-- EMAIL 추가 연결은 이메일 인증·비밀번호 설정 UX까지 필요하므로 MVP에서는 기존 EMAIL 계정의 카카오 연결만 제공한다.
+- 한 `USER`는 EMAIL 또는 KAKAO 중 정확히 하나만 보유한다.
+- P0에서는 로그인 수단 연결·추가·해제·전환 API를 제공하지 않는다.
+- 동일 이메일만으로 서로 다른 provider 계정을 자동 병합하지 않는다.
 - 이메일 주소 변경은 MVP 범위 밖이다.
 
 ### 2-1 `PUT /api/me/password` — EMAIL 비밀번호 변경
 
-`GET /api/me/identities`의 `items[].provider`에 `EMAIL`이 있는 계정에서만 사용한다. Android는 EMAIL이 없으면 비밀번호 변경 메뉴를 노출하지 않는다.
+`GET /api/me`의 `loginProvider=EMAIL`인 계정에서만 사용한다. Android는 `loginProvider=KAKAO`이면 비밀번호 변경 메뉴를 노출하지 않는다.
 
 ```json
 { "currentPassword": "run4life1", "newPassword": "newRun4life2" }
@@ -250,7 +248,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 2-2 `POST /api/me/reauth` · `DELETE /api/me` — 탈퇴 재인증
 
-재인증은 계정에 연결된 수단 중 하나를 사용한다. EMAIL은 현재 비밀번호, KAKAO는 Android SDK가 방금 발급한 액세스 토큰을 보낸다.
+재인증은 계정의 단일 `loginProvider`와 같은 수단으로 수행한다. EMAIL은 현재 비밀번호, KAKAO는 Android SDK가 방금 발급한 액세스 토큰을 보낸다.
 
 ```json
 { "provider": "EMAIL", "password": "run4life1" }
@@ -266,7 +264,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 `DELETE /api/me`는 `X-Reauth-Token: {reauthToken}` 헤더를 요구한다. 성공 시 `204`, 사용자의 모든 refresh token을 revoke하고 USER에 종속된 동의·찜·동선·저장 코스·러닝 기록을 삭제한다. 앱은 성공 후 Access/Refresh Token과 사용자 Room 캐시를 삭제한다.
 
-오류: `401 REAUTH_FAILED` · `401 INVALID_REAUTH_TOKEN` · `409 REAUTH_PROVIDER_NOT_LINKED`.
+오류: `401 REAUTH_FAILED` · `401 INVALID_REAUTH_TOKEN` · `409 REAUTH_PROVIDER_MISMATCH`.
 
 ---
 
@@ -566,7 +564,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
-`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 요청 snapshot의 경로 좌표·거리·진입점 등 정규화된 주요 값으로 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환한다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않고 서버가 재계산한다.
+`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 `pathPolyline`의 geometry만 사용해 `routeFingerprint`를 계산한다. 좌표를 확정 정밀도로 정규화하고 연속 중복 좌표만 제거하되 진행 순서는 유지하며, 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. 좌표 정밀도는 GraphHopper 실제 응답 확인 후 고정한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다.
 
 ### 7-B 러닝 기록 `/api/runs` — P1 예약
 
@@ -629,7 +627,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | 9 마이 코스 | P0 saved / P1 ran | 7-A GET / 7-B GET(P1) |
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
-| 9 마이 계정 | 카카오 연결·해제 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-POST·DELETE `/identities/kakao` / 1-10 / 2-2 POST·DELETE |
+| 9 마이 계정 | 가입 로그인 방식 표시 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-GET `/me` / 1-10 / 2-2 POST·DELETE |
 | 10 코스 상세 | 점선(예정, P0) / 실선(뛴 기록, P1) | 7-A GET {id} / 7-B GET {id} |
 | 공통 | 앱 시작 세션 확인 / 재발급 / 로그아웃 | 2-GET / 1-9 / 1-10 |
 
@@ -686,9 +684,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
-| `IDENTITY_ALREADY_LINKED` | 409 | 카카오 로그인 수단이 다른 계정에 연결됨 |
-| `LAST_IDENTITY_REQUIRED` | 409 | 마지막 로그인 수단 해제 시도 |
-| `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_NOT_LINKED` | 409 | EMAIL 없는 계정의 비밀번호 변경 / 연결되지 않은 수단으로 재인증 |
+| `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
