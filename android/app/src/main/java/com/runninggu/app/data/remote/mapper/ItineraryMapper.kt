@@ -1,78 +1,33 @@
-package com.runninggu.app.ui.wizard
+package com.runninggu.app.data.remote.mapper
 
+import com.runninggu.app.data.model.HotelSnapshot
+import com.runninggu.app.data.model.ItineraryRequestSnapshot
+import com.runninggu.app.data.model.ItineraryResult
+import com.runninggu.app.data.model.RecoveryNote
+import com.runninggu.app.data.remote.dto.BlockDto
+import com.runninggu.app.data.remote.dto.DayDto
+import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.Poi
-import kotlinx.serialization.Serializable
 import java.time.LocalDate
-
-/**
- * `POST /api/itineraries/generate` 응답. (API 명세 §5-1 · SPEC 결정-41)
- *
- * 동선 생성은 **서버 단일 주체**다. 앱은 이 DTO 를 받아 표시하고 저장 전 USER 블록만 편집한다.
- *
- * TODO(AP-14): `data/remote` 로 옮기고 Retrofit 응답 타입으로 쓴다. 지금 `ui/wizard` 에 둔 것은
- *  `data/` 패키지 생성이 AP-14(앱 코어 담당) 범위라서다 — 화면 개발을 막지 않으려는 임시 위치다.
- */
-@Serializable
-data class GenerateItineraryResponse(
-    val title: String,
-    val event: String,
-    val recovery: RecoveryDto? = null,
-    val days: List<DayDto> = emptyList(),
-)
-
-@Serializable
-data class RecoveryDto(val label: String, val note: String)
-
-@Serializable
-data class DayDto(
-    val dayIndex: Int,
-    val date: String,
-    val dayLabel: String,
-    /** 회복일인가. 일자 탭과 지도 핀 색을 가른다. (API 명세 §5-1) */
-    val recovery: Boolean = false,
-    val note: String = "",
-    val blocks: List<BlockDto> = emptyList(),
-)
-
-/**
- * 일정 블록.
- *
- * 외부 POI 조회가 실패하면 서버가 `placeName`·`lat`·`lng` 를 null 로 강등하되 생성은 성공시킨다
- * (API 명세 §5-1 · NFR-3). 그래서 장소 없는 블록이 정상적으로 올 수 있다.
- */
-@Serializable
-data class BlockDto(
-    val startTime: String,
-    val title: String,
-    val category: String,
-    val placeName: String? = null,
-    val address: String? = null,
-    val lat: Double? = null,
-    val lng: Double? = null,
-    val description: String = "",
-    val blockType: String = "USER",
-    val systemManaged: Boolean = false,
-)
-
-/** 화면이 쓰는 결과 묶음. 서버 응답에서 필요한 것만 추린다. */
-data class ItineraryResult(
-    val title: String,
-    val days: List<ItineraryDay>,
-    val recovery: RecoveryDto?,
-    /** 일자별 회복일 플래그. 서버가 판정한 값을 그대로 들고 있는다. (API 명세 §5-1) */
-    val recoveryFlags: List<Boolean>,
-)
 
 // ── DTO → 화면 모델 ────────────────────────────────────────────
 
 fun GenerateItineraryResponse.toResult(): ItineraryResult = ItineraryResult(
     title = title,
     days = days.map { it.toDomain() },
-    recovery = recovery,
+    recovery = recovery?.let { RecoveryNote(it.label, it.note) },
+    request = ItineraryRequestSnapshot(
+        contestId = contestId,
+        event = event,
+        themes = themes,
+        startDate = startDate,
+        endDate = endDate,
+        hotel = hotel?.let { HotelSnapshot(it.name, it.lat, it.lng) },
+    ),
     recoveryFlags = days.map { it.recovery },
 )
 

@@ -5,7 +5,7 @@ import com.runninggu.app.data.remote.dto.ClosingSoonDto
 import com.runninggu.app.data.remote.dto.ContestDto
 import com.runninggu.app.data.remote.dto.ContestListDto
 import com.runninggu.app.data.remote.dto.DailyCountsDto
-import com.runninggu.app.data.repository.toServerName
+import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.domain.regStatusOf
