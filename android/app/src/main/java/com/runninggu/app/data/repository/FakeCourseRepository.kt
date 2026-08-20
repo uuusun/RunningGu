@@ -67,10 +67,18 @@ object FakeCourseRepository : CourseRepository {
         )
     }
 
+    /** 서버처럼 잘라서 준다 — 그래야 화면의 [더 보기] 를 스텁으로도 눌러 볼 수 있다. */
     override suspend fun byRegion(region: String?, page: Int, size: Int): CoursePage {
-        val all = DEMO_COURSES.filter { region == null || it.sido == region }
-        val sorted = all.sortedBy { it.distanceKm }
-        return CoursePage(courses = sorted, hasNext = false, totalElements = sorted.size.toLong())
+        val sorted = DEMO_COURSES
+            .filter { region == null || it.sido == region }
+            .sortedBy { it.distanceKm }
+        val from = (page * size).coerceIn(0, sorted.size)
+        val to = (from + size).coerceIn(0, sorted.size)
+        return CoursePage(
+            courses = sorted.subList(from, to),
+            hasNext = to < sorted.size,
+            totalElements = sorted.size.toLong(),
+        )
     }
 
     override suspend fun regions(): List<CourseRegion> = DEMO_REGIONS

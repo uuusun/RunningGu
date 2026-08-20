@@ -377,8 +377,57 @@ private fun RegionTab(state: CourseUiState, viewModel: CourseViewModel) {
                 }
                 items(courses.courses) { CourseRow(it) }
 
+                if (courses.hasNext || courses.moreMessage != null) {
+                    item { LoadMoreRow(courses, viewModel) }
+                }
+
                 // 목록 하단 출처 한 줄 (SPEC §4.11-b · 결정-44)
                 item { Attributions(courses.attributions) }
+            }
+        }
+    }
+}
+
+/**
+ * 지역별 목록의 [더 보기]. (§4.11-b)
+ *
+ * 서버가 한 번에 20건씩 주므로 코스가 많은 지역은 이걸 눌러 이어 받는다.
+ * 실패해도 이미 받은 목록은 그대로 두고 문구만 붙인다.
+ */
+@Composable
+private fun LoadMoreRow(state: RegionCoursesState.Content, viewModel: CourseViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        state.moreMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        if (state.hasNext) {
+            OutlinedButton(
+                onClick = viewModel::loadMoreRegionCourses,
+                enabled = state.canLoadMore,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // 몇 개가 더 있는지 보이면 누를지 말지 판단할 수 있다
+                val rest = state.totalElements - state.courses.size
+                Text(
+                    if (state.loadingMore) {
+                        "불러오는 중…"
+                    } else if (rest > 0) {
+                        "더 보기 ($rest)"
+                    } else {
+                        "더 보기"
+                    },
+                )
             }
         }
     }

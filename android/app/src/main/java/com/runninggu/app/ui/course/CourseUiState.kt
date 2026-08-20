@@ -128,6 +128,7 @@ sealed interface RegionsState {
 sealed interface RegionCoursesState {
     data object Loading : RegionCoursesState
     data class Content(
+        /** 지금까지 받아온 것을 **이어 붙인** 목록. 다음 장을 받으면 뒤에 붙는다. */
         val courses: List<CourseSummary>,
         val hasNext: Boolean,
         /**
@@ -142,7 +143,17 @@ sealed interface RegionCoursesState {
          * `courses.size` 가 아니다 — 한 번에 20건씩 받으므로 그렇게 세면 틀어진다.
          */
         val totalElements: Long,
-    ) : RegionCoursesState
+        /** [더 보기] 를 눌러 다음 장을 받는 중. 목록은 그대로 두고 버튼만 바뀐다. */
+        val loadingMore: Boolean = false,
+        /**
+         * 다음 장을 못 받았다. **이미 받은 목록은 지우지 않는다** — 20건이라도 보이는 게
+         * 빈 화면보다 낫다(§4.11-7 의 부분 실패와 같은 취지).
+         */
+        val moreMessage: String? = null,
+    ) : RegionCoursesState {
+        /** 더 받을 게 남았고 지금 받는 중이 아니다. */
+        val canLoadMore: Boolean get() = hasNext && !loadingMore
+    }
 
     /** "이 지역엔 코스가 없어요." */
     data object Empty : RegionCoursesState
