@@ -1,8 +1,10 @@
 package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.Contest
+import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.mapper.toDomain
 import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.data.remote.mapper.toContest
 import com.runninggu.app.domain.EventType
@@ -32,6 +34,16 @@ interface ContestRepository {
      * 호출부는 [Contest.serverId] 를 쓰고, null 이면 서버를 부르지 않는다.
      */
     suspend fun detail(id: Long): Contest
+
+    /**
+     * 대회 인근 축제. (§3-5)
+     *
+     * **상세 본문과 따로 부른다** — 외부 API 경유라 느리고, 실패해도 대회 상세는 그대로
+     * 보여야 한다(§4.6 부분 실패). 빈 목록은 정상이고 화면이 Empty 로 그린다.
+     *
+     * 대회 좌표가 없으면 서버가 `409 CONTEST_LOCATION_UNAVAILABLE` 을 준다.
+     */
+    suspend fun festivals(id: Long): List<NearbyFestival>
 }
 
 /**
@@ -101,6 +113,10 @@ class RemoteContestRepository(private val api: ContestApi) : ContestRepository {
 
     override suspend fun detail(id: Long): Contest = apiCall {
         api.detail(id).toContest()
+    }
+
+    override suspend fun festivals(id: Long): List<NearbyFestival> = apiCall {
+        api.festivals(id).toDomain()
     }
 }
 
