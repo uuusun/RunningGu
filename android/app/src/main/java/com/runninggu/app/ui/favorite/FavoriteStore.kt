@@ -62,8 +62,14 @@ object FavoriteStore {
     /** 대회별 자물쇠. 같은 대회의 `PUT`·`DELETE` 가 절대 겹치지 않게 한다. */
     private val locks = ConcurrentHashMap<String, Mutex>()
 
-    /** 요청이 떠 있는 대회. [refresh] 가 진행 중인 토글을 덮지 않게 하는 데 쓴다. */
-    private val inFlight: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    /**
+     * 대회별로 **떠 있는 요청 수**. [refresh] 가 진행 중인 토글을 덮지 않게 하는 데 쓴다.
+     *
+     * 집합이 아니라 개수인 이유 — 같은 대회에 토글이 둘 대기 중이면 먼저 끝난 쪽이 집합에서
+     * id 를 지워 버린다. 그 틈에 조회가 들어오면 **아직 반영 안 된 서버 상태**를 화면에 씌우고,
+     * 뒤이은 요청은 성공 경로라 화면을 다시 손대지 않아 그대로 갈린다(#64 리뷰).
+     */
+    private val inFlight = ConcurrentHashMap<String, Int>()
 
     private var sessionJob: Job? = null
 
@@ -101,13 +107,14 @@ object FavoriteStore {
             return
         }
         repository.loadFavoriteIds().onSuccess { ids ->
+            val pending = inFlight.keys
             _favoriteIds.update { current ->
                 // 요청이 떠 있는 대회는 조회 결과보다 화면 값이 최신이다. 조회가 덮으면
                 // 방금 누른 하트가 되돌아갔다가 다시 켜지는 것처럼 깜빡인다.
-                (ids - inFlight) + current.filter { it in inFlight }
+                (ids - pending) + current.filter { it in pending }
             }
-            confirmed.removeAll { it !in inFlight }
-            confirmed += ids - inFlight
+            confirmed.removeAll { it !in pending }
+            confirmed += ids - pending
         }
         // 실패는 조용히 둔다 — 마지막 성공 목록을 계속 보여주는 편이 낫다(§4.13 오프라인 규칙).
     }
@@ -129,7 +136,8 @@ object FavoriteStore {
         val nowFavorite = raceId !in _favoriteIds.value
         applyLocally(raceId, nowFavorite)
 
-        inFlight += raceId
+        // 같은 대회에 대기 중인 토글이 남아 있으면 id 가 유지된다.
+        inFlight.merge(raceId, 1, Int::plus)
         try {
             locks.computeIfAbsent(raceId) { Mutex() }.withLock {
                 val serverHas = raceId in confirmed
@@ -146,7 +154,8 @@ object FavoriteStore {
                 }
             }
         } finally {
-            inFlight -= raceId
+            // 마지막 하나가 끝날 때만 지운다.
+            inFlight.computeIfPresent(raceId) { _, n -> if (n <= 1) null else n - 1 }
         }
 
         // 서버가 내 의도대로 됐는지로만 판단한다. 뒤이은 토글이 상태를 또 바꿨더라도

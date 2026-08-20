@@ -1,4 +1,4 @@
-# 서버용 대회 스냅샷 계약 (결정-39·40)
+# 서버용 대회 스냅샷 계약 (결정-39·40·46)
 
 > **지위**: 데이터 파이프라인(Python) ↔ 백엔드 Importer 사이의 파일 계약.
 > 생산자는 `scripts/build_contest_snapshot.py`, 소비자는 백엔드 Importer(AP-07)다.
@@ -40,12 +40,24 @@
    - ③ 둘 다 없으면 신규 insert.
    - 별도 승계 필드를 스냅샷에 넣지 않는 이유: 생성기는 DB 이전 상태를 모르므로 승계는
      소비자(Importer)만 판정할 수 있다.
-2. **갱신된 canonical의 하위는 완전 대체다.** `CONTEST_EVENT`·`CONTEST_SOURCE`는 스냅샷의
-   `events[]`·`sources[]`로 교체한다 — 사라진 행은 삭제한다. 소스가 다른 canonical로 재병합돼
-   왔으면 `contest_id`를 옮긴다(전역 유일키라 충돌하지 않는다).
-3. **스냅샷에 없는 기존 canonical은 하위 포함 그대로 둔다**(과거 대회는 크롤 범위 밖이지만
-   저장 동선이 참조할 수 있다). 취소된 것으로 보이는 미래 대회의 비활성화·명시적 삭제는
-   P0 범위 밖이며, 공개 API는 지금처럼 `contest_date >= 오늘` 필터만 적용한다.
+2. **스냅샷에 있는 하위만 갱신한다.** `CONTEST_EVENT`는 현재 canonical의 `events[]`로 완전
+   대체한다. `CONTEST_SOURCE`는 `(sourceType, externalId)`로 upsert하고, 다른 canonical로
+   재병합됐으면 `contest_id`를 옮긴다. 이번 스냅샷에 나타난 source는 `active=true`,
+   `consecutive_missing_count=0`으로 즉시 복구한다. 스냅샷에 없다는 이유만으로 source를
+   삭제하지 않는다.
+3. **누락 판정은 승인된 완전 스냅샷에서만 한다**(결정-46, 이슈 #56).
+   - 모든 설정 원천 수집이 성공하고 §4 검증을 통과한 full snapshot만 승인 경로로 승격한다.
+     수집 실패·중단·부분 결과는 현재 파일을 교체하거나 Importer에 전달하지 않으므로 누락
+     횟수가 변하지 않는다.
+   - DB의 기존 source가 첫 번째 승인 스냅샷에서 보이지 않으면
+     `consecutive_missing_count=1`, `active=true`로 유지한다. 다음 **서로 다른 승인 스냅샷**에도
+     연속 누락되면 count를 2로 고정하고 `active=false`로 바꾼다.
+   - 같은 스냅샷을 재적재해도 누락 횟수를 다시 올리지 않는다. Importer는
+     `meta.sourceSha256 + meta.checkedAtMax`로 이미 적용한 스냅샷을 식별하고, 이전 스냅샷을
+     다시 적용한 누락 상태 후퇴도 금지한다.
+   - `CONTEST.active`는 연결된 source 중 하나라도 active면 true, 모두 inactive면 false다.
+     비활성 canonical과 과거 대회, 이를 참조하는 찜·저장 동선은 물리 삭제하지 않는다.
+     공개 목록·검색·월간 건수·마감 임박만 active 대회로 제한하고 id 상세 조회는 유지한다.
 
 ## 2. 최상위 구조
 
@@ -86,7 +98,7 @@
 | `roadAddress` | string | ✓ | 도로명 주소 |
 | `contestDate` | string | ✗ | `YYYY-MM-DD` (KST 기준 날짜) |
 | `startTime` | string | ✓ | `HH:MM`. 형식 불일치 시 null |
-| `events` | string[] | ✗(빈 배열 허용) | `FULL·HALF·K10·K5` (API 명세 부록 enum). 순서는 이 고정 순서. 빈 배열 = 종목 미표기(§8.2 28건 정책) → `CONTEST_EVENT` 행 없음 |
+| `events` | string[] | ✗(빈 배열 허용) | `FULL·HALF·K10·K5` (API 명세 부록 enum). 순서는 이 고정 순서. 빈 배열 = 종목 미표기(§8.2 정책, 현재 2건) → `CONTEST_EVENT` 행 없음 |
 | `category` | string | ✗ | `로드·트레일·걷기·야간` (SPEC §6.2) |
 | `applyStart` | string | ✓ | `YYYY-MM-DD`. 형식 불일치 시 null |
 | `applyEnd` | string | ✓ | `YYYY-MM-DD`. 형식 불일치 시 null |
@@ -135,9 +147,13 @@
    - `eventRecordCount` = 모든 `events[]` 길이 합
    - `checkedAtMax` = 전체 `sources[].fetchedAt` 최댓값, canonical별 `checkedAt` = 해당
      `sources[].fetchedAt` 최댓값
-6. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical 유지 (SPEC §8.2)
+6. 모든 설정 원천 수집이 완료된 승인 full snapshot인지 배포 게이트에서 확인. 실패·부분 산출물은
+   기존 `data/contest_snapshot.json`을 교체하지 않고 Importer를 실행하지 않음
+7. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical·누락 횟수·active 유지 (SPEC §8.2)
 
-적재는 멱등이다: 같은 스냅샷을 두 번 적재해도 결과가 같다.
+적재는 멱등이다: 같은 스냅샷을 두 번 적재해도 데이터와 누락 횟수가 같다. 첫 승인 누락은
+count 1/active, 서로 다른 다음 승인 스냅샷의 연속 누락은 count 2/inactive, 재등장은 count 0/active가
+되어야 한다. 한 canonical에 active source가 하나라도 남으면 canonical은 active를 유지한다.
 
 ## 5. 버전 규칙
 

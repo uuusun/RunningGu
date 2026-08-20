@@ -6,7 +6,7 @@
     "sourceRowCount": 271,
     "canonicalCount": 153,
     "sourceRecordCount": 270,
-    "eventRecordCount": 290,
+    "eventRecordCount": 341,
     "skipped": [
       {
         "externalId": "roadrun-41611",
@@ -24,7 +24,11 @@
       "roadAddress": null,
       "contestDate": "2026-06-06",
       "startTime": "09:00",
-      "events": [],
+      "events": [
+        "HALF",
+        "K10",
+        "K5"
+      ],
       "category": "트레일",
       "applyStart": "2026-04-06",
       "applyEnd": "2026-05-31",
@@ -284,6 +288,7 @@
       "contestDate": "2026-06-06",
       "startTime": "06:00",
       "events": [
+        "HALF",
         "K10"
       ],
       "category": "로드",
@@ -349,7 +354,8 @@
       "startTime": "08:30",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-04-10",
@@ -412,7 +418,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-06",
       "startTime": "09:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2025-10-25",
       "applyEnd": "2026-05-25",
@@ -670,7 +678,11 @@
       "roadAddress": null,
       "contestDate": "2026-06-07",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF",
+        "K10",
+        "K5"
+      ],
       "category": "로드",
       "applyStart": "2026-04-08",
       "applyEnd": "2026-05-06",
@@ -902,7 +914,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-13",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "로드",
       "applyStart": "2026-03-03",
       "applyEnd": "2026-04-08",
@@ -2321,7 +2335,8 @@
       "contestDate": "2026-06-20",
       "startTime": "08:00",
       "events": [
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-04-13",
@@ -2489,7 +2504,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-20",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2026-03-11",
       "applyEnd": "2026-06-19",
@@ -3113,7 +3130,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-21",
       "startTime": "10:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2025-12-01",
       "applyEnd": "2026-06-10",
@@ -3307,7 +3326,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-21",
       "startTime": "09:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2026-05-15",
       "applyEnd": "2026-06-05",
@@ -3408,7 +3429,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-21",
       "startTime": "10:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2025-12-01",
       "applyEnd": "2026-06-10",
@@ -3613,7 +3636,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-27",
       "startTime": "09:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2026-05-13",
       "applyEnd": "2026-06-17",
@@ -3923,7 +3948,9 @@
       "roadAddress": null,
       "contestDate": "2026-06-27",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-06-01",
       "applyEnd": "2026-06-19",
@@ -4974,7 +5001,9 @@
       "roadAddress": null,
       "contestDate": "2026-07-04",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "로드",
       "applyStart": "2026-04-01",
       "applyEnd": "2026-05-31",
@@ -5179,7 +5208,9 @@
       "roadAddress": null,
       "contestDate": "2026-07-05",
       "startTime": "09:00",
-      "events": [],
+      "events": [
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2025-11-13",
       "applyEnd": "2026-06-27",
@@ -5281,7 +5312,10 @@
       "contestDate": "2026-07-11",
       "startTime": "06:30",
       "events": [
-        "FULL"
+        "FULL",
+        "HALF",
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-06-02",
@@ -5488,7 +5522,9 @@
       "roadAddress": null,
       "contestDate": "2026-07-12",
       "startTime": "07:00",
-      "events": [],
+      "events": [
+        "FULL"
+      ],
       "category": "트레일",
       "applyStart": "2025-08-04",
       "applyEnd": "2026-05-30",
@@ -5589,7 +5625,11 @@
       "roadAddress": null,
       "contestDate": "2026-07-18",
       "startTime": "17:00",
-      "events": [],
+      "events": [
+        "HALF",
+        "K10",
+        "K5"
+      ],
       "category": "야간",
       "applyStart": "2026-05-22",
       "applyEnd": "2026-05-22",
@@ -5690,7 +5730,9 @@
       "roadAddress": null,
       "contestDate": "2026-07-18",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-04-27",
       "applyEnd": null,
@@ -5856,7 +5898,8 @@
       "contestDate": "2026-07-19",
       "startTime": "08:00",
       "events": [
-        "HALF"
+        "HALF",
+        "K5"
       ],
       "category": "트레일",
       "applyStart": "2025-10-20",
@@ -5958,7 +6001,9 @@
       "roadAddress": null,
       "contestDate": "2026-07-19",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-04-27",
       "applyEnd": "2026-05-31",
@@ -6022,7 +6067,8 @@
       "startTime": "06:00",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-04-20",
@@ -6393,7 +6439,9 @@
       "roadAddress": null,
       "contestDate": "2026-08-02",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-05-11",
       "applyEnd": "2026-07-10",
@@ -6455,7 +6503,9 @@
       "roadAddress": null,
       "contestDate": "2026-08-08",
       "startTime": "17:30",
-      "events": [],
+      "events": [
+        "K5"
+      ],
       "category": "로드",
       "applyStart": "2026-06-08",
       "applyEnd": "2026-07-23",
@@ -6660,7 +6710,9 @@
       "roadAddress": null,
       "contestDate": "2026-08-15",
       "startTime": "19:00",
-      "events": [],
+      "events": [
+        "FULL"
+      ],
       "category": "트레일",
       "applyStart": "2026-05-15",
       "applyEnd": "2026-07-31",
@@ -6761,7 +6813,9 @@
       "roadAddress": null,
       "contestDate": "2026-08-23",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-04-07",
       "applyEnd": "2026-05-31",
@@ -7927,7 +7981,9 @@
       "roadAddress": null,
       "contestDate": "2026-09-06",
       "startTime": "10:00",
-      "events": [],
+      "events": [
+        "K5"
+      ],
       "category": "로드",
       "applyStart": "2026-03-16",
       "applyEnd": "2026-07-06",
@@ -8237,7 +8293,9 @@
       "roadAddress": null,
       "contestDate": "2026-09-06",
       "startTime": "08:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2025-12-18",
       "applyEnd": "2026-08-30",
@@ -8339,7 +8397,8 @@
       "contestDate": "2026-09-06",
       "startTime": "08:30",
       "events": [
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-06-10",
@@ -8652,6 +8711,7 @@
       "contestDate": "2026-09-12",
       "startTime": "08:00",
       "events": [
+        "HALF",
         "K10"
       ],
       "category": "트레일",
@@ -9095,7 +9155,9 @@
       "roadAddress": null,
       "contestDate": "2026-09-13",
       "startTime": "03:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "로드",
       "applyStart": "2025-11-13",
       "applyEnd": "2026-08-31",
@@ -9157,7 +9219,9 @@
       "roadAddress": null,
       "contestDate": "2026-09-13",
       "startTime": "03:00",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "로드",
       "applyStart": "2025-11-13",
       "applyEnd": "2026-08-25",
@@ -9431,7 +9495,8 @@
       "startTime": "08:00",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-04-17",
@@ -10163,7 +10228,8 @@
       "contestDate": "2026-10-03",
       "startTime": "09:00",
       "events": [
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-04-13",
@@ -11337,6 +11403,7 @@
       "contestDate": "2026-10-10",
       "startTime": "08:00",
       "events": [
+        "HALF",
         "K10"
       ],
       "category": "트레일",
@@ -11546,7 +11613,8 @@
       "startTime": "08:30",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-05-08",
@@ -12490,7 +12558,8 @@
       "startTime": "08:30",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-06-02",
@@ -12698,6 +12767,7 @@
       "contestDate": "2026-10-24",
       "startTime": null,
       "events": [
+        "HALF",
         "K10"
       ],
       "category": "트레일",
@@ -13037,7 +13107,8 @@
       "startTime": "09:30",
       "events": [
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-07-20",
@@ -13869,7 +13940,9 @@
       "roadAddress": null,
       "contestDate": "2026-11-15",
       "startTime": "08:30",
-      "events": [],
+      "events": [
+        "HALF"
+      ],
       "category": "트레일",
       "applyStart": "2026-06-08",
       "applyEnd": "2026-08-31",
@@ -14076,7 +14149,8 @@
       "events": [
         "FULL",
         "HALF",
-        "K10"
+        "K10",
+        "K5"
       ],
       "category": "로드",
       "applyStart": "2026-05-06",
@@ -14282,7 +14356,10 @@
       "roadAddress": null,
       "contestDate": "2026-11-15",
       "startTime": "07:00",
-      "events": [],
+      "events": [
+        "FULL",
+        "K10"
+      ],
       "category": "트레일",
       "applyStart": "2026-05-04",
       "applyEnd": "2026-10-15",

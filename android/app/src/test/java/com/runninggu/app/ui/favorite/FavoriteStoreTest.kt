@@ -124,6 +124,31 @@ class FavoriteStoreTest {
         assertTrue(RACE in FavoriteStore.favoriteIds.value)
     }
 
+    @Test
+    fun `앞 요청이 끝나도 뒤 요청이 남아 있으면 조회가 덮지 않는다`() = runBlocking {
+        // 연타 → 첫 요청(PUT) 완료 → 두 번째(DELETE) 진행 중에 조회. (#64 리뷰)
+        //
+        // 이때 서버 목록에는 PUT 만 반영돼 있어 '찜' 으로 온다. 그걸 화면에 씌우면
+        // DELETE 가 성공해도 성공 경로는 화면을 다시 손대지 않아 그대로 갈린다.
+        repository.delaysMs = ArrayDeque(listOf(50L, 300L))
+
+        val first = async { FavoriteStore.toggle(RACE) }
+        val second = async { FavoriteStore.toggle(RACE) }
+
+        delay(150) // PUT 은 끝났고 DELETE 는 아직인 시점
+        assertTrue("PUT 이 아직 안 끝났다 — 타이밍 전제가 깨졌다", RACE in repository.stored)
+        FavoriteStore.refresh()
+        assertFalse(
+            "먼저 끝난 요청이 id 를 지워 조회가 진행 중인 해제를 덮었다",
+            RACE in FavoriteStore.favoriteIds.value,
+        )
+
+        first.await()
+        second.await()
+        assertFalse(RACE in FavoriteStore.favoriteIds.value)
+        assertFalse(RACE in repository.stored)
+    }
+
     private companion object {
         const val RACE = "roadrun-41543"
     }

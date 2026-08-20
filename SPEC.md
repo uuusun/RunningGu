@@ -1,12 +1,12 @@
 # 런닝구(區) — 최종 통합 명세서 (SPEC v4 · 안드로이드)
 
-> **기준일 2026-08-19** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
-> v3의 안드로이드 전환안에 서버 중심 데이터·계정 연결·대회/코스 관리 정책을 확정 반영한 판이다. 내용이 충돌하면 **번호가 빠른 쪽이 우선**한다.
+> **기준일 2026-08-20** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
+> v3의 안드로이드 전환안에 서버 중심 데이터·단일 가입 수단·대회/코스 관리 정책을 확정 반영한 판이다. 내용이 충돌하면 **번호가 빠른 쪽이 우선**한다.
 >
 > | 우선 | 원천 | 처리 |
 > |---|---|---|
 > | ① | **코딩 착수 결정 (2026-07-16, §12.1)** — 런닝구 표기 확정 · Jetpack Compose · Spring Boot+PostgreSQL · 게스트 범위 · 커뮤니티 MVP 이후 · 재설정 링크 · **REST 키 서버 전용** + 안드로이드 전환·README·CONVENTION | 본 문서 전체에 반영 (🔒확정 표기) |
-> | ② | **팀 추가 결정 (2026-07-30, §12.2)** — 4탭·마이 정보수정·다중 로그인 수단·canonical 대회·시스템 RACE·공통 API 계약·두루누비 동기화·UTF-8 CI | 전부 반영 |
+> | ② | **팀 추가 결정 (2026-07-30, 2026-08-19~20 계정 정책 개정, §12.2)** — 4탭·마이 정보수정·사용자당 단일 가입 수단·canonical 대회·시스템 RACE·공통 API 계약·두루누비 동기화·UTF-8 CI | 전부 반영 |
 > | ③ | **OSM 도시 러닝코스 P0 결정 (2026-08-18, 08-19 개정, 결정-42)** — GraphHopper 서버 생성·큐레이션 우선·서버 품질 상한 | §4.11·§5.8·§6.4·§8.4·§9.2~9.3에 반영 |
 > | ④ | `reference-web/` 목업 (구 design/, 07-08 머지 상태) | UX·도메인 로직의 **참조 구현** — 포팅 매핑은 부록 D |
 > | ⑤ | REQUIREMENTS.md(07-08) · SPEC v1(07-02) · SPEC v2(07-16 웹 기준) | 본 문서로 **대체** (이력: git) |
@@ -212,8 +212,8 @@ root
 
 - 구성: 로고/워드마크 · 이메일 인풋 · 비밀번호 인풋 · [로그인] · **[카카오로 시작하기]** · 링크: "회원가입" / "비밀번호 찾기".
 - [로그인]: 이메일/비밀번호 검증 → 성공 시 `home`으로 (백스택 클리어). 실패 시 인라인 오류 "이메일 또는 비밀번호를 확인해 주세요" 🔧정책.
-- [카카오로 시작하기] 📱전환: **카카오 로그인 Android SDK** — 카카오톡 설치 시 앱 전환 간편로그인, 미설치 시 카카오계정 로그인. 발급 토큰을 백엔드로 전달·검증(§9.3) → 기존 연동 계정이면 로그인, 미가입이면 A2 카카오 가입 플로우.
-- 계정 모델 🆕 구현 추가 요구사항: 한 `USER`에 `LOGIN_IDENTITY(EMAIL)`과 `LOGIN_IDENTITY(KAKAO)`를 연결한다. 동일 이메일이라는 이유로 자동 병합하지 않으며, 로그인 후 마이의 명시적 [카카오 계정 연결]만 허용한다.
+- [카카오로 시작하기] 📱전환: **카카오 로그인 Android SDK** — 카카오톡 설치 시 앱 전환 간편로그인, 미설치 시 카카오계정 로그인. 발급 토큰을 백엔드로 전달·검증(§9.3) → 기존 KAKAO 가입 계정이면 로그인, 미가입이면 A2 카카오 가입 플로우.
+- 계정 모델 🔒(결정-22 개정): 사용자는 가입 시 `EMAIL` 또는 `KAKAO` 중 하나를 선택하고, 한 `USER`는 정확히 하나의 `LOGIN_IDENTITY`만 가진다. P0에서는 로그인 수단 연결·추가·전환을 지원하지 않으며 서로 다른 provider 계정을 이메일만으로 자동 병합하지 않는다. KAKAO 이메일은 카카오가 제공한 경우에만 보관하는 nullable 스냅샷이며 별도 이메일 입력·인증을 요구하지 않는다.
 - 구글·네이버 버튼: P2 🆕회의.
 - **게스트 둘러보기** 🔒확정: 탐색과 무상태 동선 생성(S1~S8)은 게스트 허용, 저장(찜·마이·동선·코스·러닝 기록)은 로그인 요구 — 시도 시 로그인 화면으로 유도. 로그인 화면에 "둘러보기" 진입점 제공 🔧정책.
 
@@ -254,7 +254,7 @@ root
 
 ### 4.5 S2 캘린더
 
-- **노출 대상**: 오늘 이후 대회만 🧩목업. 접수 상태는 **오늘 기준 재계산**(`regStatusOf`, §5.5).
+- **노출 대상**: `active=true`인 오늘 이후 대회만 🧩목업. 비활성 대회는 공개 목록·검색·월간 건수·마감 임박에서 제외하고, 접수 상태는 **오늘 기준 재계산**(`regStatusOf`, §5.5).
 - **리스트/캘린더 뷰 토글** — 기본 리스트. 캘린더 뷰 🧩목업:
   - 월 네비(‹ YYYY.M ›) · 요일 헤더(일 빨강·토 파랑) · 대회 있는 날 점(2건 이상이면 건수) · 오늘 테두리.
   - **날짜 탭 → 해당 일자 대회 목록**(재탭 해제, 월 이동 시 초기화). 미선택 시 이달 전체. 🆕회의 — 날짜 → 대회 → S3 → 위저드가 동선 진입 표준 경로.
@@ -275,7 +275,8 @@ root
 - 히어로: `imageUrl`이 있으면 대회 이미지, 없으면 기본 placeholder. "{지역} · 마라톤" + 대회명 · **D-day**(오늘 기준, Asia/Seoul §6.6) · "MM.DD 요일" · "출발 {시각} · {장소}" · 접수 배지(접수중 강조 + "~MM.DD").
 - 정보: 종목(" · ") · 접수 기간 · 주최 · "출처 {source} · 확인 MM.DD" + [공식 페이지 ↗] — **Chrome Custom Tabs로 열기** 📱전환.
 - **인근 축제 (M3)** 🧩목업: 백엔드 `GET /contests/{id}/festivals` 경유 🔒확정(§8.3) — 대회일 ±14일 → 반경 40km → 거리순 6건. 카드: 이미지(`firstimage`, Coil 🔧정책) · 축제명 · "MM.DD~MM.DD · 대회장 {d.d}km". 로딩 "축제를 찾는 중…" / 빈 상태 "대회 기간에 열리는 인근 축제가 없어요." + "대회 전후 여행 동선은 그대로 짜드릴 수 있어요." 출처 "한국관광공사".
-- CTA(하단 고정): **"이 대회로 동선 만들기"** → S4. 현재 canonical 153건은 좌표 누락 0건이지만 앱 DTO는 `lat/lng`를 nullable로 방어한다. 예외적으로 좌표가 없으면 P0에서는 CTA만 비활성화하며 좌표 전용 상태·안내 UX는 P1에서 검토한다.
+- **비활성 대회** 🔒확정(결정-46, 이슈 #56): 찜·저장 동선에서 진입한 상세는 삭제하지 않고 `active=false`로 반환한다. 화면을 흐리게 표시하고 "정보 제공 종료" 안내를 노출하며, 동선 만들기 CTA를 비활성화하고 인근 축제 API는 호출하지 않는다.
+- CTA(하단 고정): **"이 대회로 동선 만들기"** → S4. 현재 canonical 153건은 좌표 누락 0건이지만 앱 DTO는 `lat/lng`를 nullable로 방어한다. 예외적으로 좌표가 없거나 대회가 비활성이면 P0에서는 CTA를 비활성화한다. 좌표 전용 상태·안내 UX는 P1에서 검토한다.
 
 ### 4.7 S4 일정 선택
 
@@ -307,10 +308,11 @@ root
 - **요약/일자 탭** — 회복 배지 · "{지역} {당일치기|n박 n+1일}" + "{장소 수}곳" · 일자 탭("D-1 · 06.17 수", 회복일 구분 스타일) → 활성화 + 지도 재계산 + 첫 핀 활성. 일자 라벨 줄 + [편집] · 일자 노트.
 - **타임라인(조회)** — 시간순 카드: 번호 레일 · 제목+시간 · 태그(대회·숙소 생략)+장소명 · 설명. 활성 카드 강조.
 - **지도 ↔ 타임라인 동기화** 📱전환: 카드 탭→핀 카메라 이동 / 핀 탭→카드로 스크롤 / **LazyList 스크롤 중앙 밴드(상하 45% 제외)에 든 카드 자동 활성**(목업 IntersectionObserver 계약 승계). 편집 모드 중 동기화 중단.
-- **편집 모드** — [편집]↔[완료]. 안내 "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요." USER 행: 그립+번호+제목+"{시간}·{장소}·{카테고리}"+교체·삭제 버튼. RACE 행: 잠금 아이콘과 "관리자 업데이트" 표시, 그립·교체·삭제 미노출. RACE 블록은 사용자가 수정·삭제·이동할 수 없고, 서버는 위반 요청에 `409 SYSTEM_BLOCK_IMMUTABLE`을 반환한다. 대회 원본 변경은 관리자/배치가 canonical `CONTEST`를 갱신하고 저장 동선 조회 시 반영한다. 🆕 구현 추가 요구사항
+- **편집 모드** — [편집]↔[완료]. 안내 "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요." USER 행: 그립+번호+제목+"{시간}·{장소}·{카테고리}"+교체·삭제 버튼. RACE 행: 잠금 아이콘과 "저장 당시 대회 일정" 표시, 그립·교체·삭제 미노출. RACE 블록은 사용자가 수정·삭제·이동할 수 없고, 서버는 위반 요청에 `409 SYSTEM_BLOCK_IMMUTABLE`을 반환한다. 저장된 RACE 날짜·시간·장소는 snapshot으로 유지하고 canonical 변경을 기존 타임라인에 자동 반영하거나 재배치하지 않는다. 🆕 구현 추가 요구사항
 - **후보 시트** — ModalBottomSheet 📱전환. "{카테고리} {교체|추가} · 인근" + 소스 배지. 추가 모드만 카테고리 칩(취향 6종+숙소). POI 8건(중심: 숙소>대회장). [선택]: 교체=장소·설명·카테고리 교체(블록 id·시간 유지) / 추가=새 블록(13:00) 맨 끝 → 닫기.
 - ~~숙소 주변 산책 코스 섹션~~ — **삭제** 🆕회의. 대체 🔧정책: 조회 모드 하단 **연계 카드** "숙소 주변에서 뛰기·걷기 → 러닝코스에서 보기" → `CourseLaunchContext`로 S8 내 주변에 출발지=숙소와 목표 기본 `min(RECOVERY.walk, 5)km`만 전달한다. 종목·난이도는 전달하지 않는다 🔒확정(결정-42 개정).
 - **저장 CTA** — "이 동선 저장하기": `(user, contestId, startDate, endDate)`가 같으면 서버가 기존 동선을 교체 → **마이[동선]** → "마이에 저장했어요". Room은 성공 응답을 읽기 캐시로 저장한다.
+- **대회 변경 후 재생성** 🔒확정(결정-45, 이슈 #55): 조회 시 최신 canonical 대회명·날짜·시간·장소·지역·`active`와 저장된 RACE/지역 snapshot을 함께 보여준다. 날짜·시간·장소·지역·좌표가 달라졌으면 서버가 `needsRegeneration=true`를 파생하고, 이름만 바뀐 경우는 제외한다. 앱은 "대회 정보가 변경됐어요"와 [다시 만들기]를 표시하고 "직접 고친 장소는 사라져요. 다시 만들까요?" 확인 후 최신 canonical로 무상태 생성한다. 재생성 미리보기 동안 기존 저장 동선을 유지하며, 사용자가 최종 저장할 때만 `PUT /api/itineraries/{itineraryId}`로 같은 id의 트리를 교체한다. 기존 USER 편집은 새 결과에 자동 병합하지 않는다.
 - **빈 상태** — "동선이 아직 없어요." + [조건 바꾸기]. 입력을 유지한 채 위저드로 돌아간다.
 - **오류 상태** — 오류 안내 + [다시 시도]. 기존 입력으로 같은 생성 요청을 재시도한다.
 
@@ -333,9 +335,10 @@ root
 
 > 📌 두루누비는 코리아둘레길 4개 노선(261코스)뿐이라 **서울 반경 8km 내 코스가 0건**이다(실측 — [도메인 로직 대조](docs/domain-logic-audit.md) §C). 결정-42에 따라 이 도시 공백은 서버 OSM 생성 경로가 채우며, GraphHopper 실패 때만 걷기 스팟 중심 화면으로 강등한다.
 
-**(b) 지역별** — 시도 칩(코스 수 내림차순, 단일·재탭 해제) · "{지역|전국} 코스 N" 거리 오름차순 · 카드: 코스명·"{시군}·{km}·{난이도}·약 {분}분" · 목록 하단 출처 한 줄 · 빈 상태 "이 지역엔 코스가 없어요."
+**(b) 지역별** — 시도 칩(코스 수 내림차순, 단일·재탭 해제) · "{지역|전국} 코스 N" 거리 오름차순 · 카드: 코스명·"{시군}·{km}·{난이도}·약 {분}분" · 목록 하단 출처 한 줄 · 빈 상태 "이 지역엔 코스가 없어요." `GET /api/courses`의 `attributions[]`에는 응답 코스에 실제 사용된 원천의 검증 완료 문구만 담고, 앱은 순서·문구를 바꾸지 않고 `" · "`로 연결해 표시한다.
 
 **(c) 코스 저장·뛰기** — [코스 저장] → S10 마이[러닝코스] (saved). **[이 코스 뛰기] → GPS 기록 모드** 🔒확정(결정-14, AP-22·P1):
+- 저장 코스의 `attributions[]`는 서버가 원천 메타데이터에서 만든 완성 문구 배열을 저장 시점 snapshot으로 보존한다. 클라이언트가 보낸 출처 문구는 신뢰하지 않으며, 빈 값은 `[]`이다. 저장 코스 상세에서만 반환하고 목록 카드에는 반환하지 않는다. 외부 문구가 바뀌어도 기존 snapshot을 소급 변경하지 않으며 `routeFingerprint` 입력에도 포함하지 않는다 🔒확정(결정-44, 이슈 #54).
 - 기록 중: 경과 시간·누적 거리 표시, 지도에 실제 이동 경로 실시간 폴리라인. **포그라운드 서비스 + 상시 알림**으로 화면이 꺼져도 기록 유지 🔧정책(NFR-13).
 - [종료] → 요약(거리·시간·평균 페이스) 확인 → 마이[러닝코스]에 `ran`으로 저장(실제 뛴 경로 포함) + 스낵바 "러닝 기록을 저장했어요".
 - 코스 없이 자유 달리기 기록도 허용 🔧정책(출발지만 있으면 시작 가능).
@@ -346,15 +349,17 @@ root
 
 ### 4.13 S10 마이 🆕회의 + 🔒확정
 
-상단에 프로필 요약(닉네임·대표 이메일·연결 로그인 수단)과 [정보 수정]을 두고, 아래에 세그먼트 3개 **[동선] | [러닝코스] | [찜한 대회]**를 유지한다.
+상단에 프로필 요약(닉네임·가입 로그인 방식, 대표 이메일은 있을 때만)과 [정보 수정]을 두고, 아래에 세그먼트 3개 **[동선] | [러닝코스] | [찜한 대회]**를 유지한다.
 
-- **정보 수정** 🆕 구현 추가 요구사항: 닉네임, 마케팅 수신 동의, EMAIL 계정 비밀번호 변경, 카카오 로그인 수단 연결/해제, 로그아웃, 회원 탈퇴. `GET /me/identities`에 `EMAIL`이 있을 때만 Android 전용 비밀번호 변경 메뉴를 노출하고 카카오 전용 계정에는 숨긴다. 변경 성공 시 기존 refresh token을 전부 폐기하고 현재 기기용 새 Access/Refresh 쌍을 발급한다. 필수 약관 철회는 탈퇴로 안내하고 이메일 주소 변경은 MVP 제외.
-- 로그인 수단은 최소 1개를 유지한다. 이미 다른 USER에 연결된 카카오 수단은 연결할 수 없으며, 같은 이메일만으로 계정을 자동 병합하지 않는다.
+- `GET /me.email`은 응답 키를 항상 포함하는 `string|null`이다. EMAIL 가입자는 정규화 이메일을 표시하고, KAKAO 가입자는 가입 시 카카오가 제공한 이메일 스냅샷이 있을 때만 표시한다. KAKAO 이메일이 없으면 이메일 행 자체를 숨기며 placeholder를 두지 않는다. 카카오 가입 과정에서 별도 이메일 입력·자체 이메일 인증을 요구하지 않는다.
+
+- **정보 수정** 🆕 구현 추가 요구사항: 닉네임, 마케팅 수신 동의, EMAIL 가입자의 비밀번호 변경, 로그아웃, 회원 탈퇴. `GET /me`의 `loginProvider=EMAIL`일 때만 Android 전용 비밀번호 변경 메뉴를 노출하고 KAKAO 가입자에게는 숨긴다. 변경 성공 시 기존 refresh token을 전부 폐기하고 현재 기기용 새 Access/Refresh 쌍을 발급한다. 로그인 방식 변경과 이메일 주소 변경은 MVP에서 지원하지 않는다.
+- 가입 로그인 방식은 계정 수명 동안 하나만 유지한다. `EMAIL↔KAKAO` 연결·해제·전환과 이메일 기반 자동 계정 병합은 P0에서 제공하지 않는다.
 - 회원 탈퇴는 비밀번호 또는 카카오 SDK 토큰으로 재인증한 뒤 짧게 유효한 탈퇴 전용 토큰을 발급받아 수행한다. 성공 시 모든 세션과 기기 사용자 캐시를 삭제한다 🔒확정.
 
-- **[동선]** — 카드: "{지역} {당일치기|n박 n일}"·"{대회명} · {종목}"·회복 배지·"MM.DD~MM.DD · {장소 수}곳". 탭 → 저장 상태 복원 → S7(첫날 활성). 액션: [삭제] 🔧정책. 빈 상태: "아직 저장한 동선이 없어요." + [대회 둘러보기]→S2.
+- **[동선]** — 카드: snapshot "{지역} {당일치기|n박 n일}"·최신 "{대회명} · {종목}"·회복 배지·"MM.DD~MM.DD · {장소 수}곳". `needsRegeneration=true`면 "대회 변경" 배지를 표시한다. 탭 → 저장 상태 복원 → S7(첫날 활성). 비활성 대회의 기존 동선도 유지하고 상세에는 "정보 제공 종료"를 표시한다. 액션: [삭제] 🔧정책. 빈 상태: "아직 저장한 동선이 없어요." + [대회 둘러보기]→S2.
 - **[러닝코스]** — P0는 `saved`(저장 코스)만 조회한다. `ran`(**GPS로 기록한 뛴 코스** 🔒확정, 결정-14 — 완료 배지·뛴 날짜·실제 거리/시간)은 AP-22와 함께 P1에서 구현한다. saved/ran 통합 정렬·페이징 계약도 GPS P1 착수 시 결정한다. 카드 탭 → 경로 지도 상세(saved는 코스 경로, ran은 실제 뛴 경로). 빈 상태: "저장한 코스가 없어요." + [러닝코스 둘러보기]→S8.
-- **[찜한 대회]** 🔒확정(결정-16) — S2 대회 카드 재사용(하트 채움 상태). 탭 → S3 상세. 하트 재탭으로 찜 해제(목록에서 제거). 지난 대회는 흐림 처리 🔧정책. 빈 상태: "찜한 대회가 없어요." + [대회 둘러보기]→S2.
+- **[찜한 대회]** 🔒확정(결정-16·46) — S2 대회 카드 재사용(하트 채움 상태). 탭 → S3 상세. 하트 재탭으로 찜 해제(목록에서 제거). 지난 대회와 `active=false` 대회는 흐림 처리하고, 비활성에는 "정보 제공 종료"를 표시한다. 빈 상태: "찜한 대회가 없어요." + [대회 둘러보기]→S2.
 - 저장소: **서버 SSOT + Room 읽기 캐시** 📱전환 (§9.3). 오프라인에서는 마지막 성공 목록만 읽고 추가·수정·삭제는 온라인에서 수행한다. 마이 진입 자체가 로그인 필요(결정-4).
 
 ---
@@ -396,7 +401,12 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 - `stdEvent`: `풀|full|42→풀` · `하프|half|21→하프` · `10k|단독10→10K` · 그 외 `5K`. 순서 `[풀,하프,10K,5K]`.
 - `stdEventKm`(거리 버킷): **≥32→풀 · ≥18→하프 · ≥9→10K · 그 외 5K**.
-- `eventsFromContest` 우선순위: ① `has_*` 플래그 → ② `distances` 버킷 → ③ `event_types` 토큰.
+- `eventsFromContest` **합집합**: ① `has_*` 플래그 ∪ ② `distances` 버킷 ∪ ③ `event_types` 토큰.
+  번호는 표기 순서일 뿐 **우선순위가 아니다** — 종목 **목록**을 만드는 자리라 앞 단계가 뒤를 가리면
+  안 된다(`has_5k=true` 인 대회의 `distances=[42,21,10,5]` 가 5K 하나로 줄어드는 것을 막는다).
+  ③ 은 앞 단계가 못 채운 것만 보강하며 **불명 토큰을 `5K` 로 강제하지 않는다** — `stdEvent` 의
+  "그 외 5K" 는 종목 하나를 표준화할 때의 규칙이고, 여기서는 종목 **목록**을 만드는 중이라
+  모르는 토큰을 5K 로 넣으면 없는 종목이 생긴다.
 
 ### 5.5 접수 상태 `regStatusOf`
 
@@ -492,7 +502,7 @@ Contest { id, name, region, venue, date('YYYY-MM-DD'), startTime('HH:MM'),
        regStatus, regStart, regEnd,               // 표시는 regStatusOf()로 재계산 (§5.5)
        organizer, sources[], checkedAt,            // canonical + 출처별 원본 (A3)
        officialUrl, detailUrl, imageUrl?, lat?, lng?, category(로드|트레일|걷기|야간) }
-ContestSource { contestId, sourceType, sourceKey, rawPayload, fetchedAt, sourceUrl }
+ContestSource { contestId, sourceType, externalId, rawPayload, fetchedAt, sourceUrl }
 ```
 
 - 원천 snake_case(`race_id`·`event_date`·`latitude`…) → camelCase 정규화 (원본: normalize.js).
@@ -507,10 +517,12 @@ Poi   { name, lat, lng, desc, addr, url }
 day   { date, off, label('D-1'|'D-day'|'D+n'), dateLabel, note, blocks }
 block { id(안정적 — 편집 간 유지), time, title, catKey, place: Poi?, desc,
         blockType: USER|RACE, systemManaged }
-trip  { id: '{contestId}-{start}-{end}', contestId, contestName, region, event, themes,
-        start, end, days, recovery, userId? }
+trip  { id, contestId, contestName(current), region(snapshot), event, themes,
+        start, end, days(snapshot), recovery(snapshot), active(current),
+        needsRegeneration(derived), userId? }
 ```
 
+- 저장 시 `region`, `recovery.label/note`, 호텔, 일자 note, USER 블록과 RACE 날짜·시간·장소·주소·좌표를 snapshot으로 보존한다. `contestName`과 현재 대회 메타데이터는 `CONTEST`에서 조회하며, `needsRegeneration`은 저장 snapshot과 현재 canonical의 일정·시간·장소·지역·좌표 차이로 파생하고 DB 컬럼으로 저장하지 않는다(결정-45).
 - 카카오 변환: `place_name→name, y→lat, x→lng, category_name 말단→desc, road_address_name||address_name→addr, place_url→url`.
 - KTO 변환 🔧정책: `title→name, mapy→lat, mapx→lng, addr1→addr` + `image(firstimage), contentId, dist`.
 - POI 조회 결과 `{ source: LIVE|SAMPLE|SYNTH, places }` — 폴백 체인 §8.1, Enum은 대문자로 통일하고 배지를 노출한다(NFR-2).
@@ -524,7 +536,8 @@ builtRoute  { routeId, sourceCourseId?, dataSource: API_GPX|GPX_ONLY|OSM_GENERAT
               name, sido?, sigun?, difficulty, fullDistKm?, accessM, routeKm, minutes,
               gainM, elevationProfileM[], shortfall, start, routePoints }
 walkSpot    { name, category, addr, lat, lng, distM, url }
-savedCourse { userId, kind: saved|ran, routeFingerprint, course|builtRoute 스냅샷, savedAt,
+savedCourse { userId, kind: saved|ran, routeFingerprint, course|builtRoute 스냅샷,
+              attributions[], savedAt,
               run?: { points[[lat,lng]…], distKm, durationMin, ranAt } }   // ran = GPS 기록 🔒확정
 favoriteContest { userId, contestId, savedAt }                               // 찜 🔒확정(결정-16)
 ```
@@ -532,20 +545,23 @@ favoriteContest { userId, contestId, savedAt }                               // 
 - `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
 - `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
 - **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)와 GPS 전송 전 임시 기록만 둔다. 서버 ID·버전·`cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
-- 저장 코스는 서버가 원천 ID가 아니라 정규화한 경로·거리·진입점 snapshot으로 `routeFingerprint`를 계산하고 `(userId, routeFingerprint)` 중복 저장을 멱등 처리한다. 따라서 `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정.
+- 저장 코스는 서버가 `pathPolyline`을 좌표열로 복원한 뒤 동일 정밀도로 정규화하고 연속 중복 좌표만 제거해 진행 순서를 유지한 canonical geometry를 만든다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 개정). 좌표 정밀도는 GraphHopper 실제 polyline 정밀도 확인 후 고정한다.
+- 서버는 저장 시 실제 경로 원천의 검증 완료 attribution 완성 문구를 `attributions` snapshot으로 확정한다. PostgreSQL은 `JSONB NOT NULL DEFAULT '[]'`로 보존하며, 상세 API만 `List<String>`으로 반환한다. 클라이언트 입력과 이후 라이선스 문구 변경은 기존 값에 반영하지 않고, attribution은 geometry 기반 `routeFingerprint` 계산에서도 제외한다 🔒확정(결정-44).
 
 ### 6.5 회원 계약 🆕회의 (**Spring Boot + PostgreSQL** 🔒확정 — 구현 시 테이블 상세화)
 
 ```
 user          { id, nickname, representativeEmail?, createdAt, updatedAt }
-loginIdentity { id, userId, provider: EMAIL|KAKAO, providerSubject,
-                emailSnapshot?, passwordHash?, linkedAt, lastLoginAt }
+loginIdentity { id, userId(unique), provider: EMAIL|KAKAO, providerSubject,
+                emailSnapshot?, passwordHash?, emailVerifiedAt?, createdAt, lastLoginAt }
 userAgreement { userId, type: TOS|PRIVACY|MARKETING, version, agreed, changedAt }
-emailAuth     { email, purpose: SIGNUP|RESET, tokenHash, expiresAt, attempts, verifiedAt? }
+emailAuth     { email, purpose: SIGNUP|PASSWORD_RESET, tokenHash, expiresAt, attempts, verifiedAt? }
 ```
 
-- USER는 로그인 주체, LOGIN_IDENTITY는 로그인 방법이다. 한 USER가 EMAIL과 KAKAO를 동시에 가질 수 있고 최소 한 수단을 유지한다.
-- `(provider, providerSubject)`는 전역 유일하다. 동일 이메일 자동 병합 금지, 로그인된 세션에서 명시적 연결만 허용한다.
+- USER는 로그인 주체, LOGIN_IDENTITY는 가입 시 선택한 로그인 방법이다. `USER:LOGIN_IDENTITY`는 1:1이며 `LOGIN_IDENTITY.userId`와 `(provider, providerSubject)`는 각각 UNIQUE다. P0에서는 로그인 방법 연결·추가·전환을 지원하지 않는다.
+- 대표 이메일은 EMAIL 가입자면 정규화된 `providerSubject`, KAKAO 가입자면 nullable `emailSnapshot`에서 파생한다. USER에 이메일을 중복 저장하지 않는다. `GET /me`는 `email` 키를 항상 포함해 `string|null`로 반환한다.
+- EMAIL 수단은 `passwordHash`와 `emailVerifiedAt`이 필수이고 `emailSnapshot`은 null이다. KAKAO 수단은 비밀번호·자체 이메일 인증 시각이 null이며 카카오 회원번호를 로그인 식별자로 사용한다. 카카오가 이메일을 제공하지 않아도 가입할 수 있고, 별도 이메일 입력·자체 인증을 추가하지 않는다.
+- `(provider, providerSubject)`는 전역 유일하다. 동일 이메일 자동 병합을 금지하고 P0에서는 provider 연결·전환 API를 두지 않는다.
 
 - ~~communityPost·raceView~~ — 커뮤니티 제외(결정-13)·인기 섹션 제거(결정-11)로 **삭제**.
 
@@ -658,9 +674,11 @@ emailAuth     { email, purpose: SIGNUP|RESET, tokenHash, expiresAt, attempts, ve
 - 현재 `reference-web/public/data/races.json`은 실제 크롤 원천을 병합한 **목업용 대표 목록**이며 서버용 대회 스냅샷이 아니다. 서버용 스냅샷은 `CONTEST_SOURCE`를 복원할 수 있도록 canonical별 원천 `sources[]`와 표준 `events[]`를 포함하며, 계약은 `docs/contest-snapshot-contract.md`, 생성기는 `scripts/build_contest_snapshot.py`, 산출물은 `data/contest_snapshot.json`이다.
 - **P0 전달 경로는 `Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL`** 로 고정한다 🔒확정(결정-40). Python은 운영 핵심 테이블을 직접 수정하지 않으며, 백엔드가 전체 검증·원자적 승격·실패 롤백을 담당한다. 최초 파일은 초기 시드, 이후 주간 파일은 갱신 스냅샷이다.
 - 향후 자동화는 `Python → 인증된 내부 수집 API` 또는 `Python → 스테이징 테이블 → 백엔드 승격`으로 전환한다. 두 후보 중 하나는 자동화 착수 시 운영 환경과 배포 방식을 보고 확정하며, 어느 경우에도 Python이 `CONTEST*` 핵심 테이블에 직접 쓰지 않는다.
-- 현재 생성본의 종목 미표기 28건 🔧정책(종목 토큰 정규식이 15km 를 5K 로 오인하던 2건 교정으로 26→28): 트레일·걷기는 캘린더 노출, 위저드 종목은 5K 폴백 + "종목 정보 없음". 필수값 누락 원천 1행은 경고 후 제외한다.
+- 현재 생성본의 종목 미표기 **2건** 🔧정책: 트레일·걷기는 캘린더 노출, 위저드 종목은 5K 폴백 + "종목 정보 없음". 필수값 누락 원천 1행은 경고 후 제외한다.
+  §5.4 의 ② `distances` 버킷을 넣기 전에는 28건이었다 — `15km`·`40km` 같은 토큰이 어느 종목인지 문자열만으로는 알 수 없었기 때문이다(이슈 #48).
 - 사용자는 canonical 대회 레코드를 생성·수정·삭제할 수 없다. 관리자/배치만 갱신한다.
 - 재수집 주기 주 1회 🔧정책. 접수상태는 서버 공통 정책으로 조회 시점 파생하고 목록·월 집계·마감 임박에서 같은 함수를 사용한다(§5.5).
+- **누락 비활성화** 🔒확정(결정-46, 이슈 #56): 모든 설정 원천 수집과 기존 집계 검증을 완료한 정상 full snapshot만 누락 판정에 사용한다. 원천 레코드가 1회 누락되면 `consecutiveMissingCount=1`로 유지하고, **2회 연속 누락**되면 해당 `CONTEST_SOURCE.active=false`로 전환한다. 실패·부분 snapshot은 횟수를 올리지 않으며, 같은 `(sourceType, externalId)`가 다시 나타나면 즉시 활성화하고 횟수를 0으로 초기화한다. canonical `CONTEST.active`는 활성 source가 하나라도 있으면 true이고 모두 비활성이면 false다. 과거·비활성 대회와 이를 참조하는 찜·저장 동선은 물리 삭제하지 않는다.
 - 좌표 보정 도구는 `KAKAO_REST_KEY` 환경변수만 사용하고 키가 없으면 fail-fast한다. 재수집 → 좌표 보정 → 병합 후 좌표 누락 0건을 검증하며, 누락이 있으면 새 canonical로 교체하지 않고 이전 정상본을 유지한다 🔒확정.
 
 ### 8.3 M3 축제
@@ -725,10 +743,10 @@ app/src/main/java/com/runninggu/app/
 | 영역 | 엔드포인트/테이블 |
 |---|---|
 | 인증 | `POST /auth/signup` · `/auth/email/send-code` · `/auth/email/verify` · `/auth/login` · `/auth/password/reset-request` · `/auth/password/reset` · `/auth/kakao`(SDK 토큰 검증→세션 발급) |
-| 회원 | `GET/PATCH /me` · `PATCH /me/agreements` · `PUT /me/password` · `GET/POST/DELETE /me/identities/**` · `DELETE /me` |
+| 회원 | `GET/PATCH /me` · `PATCH /me/agreements` · `PUT /me/password`(EMAIL만) · `POST /me/reauth` · `DELETE /me` |
 | 동선 | `POST /itineraries/generate` — 게스트 허용·무상태 서버 생성 🔒(결정-41) · 저장/조회/편집 `/itineraries/**`는 인증 필요 |
 | 마이·찜 | `/me/courses` · `/me/favorites` — 서버 SSOT, Room은 읽기 캐시. `/runs`는 P1 |
-| 대회 | `GET /contests` · `/daily-counts` · `/closing-soon` · `/{id}` — canonical 조회 전용, 관리자/배치만 갱신 |
+| 대회 | `GET /contests` · `/daily-counts` · `/closing-soon` · `/{id}` — 활성 canonical 공개 조회, 찜·저장 참조 상세는 비활성도 조회, 관리자/배치만 갱신 |
 | 코스 | `GET /courses/near`(목표 거리·`HARD` 제외 큐레이션 우선, 적격 경로가 없으면 품질 상한 OSM/GraphHopper 생성 1건, 카카오 걷기 스팟 통합) · `/courses` · `/courses/regions`(큐레이션 전용) |
 | **외부 API 프록시** 🔒확정 | `GET /pois?category=&lat=&lng=&radius=`(숙소 AD5 포함) · `GET /contests/{id}/festivals` · `GET /festivals` · `GET /geocode?query=` — 서버 캐싱 🔧정책. 카카오 걷기 스팟 조회는 `/courses/near`의 서버 내부 소스이며 독립 앱 API로 노출하지 않는다 |
 
@@ -787,7 +805,7 @@ app/src/main/java/com/runninggu/app/
 
 | 팀원 | 영역 | 담당 백로그 |
 |---|---|---|
-| **유선경** | **백엔드 전담** — 인증/계정 연결·canonical 대회·외부 프록시·큐레이션 동기화·OSM 라우팅·마이 영속화·springdoc·배포 | AP-02 · AP-07 · AP-23 · AP-24(서버 계약) · AP-25 |
+| **유선경** | **백엔드 전담** — 인증/단일 가입 수단·canonical 대회·외부 프록시·큐레이션 동기화·OSM 라우팅·마이 영속화·springdoc·배포 | AP-02 · AP-07 · AP-23 · AP-24(서버 계약) · AP-25 |
 | **이건모** | **앱 UI** — Compose 테마·4탭·인증/홈/캘린더/위저드/결과/마이 정보수정·찜·공통 UI 상태 | AP-06 · 08 · 09 · 10 · 11 · 13 · 21 |
 | **김민지** | **앱 코어** — 프로젝트·도메인/데이터 레이어·카카오맵·러닝코스/GPX 폴백·GPS 기록·공통 API 계약 + scripts/CI | AP-01 · 03 · 04 · 05 · 12 · 14 · 22 · AP-24(앱/데이터) |
 
@@ -816,7 +834,7 @@ app/src/main/java/com/runninggu/app/
 | AP-10 | S2 캘린더 (리스트+캘린더 뷰·검색·**필터 모달 F1**·카드) | §4.5 |
 | AP-11 | S3~S7 상세+위저드+결과 (편집·후보 시트·저장, **산책 섹션 제거+S8 연계 카드**) | §4.6~4.10 |
 | AP-12 | S8 러닝코스 (위치 권한·목표거리·표시용 난이도·큐레이션/OSM 경로·걷기 스팟·지역별; P0 난이도 칩 없음) | §4.11 |
-| AP-13 | S10 마이 (프로필·정보수정·계정 연결 + 동선/저장 러닝코스/**찜한 대회** 세그먼트·서버 SSOT, ran은 P1) | §4.13 |
+| AP-13 | S10 마이 (프로필·정보수정·가입 로그인 방식 표시 + 동선/저장 러닝코스/**찜한 대회** 세그먼트·서버 SSOT, ran은 P1) | §4.13 |
 | AP-14 | data/remote — **백엔드 API 클라이언트(Retrofit)** + 동선·POI·`GET /courses/near`(OSM 원천·표시 난이도·부분 실패) 요청/응답·ProblemDetail/Enum/페이징 DTO 매퍼 + 제한적 폴백 | §8.1·§9.3 |
 | ~~AP-20~~ | ~~전 대회 POI 사전수집~~ — 운영 오프라인 동선 생성 제외 결정으로 **MVP 제외**, SAMPLE은 목업/데모만 유지 | §8.1 · NFR-1 |
 | AP-21 | **대회 찜(B2)** 🔒확정 — 카드·상세 하트 토글 + 마이 세그먼트 + `/me/favorites` 동기화 | §4.5·4.13 |
@@ -872,7 +890,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-19 | 하단 탭은 **홈·캘린더·러닝코스·마이 4개** | 목업·IA·내비게이션 라벨을 하나로 고정 | §2.1 · AP-06 |
 | 결정-20 | **서버 중심 온라인 SSOT + 제한적 오프라인 폴백** | 계정·찜·동선 충돌을 줄이고 MVP 동기화 복잡도를 제한 | §2.4 · NFR-1 |
 | 결정-21 | 대회는 **CONTEST canonical + CONTEST_SOURCE 원본 분리** | 271개 원본의 출처·감사를 보존하면서 중복 병합된 153개를 안정적으로 제공 | §6.2 · §8.2 |
-| 결정-22 | EMAIL/KAKAO는 `LOGIN_IDENTITY`로 한 USER에 연결, **동일 이메일 자동 병합 금지** | 카카오 이메일 미제공·변경과 계정 탈취/오병합 위험 방지 | §4.1 · §6.5 |
+| 결정-22(08-20 개정) | EMAIL/KAKAO는 `LOGIN_IDENTITY`로 분리하되 **한 USER는 가입 시 선택한 수단 하나만 보유**한다. P0 연결·추가·전환과 동일 이메일 자동 병합은 지원하지 않는다. KAKAO 이메일은 제공된 경우에만 nullable 스냅샷으로 보관하고 별도 입력·인증을 요구하지 않는다 | 제품에 계정 연결 기능이 없으므로 USER와 로그인 수단을 1:1로 고정하고 불필요한 연결·해제 계약을 제거한다. 카카오 이메일 미동의도 가입 가능하게 유지한다 | §4.1 · §4.13 · §6.5 |
 | 결정-23 | 동선의 **RACE 블록은 시스템 관리, 사용자 수정·삭제·이동 금지** | 대회 canonical과 저장 동선의 정합성 유지 | §4.10 · §5.7 |
 | 결정-24 | API 공통 계약은 **ProblemDetail·대문자 Enum·대회 cursor·개인 Pageable·KST/UTC** | 클라이언트 분기·오류 처리·페이징 불일치 방지 | §9.3 · NFR-17 |
 | 결정-25 | 코스는 **두루누비 API 메타 동기화 + GPX 경로 결합**, 앱 GPX 축약 폴백 | 최신 메타와 실제 경로를 함께 확보하고 외부 장애에도 코스 핵심 기능 유지 | §5.8 · §8.4 |
@@ -893,7 +911,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-30 | D-13을 개정해 동선 생성의 **Empty와 Error를 분리**하고 Empty는 조건 수정, Error는 재시도 | 정상 0건과 장애를 같은 실패 화면으로 숨기지 않는다 | §3.5 · §4.9 · §4.10 |
 | 결정-31 | canonical 좌표 누락 0건을 배치 게이트로 검증하고 앱 DTO는 nullable로 방어 | 현재 데이터에는 별도 좌표 없음 UX가 불필요하지만 재수집 회귀를 막아야 한다 | §4.6 · §6.2 · §8.2 |
 | 결정-32 | 숙소 검색은 2자 이상·500ms debounce로 서버 `query`를 호출 | 외부 API 쿼터와 입력 UX를 함께 보호한다 | §4.9 |
-| 결정-33 | 저장 코스는 `routeFingerprint`로 사용자별 멱등 저장 | 중복 탭과 같은 코스 재저장을 중복 레코드로 만들지 않는다 | §6.4 |
+| 결정-33(08-19 개정) | 저장 코스는 geometry 좌표열만 정규화해 서버가 `v1:` + SHA-256 lowercase hex `routeFingerprint`를 만들고 사용자별 멱등 저장한다. 진행 반대 경로는 별개이며 연속 중복 좌표는 제거한다 | 코스 메타데이터 변경이 동일 경로 판정을 흔들지 않게 하고 클라이언트별 계산 차이를 막는다. 좌표 정밀도만 실제 GraphHopper 응답 확인 후 고정한다 | §6.4 |
 | 결정-34 | 탈퇴는 짧게 유효한 재인증 토큰을 요구 | 탈취된 Access Token만으로 계정을 삭제하지 못하게 한다 | §4.13 |
 | 결정-35 | 대회 `imageUrl`은 P0부터 nullable, 미보유 시 placeholder | 이미지가 없는 대회도 목록·상세에서 유지한다 | §4.6 · §6.2 |
 | 결정-36 | GPS 기록·`ran` 목록과 saved/ran 통합 계약은 **P1** | P0에는 저장 코스만 있어 통합 정렬·페이징을 미리 추측하지 않는다 | §4.11 · §4.13 · AP-22 |
@@ -903,10 +921,14 @@ app/src/main/java/com/runninggu/app/
 | 결정-40 | P0 대회 전달은 **Python → 서버용 JSON 스냅샷 → 백엔드 Importer → PostgreSQL**로 하고, 향후 내부 수집 API 또는 스테이징 승격으로 자동화한다 | 초기에는 검토·재현·롤백이 쉬운 파일 계약을 사용하고, 운영 자동화 이후에도 Python의 핵심 테이블 직접 쓰기를 금지해 DB 소유권과 검증 경계를 유지한다 | §8.2 · AP-07 · AP-24 |
 | 결정-41 | P0 동선 생성의 운영 주체는 **백엔드 `POST /itineraries/generate` 하나**로 고정하고 앱은 생성 응답 표시·저장 전 편집만 한다 | 외부 POI 키·캐시·폴백·부분 실패와 생성 규칙을 서버 한 곳에서 관리해 앱 버전별 결과 차이와 다중 POI 요청 조율을 막는다. PR #22 앱 엔진은 서버 이식의 참고 구현일 뿐 런타임 계약이 아니다 | §4.9 · §5.6 · §9.2~9.3 · AP-04·07·14 |
 | 결정-42(08-19 개정) | **OSM·GraphHopper 도시 러닝코스 생성을 P0에 포함**한다. GraphHopper는 서버 내부 별도 프로세스와 영속 그래프 캐시로 운영한다. P0 내 주변은 난이도 칩(a)과 `EventType` 기본값(c)을 모두 제거하고 S7이 출발지·회복 목표거리만 전달한다. 서버는 `HARD`와 거리·차도·실제 회전 상한 초과 경로를 자동 추천하지 않으며 상한을 완화하지 않는다 | 초기 `(a)+(c)` 매핑은 §5.1 회복 룰과 충돌하고 `EASY` 한정 시 PoC 커버리지가 42/60으로 감소했다. PR #32 `a4587ef`의 수도권 20곳×5·10·21km 후보 실측은 `HARD` 제외·실제 회전 6회/km 상한에서도 경로 후보가 남음을 보였다. 사용자 입력을 늘리지 않고 산악·고차도·과다 회전 경로를 서버에서 차단하며, 차도 상한은 포인트 수가 아닌 실거리 가중 회귀 테스트로 검증한다 | §4.10~4.11 · §5.8 · §6.4 · §8.4 · §9.2~9.3 · AP-12·14·25 · NFR-18 |
+| 결정-43 | 대회 원천 ID는 `externalId/external_id`, 이메일 인증 목적은 `SIGNUP/PASSWORD_RESET`, 원천 수집 시각은 `fetchedAt/fetched_at`, 주최자는 `organizer`로 통일한다. 사용자·aggregate 자식은 FK `ON DELETE CASCADE`, 대회 참조는 `RESTRICT`, Enum은 `VARCHAR+CHECK`, 좌표는 `NUMERIC(10,7)`로 고정한다 | 데이터 파일·API·DB의 동의어를 제거하고 탈퇴·aggregate 삭제와 canonical 참조 보존의 경계를 물리 스키마 전에 명확히 한다 | §6.2 · §6.5 · ERD v4 |
+| 결정-44 | 저장 코스의 attribution은 서버가 원천 메타데이터에서 완성 문구 배열로 생성해 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존한다. 상세 API에만 반환하고 목록·`routeFingerprint`에서는 제외하며, 문구 변경을 기존 저장 데이터에 소급하지 않는다. 지역별 `GET /api/courses`도 실제 사용 원천의 `attributions[]`를 반환한다 | 앱이 원천 코드로 라이선스 문구를 추측하지 않게 하고 저장 당시 출처를 재현하면서, 문구 변경 때문에 동일 geometry의 멱등 판정이 흔들리지 않게 한다(이슈 #54) | §4.11 · §6.4 |
+| 결정-45 | 저장 동선은 지역·회복·전체 트리와 RACE 날짜·시간·장소를 snapshot으로 보존하고 대회명·현재 canonical 메타데이터는 조회 시 파생한다. 이름 외 일정·장소·지역·좌표 변경은 `needsRegeneration=true`로 알리되 자동 재배치하지 않으며, 재생성 결과를 사용자가 최종 저장할 때 `PUT /itineraries/{id}`로 같은 id의 트리를 교체한다 | canonical 변경으로 사용자 편집 동선이 예고 없이 바뀌는 것을 막고, 최신 대회 정보와 저장 당시 계획을 함께 설명할 수 있게 한다(이슈 #55) | §4.10 · §4.13 · §6.3 |
+| 결정-46 | 검증 완료 full snapshot에서 원천이 **2회 연속 누락**되면 source를 비활성화하고, 활성 source가 없는 canonical만 비활성화한다. 실패·부분 snapshot은 누락 횟수에 포함하지 않고 재등장 시 즉시 활성화한다. 물리 삭제 없이 공개 목록에서 제외하되 기존 찜·동선의 상세 조회는 유지한다 | 일시 수집 장애로 대회가 사라지는 것을 막으면서 장기 미제공 항목은 공개 탐색에서 제거한다(이슈 #56) | §4.5~4.6 · §4.13 · §8.2 |
 
 ### 12.5 남은 미결
 
-**P0 제품 미결 없음.** D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
+**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성은 차단하되 정확한 HTTP status·오류 `code`는 이슈 #56의 추가 리뷰 후 API 계약에 확정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
 
 > 구 미결 1~13번은 전부 12.1의 결정으로 해소되었다 (번호는 문서 내 참조 보존을 위해 재사용하지 않음).
 
