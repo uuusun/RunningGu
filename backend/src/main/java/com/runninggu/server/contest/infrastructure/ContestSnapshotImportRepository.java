@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ContestSnapshotImportRepository
         extends JpaRepository<ContestSnapshotImport, Long> {
 
-    Optional<ContestSnapshotImport> findBySourceSha256AndCheckedAtMax(
-            String sourceSha256, Instant checkedAtMax);
+    Optional<ContestSnapshotImport> findBySnapshotSha256AndCheckedAtMax(
+            String snapshotSha256, Instant checkedAtMax);
 
     Optional<ContestSnapshotImport> findTopByOrderByCheckedAtMaxDesc();
 }

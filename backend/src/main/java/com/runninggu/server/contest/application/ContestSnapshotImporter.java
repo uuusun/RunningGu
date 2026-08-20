@@ -1,6 +1,6 @@
 package com.runninggu.server.contest.application;
 
-import com.runninggu.server.contest.application.snapshot.ContestSnapshot;
+import com.runninggu.server.contest.application.snapshot.ContestSnapshotFile;
 import com.runninggu.server.contest.infrastructure.ContestSnapshotFileReader;
 import java.nio.file.Path;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ public class ContestSnapshotImporter {
     }
 
     public ContestSnapshotImportResult importFile(Path path) {
-        ContestSnapshot snapshot = fileReader.read(path);
-        return importService.importSnapshot(snapshot);
+        ContestSnapshotFile snapshotFile = fileReader.read(path);
+        return importService.importSnapshot(snapshotFile);
     }
 }

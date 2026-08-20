@@ -2,6 +2,7 @@ package com.runninggu.server.contest.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshot;
+import com.runninggu.server.contest.application.snapshot.ContestSnapshotFile;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshotValidator;
 import com.runninggu.server.contest.domain.Contest;
 import com.runninggu.server.contest.domain.ContestCategory;
@@ -65,17 +66,19 @@ public class ContestSnapshotImportService {
 
     /** 검증·canonical 승계·하위 갱신·적용 이력을 한 트랜잭션으로 처리한다. (SPEC §8.2) */
     @Transactional
-    public ContestSnapshotImportResult importSnapshot(ContestSnapshot snapshot) {
+    public ContestSnapshotImportResult importSnapshot(ContestSnapshotFile snapshotFile) {
+        ContestSnapshot snapshot = snapshotFile.snapshot();
+        String snapshotSha256 = snapshotFile.snapshotSha256();
         validator.validate(snapshot);
         importLock.acquire();
 
         Instant checkedAtMax = Instant.parse(snapshot.meta().checkedAtMax());
         if (importRepository
-                .findBySourceSha256AndCheckedAtMax(snapshot.meta().sourceSha256(), checkedAtMax)
+                .findBySnapshotSha256AndCheckedAtMax(snapshotSha256, checkedAtMax)
                 .isPresent()) {
             return ContestSnapshotImportResult.noOp();
         }
-        rejectOutOfOrder(snapshot.meta().sourceSha256(), checkedAtMax);
+        rejectOutOfOrder(snapshotSha256, checkedAtMax);
 
         Instant mutationAt = clock.instant();
         List<Contest> contests = new ArrayList<>(contestRepository.findAll());
@@ -152,7 +155,11 @@ public class ContestSnapshotImportService {
 
         Instant appliedAt = clock.instant();
         importRepository.save(new ContestSnapshotImport(
-                snapshot.schemaVersion(), snapshot.meta().sourceSha256(), checkedAtMax, appliedAt));
+                snapshot.schemaVersion(),
+                snapshotSha256,
+                snapshot.meta().sourceSha256(),
+                checkedAtMax,
+                appliedAt));
 
         return new ContestSnapshotImportResult(
                 ContestSnapshotImportResult.Status.APPLIED,
@@ -162,13 +169,13 @@ public class ContestSnapshotImportService {
                 importedEvents);
     }
 
-    private void rejectOutOfOrder(String sourceSha256, Instant checkedAtMax) {
+    private void rejectOutOfOrder(String snapshotSha256, Instant checkedAtMax) {
         importRepository.findTopByOrderByCheckedAtMaxDesc().ifPresent(latest -> {
             if (checkedAtMax.isBefore(latest.getCheckedAtMax())) {
                 throw new ContestSnapshotOrderException("마지막 성공 이력보다 과거 snapshot입니다");
             }
             if (checkedAtMax.equals(latest.getCheckedAtMax())
-                    && !sourceSha256.equals(latest.getSourceSha256())) {
+                    && !snapshotSha256.equals(latest.getSnapshotSha256())) {
                 throw new ContestSnapshotOrderException("같은 checkedAtMax의 snapshot hash가 다릅니다");
             }
         });

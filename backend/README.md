@@ -50,8 +50,9 @@ cd backend
 .\gradlew.bat contestImport -PsnapshotPath=C:\snapshots\contest_snapshot.json
 ```
 
-검증 실패, 과거 snapshot, 동일 기준 시각의 다른 hash는 전체 롤백한다. 같은
-`sourceSha256 + checkedAtMax`를 다시 실행하면 성공 no-op다.
+검증 실패, 과거 snapshot, 동일 기준 시각의 다른 snapshot 파일 hash는 전체 롤백한다. 같은
+`snapshot_sha256 + checked_at_max`를 다시 실행하면 성공 no-op다. `source_sha256`은 입력 CSV
+출처 추적용이며 snapshot 식별에는 사용하지 않는다.
 
 ## 검증
 

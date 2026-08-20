@@ -19,6 +19,9 @@ public class ContestSnapshotImport {
     @Column(name = "schema_version", nullable = false)
     private int schemaVersion;
 
+    @Column(name = "snapshot_sha256", nullable = false, length = 64)
+    private String snapshotSha256;
+
     @Column(name = "source_sha256", nullable = false, length = 64)
     private String sourceSha256;
 
@@ -31,11 +34,20 @@ public class ContestSnapshotImport {
     protected ContestSnapshotImport() {}
 
     public ContestSnapshotImport(
-            int schemaVersion, String sourceSha256, Instant checkedAtMax, Instant appliedAt) {
+            int schemaVersion,
+            String snapshotSha256,
+            String sourceSha256,
+            Instant checkedAtMax,
+            Instant appliedAt) {
         this.schemaVersion = schemaVersion;
+        this.snapshotSha256 = snapshotSha256;
         this.sourceSha256 = sourceSha256;
         this.checkedAtMax = checkedAtMax;
         this.appliedAt = appliedAt;
+    }
+
+    public String getSnapshotSha256() {
+        return snapshotSha256;
     }
 
     public String getSourceSha256() {

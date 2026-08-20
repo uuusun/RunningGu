@@ -8,6 +8,7 @@ import com.runninggu.server.contest.application.ContestSnapshotImportResult;
 import com.runninggu.server.contest.application.ContestSnapshotImportService;
 import com.runninggu.server.contest.application.ContestSnapshotOrderException;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshot;
+import com.runninggu.server.contest.application.snapshot.ContestSnapshotFile;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshotValidationException;
 import com.runninggu.server.contest.domain.Contest;
 import com.runninggu.server.contest.infrastructure.ContestEventRepository;
@@ -62,8 +63,9 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void nullable_컬럼과_하위_데이터와_적용_이력을_원자적으로_적재한다() throws Exception {
         ContestSnapshot snapshot = fixture();
+        ContestSnapshotFile snapshotFile = snapshotFile(snapshot);
 
-        ContestSnapshotImportResult result = importService.importSnapshot(snapshot);
+        ContestSnapshotImportResult result = importService.importSnapshot(snapshotFile);
 
         assertThat(result.status()).isEqualTo(ContestSnapshotImportResult.Status.APPLIED);
         assertThat(result.insertedContests()).isEqualTo(1);
@@ -78,6 +80,12 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
         assertThat(count("contest_source")).isEqualTo(2);
         assertThat(count("contest_snapshot_import")).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
+                        "SELECT snapshot_sha256 FROM contest_snapshot_import", String.class))
+                .isEqualTo(snapshotFile.snapshotSha256());
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT source_sha256 FROM contest_snapshot_import", String.class))
+                .isEqualTo(snapshot.meta().sourceSha256());
+        assertThat(jdbcTemplate.queryForObject(
                         "SELECT raw_payload ->> 'race_id' FROM contest_source WHERE external_id = ?",
                         String.class,
                         "go-seoul-2026"))
@@ -86,11 +94,12 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
 
     @Test
     void 저장소의_전체_snapshot을_적재하고_재실행하면_no_op이다() {
-        ContestSnapshot snapshot =
+        ContestSnapshotFile snapshotFile =
                 fileReader.read(Path.of("..", "data", "contest_snapshot.json"));
+        ContestSnapshot snapshot = snapshotFile.snapshot();
 
-        ContestSnapshotImportResult applied = importService.importSnapshot(snapshot);
-        ContestSnapshotImportResult repeated = importService.importSnapshot(snapshot);
+        ContestSnapshotImportResult applied = importService.importSnapshot(snapshotFile);
+        ContestSnapshotImportResult repeated = importService.importSnapshot(snapshotFile);
 
         assertThat(applied.insertedContests()).isEqualTo(snapshot.meta().canonicalCount());
         assertThat(count("contest")).isEqualTo(snapshot.meta().canonicalCount().longValue());
@@ -102,14 +111,15 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
 
     @Test
     void import_history_lock이_동시_적재의_최신이력_판정을_직렬화한다() throws Exception {
-        ContestSnapshot snapshot = fixture();
+        ContestSnapshotFile snapshotFile = snapshotFile(fixture());
         ExecutorService executor = Executors.newSingleThreadExecutor();
         CompletableFuture<ContestSnapshotImportResult> future;
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
             connection.setAutoCommit(false);
             statement.execute("LOCK TABLE contest_snapshot_import IN EXCLUSIVE MODE");
-            future = CompletableFuture.supplyAsync(() -> importService.importSnapshot(snapshot), executor);
+            future = CompletableFuture.supplyAsync(
+                    () -> importService.importSnapshot(snapshotFile), executor);
 
             assertThatThrownBy(() -> future.get(500, TimeUnit.MILLISECONDS))
                     .isInstanceOf(TimeoutException.class);
@@ -124,7 +134,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 같은_snapshot은_no_op이고_누락_횟수를_다시_올리지_않는다() throws Exception {
         ContestSnapshot initial = fixture();
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial));
         ContestSnapshot firstMissing = version(
                 initial,
                 '2',
@@ -134,8 +144,9 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 initial.contests().getFirst().canonicalKey(),
                 initial.contests().getFirst().name());
 
-        importService.importSnapshot(firstMissing);
-        ContestSnapshotImportResult repeated = importService.importSnapshot(firstMissing);
+        ContestSnapshotFile firstMissingFile = snapshotFile(firstMissing);
+        importService.importSnapshot(firstMissingFile);
+        ContestSnapshotImportResult repeated = importService.importSnapshot(firstMissingFile);
 
         assertThat(repeated.status()).isEqualTo(ContestSnapshotImportResult.Status.NO_OP);
         assertThat(missingCount("online-seoul-2026")).isEqualTo(1);
@@ -145,48 +156,48 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 두_번_연속_누락하면_source를_비활성화하고_재등장하면_복구한다() throws Exception {
         ContestSnapshot initial = fixture();
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial));
         ContestSnapshot.Source goSource = initial.contests().getFirst().sources().getFirst();
         ContestSnapshot.Source onlineSource = initial.contests().getFirst().sources().get(1);
 
-        importService.importSnapshot(version(
+        importService.importSnapshot(snapshotFile(version(
                 initial,
                 '2',
                 "2026-06-14T02:00:00Z",
                 List.of(goSource),
                 initial.contests().getFirst().events(),
                 initial.contests().getFirst().canonicalKey(),
-                initial.contests().getFirst().name()));
-        importService.importSnapshot(version(
+                initial.contests().getFirst().name())));
+        importService.importSnapshot(snapshotFile(version(
                 initial,
                 '3',
                 "2026-06-14T03:00:00Z",
                 List.of(goSource),
                 initial.contests().getFirst().events(),
                 initial.contests().getFirst().canonicalKey(),
-                initial.contests().getFirst().name()));
+                initial.contests().getFirst().name())));
 
         assertThat(missingCount("online-seoul-2026")).isEqualTo(2);
         assertThat(sourceActive("online-seoul-2026")).isFalse();
         assertThat(contestRepository.findAll().getFirst().isActive()).isTrue();
 
-        importService.importSnapshot(version(
+        importService.importSnapshot(snapshotFile(version(
                 initial,
                 '4',
                 "2026-06-14T04:00:00Z",
                 List.of(goSource, onlineSource),
                 initial.contests().getFirst().events(),
                 initial.contests().getFirst().canonicalKey(),
-                initial.contests().getFirst().name()));
+                initial.contests().getFirst().name())));
 
         assertThat(missingCount("online-seoul-2026")).isZero();
         assertThat(sourceActive("online-seoul-2026")).isTrue();
     }
 
     @Test
-    void 과거_snapshot과_동일시각의_다른_hash를_거부한다() throws Exception {
+    void 과거_snapshot과_동일시각의_다른_파일_hash를_거부한다() throws Exception {
         ContestSnapshot initial = fixture();
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial, 'a'));
         ContestSnapshot.ContestItem contest = initial.contests().getFirst();
 
         ContestSnapshot older = version(
@@ -199,17 +210,20 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 contest.name());
         ContestSnapshot sameTimeDifferentHash = version(
                 initial,
-                '3',
+                '1',
                 initial.meta().checkedAtMax(),
                 contest.sources(),
                 contest.events(),
                 contest.canonicalKey(),
                 contest.name());
 
-        assertThatThrownBy(() -> importService.importSnapshot(older))
+        assertThatThrownBy(() -> importService.importSnapshot(snapshotFile(older, 'b')))
                 .isInstanceOf(ContestSnapshotOrderException.class)
                 .hasMessageContaining("과거");
-        assertThatThrownBy(() -> importService.importSnapshot(sameTimeDifferentHash))
+        assertThat(sameTimeDifferentHash.meta().sourceSha256())
+                .isEqualTo(initial.meta().sourceSha256());
+        assertThatThrownBy(() ->
+                        importService.importSnapshot(snapshotFile(sameTimeDifferentHash, 'c')))
                 .isInstanceOf(ContestSnapshotOrderException.class)
                 .hasMessageContaining("hash");
         assertThat(count("contest_snapshot_import")).isEqualTo(1);
@@ -218,7 +232,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 검증_실패는_기존_DB와_적용_이력을_바꾸지_않는다() throws Exception {
         ContestSnapshot initial = fixture();
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial));
         ContestSnapshot.Meta invalidMeta = new ContestSnapshot.Meta(
                 initial.meta().source(),
                 repeat('2'),
@@ -229,8 +243,8 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 initial.meta().skipped(),
                 "2026-06-14T02:00:00Z");
 
-        assertThatThrownBy(() -> importService.importSnapshot(
-                        new ContestSnapshot(initial.schemaVersion(), invalidMeta, initial.contests())))
+        assertThatThrownBy(() -> importService.importSnapshot(snapshotFile(
+                        new ContestSnapshot(initial.schemaVersion(), invalidMeta, initial.contests()))))
                 .isInstanceOf(ContestSnapshotValidationException.class);
         assertThat(contestRepository.findAll().getFirst().getName()).isEqualTo("서울 달리기");
         assertThat(count("contest_snapshot_import")).isEqualTo(1);
@@ -239,7 +253,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void source_승계로_canonical_PK를_유지하고_event를_완전_교체한다() throws Exception {
         ContestSnapshot initial = fixture();
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial));
         Long originalId = contestRepository.findAll().getFirst().getId();
         ContestSnapshot.ContestItem contest = initial.contests().getFirst();
         ContestSnapshot renamed = version(
@@ -251,7 +265,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 "2026-10-18|서울달리기대회",
                 "서울 달리기 대회");
 
-        importService.importSnapshot(renamed);
+        importService.importSnapshot(snapshotFile(renamed));
 
         Contest updated = contestRepository.findAll().getFirst();
         assertThat(updated.getId()).isEqualTo(originalId);
@@ -280,7 +294,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
         ContestSnapshot.ContestItem second = contest(
                 template, "2026-10-18|b대회", "B 대회", List.of(third), List.of("K5"), "2026-06-14T01:10:00Z");
         ContestSnapshot initial = snapshot(base, '1', "2026-06-14T01:10:00Z", List.of(first, second));
-        importService.importSnapshot(initial);
+        importService.importSnapshot(snapshotFile(initial));
         Long firstId = contestRepository.findByCanonicalKey(first.canonicalKey()).orElseThrow().getId();
         Long secondId = contestRepository.findByCanonicalKey(second.canonicalKey()).orElseThrow().getId();
 
@@ -294,7 +308,8 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                         withFetchedAt(online, "2026-06-14T02:00:00Z")),
                 List.of("FULL"),
                 "2026-06-14T02:00:00Z");
-        importService.importSnapshot(snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(merged)));
+        importService.importSnapshot(snapshotFile(
+                snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(merged))));
 
         Contest body = contestRepository.findByCanonicalKey(merged.canonicalKey()).orElseThrow();
         assertThat(body.getId()).isEqualTo(firstId);
@@ -320,8 +335,8 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 go.fetchedAt());
         ContestSnapshot.ContestItem second = contest(
                 template, "2026-10-18|b대회", "B 대회", List.of(online), List.of("K5"), base.meta().checkedAtMax());
-        importService.importSnapshot(snapshot(
-                base, '1', base.meta().checkedAtMax(), List.of(first, second)));
+        importService.importSnapshot(snapshotFile(snapshot(
+                base, '1', base.meta().checkedAtMax(), List.of(first, second))));
         ContestSnapshot.ContestItem merged = contest(
                 template,
                 "2026-10-18|c대회",
@@ -332,8 +347,8 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 List.of("FULL"),
                 "2026-06-14T02:00:00Z");
 
-        assertThatThrownBy(() -> importService.importSnapshot(
-                        snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(merged))))
+        assertThatThrownBy(() -> importService.importSnapshot(snapshotFile(
+                        snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(merged)))))
                 .isInstanceOf(AmbiguousContestSuccessionException.class)
                 .hasMessageContaining("동률");
         assertThat(count("contest")).isEqualTo(2);
@@ -343,7 +358,7 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 기존_canonical이_둘로_분리되면_snapshot_전체를_롤백한다() throws Exception {
         ContestSnapshot base = fixture();
-        importService.importSnapshot(base);
+        importService.importSnapshot(snapshotFile(base));
         ContestSnapshot.ContestItem template = base.contests().getFirst();
         ContestSnapshot.ContestItem first = contest(
                 template,
@@ -360,8 +375,8 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
                 List.of("K5"),
                 "2026-06-14T02:00:00Z");
 
-        assertThatThrownBy(() -> importService.importSnapshot(
-                        snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(first, second))))
+        assertThatThrownBy(() -> importService.importSnapshot(snapshotFile(
+                        snapshot(base, '2', "2026-06-14T02:00:00Z", List.of(first, second)))))
                 .isInstanceOf(AmbiguousContestSuccessionException.class)
                 .hasMessageContaining("둘 이상");
         assertThat(contestRepository.findAll())
@@ -375,7 +390,15 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
         Path path = Path.of(Objects.requireNonNull(
                                 getClass().getResource("/contest/valid-contest-snapshot.json"))
                         .toURI());
-        return fileReader.read(path);
+        return fileReader.read(path).snapshot();
+    }
+
+    private ContestSnapshotFile snapshotFile(ContestSnapshot snapshot) {
+        return new ContestSnapshotFile(snapshot, snapshot.meta().sourceSha256());
+    }
+
+    private ContestSnapshotFile snapshotFile(ContestSnapshot snapshot, char hashCharacter) {
+        return new ContestSnapshotFile(snapshot, repeat(hashCharacter));
     }
 
     private ContestSnapshot version(

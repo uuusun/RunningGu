@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshot;
+import com.runninggu.server.contest.application.snapshot.ContestSnapshotFile;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshotValidationException;
 import com.runninggu.server.contest.application.snapshot.ContestSnapshotValidator;
 import com.runninggu.server.contest.infrastructure.ContestSnapshotFileReader;
@@ -28,10 +29,13 @@ class ContestSnapshotFileContractTest {
 
     @Test
     void fixture를_읽고_알_수_없는_필드는_무시한다() throws URISyntaxException {
-        ContestSnapshot snapshot = reader.read(fixturePath());
+        ContestSnapshotFile snapshotFile = reader.read(fixturePath());
+        ContestSnapshot snapshot = snapshotFile.snapshot();
 
         validator.validate(snapshot);
 
+        assertThat(snapshotFile.snapshotSha256())
+                .isEqualTo("d2e0034fa71c543b8c67797adc99ca13d886cca56cc52e989e25c103c065346d");
         assertThat(snapshot.schemaVersion()).isEqualTo(1);
         assertThat(snapshot.contests()).hasSize(1);
         assertThat(snapshot.contests().getFirst().roadAddress()).isNull();
@@ -41,16 +45,19 @@ class ContestSnapshotFileContractTest {
 
     @Test
     void 실제_저장소_snapshot이_파일_계약을_만족한다() {
-        ContestSnapshot snapshot = reader.read(Path.of("..", "data", "contest_snapshot.json"));
+        ContestSnapshotFile snapshotFile =
+                reader.read(Path.of("..", "data", "contest_snapshot.json"));
+        ContestSnapshot snapshot = snapshotFile.snapshot();
 
         validator.validate(snapshot);
 
+        assertThat(snapshotFile.snapshotSha256()).matches("[0-9a-f]{64}");
         assertThat(snapshot.contests()).hasSize(snapshot.meta().canonicalCount());
     }
 
     @Test
     void 집계가_다르면_전체_검증을_거부한다() throws URISyntaxException {
-        ContestSnapshot valid = reader.read(fixturePath());
+        ContestSnapshot valid = reader.read(fixturePath()).snapshot();
         ContestSnapshot.Meta invalidMeta = new ContestSnapshot.Meta(
                 valid.meta().source(),
                 valid.meta().sourceSha256(),
