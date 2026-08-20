@@ -43,6 +43,7 @@
 - 승인된 완전 snapshot에서 source가 1회 누락되면 count 1/활성 유지, 서로 다른 다음 승인 snapshot에도 연속 누락되면 count 2/비활성이다. 실패·부분 snapshot과 같은 파일 재적재는 횟수를 올리지 않고, 재등장은 count 0/활성으로 복구한다.
 - canonical `active`는 활성 source 존재 여부로 결정한다. 비활성·과거 canonical을 물리 삭제하지 않고 공개 탐색에서만 제외하며 찜·동선의 상세 참조는 유지한다(확정-DB-05, 이슈 #56).
 - 성공한 snapshot은 `CONTEST_SNAPSHOT_IMPORT(schema_version, source_sha256, checked_at_max, applied_at)`에 같은 트랜잭션으로 기록한다. 같은 `(source_sha256, checked_at_max)`는 no-op, 과거 기준 시각과 동일 기준 시각의 다른 hash는 거부하며 실패한 적재는 이력을 남기지 않는다. 동시 실행은 DB 잠금으로 직렬화한다(확정-DB-08, 결정-47).
+- 한 canonical의 마라톤GO·마라톤온라인 다중 원천은 정상 수용한다. 다만 최대 source 겹침이 동률이거나 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 snapshot 전체를 거부해 기존 PK 참조·누락 상태·적용 이력을 보존한다(결정-48).
 
 ### 2.3 저장 동선
 

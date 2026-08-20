@@ -1,4 +1,4 @@
-# 서버용 대회 스냅샷 계약 (결정-39·40·46·47)
+# 서버용 대회 스냅샷 계약 (결정-39·40·46·47·48)
 
 > **지위**: 데이터 파이프라인(Python) ↔ 백엔드 Importer 사이의 파일 계약.
 > 생산자는 `scripts/build_contest_snapshot.py`, 소비자는 백엔드 Importer(AP-07)다.
@@ -40,6 +40,13 @@
    - ③ 둘 다 없으면 신규 insert.
    - 별도 승계 필드를 스냅샷에 넣지 않는 이유: 생성기는 DB 이전 상태를 모르므로 승계는
      소비자(Importer)만 판정할 수 있다.
+   - **승계 충돌은 fail-closed한다**(결정-48). Importer는 DB를 바꾸기 전에 snapshot 전체의
+     승계 대상을 먼저 계산한다. 재병합 시 최대 source 겹침 수가 둘 이상 기존 canonical에서
+     동률이거나, 한 기존 canonical이 둘 이상의 새 canonical의 승계 대상으로 중복 선택되는
+     분리 상황이면 어느 PK도 임의로 고르지 않고 snapshot 전체를 거부한다. 이때 canonical·
+     source·event·누락 횟수·`active`·적용 이력을 모두 기존 상태로 유지한다. 한 canonical에
+     `MARATHON_GO`와 `MARATHON_ONLINE` source가 함께 있는 정상적인 다중 원천은 거부 사유가
+     아니다.
 2. **스냅샷에 있는 하위만 갱신한다.** `CONTEST_EVENT`는 현재 canonical의 `events[]`로 완전
    대체한다. `CONTEST_SOURCE`는 `(sourceType, externalId)`로 upsert하고, 다른 canonical로
    재병합됐으면 `contest_id`를 옮긴다. 이번 스냅샷에 나타난 source는 `active=true`,
@@ -176,6 +183,8 @@ Importer는 성공적으로 적용한 snapshot을 다음 물리 계약으로 기
    기존 `data/contest_snapshot.json`을 교체하지 않고 Importer를 실행하지 않음
 7. 1.3의 적용 이력으로 동일 snapshot no-op·과거 snapshot·동일 기준 시각의 다른 hash 거부를 판정
 8. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical·누락 횟수·active·적용 이력 유지 (SPEC §8.2)
+9. 전체 canonical의 승계 대상을 DB 변경 전에 계산하고, 최대 source 겹침 동률 또는 하나의 기존
+   canonical을 둘 이상의 새 canonical이 승계하려는 충돌이면 전체 적재 거부(결정-48)
 
 적재는 멱등이다: 같은 스냅샷을 두 번 적재해도 데이터와 누락 횟수가 같다. 첫 승인 누락은
 count 1/active, 서로 다른 다음 승인 스냅샷의 연속 누락은 count 2/inactive, 재등장은 count 0/active가
