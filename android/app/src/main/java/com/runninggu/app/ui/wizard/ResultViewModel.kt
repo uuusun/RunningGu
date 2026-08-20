@@ -2,6 +2,10 @@ package com.runninggu.app.ui.wizard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.repository.FakeItineraryRepository
+import com.runninggu.app.data.repository.GenerateItineraryRequest
+import com.runninggu.app.data.repository.HotelInput
+import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
@@ -22,7 +26,8 @@ import kotlinx.coroutines.launch
  * 서버에 맡기고(결정-41), 받은 응답을 화면 상태로 들고 있는다. 저장 전 USER 블록 편집만
  * 앱 몫이다(§5.7).
  *
- * TODO(AP-14): [FakeItineraryRepository] 를 Retrofit 구현으로 교체한다.
+ * 서버가 서면 [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다 —
+ * 화면은 그대로다(AGENTS 4장).
  */
 class ResultViewModel(
     private val repository: ItineraryRepository = FakeItineraryRepository,
@@ -263,6 +268,7 @@ private fun WizardUiState.toRequestOrNull(): GenerateItineraryRequest? {
         endDate = end,
         event = event,
         themes = themes,
-        hotel = stay,
+        // 화면 후보 모델을 그대로 보내지 않는다 — 요청에 필요한 세 값만 옮긴다
+        hotel = stay?.let { HotelInput(it.name, it.lat, it.lng) },
     )
 }
