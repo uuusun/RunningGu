@@ -69,7 +69,8 @@ object FakeCourseRepository : CourseRepository {
 
     override suspend fun byRegion(region: String?, page: Int, size: Int): CoursePage {
         val all = DEMO_COURSES.filter { region == null || it.sido == region }
-        return CoursePage(courses = all.sortedBy { it.distanceKm }, hasNext = false)
+        val sorted = all.sortedBy { it.distanceKm }
+        return CoursePage(courses = sorted, hasNext = false, totalElements = sorted.size.toLong())
     }
 
     override suspend fun regions(): List<CourseRegion> = DEMO_REGIONS

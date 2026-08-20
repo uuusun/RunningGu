@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 /**
  * S8 화면 계약. (SPEC §4.11)
@@ -156,6 +157,19 @@ class CourseFormatTest {
         val state = NearbyState.Content(items = listOf(route()), attributions = emptyList())
 
         assertNull(state.degradedMessage)
+    }
+
+    @Test
+    fun `거리 표기는 기기 로캘을 타지 않는다`() {
+        // 소수점을 "," 로 찍는 로캘에서도 "1.2km" 여야 한다
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.GERMANY)
+            assertEquals("1.2km", formatDistance(1234))
+            assertEquals("980m", formatDistance(980))
+        } finally {
+            Locale.setDefault(original)
+        }
     }
 
     @Test

@@ -1,7 +1,9 @@
 package com.runninggu.app.ui.course
 
 import com.runninggu.app.data.model.CourseSummary
+import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
+import java.util.Locale
 
 /**
  * S8 카드 문구. (SPEC §4.11-5 · §4.11-b)
@@ -12,7 +14,7 @@ import com.runninggu.app.data.model.NearbyItem
 
 /** 슬라이더 사이 눈금 수. 1~21km 를 0.5 단위로 나눈 뒤 양 끝을 뺀다. */
 internal val TARGET_SLIDER_STEPS: Int =
-    ((CourseUiState.MAX_TARGET_KM - CourseUiState.MIN_TARGET_KM) / CourseUiState.TARGET_STEP_KM)
+    ((CourseTargetKm.MAX - CourseTargetKm.MIN) / CourseTargetKm.STEP)
         .toInt() - 1
 
 /** 5.0 → "5", 5.5 → "5.5". 정수는 소수점을 떼서 읽기 편하게 한다. */
@@ -49,4 +51,5 @@ fun courseSubtitle(course: CourseSummary): String = buildList {
 
 /** 1km 미만은 m, 그 이상은 소수 한 자리 km. */
 fun formatDistance(meters: Int): String =
-    if (meters < 1000) "${meters}m" else String.format("%.1fkm", meters / 1000.0)
+    // Locale 을 안 주면 기기 설정에 따라 소수점이 "," 로 나온다
+    if (meters < 1000) "${meters}m" else String.format(Locale.KOREA, "%.1fkm", meters / 1000.0)

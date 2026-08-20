@@ -3,6 +3,7 @@ package com.runninggu.app.ui.course
 import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.CourseSummary
+import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
 
 /**
@@ -16,8 +17,8 @@ import com.runninggu.app.data.model.NearbyItem
 data class CourseUiState(
     val tab: Tab = Tab.NEARBY,
     val origin: OriginState = OriginState.Undecided,
-    /** 목표 거리(km). 1~21, 0.5 단위. (SPEC §4.11-2) */
-    val targetKm: Double = DEFAULT_TARGET_KM,
+    /** 목표 거리(km). 범위·단위는 [CourseTargetKm] 이 유일한 출처다. (SPEC §4.11-2) */
+    val targetKm: Double = CourseTargetKm.DEFAULT,
     val nearby: NearbyState = NearbyState.Idle,
     val regions: RegionsState = RegionsState.Loading,
     /** 지역 칩 선택. null 이면 전국이다. 재탭하면 해제된다. (§4.11-b) */
@@ -29,13 +30,6 @@ data class CourseUiState(
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
         BY_REGION("지역별"),
-    }
-
-    companion object {
-        const val MIN_TARGET_KM = 1.0
-        const val MAX_TARGET_KM = 21.0
-        const val TARGET_STEP_KM = 0.5
-        const val DEFAULT_TARGET_KM = 5.0
     }
 }
 
@@ -115,7 +109,16 @@ sealed interface RegionsState {
 /** 지역별 코스 목록. (§4.11-b · §6-2) */
 sealed interface RegionCoursesState {
     data object Loading : RegionCoursesState
-    data class Content(val courses: List<CourseSummary>, val hasNext: Boolean) : RegionCoursesState
+    data class Content(
+        val courses: List<CourseSummary>,
+        val hasNext: Boolean,
+        /**
+         * 조건에 맞는 전체 코스 수. 칼럼 "{지역} 코스 N" 에 쓴다 (§4.11-b).
+         *
+         * `courses.size` 가 아니다 — 한 번에 20건씩 받으므로 그렇게 세면 틀어진다.
+         */
+        val totalElements: Long,
+    ) : RegionCoursesState
 
     /** "이 지역엔 코스가 없어요." */
     data object Empty : RegionCoursesState

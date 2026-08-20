@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeCourseRepository
@@ -31,13 +32,18 @@ class CourseViewModel(
     /** 슬라이더를 끌 때마다 조회하면 요청이 쏟아진다 — 이전 조회를 취소하고 마지막 것만 남긴다. */
     private var nearbyJob: Job? = null
 
+    /** 칩을 빠르게 두 번 누르면 먼저 보낸 응답이 늦게 도착해 목록이 어긋난다 — 같은 이유로 끊는다. */
+    private var regionJob: Job? = null
+
     init {
         loadRegions()
-        loadRegionCourses()
+        // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 내 주변이라 미리 부르면 헛 호출이다
     }
 
     fun onTabChange(tab: CourseUiState.Tab) {
         _uiState.update { it.copy(tab = tab) }
+        // 지역별을 처음 열 때 한 번만 부른다. 이후 갱신은 칩 선택·재시도가 맡는다
+        if (tab == CourseUiState.Tab.BY_REGION && regionJob == null) loadRegionCourses()
     }
 
     /** 출발지가 정해지면 바로 조회한다. (§4.11-1) */
@@ -120,14 +126,17 @@ class CourseViewModel(
     }
 
     fun loadRegionCourses() {
-        viewModelScope.launch {
+        regionJob?.cancel()
+        regionJob = viewModelScope.launch {
             _uiState.update { it.copy(regionCourses = RegionCoursesState.Loading) }
             val state = try {
                 val page = repository.byRegion(_uiState.value.selectedRegion)
                 if (page.courses.isEmpty()) {
                     RegionCoursesState.Empty
                 } else {
-                    RegionCoursesState.Content(page.courses, page.hasNext)
+                    // TODO(AP-12 후속): 21건 이상인 지역은 hasNext 를 살려 더 불러온다.
+                    //  지금은 첫 20건만 보이고 N 은 전체 건수를 그대로 쓴다
+                    RegionCoursesState.Content(page.courses, page.hasNext, page.totalElements)
                 }
             } catch (e: ApiException) {
                 RegionCoursesState.Error(e.userMessageOrDefault())
@@ -139,9 +148,9 @@ class CourseViewModel(
 
 /** 슬라이더 값을 계약 범위·단위로 맞춘다. 1~21km, 0.5 단위. (SPEC §4.11-2) */
 internal fun snapTargetKm(raw: Double): Double {
-    val step = CourseUiState.TARGET_STEP_KM
+    val step = CourseTargetKm.STEP
     val snapped = (raw / step).roundToInt() * step
-    return snapped.coerceIn(CourseUiState.MIN_TARGET_KM, CourseUiState.MAX_TARGET_KM)
+    return snapped.coerceIn(CourseTargetKm.MIN, CourseTargetKm.MAX)
 }
 
 /**

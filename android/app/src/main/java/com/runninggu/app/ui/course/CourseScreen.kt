@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.CourseSummary
+import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.ui.common.ElevationLine
 import com.runninggu.app.ui.common.EmptyState
@@ -170,7 +171,7 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
             value = state.targetKm.toFloat(),
             onValueChange = { viewModel.onTargetKmChange(it.toDouble()) },
             onValueChangeFinished = viewModel::onTargetKmCommit,
-            valueRange = CourseUiState.MIN_TARGET_KM.toFloat()..CourseUiState.MAX_TARGET_KM.toFloat(),
+            valueRange = CourseTargetKm.MIN.toFloat()..CourseTargetKm.MAX.toFloat(),
             // 1~21km 를 0.5 단위로 — 양 끝을 뺀 사이 눈금 수다
             steps = TARGET_SLIDER_STEPS,
         )
@@ -310,7 +311,8 @@ private fun RegionTab(state: CourseUiState, viewModel: CourseViewModel) {
             is RegionCoursesState.Content -> {
                 item {
                     Text(
-                        text = "${state.selectedRegion ?: "전국"} 코스 ${courses.courses.size}",
+                        // 전체 건수다 — 지금 보이는 개수가 아니다 (§4.11-b)
+                        text = "${state.selectedRegion ?: "전국"} 코스 ${courses.totalElements}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
