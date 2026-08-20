@@ -3,6 +3,7 @@ package com.runninggu.app.data.repository
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.data.remote.mapper.toContest
 import com.runninggu.app.domain.EventType
 import java.time.LocalDate
@@ -103,10 +104,3 @@ class RemoteContestRepository(private val api: ContestApi) : ContestRepository {
     }
 }
 
-/** 도메인 종목 → 서버 enum. (부록 C — 도메인은 한국어 라벨을 쓴다) */
-internal fun EventType.toServerName(): String = when (this) {
-    EventType.FULL -> "FULL"
-    EventType.HALF -> "HALF"
-    EventType.TEN_K -> "K10"
-    EventType.FIVE_K -> "K5"
-}

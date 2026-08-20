@@ -19,6 +19,8 @@ data class CourseUiState(
     val origin: OriginState = OriginState.Undecided,
     /** 목표 거리(km). 범위·단위는 [CourseTargetKm] 이 유일한 출처다. (SPEC §4.11-2) */
     val targetKm: Double = CourseTargetKm.DEFAULT,
+    /** 출발지 검색 입력·결과. (SPEC §4.11-1 ②) */
+    val originSearch: OriginSearchState = OriginSearchState(),
     val nearby: NearbyState = NearbyState.Idle,
     val regions: RegionsState = RegionsState.Loading,
     /** 지역 칩 선택. null 이면 전국이다. 재탭하면 해제된다. (§4.11-b) */
@@ -51,6 +53,22 @@ sealed interface OriginState {
     ) : OriginState {
         enum class Source { GPS, SEARCH, PRESET, ITINERARY }
     }
+}
+
+/**
+ * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
+ *
+ * 서버가 **카카오 키워드 첫 결과 하나**만 주므로 후보 목록이 없다 — 찾으면 바로 출발지가 된다.
+ * 그래서 이 상태에는 결과가 없고 진행 상황과 실패 문구만 있다.
+ */
+data class OriginSearchState(
+    val query: String = "",
+    val searching: Boolean = false,
+    /** 실패 문구. 없으면 null. `404 NO_RESULT` 와 그 밖의 실패를 다르게 적는다. */
+    val message: String? = null,
+) {
+    /** 공백만 넣고 누르면 부르지 않는다. */
+    val canSubmit: Boolean get() = query.isNotBlank() && !searching
 }
 
 /**
@@ -110,6 +128,7 @@ sealed interface RegionsState {
 sealed interface RegionCoursesState {
     data object Loading : RegionCoursesState
     data class Content(
+        /** 지금까지 받아온 것을 **이어 붙인** 목록. 다음 장을 받으면 뒤에 붙는다. */
         val courses: List<CourseSummary>,
         val hasNext: Boolean,
         /**
@@ -124,7 +143,17 @@ sealed interface RegionCoursesState {
          * `courses.size` 가 아니다 — 한 번에 20건씩 받으므로 그렇게 세면 틀어진다.
          */
         val totalElements: Long,
-    ) : RegionCoursesState
+        /** [더 보기] 를 눌러 다음 장을 받는 중. 목록은 그대로 두고 버튼만 바뀐다. */
+        val loadingMore: Boolean = false,
+        /**
+         * 다음 장을 못 받았다. **이미 받은 목록은 지우지 않는다** — 20건이라도 보이는 게
+         * 빈 화면보다 낫다(§4.11-7 의 부분 실패와 같은 취지).
+         */
+        val moreMessage: String? = null,
+    ) : RegionCoursesState {
+        /** 더 받을 게 남았고 지금 받는 중이 아니다. */
+        val canLoadMore: Boolean get() = hasNext && !loadingMore
+    }
 
     /** "이 지역엔 코스가 없어요." */
     data object Empty : RegionCoursesState

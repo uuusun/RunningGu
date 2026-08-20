@@ -9,6 +9,8 @@ import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeCourseRepository
+import com.runninggu.app.data.repository.FakeGeocodeRepository
+import com.runninggu.app.data.repository.GeocodeRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,7 @@ import kotlin.math.roundToInt
  */
 class CourseViewModel(
     private val repository: CourseRepository,
+    private val geocodeRepository: GeocodeRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseUiState())
@@ -34,6 +37,12 @@ class CourseViewModel(
 
     /** 칩을 빠르게 두 번 누르면 먼저 보낸 응답이 늦게 도착해 목록이 어긋난다 — 같은 이유로 끊는다. */
     private var regionJob: Job? = null
+
+    /** 검색 버튼 연타도 마지막 것만 남긴다. */
+    private var searchJob: Job? = null
+
+    /** 지역별 목록에서 지금까지 받은 페이지 번호. 지역을 바꾸면 0 으로 돌아간다. */
+    private var regionPage = 0
 
     init {
         loadRegions()
@@ -50,6 +59,51 @@ class CourseViewModel(
     fun onOriginChange(origin: OriginState) {
         _uiState.update { it.copy(origin = origin) }
         if (origin is OriginState.Fixed) refreshNearby()
+    }
+
+    fun onOriginQueryChange(query: String) {
+        // 입력을 고치면 앞선 실패 문구는 지운다 — 새 시도를 하는 중이다
+        _uiState.update { it.copy(originSearch = it.originSearch.copy(query = query, message = null)) }
+    }
+
+    /**
+     * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
+     *
+     * 서버가 카카오 키워드 **첫 결과 하나**를 주므로 찾으면 곧바로 출발지로 삼고 조회까지 간다.
+     * 후보 목록을 보여주고 고르게 하지 않는다.
+     */
+    fun onOriginSearch() {
+        val query = _uiState.value.originSearch.query.trim()
+        if (query.isBlank()) return
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(originSearch = it.originSearch.copy(searching = true, message = null))
+            }
+            try {
+                val place = geocodeRepository.search(query)
+                _uiState.update {
+                    it.copy(originSearch = it.originSearch.copy(searching = false, message = null))
+                }
+                onOriginChange(
+                    OriginState.Fixed(
+                        name = place.name,
+                        lat = place.lat,
+                        lng = place.lng,
+                        from = OriginState.Fixed.Source.SEARCH,
+                    ),
+                )
+            } catch (e: ApiException) {
+                _uiState.update {
+                    it.copy(
+                        originSearch = it.originSearch.copy(
+                            searching = false,
+                            message = e.searchMessage(),
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -120,22 +174,25 @@ class CourseViewModel(
          * 백엔드가 준비되면 [com.runninggu.app.data.repository.RemoteCourseRepository] 로 바꾼다.
          * 화면은 안 건드린다 — Repository 인터페이스만 보기 때문이다(AGENTS 4장).
          */
-        fun factory(repository: CourseRepository = FakeCourseRepository) = viewModelFactory {
-            initializer { CourseViewModel(repository) }
+        fun factory(
+            repository: CourseRepository = FakeCourseRepository,
+            geocodeRepository: GeocodeRepository = FakeGeocodeRepository,
+        ) = viewModelFactory {
+            initializer { CourseViewModel(repository, geocodeRepository) }
         }
     }
 
+    /** 첫 장부터 다시. 지역을 바꿨거나 오류에서 재시도할 때다. */
     fun loadRegionCourses() {
         regionJob?.cancel()
+        regionPage = 0
         regionJob = viewModelScope.launch {
             _uiState.update { it.copy(regionCourses = RegionCoursesState.Loading) }
             val state = try {
-                val page = repository.byRegion(_uiState.value.selectedRegion)
+                val page = repository.byRegion(_uiState.value.selectedRegion, page = 0)
                 if (page.courses.isEmpty()) {
                     RegionCoursesState.Empty
                 } else {
-                    // TODO(AP-12 후속): 21건 이상인 지역은 hasNext 를 살려 더 불러온다.
-                    //  지금은 첫 20건만 보이고 N 은 전체 건수를 그대로 쓴다
                     RegionCoursesState.Content(
                         courses = page.courses,
                         hasNext = page.hasNext,
@@ -145,6 +202,41 @@ class CourseViewModel(
                 }
             } catch (e: ApiException) {
                 RegionCoursesState.Error(e.userMessageOrDefault())
+            }
+            _uiState.update { it.copy(regionCourses = state) }
+        }
+    }
+
+    /**
+     * [더 보기] — 다음 장을 받아 **뒤에 이어 붙인다**. (§4.11-b)
+     *
+     * 한 번에 20건씩 오므로 코스가 많은 지역은 이걸 눌러야 21번째부터 볼 수 있다.
+     * 실패해도 **이미 받은 목록은 두고** 문구만 붙인다 — 보이던 게 사라지면 안 된다.
+     */
+    fun loadMoreRegionCourses() {
+        val current = _uiState.value.regionCourses as? RegionCoursesState.Content ?: return
+        if (!current.canLoadMore) return
+        regionJob?.cancel()
+        regionJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(regionCourses = current.copy(loadingMore = true, moreMessage = null))
+            }
+            val state = try {
+                val next = repository.byRegion(_uiState.value.selectedRegion, page = regionPage + 1)
+                regionPage += 1
+                current.copy(
+                    courses = current.courses + next.courses,
+                    hasNext = next.hasNext,
+                    // 총 건수는 서버가 매 응답에 준다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
+                    totalElements = next.totalElements,
+                    // 출처는 **화면에 보이는 코스 전체** 기준이다. 이어 붙인 장에 새 원천이
+                    // 섞이면 그것도 표시해야 한다 (§6-2 · 결정-44)
+                    attributions = (current.attributions + next.attributions).distinct(),
+                    loadingMore = false,
+                    moreMessage = null,
+                )
+            } catch (e: ApiException) {
+                current.copy(loadingMore = false, moreMessage = e.userMessageOrDefault())
             }
             _uiState.update { it.copy(regionCourses = state) }
         }
@@ -168,6 +260,18 @@ internal fun ApiException.nearbyMessage(): String = when {
     this is ApiException.Network -> "네트워크에 연결할 수 없어요."
     this is ApiException.Http && code == ApiErrorCode.COURSE_SOURCES_UNAVAILABLE ->
         "코스 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    else -> userMessageOrDefault()
+}
+
+/**
+ * 출발지 검색 실패 문구. (§4-4)
+ *
+ * **못 찾은 것과 못 부른 것을 나눈다** — 전자는 검색어를 바꾸면 되고 후자는 다시 눌러야 한다.
+ */
+internal fun ApiException.searchMessage(): String = when {
+    this is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    this is ApiException.Http && code == ApiErrorCode.NO_RESULT ->
+        "그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요."
     else -> userMessageOrDefault()
 }
 

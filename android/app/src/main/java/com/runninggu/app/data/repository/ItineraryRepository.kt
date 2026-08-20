@@ -1,34 +1,72 @@
-package com.runninggu.app.ui.wizard
+package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.model.ItineraryResult
+import com.runninggu.app.data.remote.ApiJson
+import com.runninggu.app.data.remote.ItineraryApi
+import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
+import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
+import com.runninggu.app.data.remote.dto.HotelDto
+import com.runninggu.app.data.remote.mapper.toResult
+import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
 import kotlinx.coroutines.delay
-import kotlinx.serialization.json.Json
 import java.time.LocalDate
+import com.runninggu.app.data.model.PoiItem
 
 /** `POST /api/itineraries/generate` 요청. (API 명세 §5-1) */
 data class GenerateItineraryRequest(
-    val contestId: String,
+    /** canonical `CONTEST.id`. 번들만 있는 대회는 생성을 부를 수 없다 ([Contest.serverId]). */
+    val contestId: Long,
     val startDate: LocalDate,
     val endDate: LocalDate,
     val event: EventType,
     val themes: List<PoiCategory>,
     /** 숙소. null 이면 서버가 대회장 중심으로 슬롯을 채운다. (API 명세 §5-1 · SPEC §4.9) */
-    val hotel: PoiItem? = null,
+    val hotel: HotelInput? = null,
 )
+
+/**
+ * 요청에 실을 숙소.
+ *
+ * 화면의 후보 모델(`PoiItem`)을 그대로 쓰지 않는다 — `data` 가 `ui` 를 알면 안 된다
+ * (AGENTS 2장). 화면에서 필요한 세 값만 옮겨 담는다.
+ */
+data class HotelInput(val name: String, val lat: Double, val lng: Double)
 
 /**
  * 동선 생성 창구. (SPEC 결정-41)
  *
  * **앱은 동선을 만들지 않는다.** 서버가 KTO·카카오 POI 조회·캐시·폴백과 §5.6 조립을 한 요청에서
  * 수행하고, 앱은 응답을 표시하고 저장 전 USER 블록만 편집한다.
- *
- * TODO(AP-14): `data/remote` 의 Retrofit 구현으로 교체한다.
  */
 interface ItineraryRepository {
     suspend fun generate(request: GenerateItineraryRequest): ItineraryResult
 }
+
+/** 서버 구현. (API 명세 §5-1 — 게스트도 부를 수 있다) */
+class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryRepository {
+    override suspend fun generate(request: GenerateItineraryRequest): ItineraryResult =
+        apiCall { api.generate(request.toDto()).toResult() }
+}
+
+/**
+ * 요청 모델 → 전송 DTO. (§5-1)
+ *
+ * 날짜는 KST 비즈니스 날짜라 `toString()` 이 곧 `YYYY-MM-DD` 다. enum 은 서버와 같은
+ * 대문자 이름을 그대로 보낸다 — 라벨(한국어)을 보내면 안 된다.
+ */
+internal fun GenerateItineraryRequest.toDto() = GenerateItineraryRequestDto(
+    contestId = contestId,
+    startDate = startDate.toString(),
+    endDate = endDate.toString(),
+    // 부록 C 는 K5·K10 이다. enum 이름(FIVE_K·TEN_K)을 그대로 보내면 서버가 못 읽는다
+    event = event.toServerName(),
+    themes = themes.map { it.name },
+    hotel = hotel?.let { HotelDto(it.name, it.lat, it.lng) },
+)
 
 /**
  * 백엔드가 준비되기 전까지 쓰는 스텁. (매핑표 §12)
@@ -42,13 +80,11 @@ interface ItineraryRepository {
  */
 object FakeItineraryRepository : ItineraryRepository {
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     override suspend fun generate(request: GenerateItineraryRequest): ItineraryResult {
         delay(NETWORK_DELAY_MS) // 서버 왕복을 흉내 낸다 — 로딩 상태를 화면에서 확인할 수 있게.
 
         val fixture = if (Recovery[request.event].noHard) RECOVERY_FIXTURE else NORMAL_FIXTURE
-        val response = json.decodeFromString<GenerateItineraryResponse>(fixture)
+        val response = ApiJson.decodeFromString(GenerateItineraryResponse.serializer(), fixture)
         return response.toResult().alignTo(request)
     }
 
