@@ -113,6 +113,12 @@ sealed interface RegionCoursesState {
         val courses: List<CourseSummary>,
         val hasNext: Boolean,
         /**
+         * 목록 하단 출처 한 줄. (SPEC §4.11-b · 결정-44)
+         *
+         * 순서·문구를 바꾸지 않고 그대로 표시한다 — 공공누리·ODbL 출처표시 의무다.
+         */
+        val attributions: List<String> = emptyList(),
+        /**
          * 조건에 맞는 전체 코스 수. 칼럼 "{지역} 코스 N" 에 쓴다 (§4.11-b).
          *
          * `courses.size` 가 아니다 — 한 번에 20건씩 받으므로 그렇게 세면 틀어진다.

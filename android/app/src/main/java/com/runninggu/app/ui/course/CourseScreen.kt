@@ -319,6 +319,9 @@ private fun RegionTab(state: CourseUiState, viewModel: CourseViewModel) {
                     )
                 }
                 items(courses.courses) { CourseRow(it) }
+
+                // 목록 하단 출처 한 줄 (SPEC §4.11-b · 결정-44)
+                item { Attributions(courses.attributions) }
             }
         }
     }

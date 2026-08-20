@@ -136,7 +136,12 @@ class CourseViewModel(
                 } else {
                     // TODO(AP-12 후속): 21건 이상인 지역은 hasNext 를 살려 더 불러온다.
                     //  지금은 첫 20건만 보이고 N 은 전체 건수를 그대로 쓴다
-                    RegionCoursesState.Content(page.courses, page.hasNext, page.totalElements)
+                    RegionCoursesState.Content(
+                        courses = page.courses,
+                        hasNext = page.hasNext,
+                        totalElements = page.totalElements,
+                        attributions = page.attributions,
+                    )
                 }
             } catch (e: ApiException) {
                 RegionCoursesState.Error(e.userMessageOrDefault())
