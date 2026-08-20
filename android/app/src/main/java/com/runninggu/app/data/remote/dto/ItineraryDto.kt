@@ -34,6 +34,7 @@ data class HotelDto(val name: String, val lat: Double, val lng: Double)
 @Serializable
 data class GenerateItineraryResponse(
     val title: String,
+    /** 요청과 같은 계약 값 — `FULL|HALF|K10|K5` 다. */
     val event: String,
     val recovery: RecoveryDto? = null,
     val days: List<DayDto> = emptyList(),

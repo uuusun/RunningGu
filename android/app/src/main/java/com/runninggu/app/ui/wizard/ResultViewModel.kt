@@ -59,7 +59,13 @@ class ResultViewModel(
 
     /** 위저드 상태로 생성을 요청한다. 같은 조건이면 다시 부르지 않는다. */
     fun generate(wizard: WizardUiState) {
-        val request = wizard.toRequestOrNull(demoContestId) ?: return
+        val request = wizard.toRequestOrNull(demoContestId) ?: run {
+            // 화면은 어떤 이유로든 무반응이면 안 된다. 예전에는 위저드 CTA 가 막아 줘서
+            // 여기 닿지 않았지만, canonical id 가 없는 대회(번들·오프라인)라는 **새 원인**이
+            // 생겼다 — 그대로 두면 스피너가 영원히 돈다 (#66 리뷰)
+            _uiState.update { it.copy(phase = ResultUiState.Phase.ERROR, errorMessage = wizard.blockedReason()) }
+            return
+        }
         // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다.
         sheetCenter = wizard.stay?.let { it.lat to it.lng } ?: (0.0 to 0.0)
         // LOADING 중 LaunchedEffect 재발화(회전·재진입)로 같은 요청이 두 번 나가는 것도 막는다.
@@ -264,6 +270,17 @@ class ResultViewModel(
             )
         }
     }
+}
+
+/**
+ * 생성을 못 부르는 이유. 사용자가 할 일이 다르므로 나눈다. (#66 리뷰)
+ *
+ * 조건이 덜 정해진 것은 되돌아가면 되고, canonical id 가 없는 것은 사용자가 할 수 있는 게
+ * 없다 — 후자는 애초에 CTA 를 막는 게 맞아서 후속으로 @mo-gun 님이 닫기로 했다.
+ */
+private fun WizardUiState.blockedReason(): String = when {
+    race == null || start == null || end == null -> "여행 조건이 덜 정해졌어요. 이전 단계에서 다시 골라 주세요."
+    else -> "이 대회는 아직 동선을 만들 수 없어요. 목록을 새로 불러온 뒤 다시 시도해 주세요."
 }
 
 /** 스텁 데모 전용 대회 id. 서버 요청에는 실리지 않는다. */
