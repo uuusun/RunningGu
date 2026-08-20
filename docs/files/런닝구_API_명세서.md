@@ -1,6 +1,6 @@
-# 런닝구 백엔드 API 명세서 v2.5
+# 런닝구 백엔드 API 명세서 v2.7
 
-> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4·수정 DFD
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.2·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
@@ -270,7 +270,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 3. 대회 API `/api/contests` (공개)
 
-**데이터 적재 계약 🔒(결정-39·40)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다. **스냅샷 파일 계약(경로 `data/contest_snapshot.json`·스키마·유일키·Importer 검증 의무)은 `docs/contest-snapshot-contract.md`가 SSOT다.**
+**데이터 적재 계약 🔒(결정-39·40·46)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 검증 완료 full snapshot에서 source가 2회 연속 누락될 때만 비활성화하고, 실패·부분 snapshot은 누락 횟수에 포함하지 않으며 재등장 시 즉시 활성화한다. canonical은 활성 source 존재 여부로 `active`를 파생·갱신하고 물리 삭제하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다. **스냅샷 파일 계약(경로 `data/contest_snapshot.json`·스키마·유일키·Importer 검증 의무)은 `docs/contest-snapshot-contract.md`가 SSOT다.**
 
 ### 3-1 `GET /api/contests` — 목록 (커서 페이징) 🔒
 
@@ -284,7 +284,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | `cursor` | string | 이전 응답의 불투명 `nextCursor` 그대로. 클라이언트 해석 금지 |
 | `size` | int | 기본 20 · 최대 50 🔧 |
 
-규칙: `contest_date >= 오늘(KST)` 고정 🔒 · 정렬 `(contest_date, id) ASC` · 필터는 AND 결합(events 내부만 OR) · 서버는 cursor를 검증·복호화한 뒤 내부 `(contestDate, id)` 튜플에 keyset 조건을 적용한다.
+규칙: `active=true AND contest_date >= 오늘(KST)` 고정 🔒 · 정렬 `(contest_date, id) ASC` · 필터는 AND 결합(events 내부만 OR) · 서버는 cursor를 검증·복호화한 뒤 내부 `(contestDate, id)` 튜플에 keyset 조건을 적용한다. 비활성 대회는 검색·목록·월간 건수·마감 임박에서 제외한다.
 
 ```json
 {
@@ -300,6 +300,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
       "imageUrl": "https://...",
       "sources": ["MARATHON_ONLINE", "MARATHON_GO"],
       "checkedAt": "2026-07-15T04:30:00Z",
+      "active": true,
       "favorite": false
     }
   ],
@@ -329,6 +330,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 3-1 카드 필드 + `organizer, officialUrl, lat, lng, dDay`(대회일 − 오늘, KST).
 `404 CONTEST_NOT_FOUND`. `organizer`, `officialUrl`, `imageUrl`, `lat`, `lng`는 nullable이다. 현재 원천 271건과 canonical 153건은 좌표 누락 0건이다. 좌표는 지도·인근 축제·동선 위저드의 기준점이며, 앱은 좌표가 없으면 P0에서 동선 만들기 CTA를 비활성화한다.
+비활성 canonical도 id 상세 조회는 유지하고 `active=false`를 반환한다. 앱은 "정보 제공 종료"를 표시하고 동선 생성 CTA를 비활성화하며 3-5를 호출하지 않는다. 찜·저장 동선의 참조를 보존하기 위한 계약이며 비활성을 `404`로 숨기지 않는다.
 
 ### 3-5 `GET /api/contests/{id}/festivals` — 인근 축제 (M3 프록시) 🔒
 
@@ -422,6 +424,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 - `themes`는 1개 이상(§4.8 — 0개면 클라 CTA 비활성) · `event`는 대회 종목에 없어도 선택 가능(§4.8).
 - `startDate/endDate`는 역순을 허용하지 않으며 시작·종료일 포함 최대 7일, 해당 대회일을 반드시 포함한다. 위반 시 `400 INVALID_TRAVEL_PERIOD`.
 - canonical 대회의 `lat/lng`가 없으면 생성하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
+- 비활성 대회는 새 동선을 생성하지 않는다. 정확한 HTTP status와 문제 응답 `code`는 이슈 #56의 추가 리뷰 전까지 미확정이므로 임의의 오류 계약으로 구현하지 않는다.
 
 응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
 
@@ -458,29 +461,41 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 요청 = 5-1 응답 구조 그대로(클라 편집 반영본). `201 {"id": 42}`.
 같은 `(user, contestId, startDate, endDate)`가 이미 있으면 **교체** 후 `200 {"id": 42, "replaced": true}` 🔒(SPEC §4.10 trip id `{대회id}-{시작일}-{종료일}` "동일 id 교체" 계약 승계).
-검증: `RACE` 블록은 서버가 canonical 대회 정보로 재구성해 **강제 주입**한다. 클라이언트가 보낸 RACE 제목·시간·장소·순서는 신뢰하지 않는다.
+검증: `RACE` 블록은 서버가 저장 시점의 canonical 대회 정보로 재구성해 **강제 주입**하고 이후 snapshot으로 보존한다. 클라이언트가 보낸 RACE 제목·시간·장소·순서는 신뢰하지 않는다. `region`, `recovery.label/note`, 호텔, 일자와 USER/RACE 블록 전체도 저장 시점 snapshot이다.
 
-### 5-3 `GET /api/itineraries` — 내 동선 목록 (인증, Pageable)
+### 5-3 `PUT /api/itineraries/{id}` — 재생성 결과로 교체 (인증·소유자)
 
-`content[]`: `{id, title, contestName, event, recovery, startDate, endDate, placeCount, createdAt}` — 마이 [동선] 카드 "{지역} n박 n일 · {대회명} · {종목} · 회복 배지 · 기간 · {장소 수}곳".
+대회 변경 안내에서 사용자가 다시 만든 결과를 최종 저장할 때만 호출한다. 요청은 5-1 응답 구조의 클라이언트 편집 반영본이며, path의 기존 동선과 `contestId`가 같아야 한다. 서버는 현재 canonical으로 RACE를 재구성·검증한 뒤 기존 id를 유지하고 트리와 snapshot을 한 트랜잭션에서 교체한다. 성공은 `200 {"id": 42, "replaced": true}`다.
 
-### 5-4 `GET /api/itineraries/{id}` — 상세 (인증·소유자)
+`POST /api/itineraries/generate` 미리보기와 확인 모달 단계에서는 기존 동선을 변경하지 않는다. 교체 트랜잭션이 실패해도 기존 트리를 유지하며, 기존 USER 편집을 새 결과에 자동 병합하지 않는다.
 
-5-1 응답 구조 + `id`, `days[].id`, `blocks[].id`, `blocks[].orderNo`(ASC 정렬). S7 복원·편집 모드 진입용.
+### 5-4 `GET /api/itineraries` — 내 동선 목록 (인증, Pageable)
+
+`content[]`: `{id, title, contestId, contestName, event, region, recovery, startDate, endDate, placeCount, createdAt, active, needsRegeneration}`.
+
+- `contestName`, `active`는 현재 `CONTEST`에서 파생하고 `region`, `recovery`, 기간은 저장 snapshot이다.
+- 저장된 RACE의 날짜·시간·장소·지역·좌표와 현재 canonical이 다르면 `needsRegeneration=true`다. 이름만 바뀐 경우와 `active` 변경만으로는 true가 되지 않는다.
+- 앱은 `needsRegeneration=true`에 "대회 변경" 배지를 표시하고, `active=false`인 기존 동선도 목록에서 삭제하지 않는다.
+
+### 5-5 `GET /api/itineraries/{id}` — 상세 (인증·소유자)
+
+5-1 응답 구조 + `id`, snapshot `region`, `days[].id`, `blocks[].id`, `blocks[].orderNo`(ASC 정렬), `needsRegeneration`, 최신 canonical `contest: {name, region, place, contestDate, startTime, lat, lng, active}`. S7 복원·편집 모드 진입용이다.
+
+`recovery`, 호텔, days와 모든 블록은 저장 snapshot을 반환한다. 특히 RACE 날짜·시간·장소를 최신 canonical로 자동 덮어쓰거나 타임라인을 재배치하지 않는다. 앱은 `contest`를 최신 대회 안내에, snapshot 트리를 저장 당시 일정 표시에 사용한다.
 구현 규약: days+blocks 동시 fetch join 금지(MultipleBagFetchException) → `hibernate.default_batch_fetch_size=100` 배치 로딩 🔒(정리본 확정).
 
-### 5-5 `DELETE /api/itineraries/{id}` → `204` (소유자 검증 `403`)
+### 5-6 `DELETE /api/itineraries/{id}` → `204` (소유자 검증 `403`)
 
-### 5-6 ~ 5-9 저장 후 편집 (인증·소유자) 🔒(정리본 확정 8 — 저장 전 편집은 클라 로컬)
+### 5-7 ~ 5-10 저장 후 편집 (인증·소유자) 🔒(정리본 확정 8 — 저장 전 편집은 클라 로컬)
 
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
-| 5-6 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-7 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
-| 5-8 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
-| 5-9 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
+| 5-7 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
+| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-9 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-10 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
 
-5-7의 block 응답은 5-4 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
+5-8의 block 응답은 5-5 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
 
 ---
 
@@ -547,7 +562,36 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=&size=` → 큐레이션 코스만 `content[]`: `{courseId, courseName, sido, sigun, distanceKm, difficulty, gainM, durationMin, dataSource, syncedAt}` — 거리 오름차순 🔒(§4.11-b). 여기의 `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다. `OSM_GENERATED`는 포함하지 않는다.
+`?region=부산&page=0&size=20` → 큐레이션 코스만 거리 오름차순으로 반환한다 🔒(§4.11-b). `OSM_GENERATED`는 포함하지 않는다.
+
+```json
+{
+  "content": [
+    {
+      "courseId": "durunubi-001",
+      "courseName": "해파랑길 1코스",
+      "sido": "부산",
+      "sigun": "남구",
+      "distanceKm": 17.8,
+      "difficulty": "NORMAL",
+      "gainM": 312,
+      "durationMin": 162,
+      "dataSource": "API_GPX",
+      "syncedAt": "2026-08-20T00:00:00Z"
+    }
+  ],
+  "page": {
+    "number": 0,
+    "size": 20,
+    "totalElements": 27,
+    "hasNext": true
+  },
+  "attributions": ["두루누비 걷기길(한국관광공사)"]
+}
+```
+
+- `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
+- `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
 
@@ -561,10 +605,12 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 |---|---|---|
 | POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId?, dataSource, courseName, region?, distanceKm, durationMin, difficulty, gainM, elevationProfileM, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
-| GET | `/me/courses/{id}` | 상세 — `pathPolyline` 포함 (코스 상세 **점선** 렌더링 🔒) |
+| GET | `/me/courses/{id}` | 상세 — `pathPolyline`, `attributions[]` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
 
 `sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 `pathPolyline`의 geometry만 사용해 `routeFingerprint`를 계산한다. 좌표를 확정 정밀도로 정규화하고 연속 중복 좌표만 제거하되 진행 순서는 유지하며, 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. 좌표 정밀도는 GraphHopper 실제 응답 확인 후 고정한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다.
+
+저장 시 서버는 `sourceCourseId`와 원천 메타데이터 또는 서버가 생성한 OSM 원천 정보를 기준으로 attribution 완성 문구를 확정한다. 요청에 attribution을 받지 않으며 클라이언트가 보내더라도 무시한다. `SAVED_COURSE.attributions`는 PostgreSQL `JSONB NOT NULL DEFAULT '[]'` snapshot이고, 외부 라이선스 문구가 바뀌어도 기존 값을 소급 변경하지 않는다. 상세 응답의 `attributions`는 `List<String>`이며 출처가 없으면 `[]`이다. 목록 응답에는 이 필드를 포함하지 않고, 상세에서 앱이 배열 순서대로 `" · "`로 연결한다. attribution은 `routeFingerprint` 입력에서 제외한다(결정-44, 이슈 #54).
 
 ### 7-B 러닝 기록 `/api/runs` — P1 예약
 
@@ -596,7 +642,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/me/favorites` | 찜한 대회 목록(Pageable) — 항목 = 3-1 대회 카드(`favorite=true`). 지난 대회 흐림은 클라 판정(`contestDate < 오늘`) 🔒 |
+| GET | `/me/favorites` | 찜한 대회 목록(Pageable) — 항목 = 3-1 대회 카드(`favorite=true`). 공개 목록과 달리 비활성도 유지해 `active=false`로 반환하며, 지난 대회·비활성 흐림은 클라 판정 🔒 |
 | PUT | `/me/favorites/{contestId}` | 찜 — **멱등** `204` (이미 찜이어도 성공). 스낵바 "찜했어요" |
 | DELETE | `/me/favorites/{contestId}` | 해제 — 멱등 `204`. 스낵바 "찜을 해제했어요" |
 
@@ -617,13 +663,13 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | 5 위저드 W3 | 숙소 목록·검색 | 4-2 (`category=LODGING` ± `query`) |
 | 5→6 생성 | 동선 추천받기 | 5-1 (게스트 허용) |
 | 6 동선 결과 | 저장 / 빈 상태 재추천 | 5-2 / 5-1 |
-| 6 편집(저장 후) | 순서·교체·삭제·추가 / 후보 시트 | 5-9·5-7·5-8·5-6 / 4-2 |
-| 6 연계 카드 | 숙소 주변에서 뛰기 | →S8 진입(6-1, 출발지=숙소·목표 min(walk,5)km — walk는 5-4의 `event`로 파생) |
+| 6 편집(저장 후) | 순서·교체·삭제·추가 / 후보 시트 | 5-10·5-8·5-9·5-7 / 4-2 |
+| 6 연계 카드 | 숙소 주변에서 뛰기 | →S8 진입(6-1, 출발지=숙소·목표 min(walk,5)km — walk는 5-5의 `event`로 파생) |
 | 7 러닝코스 내 주변 | 내 위치/출발지 검색/프리셋 / 경로·장소 통합 목록 | (GPS 클라)·4-4·(클라 상수) / 6-1 |
 | 7 러닝코스 지역별 | 지역 칩 / 목록 | 6-3 / 6-2 |
 | 7 코스 저장·뛰기 | 저장(P0) / 뛰기(P1) | 7-A POST / (GPS 기록 클라 → 종료 시 7-B) |
 | 8 GPS 기록/요약(P1) | 저장 / 삭제 | 7-B POST / 7-B DELETE |
-| 9 마이 동선 | 목록 / 열기 / 삭제 | 5-3 / 5-4 / 5-5 |
+| 9 마이 동선 | 목록 / 열기 / 재생성 교체 / 삭제 | 5-4 / 5-5 / 5-3 / 5-6 |
 | 9 마이 코스 | P0 saved / P1 ran | 7-A GET / 7-B GET(P1) |
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
@@ -786,7 +832,7 @@ public void reorder(Long userId, Long dayId, List<Long> blockIds) {
 ```
 
 **G-3. 그 외 확정 구현 규약**
-- `hibernate.default_batch_fetch_size=100` — 동선 트리 조회(5-4)의 N+1·MultipleBagFetchException 대응 🔒.
+- `hibernate.default_batch_fetch_size=100` — 동선 트리 조회(5-5)의 N+1·MultipleBagFetchException 대응 🔒.
 - 비밀번호·재설정 토큰·리프레시 토큰은 **전부 해시로만 저장**(BCrypt/SHA-256, NFR-9).
 - 접수 상태·D-day 판정은 `Clock` 주입으로 테스트 가능하게(KST 고정, §6.6).
 - springdoc: `@Tag`·`@Operation`은 본 문서의 절 제목·설명을 그대로 옮겨 Swagger UI가 이 명세와 1:1이 되게 한다(결정-18).
