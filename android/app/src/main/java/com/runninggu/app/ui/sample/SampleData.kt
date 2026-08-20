@@ -28,8 +28,12 @@ object SampleData {
         source: String = "마라톤온라인",
         regStartInDays: Long = -30,
         organizer: String = "$region 육상연맹",
+        active: Boolean = true,
+        serverId: Long? = null,
     ) = RaceSummary(
         id = id,
+        serverId = serverId,
+        active = active,
         name = name,
         region = region,
         venue = venue,
@@ -44,7 +48,33 @@ object SampleData {
         officialUrl = "https://example.com/$id",
     )
 
-    val races: List<RaceSummary> = listOf(
+    /**
+     * 공개 목록(S1·S2). (API 명세 §3-1 🔒)
+     *
+     * `active=true AND contest_date >= 오늘(KST)` 고정이라 **여기에는 비활성·지난 대회가
+     * 들어오지 않는다.** 스텁도 그 규칙을 지켜야 화면이 실제와 같은 것을 본다.
+     *
+     * `serverId` 는 비워 둔다 — 가짜 canonical id 를 만들지 않는다(#66 리뷰). 데모용
+     * 대회 id 는 `ResultViewModel` 이 스텁 저장소일 때만 쓰고 서버로 나가지 않는다.
+     */
+    val races: List<RaceSummary> = publicRaces()
+
+    /**
+     * 찜·저장 동선에서만 만나는 대회. (API 명세 §7-C · 결정-46)
+     *
+     * 공개 목록에서는 빠졌지만 참조를 지키려고 남겨 둔 것들이다. 둘을 일부러 다르게 뒀다 —
+     * **지난 대회**(흐림)와 **원천에서 사라진 대회**(흐림 + "정보 제공 종료"). 화면에서
+     * 두 경로를 다 확인할 수 있다.
+     */
+    private val archivedRaces: List<RaceSummary> = listOf(
+        race("chungbuk-past", "충북 청남대 벚꽃마라톤", "충북", "청남대", -12, "09:00", -40, listOf("하프", "10K")),
+        race("jeonbuk-ended", "전북 새만금 바람길런", "전북", "새만금 방조제", 34, "08:30", 20, listOf("풀", "하프"), active = false),
+    )
+
+    /** 공개 목록 + 보관된 것. 상세(S3)와 찜 목록(S10)이 본다. */
+    val allRaces: List<RaceSummary> = races + archivedRaces
+
+    private fun publicRaces(): List<RaceSummary> = listOf(
         race("seoul-hangang", "서울 한강 러닝 페스티벌", "서울", "여의도한강공원", 18, "09:00", 4, listOf("10K", "5K")),
         race("sejong-lake", "세종 호수공원 마라톤", "세종", "세종 호수공원", 21, "08:00", 9, listOf("하프", "10K", "5K")),
         race("incheon-bridge", "인천 송도 브릿지런", "인천", "송도 센트럴파크", 26, "08:30", -3, listOf("하프", "10K")),
@@ -59,8 +89,13 @@ object SampleData {
         race("jeonnam-green", "전남 순천만 갈대런", "전남", "순천만습지", 104, "08:30", null, listOf("하프", "10K"), regStartInDays = 20),
     )
 
-    /** id로 대회 한 건 찾기. S3 상세가 쓴다. 없으면 null → 404 CONTEST_NOT_FOUND에 대응. */
-    fun raceById(id: String): RaceSummary? = races.firstOrNull { it.id == id }
+    /**
+     * id로 대회 한 건 찾기. S3 상세가 쓴다. 없으면 null → 404 CONTEST_NOT_FOUND에 대응.
+     *
+     * **공개 목록이 아니라 [allRaces] 를 본다.** 비활성 대회도 상세 조회는 유지하고
+     * `active=false` 로 돌려주는 게 계약이다 — 404 로 숨기지 않는다(§3-4 · 결정-46).
+     */
+    fun raceById(id: String): RaceSummary? = allRaces.firstOrNull { it.id == id }
 
     /**
      * 대회별 인근 축제. (API 명세 §3-5 응답 형태)
