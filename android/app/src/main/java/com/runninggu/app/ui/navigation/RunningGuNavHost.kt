@@ -8,6 +8,9 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.runninggu.app.ui.auth.LoginScreen
+import com.runninggu.app.ui.auth.ResetScreen
+import com.runninggu.app.ui.auth.SignupScreen
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.home.HomeScreen
@@ -26,10 +29,11 @@ import com.runninggu.app.ui.wizard.StayViewModel
 import com.runninggu.app.ui.wizard.WizardViewModel
 
 /**
- * main 그래프. 시작 화면은 홈(S1).
+ * root 그래프 — auth(A1~A3) + main(S1~S10). (SPEC §2.2)
  *
- * auth 그래프(A1~A3)와 raceDetail(S3)·wizard(S4~S6)·result(S7)는
- * 각 화면 작업(AP-08·AP-11)에서 이 NavHost에 붙인다.
+ * 시작은 auth 그래프다. 세션이 있으면 `home` 으로 바로 가는 스플래시 게이트는
+ * 세션 영속(DataStore)이 붙는 AP-14 연동에서 처리한다 — 지금은 세션 저장이 없어
+ * 항상 로그인부터 시작한다(게스트 둘러보기로 즉시 통과 가능).
  */
 @Composable
 fun RunningGuNavHost(
@@ -38,9 +42,10 @@ fun RunningGuNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME,
+        startDestination = Routes.AUTH_GRAPH,
         modifier = modifier,
     ) {
+        authGraph(navController)
         // 위저드는 아래 wizardGraph()에서 붙인다.
         composable(Routes.HOME) {
             HomeScreen(
@@ -87,6 +92,50 @@ fun RunningGuNavHost(
         }
 
         wizardGraph(navController)
+    }
+}
+
+/**
+ * auth 그래프 A1~A3. (SPEC §2.2 · §4.1~4.3 · AP-08)
+ *
+ * 로그인 성공·게스트 둘러보기·가입 완료(자동 로그인)는 전부 [leaveAuthGraph] 로
+ * auth 그래프를 백스택에서 지우고 `home` 에 선다 — 홈에서 뒤로가기가 로그인으로
+ * 돌아가면 안 된다(§2.2).
+ */
+private fun NavGraphBuilder.authGraph(navController: NavHostController) {
+    fun leaveAuthGraph() {
+        navController.navigate(Routes.HOME) {
+            popUpTo(Routes.AUTH_GRAPH) { inclusive = true }
+        }
+    }
+
+    navigation(
+        route = Routes.AUTH_GRAPH,
+        startDestination = Routes.LOGIN,
+    ) {
+        composable(Routes.LOGIN) {
+            LoginScreen(
+                onLoggedIn = ::leaveAuthGraph,
+                onBrowseAsGuest = ::leaveAuthGraph,
+                onSignup = { navController.navigate(Routes.SIGNUP) },
+                onReset = { navController.navigate(Routes.RESET) },
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
+        composable(Routes.SIGNUP) {
+            SignupScreen(
+                onBack = { navController.popBackStack() },
+                // 가입 완료 = 자동 로그인 (명세 §1-5) → 홈으로.
+                onCompleted = ::leaveAuthGraph,
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
+        composable(Routes.RESET) {
+            ResetScreen(
+                onBack = { navController.popBackStack() },
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
     }
 }
 
