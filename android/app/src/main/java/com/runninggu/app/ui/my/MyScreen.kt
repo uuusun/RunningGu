@@ -317,24 +317,19 @@ private fun FavoriteList(
         BrowseButton("대회 둘러보기", onBrowseRaces)
         return
     }
-    val today = today()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         races.forEach { race ->
-            // 지난 대회는 흐림 처리. **판정은 클라가 한다** 🔒 (API 명세 §7-C · SPEC §4.13).
-            val past = race.date.isBefore(today)
+            // 지난 대회·비활성 대회 흐림은 이제 RaceCard 가 스스로 한다. 여기서 따로
+            // alpha 를 걸면 두 벌이 되어 값이 갈린다 (SPEC §4.13 · API 명세 §7-C 🔒).
             RaceCard(
                 race = race,
                 isFavorite = true, // 이 목록에 있다는 것 자체가 찜 상태다
                 onClick = { onRaceClick(race.id) },
                 onFavoriteToggle = { onFavoriteToggle(race.id) },
-                modifier = Modifier.alpha(if (past) PAST_RACE_ALPHA else 1f),
             )
         }
     }
 }
-
-/** 지난 대회 흐림 정도. (SPEC §4.13 🔧정책) */
-private const val PAST_RACE_ALPHA = 0.45f
 
 @Composable
 private fun BrowseButton(label: String, onClick: () -> Unit) {

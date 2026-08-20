@@ -95,7 +95,9 @@ class MyViewModel : ViewModel() {
         viewModelScope.launch {
             FavoriteStore.favoriteIds.collect { ids ->
                 _uiState.update { state ->
-                    state.copy(favoriteRaces = SampleData.races.filter { it.id in ids })
+                    // 공개 목록이 아니라 전체를 본다 — 찜 목록은 비활성·지난 대회도
+                    // 유지하는 게 계약이다 (API 명세 §7-C · 결정-46).
+                    state.copy(favoriteRaces = SampleData.allRaces.filter { it.id in ids })
                 }
             }
         }

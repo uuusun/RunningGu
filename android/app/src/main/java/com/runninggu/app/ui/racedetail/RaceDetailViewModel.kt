@@ -74,9 +74,19 @@ class RaceDetailViewModel : ViewModel() {
         }
     }
 
-    /** 인근 축제(M3). 대회 조회와 독립이라 실패해도 상세 본문은 유지된다. (SPEC §4.6) */
+    /**
+     * 인근 축제(M3). 대회 조회와 독립이라 실패해도 상세 본문은 유지된다. (SPEC §4.6)
+     *
+     * **비활성 대회에서는 아예 부르지 않는다**(§3-4 · 결정-46). 화면에서 섹션을 숨기는
+     * 것만으로는 부족하다 — `GET /contests/{id}/festivals` 는 KTO 를 거치는 외부 프록시라
+     * 호출 자체가 비용이고, 그 호출을 막으라는 게 계약이다(#80 리뷰).
+     *
+     * 그리는 쪽([RaceDetailUiState.showFestivalSection])이 아니라 여기서 막는 이유는
+     * [다시 시도] 버튼이 이 함수를 직접 부르기 때문이다.
+     */
     fun loadFestivals() {
         val id = raceId ?: return
+        if (_uiState.value.race?.active == false) return
         viewModelScope.launch {
             _uiState.update { it.copy(festivalPhase = RaceDetailUiState.Phase.LOADING) }
             delay(FESTIVAL_DELAY_MS) // 임시 — 외부 API 경유라 본문보다 늦게 온다.

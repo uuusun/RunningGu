@@ -41,7 +41,27 @@ data class RaceSummary(
      */
     val organizer: String? = null,
     val officialUrl: String? = null,
+    /**
+     * 원천에서 사라진 대회인가. (API 명세 §3-4 · SPEC 결정-46)
+     *
+     * 공개 목록(S2)에는 `active=true` 만 오므로 **여기서 false 를 보는 곳은 찜 목록과
+     * 저장 동선에서 들어온 상세뿐**이다. 참조를 지키려고 삭제하지 않고 남긴 것이라
+     * 화면은 흐리게 그리고 "정보 제공 종료" 를 붙인다.
+     */
+    val active: Boolean = true,
 )
+
+/**
+ * 카드·상세를 흐리게 그릴 것인가. (SPEC §4.13 · API 명세 §7-C 🔒)
+ *
+ * 지난 대회와 비활성 대회를 **같은 규칙으로** 다룬다 — 둘 다 "지금은 신청할 수 없는
+ * 대회" 라 사용자가 구분할 이유가 없다. 판정은 서버가 아니라 클라가 한다(§7-C 🔒).
+ *
+ * 접수 마감(`registrationStatus`)과는 다르다. 마감은 카드를 흐리게 하지 않고 텍스트
+ * 색만 낮춘다 — 아직 열릴 수 있는 대회이기 때문이다.
+ */
+fun RaceSummary.isDimmed(today: LocalDate = today()): Boolean =
+    !active || date.isBefore(today)
 
 /**
  * 대회일까지 남은 일수. 오늘이면 0, 지났으면 음수. (SPEC §4.6 · KST 기준 §6.6)

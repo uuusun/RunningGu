@@ -37,7 +37,14 @@ interface FavoriteRepository {
  */
 object FakeFavoriteRepository : FavoriteRepository {
 
-    private val stored = mutableSetOf<String>()
+    /**
+     * 이미 찜해 둔 대회로 시작한다.
+     *
+     * 지난 대회·비활성 대회는 **공개 목록(S2)에 나오지 않는다**(§3-1 🔒). 찜·저장 동선에서만
+     * 만나는 것들이라, 씨앗을 안 두면 화면에서 흐림과 "정보 제공 종료" 를 볼 방법이 없다.
+     * 서버가 붙으면 실제 찜 목록이 그 자리를 대신한다.
+     */
+    private val stored = mutableSetOf("chungbuk-past", "jeonbuk-ended")
 
     override suspend fun loadFavoriteIds(): Result<Set<String>> {
         delay(NETWORK_DELAY_MS)

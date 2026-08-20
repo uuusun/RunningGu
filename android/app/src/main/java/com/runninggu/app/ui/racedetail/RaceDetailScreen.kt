@@ -57,7 +57,9 @@ import com.runninggu.app.ui.model.NearbyFestival
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.dDayLabel
+import com.runninggu.app.ui.model.isDimmed
 import com.runninggu.app.ui.model.registrationStatus
+import androidx.compose.ui.draw.alpha
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -142,8 +144,14 @@ fun RaceDetailScreen(
         },
         bottomBar = {
             // 하단 고정 CTA. 대회를 못 불러왔으면 동선을 짤 수 없으므로 숨긴다. (SPEC §4.6)
+            //
+            // 비활성·서버 미보유 대회에서는 **숨기지 않고 비활성으로 둔다.** 버튼이 통째로
+            // 사라지면 "원래 없는 화면" 처럼 보여서, 왜 못 만드는지 알 수 없다 (결정-46).
             if (state.phase == RaceDetailUiState.Phase.LOADED) {
-                StartWizardBar(onClick = { onStartWizard(raceId) })
+                StartWizardBar(
+                    onClick = { onStartWizard(raceId) },
+                    enabled = state.canStartWizard,
+                )
             }
         },
     ) { innerPadding ->
@@ -170,6 +178,7 @@ fun RaceDetailScreen(
                             race = race,
                             festivalPhase = state.festivalPhase,
                             festivals = state.festivals,
+                            showFestivals = state.showFestivalSection,
                             onRetryFestivals = viewModel::loadFestivals,
                         )
                     }
@@ -183,6 +192,7 @@ private fun RaceDetailContent(
     race: RaceSummary,
     festivalPhase: RaceDetailUiState.Phase,
     festivals: List<NearbyFestival>,
+    showFestivals: Boolean,
     onRetryFestivals: () -> Unit,
 ) {
     Column(
@@ -191,22 +201,64 @@ private fun RaceDetailContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
-        RaceHero(race)
-        Spacer(Modifier.height(20.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
-        RaceInfo(race)
-        Spacer(Modifier.height(24.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
-        NearbyFestivalSection(
-            phase = festivalPhase,
-            festivals = festivals,
-            onRetry = onRetryFestivals,
-        )
+        // 안내는 흐리게 하지 않는다 — 왜 흐린지 설명하는 줄이라 이것까지 흐려지면 안 읽힌다.
+        if (!race.active) {
+            InactiveNotice()
+            Spacer(Modifier.height(16.dp))
+        }
+        Column(Modifier.alpha(if (race.isDimmed()) DIMMED_ALPHA else 1f)) {
+            RaceHero(race)
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+            RaceInfo(race)
+        }
+        if (showFestivals) {
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+            NearbyFestivalSection(
+                phase = festivalPhase,
+                festivals = festivals,
+                onRetry = onRetryFestivals,
+            )
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
+
+/**
+ * 원천에서 사라진 대회 안내. (SPEC §4.6 · §4.13 · 결정-46)
+ *
+ * 대회가 취소됐다고 단정하지 않는다 — 우리가 소식을 더 받지 못할 뿐이라, 사용자가
+ * 주최 측 공식 페이지를 확인할 여지를 남긴다. 공식 페이지 링크는 아래 정보에 그대로 있다.
+ */
+@Composable
+private fun InactiveNotice() {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = "정보 제공 종료",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "이 대회 소식을 더 받아오지 못해요. 아래 정보는 마지막으로 확인한 내용이에요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 지난·비활성 대회 흐림 정도. `RaceCard` 와 같은 값을 쓴다. (SPEC §4.13) */
+private const val DIMMED_ALPHA = 0.45f
 
 /** 히어로 — 지역·대회명·D-day·일시·장소·접수 배지. (SPEC §4.6) */
 @Composable
@@ -245,8 +297,12 @@ private fun RaceHero(race: RaceSummary) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(12.dp))
-        RegistrationBadge(race, status)
+        // 원천이 사라진 대회의 접수 상태는 우리가 말할 수 없다. "접수중" 을 그대로 두면
+        // 바로 위 "정보 제공 종료" 안내와 정면으로 어긋난다 (결정-46).
+        if (race.active) {
+            Spacer(Modifier.height(12.dp))
+            RegistrationBadge(race, status)
+        }
     }
 }
 
@@ -402,10 +458,11 @@ private fun FestivalRow(festival: NearbyFestival) {
 
 /** 하단 고정 CTA — "이 대회로 동선 만들기" → S4. (SPEC §4.6) */
 @Composable
-private fun StartWizardBar(onClick: () -> Unit) {
+private fun StartWizardBar(onClick: () -> Unit, enabled: Boolean = true) {
     Surface(shadowElevation = 8.dp) {
         Button(
             onClick = onClick,
+            enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
