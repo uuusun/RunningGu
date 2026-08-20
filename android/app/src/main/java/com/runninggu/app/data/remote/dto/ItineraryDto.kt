@@ -11,7 +11,8 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class GenerateItineraryRequestDto(
-    val contestId: String,
+    /** canonical `CONTEST.id`. **숫자다** — 번들 externalId 를 보내면 안 된다(#66 리뷰). */
+    val contestId: Long,
     val startDate: String,
     val endDate: String,
     /** `FULL|HALF|TEN_K|FIVE_K` */
@@ -36,6 +37,12 @@ data class GenerateItineraryResponse(
     val event: String,
     val recovery: RecoveryDto? = null,
     val days: List<DayDto> = emptyList(),
+    // §5-2 저장 요청이 이 응답 구조를 그대로 쓴다 — 버리면 저장·재생성 요청을 못 만든다
+    val contestId: Long? = null,
+    val themes: List<String> = emptyList(),
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val hotel: HotelDto? = null,
 )
 
 @Serializable

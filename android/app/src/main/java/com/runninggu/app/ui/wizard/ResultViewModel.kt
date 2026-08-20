@@ -260,10 +260,12 @@ class ResultViewModel(
 /** 위저드 상태 → 생성 요청. 일정이 덜 정해졌으면 null. */
 private fun WizardUiState.toRequestOrNull(): GenerateItineraryRequest? {
     val race = race ?: return null
+    // 서버가 만드는 동선이라 canonical id 가 없으면 부를 수 없다 (#66 리뷰 · 결정-41)
+    val contestId = race.serverId ?: return null
     val start = start ?: return null
     val end = end ?: return null
     return GenerateItineraryRequest(
-        contestId = race.id,
+        contestId = contestId,
         startDate = start,
         endDate = end,
         event = event,

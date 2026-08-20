@@ -8,6 +8,7 @@ import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
 import com.runninggu.app.data.remote.dto.HotelDto
 import com.runninggu.app.data.remote.mapper.toResult
+import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
@@ -16,7 +17,8 @@ import java.time.LocalDate
 
 /** `POST /api/itineraries/generate` 요청. (API 명세 §5-1) */
 data class GenerateItineraryRequest(
-    val contestId: String,
+    /** canonical `CONTEST.id`. 번들만 있는 대회는 생성을 부를 수 없다 ([Contest.serverId]). */
+    val contestId: Long,
     val startDate: LocalDate,
     val endDate: LocalDate,
     val event: EventType,
@@ -59,7 +61,8 @@ internal fun GenerateItineraryRequest.toDto() = GenerateItineraryRequestDto(
     contestId = contestId,
     startDate = startDate.toString(),
     endDate = endDate.toString(),
-    event = event.name,
+    // 부록 C 는 K5·K10 이다. enum 이름(FIVE_K·TEN_K)을 그대로 보내면 서버가 못 읽는다
+    event = event.toServerName(),
     themes = themes.map { it.name },
     hotel = hotel?.let { HotelDto(it.name, it.lat, it.lng) },
 )

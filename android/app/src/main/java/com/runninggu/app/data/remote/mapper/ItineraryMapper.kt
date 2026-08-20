@@ -1,5 +1,7 @@
 package com.runninggu.app.data.remote.mapper
 
+import com.runninggu.app.data.model.HotelSnapshot
+import com.runninggu.app.data.model.ItineraryRequestSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.model.RecoveryNote
 import com.runninggu.app.data.remote.dto.BlockDto
@@ -18,6 +20,14 @@ fun GenerateItineraryResponse.toResult(): ItineraryResult = ItineraryResult(
     title = title,
     days = days.map { it.toDomain() },
     recovery = recovery?.let { RecoveryNote(it.label, it.note) },
+    request = ItineraryRequestSnapshot(
+        contestId = contestId,
+        event = event,
+        themes = themes,
+        startDate = startDate,
+        endDate = endDate,
+        hotel = hotel?.let { HotelSnapshot(it.name, it.lat, it.lng) },
+    ),
     recoveryFlags = days.map { it.recovery },
 )
 

@@ -30,7 +30,7 @@ class ItineraryMapperTest {
     @Test
     fun `요청은 명세 필드 그대로 나간다`() {
         val request = GenerateItineraryRequest(
-            contestId = "153",
+            contestId = 153,
             startDate = LocalDate.of(2026, 8, 21),
             endDate = LocalDate.of(2026, 8, 23),
             event = EventType.HALF,
@@ -43,6 +43,8 @@ class ItineraryMapperTest {
             request.toDto(),
         )
 
+        // contestId 는 canonical 숫자다. 문자열로 나가면 서버가 못 읽는다 (#66 리뷰)
+        assertTrue(json.contains("\"contestId\":153"))
         // 날짜는 KST 비즈니스 날짜 문자열이다 — timestamp 가 아니다 (AGENTS 2장-4)
         assertTrue(json.contains("\"startDate\":\"2026-08-21\""))
         assertTrue(json.contains("\"endDate\":\"2026-08-23\""))
@@ -53,10 +55,27 @@ class ItineraryMapperTest {
     }
 
     @Test
+    fun `종목 네 가지가 모두 서버 표기로 나간다`() {
+        // 부록 C 는 K5·K10 이다. enum 이름(FIVE_K·TEN_K)을 그대로 보내면 서버가 못 읽는다
+        fun eventOf(type: EventType) = GenerateItineraryRequest(
+            contestId = 1,
+            startDate = LocalDate.of(2026, 8, 21),
+            endDate = LocalDate.of(2026, 8, 21),
+            event = type,
+            themes = listOf(PoiCategory.TOUR),
+        ).toDto().event
+
+        assertEquals("FULL", eventOf(EventType.FULL))
+        assertEquals("HALF", eventOf(EventType.HALF))
+        assertEquals("K10", eventOf(EventType.TEN_K))
+        assertEquals("K5", eventOf(EventType.FIVE_K))
+    }
+
+    @Test
     fun `숙소 없이도 요청할 수 있다`() {
         // "숙소 없이 추천받기" — 서버가 대회장 중심으로 슬롯을 채운다 (SPEC §4.9)
         val request = GenerateItineraryRequest(
-            contestId = "153",
+            contestId = 153,
             startDate = LocalDate.of(2026, 8, 21),
             endDate = LocalDate.of(2026, 8, 21),
             event = EventType.FIVE_K,
@@ -73,6 +92,10 @@ class ItineraryMapperTest {
         {
           "title": "세종 2박 3일",
           "event": "HALF",
+          "contestId": 153,
+          "themes": ["TOUR", "FOOD"],
+          "startDate": "2026-08-21", "endDate": "2026-08-23",
+          "hotel": { "name": "호텔 세종 가온", "lat": 36.4901, "lng": 127.2688 },
           "recovery": { "label": "D+1 회복 모드", "note": "하프는 완주 다음날 회복이 중요해요" },
           "days": [
             {
@@ -113,6 +136,19 @@ class ItineraryMapperTest {
         assertEquals(LocalDate.of(2026, 8, 21), result.days.first().date)
         // 일자별 회복 플래그는 서버 판정을 그대로 쓴다 (§5.6-6)
         assertEquals(listOf(false, true), result.recoveryFlags)
+    }
+
+    @Test
+    fun `생성 조건을 버리지 않고 들고 있는다`() {
+        // §5-2 저장 요청이 §5-1 응답 구조를 그대로 쓴다 — 버리면 저장·재생성을 못 만든다 (#66 리뷰)
+        val snapshot = checkNotNull(parse().request)
+
+        assertEquals(153L, snapshot.contestId)
+        assertEquals(listOf("TOUR", "FOOD"), snapshot.themes)
+        assertEquals("2026-08-21", snapshot.startDate)
+        assertEquals("2026-08-23", snapshot.endDate)
+        assertEquals("호텔 세종 가온", snapshot.hotel?.name)
+        assertEquals("HALF", snapshot.event)
     }
 
     @Test
