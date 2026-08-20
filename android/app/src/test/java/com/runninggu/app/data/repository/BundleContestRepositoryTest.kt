@@ -131,13 +131,22 @@ class BundleContestRepositoryTest {
     }
 
     @Test
-    fun `없는 대회를 조회하면 실패한다`() = runBlocking {
+    fun `번들에는 canonical id 가 없어 서버 상세를 흉내내지 않는다`() = runBlocking {
+        // 번들 id 는 크롤 원천의 externalId 라 서버 상세와 같은 키가 아니다 (#52 리뷰).
         // 조용히 빈 값을 주면 화면이 Empty 로 잘못 그린다
         try {
-            repo().detail("존재하지-않음")
+            repo().detail(153L)
             error("예외가 나야 한다")
         } catch (e: NoSuchElementException) {
-            assertTrue(e.message!!.contains("번들에 없는"))
+            assertTrue(e.message!!.contains("canonical id"))
         }
+    }
+
+    @Test
+    fun `오프라인 상세는 화면 키로 찾는다`() = runBlocking {
+        val any = repo().list().contests.first()
+
+        assertEquals(any.id, repo().findByKey(any.id)?.id)
+        assertNull(repo().findByKey("존재하지-않음"))
     }
 }

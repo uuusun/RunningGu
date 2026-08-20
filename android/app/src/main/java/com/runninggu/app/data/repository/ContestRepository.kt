@@ -24,7 +24,13 @@ interface ContestRepository {
     /** 홈 마감 임박. `dDayApply` 가 필요하므로 [ClosingSoon] 으로 감싼다. */
     suspend fun closingSoon(limit: Int = ContestApi.DEFAULT_CLOSING_SOON_LIMIT): List<ClosingSoon>
 
-    suspend fun detail(id: String): Contest
+    /**
+     * 대회 상세. **canonical id 만 받는다.** (§3-4)
+     *
+     * 번들 항목의 id 는 크롤 원천 문자열이라 여기 넣을 수 없다 — 타입이 그걸 막는다.
+     * 호출부는 [Contest.serverId] 를 쓰고, null 이면 서버를 부르지 않는다.
+     */
+    suspend fun detail(id: Long): Contest
 }
 
 /**
@@ -92,8 +98,8 @@ class RemoteContestRepository(private val api: ContestApi) : ContestRepository {
         api.closingSoon(limit).items.map { ClosingSoon(it.toContest(), it.dDayApply) }
     }
 
-    override suspend fun detail(id: String): Contest = apiCall {
-        api.detail(id.toLong()).toContest()
+    override suspend fun detail(id: Long): Contest = apiCall {
+        api.detail(id).toContest()
     }
 }
 

@@ -1,9 +1,8 @@
 package com.runninggu.app.data.remote
 
-import com.runninggu.app.data.remote.dto.CourseDto
+import com.runninggu.app.data.remote.dto.CoursePageDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
 import com.runninggu.app.data.remote.dto.CoursesNearDto
-import com.runninggu.app.data.remote.dto.PageDto
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -41,7 +40,7 @@ interface CourseApi {
         @Query("region") region: String? = null,
         @Query("page") page: Int? = null,
         @Query("size") size: Int? = null,
-    ): PageDto<CourseDto>
+    ): CoursePageDto
 
     /** 지역 칩. 코스 수 내림차순. (§6-3) */
     @GET("courses/regions")
