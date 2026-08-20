@@ -69,10 +69,12 @@ fun CalendarScreen(
     initialQuery: String = "",
     modifier: Modifier = Modifier,
     onRaceClick: (String) -> Unit = {},
+    onLoginRequest: () -> Unit,
     viewModel: CalendarViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val loginRequired by viewModel.loginRequired.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(initialQuery) {
@@ -84,6 +86,14 @@ fun CalendarScreen(
         val text = message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message = text, duration = SnackbarDuration.Short)
         viewModel.onMessageShown()
+    }
+
+    // 게스트가 하트를 누르면 로그인으로 보낸다. 찜을 예약해 두지 않는다 (결정-4 · D-27).
+    LaunchedEffect(loginRequired) {
+        if (loginRequired) {
+            onLoginRequest()
+            viewModel.onLoginRequiredShown()
+        }
     }
 
     Scaffold(

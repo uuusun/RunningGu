@@ -73,6 +73,8 @@ fun RunningGuNavHost(
             CalendarScreen(
                 initialQuery = entry.arguments?.getString(Routes.ARG_QUERY).orEmpty(),
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
+                // 게스트가 하트를 누르면 로그인으로 보내고, 끝나면 캘린더로 돌아온다 (D-27).
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.CALENDAR)) },
                 modifier = Modifier.statusBarsPadding(),
             )
         }
@@ -117,10 +119,13 @@ fun RunningGuNavHost(
                 navArgument(Routes.ARG_RACE_ID) { type = NavType.StringType },
             ),
         ) { entry ->
+            val raceId = entry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty()
             RaceDetailScreen(
-                raceId = entry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
+                raceId = raceId,
                 onBack = { navController.popBackStack() },
-                onStartWizard = { raceId -> navController.navigate(Routes.wizard(raceId)) },
+                onStartWizard = { id -> navController.navigate(Routes.wizard(id)) },
+                // 로그인 후 이 상세로 되돌아온다 (D-27).
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.raceDetail(raceId))) },
             )
         }
 

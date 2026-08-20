@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.runninggu.app.ui.auth.SessionProfile
 import com.runninggu.app.ui.auth.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.sample.SampleData
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,6 +73,10 @@ class MyViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MyUiState())
     val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
 
+    /** 찜 해제 실패 등 스낵바. (SPEC §3-4) */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
     init {
         viewModelScope.launch {
             SessionStore.session.collect { profile ->
@@ -83,6 +88,8 @@ class MyViewModel : ViewModel() {
                         courses = if (profile != null) SAMPLE_COURSES else emptyList(),
                     )
                 }
+                // 서버 SSOT 를 다시 읽는다. 게스트면 캐시를 비운다 (SPEC §4.13 · AP-21).
+                FavoriteStore.refresh()
             }
         }
         viewModelScope.launch {
@@ -105,9 +112,21 @@ class MyViewModel : ViewModel() {
         }
     }
 
-    /** 찜 해제 — 하트 재탭. 목록에서 바로 빠진다 (SPEC §4.13). */
+    /**
+     * 찜 해제 — 하트 재탭. 목록에서 바로 빠진다 (SPEC §4.13 · AP-21).
+     *
+     * 마이는 로그인 상태에서만 열리므로 `LoginRequired` 는 오지 않는다. 서버 실패만 알린다.
+     */
     fun onFavoriteToggle(raceId: String) {
-        FavoriteStore.toggle(raceId)
+        viewModelScope.launch {
+            if (FavoriteStore.toggle(raceId) == FavoriteToggleResult.Failed) {
+                _message.value = "찜을 해제하지 못했어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
+    }
+
+    fun onMessageShown() {
+        _message.value = null
     }
 
     private companion object {
