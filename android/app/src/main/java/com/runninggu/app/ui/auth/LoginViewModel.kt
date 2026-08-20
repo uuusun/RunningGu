@@ -2,6 +2,7 @@ package com.runninggu.app.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,6 +59,7 @@ class LoginViewModel(
                                 loginProvider = LoginProvider.EMAIL,
                             ),
                         )
+                        loadFavorites()
                         it.copy(isSubmitting = false, loggedIn = true)
                     },
                     onFailure = { _ ->
@@ -69,5 +71,10 @@ class LoginViewModel(
                 )
             }
         }
+    }
+
+    /** 로그인 직후 서버 찜 목록을 캐시에 채운다. (SPEC §4.13 · AP-21) */
+    private fun loadFavorites() {
+        viewModelScope.launch { FavoriteStore.refresh() }
     }
 }

@@ -3,6 +3,7 @@ package com.runninggu.app.ui.racedetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.sample.SampleData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,6 @@ import kotlinx.coroutines.launch
  * TODO(AP-14): 임시 데이터를 백엔드로 교체한다.
  *  - [load]        → `GET /api/contests/{id}`            (API 명세 §3-4)
  *  - [loadFestivals] → `GET /api/contests/{id}/festivals` (API 명세 §3-5)
- * TODO(AP-21): 찜은 [FavoriteStore] 참고 — 서버 동기화·게스트 로그인 유도.
  */
 class RaceDetailViewModel : ViewModel() {
 
@@ -27,6 +27,10 @@ class RaceDetailViewModel : ViewModel() {
     /** 찜 토글 스낵바. 소비하면 [onMessageShown]으로 비운다. (SPEC §3-4) */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    /** 게스트가 하트를 눌렀다. 화면이 로그인으로 유도한다. (SPEC §4.6 · 결정-4) */
+    private val _loginRequired = MutableStateFlow(false)
+    val loginRequired: StateFlow<Boolean> = _loginRequired.asStateFlow()
 
     private var raceId: String? = null
 
@@ -86,14 +90,26 @@ class RaceDetailViewModel : ViewModel() {
         }
     }
 
-    /** 하트 토글. 앱바·카드 어디서 눌러도 같은 값을 본다. (SPEC §4.6 · 결정-16) */
+    /** 하트 토글. 앱바·카드 어디서 눌러도 같은 값을 본다. (SPEC §4.6 · 결정-16 · AP-21) */
     fun onFavoriteToggle() {
         val id = raceId ?: return
-        _message.value = if (FavoriteStore.toggle(id)) "찜했어요" else "찜을 해제했어요"
+        viewModelScope.launch {
+            when (val result = FavoriteStore.toggle(id)) {
+                FavoriteToggleResult.LoginRequired -> _loginRequired.value = true
+                is FavoriteToggleResult.Done ->
+                    _message.value = if (result.nowFavorite) "찜했어요" else "찜을 해제했어요"
+                FavoriteToggleResult.Failed ->
+                    _message.value = "찜을 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
     }
 
     fun onMessageShown() {
         _message.value = null
+    }
+
+    fun onLoginRequiredShown() {
+        _loginRequired.value = false
     }
 
     private companion object {

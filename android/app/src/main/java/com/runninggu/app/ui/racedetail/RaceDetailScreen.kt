@@ -82,10 +82,12 @@ fun RaceDetailScreen(
     onBack: () -> Unit,
     onStartWizard: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onLoginRequest: () -> Unit = {},
     viewModel: RaceDetailViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val loginRequired by viewModel.loginRequired.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(raceId) { viewModel.start(raceId) }
@@ -95,6 +97,14 @@ fun RaceDetailScreen(
         message?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.onMessageShown()
+        }
+    }
+
+    // 게스트가 하트를 누르면 로그인으로 보낸다 (결정-4 · D-27).
+    LaunchedEffect(loginRequired) {
+        if (loginRequired) {
+            onLoginRequest()
+            viewModel.onLoginRequiredShown()
         }
     }
 

@@ -2,6 +2,7 @@ package com.runninggu.app.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -159,6 +160,8 @@ class SignupViewModel(
                             loginProvider = LoginProvider.EMAIL,
                         ),
                     )
+                    // 신규 가입이라 비어 있지만, 캐시를 서버 기준으로 맞춘다 (AP-21).
+                    FavoriteStore.refresh()
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
                 onFailure = {
