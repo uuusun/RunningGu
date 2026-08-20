@@ -62,6 +62,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -376,9 +379,12 @@ private fun EditNotice() {
  *
  * 버튼을 숨기는 게 본 방어선이고, [ItineraryEdits]의 거부는 그래도 새어 들어온 경우를 막는
  * 안전망이다 — 목업은 이 방어가 없어 대회 블록이 삭제됐다(대조표 B4).
+ *
+ * `internal` 인 것은 접근성 계약을 계측 테스트로 고정하기 위해서다(이슈 #71). 접근성
+ * 회귀는 눈에 보이지 않아서, 커스텀 액션이 조용히 사라져도 화면만 봐서는 알 수 없다.
  */
 @Composable
-private fun EditList(
+internal fun EditList(
     day: ItineraryDay,
     openedId: String?,
     onOpenedChange: (String?) -> Unit,
@@ -546,17 +552,33 @@ private fun EditList(
 
                             if (editable) {
                                 // 회복 안내처럼 조회 카테고리가 없는 블록은 교체 대상이 아니다.
+                                // 버튼 설명에 일정 이름을 넣는다. 행이 여럿인데 "삭제 버튼" 만
+                                // 읽어 주면 무엇을 지우는지 알 수 없다 (이슈 #71).
                                 if (block.catKey.toPoiCategoryOrNull() != null) {
                                     IconButton(onClick = { onReplace(block) }) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "교체")
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = "${block.title} 교체",
+                                        )
                                     }
                                 }
                                 // 삭제는 두 길이다 — 휴지통 탭, 또는 행을 왼쪽으로 스와이프.
+                                // 스와이프는 접근성 서비스로 할 수 없으니 휴지통이 그 몫도 한다.
                                 IconButton(onClick = { onRemove(block.id) }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "삭제")
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "${block.title} 삭제",
+                                    )
                                 }
                                 Spacer(Modifier.width(4.dp))
                                 DragGrip(
+                                    label = block.title,
+                                    // 이웃이 대회 블록이어도 막지 않는다 — 옮기는 것은 내
+                                    // 블록이고 대회 블록은 밀릴 뿐이다 (ItineraryEdits.moveBlock).
+                                    canMoveUp = index > 0,
+                                    canMoveDown = index < blocks.lastIndex,
+                                    onMoveUp = { onMove(index, index - 1) },
+                                    onMoveDown = { onMove(index, index + 1) },
                                     modifier = Modifier.pointerInput(block.id) {
                                         detectDragGesturesAfterLongPress(
                                             onDragStart = {
@@ -629,13 +651,41 @@ private val DELETE_REVEAL_WIDTH = 84.dp
 /** 대기 중인 이동이 없음. [Int] 인덱스와 섞이지 않게 음수를 쓴다. */
 private const val NO_PENDING_MOVE = -1
 
-/** 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립") */
+/**
+ * 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립")
+ *
+ * 드래그는 손가락으로만 되는 동작이라, 접근성 서비스에는 **커스텀 액션으로 같은 일을
+ * 따로 열어 준다**(이슈 #71). 위/아래 버튼을 되살리지 않고 시맨틱만 얹는 이유는, 화면은
+ * 그대로 두고 조작 수단만 늘리기 위해서다.
+ *
+ * 경계에서는 액션을 아예 빼 둔다. [ItineraryEdits.moveBlock] 이 범위 밖 인덱스를 **조용히
+ * 무시**하기 때문에, 첫 행에 "위로 이동" 을 남겨 두면 눌러도 아무 일이 없고 왜 안 되는지도
+ * 알 수 없다.
+ *
+ * @param label 어떤 일정을 옮기는지. 그립만 포커스했을 때 무엇을 잡았는지 알 수 있어야 한다.
+ */
 @Composable
-private fun DragGrip(modifier: Modifier = Modifier) {
+private fun DragGrip(
+    label: String,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Icon(
         imageVector = Icons.Default.Menu,
-        contentDescription = "길게 눌러 순서 변경",
-        modifier = modifier.size(20.dp),
+        // "길게 눌러 순서 변경" 은 접근성 서비스로는 할 수 없는 동작을 안내하는 말이었다.
+        // 무엇을 잡았는지만 알리고, 방법은 아래 커스텀 액션이 제시한다.
+        contentDescription = "$label 순서 변경",
+        modifier = modifier
+            .size(20.dp)
+            .semantics {
+                customActions = buildList {
+                    if (canMoveUp) add(CustomAccessibilityAction("위로 이동") { onMoveUp(); true })
+                    if (canMoveDown) add(CustomAccessibilityAction("아래로 이동") { onMoveDown(); true })
+                }
+            },
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
