@@ -52,9 +52,17 @@ class BundleContestRepository(
             .map { ClosingSoon(it, dDay(it.regEnd!!, now)) }
     }
 
-    override suspend fun detail(id: String): Contest =
-        source().firstOrNull { it.id == id }
-            ?: throw NoSuchElementException("번들에 없는 대회다: $id")
+    /**
+     * 번들에는 canonical id 가 없다 — 항상 찾지 못한다. (#52 리뷰)
+     *
+     * 번들 항목은 크롤 원천의 externalId 만 갖고 있어 서버 상세와 같은 키로 조회할 수 없다.
+     * 오프라인에서 상세를 그릴 때는 목록에서 이미 받은 [Contest] 를 쓰거나 [findByKey] 를 쓴다.
+     */
+    override suspend fun detail(id: Long): Contest =
+        throw NoSuchElementException("번들에는 canonical id 가 없다: $id")
+
+    /** 오프라인 표시용 — 화면 키(번들 id)로 찾는다. **서버 상세와 다른 경로다.** */
+    suspend fun findByKey(key: String): Contest? = source().firstOrNull { it.id == key }
 
     /** §3-1 규칙 — `contestDate >= 오늘(KST)` 고정, 정렬 `(date, id) ASC`, 필터는 AND(events 만 OR). */
     private fun matching(filter: ContestFilter): List<Contest> {

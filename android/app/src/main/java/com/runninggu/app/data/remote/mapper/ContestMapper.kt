@@ -17,7 +17,9 @@ import java.time.LocalDate
  * 접수 상태는 null 이 되어 `regStatusOf()` 가 날짜로 판정한다.
  */
 fun ContestDto.toContest(): Contest = Contest(
+    // 화면·내비게이션 키는 문자열, 서버 호출용 canonical id 는 따로 보존한다 (#52 리뷰)
     id = id.toString(),
+    serverId = id,
     name = name,
     region = region,
     venue = place,

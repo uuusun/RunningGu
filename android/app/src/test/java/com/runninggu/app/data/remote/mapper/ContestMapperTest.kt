@@ -4,6 +4,7 @@ import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.ClosingSoonDto
 import com.runninggu.app.data.remote.dto.ContestListDto
 import com.runninggu.app.data.remote.dto.DailyCountsDto
+import com.runninggu.app.data.repository.toServerName
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.domain.regStatusOf
@@ -64,6 +65,29 @@ class ContestMapperTest {
         // 커서는 불투명 문자열 — 그대로 들고 다닌다 (§0-4)
         assertEquals("MjAyNi0wOC0yMnwxNTM", dto.nextCursor)
         assertTrue(dto.hasNext)
+    }
+
+    @Test
+    fun `서버 id 는 canonical 로 보존된다`() {
+        // 화면 키는 문자열이지만 서버 호출용 숫자 id 를 잃으면 안 된다 (#52 리뷰)
+        val contest = ApiJson.decodeFromString(
+            ContestListDto.serializer(),
+            """{"items":[{"id":153,"name":"n","region":"서울","venue":"v",
+               "contestDate":"2026-09-04"}],"nextCursor":null}""",
+        ).items.single().toContest()
+
+        assertEquals(153L, contest.serverId)
+        assertEquals("153", contest.id)
+        assertTrue(contest.isServerBacked)
+    }
+
+    @Test
+    fun `종목 네 가지가 모두 서버 표기로 나간다`() {
+        // 부록 C — K5·K10 이다. enum 이름(FIVE_K·TEN_K)을 그대로 보내면 서버가 못 읽는다
+        assertEquals("FULL", EventType.FULL.toServerName())
+        assertEquals("HALF", EventType.HALF.toServerName())
+        assertEquals("K10", EventType.TEN_K.toServerName())
+        assertEquals("K5", EventType.FIVE_K.toServerName())
     }
 
     @Test
