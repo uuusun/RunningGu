@@ -26,6 +26,10 @@ data class SaveCourseRequestDto(
     val entryLng: Double,
     /** 서버가 준 문자열을 **그대로** 되돌려보낸다. 앱이 다시 인코딩하지 않는다(이슈 #62). */
     val pathPolyline: String,
+    /**
+     * 선택 🔧(§7-A). 고도 정보가 없어 난이도를 못 낸 경로도 저장할 수 있어야 한다 —
+     * 필수로 두면 그런 코스는 [저장] 자체가 막힌다.
+     */
     val difficulty: String? = null,
     val sourceCourseId: String? = null,
     val region: String? = null,
@@ -40,7 +44,11 @@ data class SaveCourseRequestDto(
 @Serializable
 data class SaveCourseResponseDto(
     val id: Long,
-    val created: Boolean = true,
+    /**
+     * 신규 저장이면 true, 같은 경로가 이미 있으면 false. **항상 온다** — 기본값을 두면
+     * 서버가 빠뜨렸을 때 "새로 저장했어요" 로 조용히 처리된다(#76 리뷰).
+     */
+    val created: Boolean,
 )
 
 /**

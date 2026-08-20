@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.SavedCourseDetailDto
+import com.runninggu.app.data.remote.dto.SaveCourseResponseDto
 import com.runninggu.app.data.remote.dto.SavedCourseDto
 import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertEquals
@@ -27,6 +28,7 @@ class SavedCourseMapperTest {
         dataSource: CourseDataSource? = CourseDataSource.OSM_GENERATED,
         sourceCourseId: String? = null,
         sido: String? = null,
+        difficulty: Difficulty? = Difficulty.EASY,
     ) = NearbyItem.Route(
         routeId = "osm:2e808bd75c4a",
         name = "내 주변 5km 평지 러닝코스",
@@ -34,7 +36,7 @@ class SavedCourseMapperTest {
         lat = 37.52461,
         lng = 126.92028,
         dataSource = dataSource,
-        difficulty = Difficulty.EASY,
+        difficulty = difficulty,
         routeKm = 5.02,
         durationMin = 46,
         gainM = 38,
@@ -116,6 +118,24 @@ class SavedCourseMapperTest {
         // UTC 자정 넘김 — KST 로 접는다 (AGENTS 2장-4)
         assertEquals(LocalDate.of(2026, 8, 20), detail.course.savedAt)
         assertEquals(Difficulty.NORMAL, detail.course.difficulty)
+    }
+
+    @Test
+    fun `created 가 빠진 저장 응답은 거부한다`() {
+        // 기본값을 두면 서버가 빠뜨렸을 때 "새로 저장했어요" 로 조용히 처리된다 (#76 리뷰).
+        // 중복 저장을 신규로 오인하면 화면 문구가 틀린다
+        assertThrows(SerializationException::class.java) {
+            ApiJson.decodeFromString(SaveCourseResponseDto.serializer(), """{"id":42}""")
+        }
+    }
+
+    @Test
+    fun `난이도를 못 낸 경로도 저장할 수 있다`() {
+        // 고도 정보가 없으면 difficulty 가 없다. 필수로 두면 그 코스는 저장 자체가 막힌다 (§7-A 🔧)
+        val body = checkNotNull(route(difficulty = null).toSaveRequest())
+
+        assertNull(body.difficulty)
+        assertEquals("인코딩된왕복경로", body.pathPolyline)
     }
 
     @Test

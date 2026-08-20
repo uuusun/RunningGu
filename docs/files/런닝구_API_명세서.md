@@ -603,10 +603,12 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId?, dataSource, courseName, region?, distanceKm, durationMin, difficulty, gainM, elevationProfileM, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` |
+| POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId?, dataSource, courseName, region?, distanceKm, durationMin, difficulty?, gainM, elevationProfileM, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` — `created`는 **항상 온다** |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
 | GET | `/me/courses/{id}` | 상세 — `pathPolyline`, `attributions[]` 포함 (코스 상세 **점선** 렌더링 🔒) |
 | DELETE | `/me/courses/{id}` | `204` |
+
+`difficulty`는 **선택**이다 🔧. `/courses/near`의 `difficulty`는 생성된 왕복 구간 기준이라 고도 정보가 없으면 값이 없고(§6-1 표시용), 저장 코스 목록·상세 응답에서도 `null`을 허용한다. 요청만 필수로 두면 난이도를 못 낸 경로는 저장 자체가 막힌다.
 
 **목록 응답** `GET /me/courses` — Pageable(§0-4), `savedAt DESC, id DESC`.
 
