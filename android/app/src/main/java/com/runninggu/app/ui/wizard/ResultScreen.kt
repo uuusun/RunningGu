@@ -42,10 +42,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -390,6 +392,16 @@ private fun EditList(
     val rowHeights = remember { mutableStateMapOf<String, Int>() }
     val rowSpacing = with(LocalDensity.current) { 8.dp.toPx() }
 
+    /**
+     * 방금 이동을 요청한 위치. [blocks] 가 갱신되기 전까지 추가 판정을 쉬게 한다.
+     *
+     * `onMove` 는 ViewModel → StateFlow → 리컴포지션을 거쳐야 [blocks] 에 반영된다.
+     * 한 프레임에 드래그 이벤트가 여러 번 오면 **직전 이동이 빠진 목록**으로 이웃 높이를
+     * 읽게 되는데, USER 행(IconButton 48dp)과 RACE 행(잠금 아이콘 18dp)은 높이가 달라서
+     * 방금 옮긴 것을 도로 되돌릴 수 있다.
+     */
+    var pendingMoveFrom by remember { mutableIntStateOf(NO_PENDING_MOVE) }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         day.blocks.forEachIndexed { index, block ->
             // key 로 행 컴포지션을 id 에 묶는다 — 드래그 중 목록이 재정렬돼도
@@ -406,6 +418,12 @@ private fun EditList(
                 // 다른 행이 열렸거나 바깥을 터치해 닫혔으면 이 행도 제자리로 돌아간다.
                 LaunchedEffect(openedId) {
                     if (openedId != block.id && reveal.value != 0f) reveal.animateTo(0f)
+                }
+
+                // 삭제된 행의 높이를 남기지 않는다 — `nextBlockId` 가 `max + 1` 이라 id 가
+                // 재사용되고(b5 삭제 후 추가하면 다시 b5), 옛 높이가 새 행 판정에 쓰인다.
+                DisposableEffect(block.id) {
+                    onDispose { rowHeights.remove(block.id) }
                 }
 
                 Box(
@@ -543,33 +561,45 @@ private fun EditList(
                                             onDragStart = {
                                                 draggingId = block.id
                                                 dragOffsetY = 0f
+                                                pendingMoveFrom = NO_PENDING_MOVE
                                             },
                                             onDrag = { change, amount ->
                                                 change.consume()
                                                 dragOffsetY += amount.y
                                                 val from = blocks.indexOfFirst { it.id == block.id }
                                                 if (from == -1) return@detectDragGesturesAfterLongPress
+                                                // 직전 이동이 아직 목록에 반영되지 않았다 — 낡은 이웃
+                                                // 높이로 판정하면 방금 옮긴 것을 되돌릴 수 있다.
+                                                if (from == pendingMoveFrom) {
+                                                    return@detectDragGesturesAfterLongPress
+                                                }
+                                                pendingMoveFrom = NO_PENDING_MOVE
+
                                                 // 이웃 행의 절반을 넘으면 실제로 한 칸 옮긴다. 옮긴 만큼
                                                 // 시각 오프셋을 되돌려 행이 손가락 밑에 그대로 남는다.
                                                 val below = blocks.getOrNull(from + 1)?.let { rowHeights[it.id] }
                                                 if (below != null && dragOffsetY > (below + rowSpacing) / 2f) {
                                                     onMove(from, from + 1)
+                                                    pendingMoveFrom = from
                                                     dragOffsetY -= below + rowSpacing
                                                     return@detectDragGesturesAfterLongPress
                                                 }
                                                 val above = blocks.getOrNull(from - 1)?.let { rowHeights[it.id] }
                                                 if (above != null && dragOffsetY < -(above + rowSpacing) / 2f) {
                                                     onMove(from, from - 1)
+                                                    pendingMoveFrom = from
                                                     dragOffsetY += above + rowSpacing
                                                 }
                                             },
                                             onDragEnd = {
                                                 draggingId = null
                                                 dragOffsetY = 0f
+                                                pendingMoveFrom = NO_PENDING_MOVE
                                             },
                                             onDragCancel = {
                                                 draggingId = null
                                                 dragOffsetY = 0f
+                                                pendingMoveFrom = NO_PENDING_MOVE
                                             },
                                         )
                                     },
@@ -594,6 +624,9 @@ private fun EditList(
 
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
+
+/** 대기 중인 이동이 없음. [Int] 인덱스와 섞이지 않게 음수를 쓴다. */
+private const val NO_PENDING_MOVE = -1
 
 /** 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립") */
 @Composable
