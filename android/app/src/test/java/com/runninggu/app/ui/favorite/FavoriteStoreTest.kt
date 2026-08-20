@@ -89,6 +89,39 @@ class FavoriteStoreTest {
     }
 
     @Test
+    fun `첫 요청이 실패해도 마지막 의도가 화면에 남는다`() = runBlocking {
+        // 찜 → 해제 → 찜 을 연타하고 첫 PUT 이 실패한다. (#64 리뷰)
+        //
+        // 실패를 그 자리에서 되돌리면 롤백이 마지막 '찜' 을 미찜으로 덮는다. 뒤이은 PUT 은
+        // 성공하지만 성공 경로는 화면을 손대지 않아, 서버는 찜인데 화면은 미찜으로 갈린다.
+        repository.failNext = true
+        repository.delaysMs = ArrayDeque(listOf(50L, 10L, 10L))
+
+        val jobs = List(3) { async { FavoriteStore.toggle(RACE) } }
+        jobs.forEach { it.await() }
+
+        assertTrue("서버는 찜인데 화면이 따라오지 않았다", RACE in FavoriteStore.favoriteIds.value)
+        assertTrue(RACE in repository.stored)
+    }
+
+    @Test
+    fun `로그아웃하면 늦게 끝난 요청이 이전 찜을 되살리지 않는다`() = runBlocking {
+        // 요청이 떠 있는 동안 로그아웃한다. 서버는 클라 취소를 모르니 저장은 끝까지 된다 —
+        // 그 결과가 다음 사용자 화면에 닿으면 계정 사고다. (#64 리뷰)
+        repository.delaysMs = ArrayDeque(listOf(300L))
+
+        val toggling = async { FavoriteStore.toggle(RACE) }
+        delay(50)
+        FavoriteStore.clear() // 로그아웃·탈퇴가 부르는 것
+
+        toggling.await()
+        assertFalse(
+            "로그아웃 뒤에 이전 세션의 찜이 화면에 되살아났다",
+            RACE in FavoriteStore.favoriteIds.value,
+        )
+    }
+
+    @Test
     fun `실패하면 서버 상태로 되돌리고 Failed 를 준다`() = runBlocking {
         repository.failNext = true
 

@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 찜 토글 결과. 화면이 스낵바 문구와 로그인 유도를 가르는 데 쓴다.
@@ -71,6 +72,15 @@ object FavoriteStore {
      */
     private val inFlight = ConcurrentHashMap<String, Int>()
 
+    /**
+     * 세션 세대. [clear] 마다 올라간다.
+     *
+     * 요청이 떠 있는 동안 로그아웃할 수 있다. 그때 늦게 끝난 응답이 [confirmed] 나 화면을
+     * 건드리면 **다음 사용자에게 이전 사용자의 찜이 보인다.** 시작할 때 세대를 적어 두고
+     * 반영 직전에 같은지 확인한다(#64 리뷰).
+     */
+    private val sessionEpoch = AtomicInteger(0)
+
     private var sessionJob: Job? = null
 
     /**
@@ -106,7 +116,10 @@ object FavoriteStore {
             _favoriteIds.value = emptySet()
             return
         }
+        val epoch = sessionEpoch.get()
         repository.loadFavoriteIds().onSuccess { ids ->
+            // 조회가 도는 사이 로그아웃했으면 이전 사용자의 목록이다. 버린다.
+            if (epoch != sessionEpoch.get()) return@onSuccess
             val pending = inFlight.keys
             _favoriteIds.update { current ->
                 // 요청이 떠 있는 대회는 조회 결과보다 화면 값이 최신이다. 조회가 덮으면
@@ -133,6 +146,7 @@ object FavoriteStore {
     suspend fun toggle(raceId: String): FavoriteToggleResult {
         if (!SessionStore.isLoggedIn) return FavoriteToggleResult.LoginRequired
 
+        val epoch = sessionEpoch.get()
         val nowFavorite = raceId !in _favoriteIds.value
         applyLocally(raceId, nowFavorite)
 
@@ -140,23 +154,39 @@ object FavoriteStore {
         inFlight.merge(raceId, 1, Int::plus)
         try {
             locks.computeIfAbsent(raceId) { Mutex() }.withLock {
+                // 자물쇠를 기다리는 사이 로그아웃했으면 이전 사용자의 찜을 서버에 쓰지 않는다.
+                if (epoch != sessionEpoch.get()) return@withLock
                 val serverHas = raceId in confirmed
                 // 앞선 토글이 이미 서버를 이 상태로 만들어 놨으면 부를 필요가 없다.
                 if (serverHas != nowFavorite) {
                     val outcome =
                         if (nowFavorite) repository.add(raceId) else repository.remove(raceId)
-                    if (outcome.isSuccess) {
+                    // 요청이 도는 사이 로그아웃했으면 이번 세션에 반영하지 않는다.
+                    if (outcome.isSuccess && epoch == sessionEpoch.get()) {
                         if (nowFavorite) confirmed += raceId else confirmed -= raceId
-                    } else {
-                        // 서버는 마지막으로 성공한 상태 그대로다. 화면을 거기에 맞춘다.
-                        applyLocally(raceId, serverHas)
                     }
                 }
             }
         } finally {
-            // 마지막 하나가 끝날 때만 지운다.
-            inFlight.computeIfPresent(raceId) { _, n -> if (n <= 1) null else n - 1 }
+            // 마지막 하나가 끝날 때만 지운다. `null` 이면 내가 마지막이었다는 뜻이다.
+            val remaining = inFlight.computeIfPresent(raceId) { _, n -> if (n <= 1) null else n - 1 }
+            if (remaining == null && epoch == sessionEpoch.get()) {
+                // 대기 중인 토글이 더 없으니 화면을 서버 상태에 맞춘다.
+                //
+                // 실패한 요청을 그 자리에서 되돌리지 않는 이유가 여기 있다 — 뒤에 더 누른
+                // 게 있으면 **롤백이 최신 의도를 덮는다.** 찜→해제→찜 에서 첫 요청이
+                // 실패하면 마지막 '찜' 이 미찜으로 덮이고, 뒤이은 성공은 화면을 안 건드려
+                // 서버는 찜인데 화면은 미찜으로 갈렸다(#64 리뷰).
+                //
+                // 되돌리기·따라가기를 한 자리에 모으면 규칙이 하나가 된다.
+                // **대기 중인 요청이 없을 때 화면은 언제나 서버와 같다.**
+                applyLocally(raceId, raceId in confirmed)
+            }
         }
+
+        // 세션이 바뀌었으면 이번 토글은 없던 일이다. LoginRequired 를 주면 방금 로그아웃한
+        // 사용자를 로그인 화면으로 떠민다 — 그건 아니다.
+        if (epoch != sessionEpoch.get()) return FavoriteToggleResult.Failed
 
         // 서버가 내 의도대로 됐는지로만 판단한다. 뒤이은 토글이 상태를 또 바꿨더라도
         // 그 호출자가 자기 결과를 따로 알린다.
@@ -167,8 +197,14 @@ object FavoriteStore {
         }
     }
 
-    /** 로그아웃·탈퇴 시 캐시를 비운다. 다음 사용자에게 이전 찜이 보이면 계정 사고다. */
+    /**
+     * 로그아웃·탈퇴 시 캐시를 비운다. 다음 사용자에게 이전 찜이 보이면 계정 사고다.
+     *
+     * 세대를 올려 **진행 중인 요청까지 무효로 만든다.** 요청 자체는 끝까지 가지만(서버는
+     * 클라 취소를 모른다) 그 결과가 이번 세션의 화면·캐시에 닿지 못한다.
+     */
     fun clear() {
+        sessionEpoch.incrementAndGet()
         _favoriteIds.value = emptySet()
         confirmed.clear()
     }
@@ -184,6 +220,7 @@ object FavoriteStore {
         sessionJob?.cancel()
         sessionJob = null
         this.repository = repository
+        sessionEpoch.incrementAndGet()
         _favoriteIds.value = emptySet()
         confirmed.clear()
         locks.clear()
