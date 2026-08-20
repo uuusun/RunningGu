@@ -15,7 +15,7 @@ data class GenerateItineraryRequestDto(
     val contestId: Long,
     val startDate: String,
     val endDate: String,
-    /** `FULL|HALF|TEN_K|FIVE_K` */
+    /** `FULL|HALF|K10|K5` — 부록 C 계약 값이다. 앱 enum 이름이 아니다. */
     val event: String,
     /** 1개 이상. 0개면 화면이 CTA 를 막는다 (§4.8). */
     val themes: List<String>,
