@@ -49,7 +49,18 @@ class LoginViewModel(
             val outcome = repository.login(state.email.trim(), state.password)
             _uiState.update {
                 outcome.fold(
-                    onSuccess = { _ -> it.copy(isSubmitting = false, loggedIn = true) },
+                    onSuccess = { tokens ->
+                        // TODO(AP-14): 로그인 응답의 user 로 채운다 (명세 §1-6). 지금은 이메일에서 파생.
+                        SessionStore.signIn(
+                            SessionProfile(
+                                nickname = state.email.trim().substringBefore('@'),
+                                email = state.email.trim(),
+                                loginProvider = LoginProvider.EMAIL,
+                            ),
+                            tokens = tokens,
+                        )
+                        it.copy(isSubmitting = false, loggedIn = true)
+                    },
                     onFailure = { cause ->
                         it.copy(
                             isSubmitting = false,

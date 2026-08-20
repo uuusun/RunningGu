@@ -12,10 +12,16 @@ object Routes {
     /**
      * auth 그래프(A1~A3). 탭바 없는 별도 그래프다 (SPEC §2.2).
      *
-     * 로그인 성공·게스트 둘러보기·가입 완료는 전부 이 그래프를 백스택에서 지우고
-     * `home` 으로 나간다 — 홈에서 뒤로가기가 로그인으로 돌아가면 안 된다.
+     * 로그인 성공·게스트 둘러보기·가입 완료는 이 그래프를 백스택에서 지우고 [ARG_RETURN_TO]
+     * 로 나간다 — 앱 시작이면 `home`, 게스트가 마이에서 들어왔으면 그 화면으로 돌아간다(D-27).
+     * 어느 쪽이든 auth 는 스택에서 사라져 뒤로가기가 로그인으로 되돌아가지 않는다.
+     *
+     * 인자를 그래프에 단 이유는 위저드와 같다 — 자식 화면(A2·A3)도 그래프 entry 에서 읽는다.
      */
-    const val AUTH_GRAPH = "auth"
+    const val ARG_RETURN_TO = "returnTo"
+    const val AUTH_GRAPH_PATTERN = "auth?$ARG_RETURN_TO={$ARG_RETURN_TO}"
+
+    fun authGraph(returnTo: String = HOME): String = "auth?$ARG_RETURN_TO=${Uri.encode(returnTo)}"
 
     /** A1 로그인. (SPEC §4.1) */
     const val LOGIN = "login"
@@ -25,6 +31,9 @@ object Routes {
 
     /** A3 비밀번호 찾기. (SPEC §4.3) */
     const val RESET = "reset"
+
+    /** 계정 관리 — 마이 설정에서 여는 별도 화면. (SPEC §4.13 · D-22) */
+    const val ACCOUNT = "account"
 
     const val HOME = "home"
     const val CALENDAR = "calendar"
