@@ -2,7 +2,8 @@ package com.runninggu.app.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.data.remote.ApiErrorCode
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,13 @@ data class SignupUiState(
     val code: String = "",
     /** 재발송까지 남은 초. 0이면 재발송 가능. (SPEC §4.2-3 쿨다운 60초) */
     val resendCooldownSec: Int = 0,
+    /**
+     * 코드가 만료됐거나 5회 실패해서 **재발송해야만** 진행할 수 있는 상태.
+     * (§1-4 `CODE_EXPIRED`·`TOO_MANY_ATTEMPTS` · NFR-10 🔒)
+     *
+     * 이 상태에서 [확인]을 열어 두면 사용자가 같은 코드로 계속 시도하다 빠져나오지 못한다.
+     */
+    val mustResend: Boolean = false,
 
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
@@ -59,7 +67,7 @@ data class SignupUiState(
         get() = !isSubmitting && isEmailValid && isPasswordValid && isPasswordConfirmed && isNicknameValid
 
     val canVerify: Boolean
-        get() = !isSubmitting && AuthValidation.isCodeValid(code)
+        get() = !isSubmitting && !mustResend && AuthValidation.isCodeValid(code)
 }
 
 /** A2 회원가입. (SPEC §4.2 · AP-08) */
@@ -69,6 +77,9 @@ class SignupViewModel(
 
     private val _uiState = MutableStateFlow(SignupUiState())
     val uiState: StateFlow<SignupUiState> = _uiState.asStateFlow()
+
+    /** 진행 중인 쿨다운 카운트다운. 새로 시작할 때 이전 것을 끊는다. */
+    private var cooldownJob: Job? = null
 
     // ── 1단계 동의 ──────────────────────────────────────────────
 
@@ -107,9 +118,9 @@ class SignupViewModel(
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.VERIFY, code = "") }
                     startResendCooldown()
                 },
-                onFailure = {
+                onFailure = { cause ->
                     _uiState.update {
-                        it.copy(isSubmitting = false, errorMessage = "인증 메일을 보내지 못했어요. 다시 시도해 주세요.")
+                        it.copy(isSubmitting = false, errorMessage = sendFailureMessage(cause))
                     }
                 },
             )
@@ -127,8 +138,16 @@ class SignupViewModel(
         val state = _uiState.value
         if (state.resendCooldownSec > 0 || state.isSubmitting) return
         viewModelScope.launch {
-            repository.sendSignupCode(state.email.trim())
-            startResendCooldown()
+            repository.sendSignupCode(state.email.trim()).fold(
+                onSuccess = {
+                    // 재발송하면 시도 횟수가 초기화되므로 잠금도 풀린다 (§1-4).
+                    _uiState.update { it.copy(mustResend = false, code = "", errorMessage = null) }
+                    startResendCooldown()
+                },
+                onFailure = { cause ->
+                    _uiState.update { it.copy(errorMessage = sendFailureMessage(cause)) }
+                },
+            )
         }
     }
 
@@ -139,9 +158,15 @@ class SignupViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
             val verified = repository.verifySignupCode(state.email.trim(), state.code)
-            if (verified.isFailure) {
+            verified.exceptionOrNull()?.let { cause ->
+                // 사유마다 사용자가 할 일이 다르다 — 만료·초과는 재발송해야 빠져나온다 (§1-4).
+                val needsResend = cause.apiErrorCode() in RESEND_REQUIRED_CODES
                 _uiState.update {
-                    it.copy(isSubmitting = false, errorMessage = "인증 코드가 맞지 않아요. 다시 확인해 주세요.")
+                    it.copy(
+                        isSubmitting = false,
+                        mustResend = needsResend,
+                        errorMessage = verifyFailureMessage(cause),
+                    )
                 }
                 return@launch
             }
@@ -151,17 +176,18 @@ class SignupViewModel(
                 nickname = state.nickname.trim(),
                 marketingAgreed = state.marketingAgreed,
             ).fold(
-                onSuccess = {
+                onSuccess = { tokens ->
                     // 201 = 자동 로그인 (명세 §1-5). TODO(AP-14): 응답의 user 로 채운다.
                     SessionStore.signIn(
                         SessionProfile(
                             nickname = state.nickname.trim(),
                             email = state.email.trim(),
                             loginProvider = LoginProvider.EMAIL,
+                            // 가입 때 고른 값을 그대로 물려준다 — 계정 관리 토글의 초기값이 된다.
+                            marketingAgreed = state.marketingAgreed,
                         ),
+                        tokens = tokens,
                     )
-                    // 신규 가입이라 비어 있지만, 캐시를 서버 기준으로 맞춘다 (AP-21).
-                    FavoriteStore.refresh()
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
                 onFailure = {
@@ -195,8 +221,15 @@ class SignupViewModel(
         }
     }
 
+    /**
+     * 재발송 쿨다운 카운트다운. **이전 타이머는 반드시 끊는다.**
+     *
+     * 3단계에서 뒤로 갔다 다시 들어오면 타이머가 겹쳐 1초에 2씩 줄어든다 — 60초 쿨다운이
+     * 30초가 되어 NFR-10 을 어긴다.
+     */
     private fun startResendCooldown() {
-        viewModelScope.launch {
+        cooldownJob?.cancel()
+        cooldownJob = viewModelScope.launch {
             _uiState.update { it.copy(resendCooldownSec = RESEND_COOLDOWN_SEC) }
             while (_uiState.value.resendCooldownSec > 0) {
                 delay(1_000)
@@ -205,8 +238,34 @@ class SignupViewModel(
         }
     }
 
+    /** 코드 검증 실패 문구. 사유별로 사용자가 할 일이 다르다. (§1-4 · `ApiErrorCode`) */
+    private fun verifyFailureMessage(cause: Throwable): String = when {
+        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        cause.apiErrorCode() == ApiErrorCode.CODE_EXPIRED ->
+            "인증 코드가 만료됐어요. 메일을 다시 받아 주세요."
+        cause.apiErrorCode() == ApiErrorCode.TOO_MANY_ATTEMPTS ->
+            "여러 번 틀렸어요. 메일을 다시 받아 주세요."
+        cause.apiErrorCode() == ApiErrorCode.INVALID_CODE ->
+            "인증 코드가 맞지 않아요. 다시 확인해 주세요."
+        else -> "인증에 실패했어요. 잠시 후 다시 시도해 주세요."
+    }
+
+    /** 인증 메일 발송 실패 문구. */
+    private fun sendFailureMessage(cause: Throwable): String = when {
+        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED -> "이미 가입된 이메일이에요."
+        cause.apiErrorCode() == ApiErrorCode.SEND_COOLDOWN -> "잠시 후 다시 시도해 주세요."
+        else -> "인증 메일을 보내지 못했어요. 다시 시도해 주세요."
+    }
+
     private companion object {
         /** SPEC §4.2-3 — 재발송 쿨다운 60초. */
         const val RESEND_COOLDOWN_SEC = 60
+
+        /** 이 사유들은 같은 코드로 재시도해도 소용없다 — 재발송해야 한다. (§1-4 · NFR-10 🔒) */
+        val RESEND_REQUIRED_CODES = setOf(
+            ApiErrorCode.CODE_EXPIRED,
+            ApiErrorCode.TOO_MANY_ATTEMPTS,
+        )
     }
 }

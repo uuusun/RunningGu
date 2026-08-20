@@ -82,7 +82,7 @@ fun RaceDetailScreen(
     onBack: () -> Unit,
     onStartWizard: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onLoginRequest: () -> Unit = {},
+    onLoginRequest: () -> Unit,
     viewModel: RaceDetailViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()

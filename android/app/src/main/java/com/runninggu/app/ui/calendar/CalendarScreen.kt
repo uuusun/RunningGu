@@ -69,7 +69,7 @@ fun CalendarScreen(
     initialQuery: String = "",
     modifier: Modifier = Modifier,
     onRaceClick: (String) -> Unit = {},
-    onLoginRequest: () -> Unit = {},
+    onLoginRequest: () -> Unit,
     viewModel: CalendarViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

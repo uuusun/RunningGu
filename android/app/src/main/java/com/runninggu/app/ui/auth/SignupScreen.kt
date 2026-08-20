@@ -223,6 +223,8 @@ private fun VerifyStep(state: SignupUiState, viewModel: SignupViewModel) {
         onValueChange = viewModel::onCodeChange,
         label = { Text("인증 코드 6자리") },
         singleLine = true,
+        // 만료·초과 상태에서는 입력을 막는다 — 같은 코드로 계속 시도해도 소용없다 (§1-4).
+        enabled = !state.mustResend,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         isError = state.errorMessage != null,
         supportingText = state.errorMessage?.let { message ->
@@ -237,11 +239,13 @@ private fun VerifyStep(state: SignupUiState, viewModel: SignupViewModel) {
         enabled = state.resendCooldownSec == 0 && !state.isSubmitting,
     ) {
         Text(
-            if (state.resendCooldownSec > 0) {
-                "재발송 (${state.resendCooldownSec}초 후 가능)"
-            } else {
-                "인증 메일 재발송"
+            text = when {
+                state.resendCooldownSec > 0 -> "재발송 (${state.resendCooldownSec}초 후 가능)"
+                // 재발송이 유일한 출구인 상태라 버튼을 강조한다 (NFR-10 🔒).
+                state.mustResend -> "인증 메일 다시 받기"
+                else -> "인증 메일 재발송"
             },
+            fontWeight = if (state.mustResend) FontWeight.Bold else null,
         )
     }
 
