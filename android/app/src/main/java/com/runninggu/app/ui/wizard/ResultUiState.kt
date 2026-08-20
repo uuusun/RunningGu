@@ -7,6 +7,7 @@ import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
+import com.runninggu.app.data.model.PoiItem
 
 /**
  * S7 동선 결과의 UI 계약. (SPEC §4.10 · §3-5)

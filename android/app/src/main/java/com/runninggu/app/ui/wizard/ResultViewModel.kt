@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.runninggu.app.data.model.PoiItem
+import com.runninggu.app.data.repository.FakePoiRepository
+import com.runninggu.app.data.repository.PoiRepository
 
 /**
  * S7 동선 결과 ViewModel. (SPEC §4.10 · AP-11)

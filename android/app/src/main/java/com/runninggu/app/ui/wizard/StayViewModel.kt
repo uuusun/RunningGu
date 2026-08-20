@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.runninggu.app.data.model.PoiItem
+import com.runninggu.app.data.repository.FakePoiRepository
+import com.runninggu.app.data.repository.PoiRepository
 
 /**
  * S6 숙소 선택의 UI 계약. (SPEC §4.9 · §3-5)
