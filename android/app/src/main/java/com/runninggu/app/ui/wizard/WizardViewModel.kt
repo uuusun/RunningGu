@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.time.LocalDate
+import com.runninggu.app.data.model.PoiItem
 
 /**
  * 위저드(S4~S7) 공유 ViewModel. (SPEC §2.4 · AP-11)

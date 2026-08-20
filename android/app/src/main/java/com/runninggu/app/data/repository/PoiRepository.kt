@@ -1,60 +1,17 @@
-package com.runninggu.app.ui.wizard
+package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.model.PoiItem
+import com.runninggu.app.data.model.PoiSearchResult
+import com.runninggu.app.data.remote.PoiApi
+import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.mapper.toResult
 import com.runninggu.app.domain.PoiCategory
 import kotlinx.coroutines.delay
-import kotlinx.serialization.Serializable
-
-/**
- * `GET /api/pois` 응답. (API 명세 §4-2)
- *
- * TODO(AP-14): `data/remote` 로 옮기고 Retrofit 응답 타입으로 쓴다.
- */
-@Serializable
-data class PoiSearchResponse(
-    /** `LIVE` · `SAMPLE` · `SYNTH` — 소스 배지로 노출한다. (SPEC §6.3 · NFR-2) */
-    val source: String,
-    val items: List<PoiItemDto> = emptyList(),
-)
-
-@Serializable
-data class PoiItemDto(
-    val name: String,
-    val category: String,
-    val lat: Double,
-    val lng: Double,
-    val distanceM: Int = 0,
-    val description: String = "",
-    val address: String = "",
-    val url: String = "",
-    val imageUrl: String? = null,
-)
-
-/** 화면이 쓰는 장소 항목. */
-data class PoiItem(
-    val name: String,
-    val address: String,
-    val description: String,
-    val lat: Double,
-    val lng: Double,
-)
-
-fun PoiItemDto.toUi() = PoiItem(
-    name = name,
-    address = address,
-    description = description,
-    lat = lat,
-    lng = lng,
-)
-
-/** 조회 결과 + 소스 배지. */
-data class PoiSearchResult(val source: String, val items: List<PoiItem>)
 
 /**
  * 장소 조회 창구. (API 명세 §4-2 · SPEC §9.4)
  *
  * **앱은 카카오·KTO 를 직접 부르지 않는다.** REST 키가 서버에만 있으므로 전부 우리 서버를 거친다.
- *
- * TODO(AP-14): `data/remote` 의 Retrofit 구현으로 교체한다.
  */
 interface PoiRepository {
     /**
@@ -75,6 +32,27 @@ interface PoiRepository {
 
         /** 키워드 검색 최소 글자 수. */
         const val MIN_QUERY_LENGTH = 2
+    }
+}
+
+/** 서버 구현. (§4-2) */
+class RemotePoiRepository(private val api: PoiApi) : PoiRepository {
+
+    override suspend fun search(
+        category: PoiCategory,
+        lat: Double,
+        lng: Double,
+        query: String?,
+        size: Int,
+    ): PoiSearchResult = apiCall {
+        api.search(
+            category = category.name,
+            lat = lat,
+            lng = lng,
+            // 공백만 있는 검색어는 보내지 않는다 — 서버가 400 을 주기 전에 앱이 거른다
+            query = query?.trim()?.takeIf { it.length >= PoiRepository.MIN_QUERY_LENGTH },
+            size = size,
+        ).toResult()
     }
 }
 

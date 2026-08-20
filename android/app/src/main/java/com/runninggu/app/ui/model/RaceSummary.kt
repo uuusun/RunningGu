@@ -14,7 +14,14 @@ import com.runninggu.app.domain.dDayLabel as domainDDayLabel
  * 여기는 UI 전용 매핑만 남긴다.
  */
 data class RaceSummary(
+    /** 화면·내비게이션 키. 번들 항목은 크롤 원천 문자열이라 서버 호출에 쓰지 않는다. */
     val id: String,
+    /**
+     * canonical `CONTEST.id`. 서버에서 온 대회만 갖는다. (API 명세 §3-1)
+     *
+     * 동선 생성·찜·상세처럼 서버를 부르는 동작은 이 값이 있을 때만 한다 (#66 리뷰).
+     */
+    val serverId: Long? = null,
     val name: String,
     val region: String,
     val venue: String,

@@ -13,6 +13,7 @@ import com.runninggu.app.ui.auth.ResetScreen
 import com.runninggu.app.ui.auth.SignupScreen
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseScreen
+import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,7 +76,12 @@ fun RunningGuNavHost(
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.COURSES) { CourseScreen(Modifier.statusBarsPadding()) }
+        composable(Routes.COURSES) {
+            CourseScreen(
+                viewModel = viewModel(factory = CourseViewModel.factory()),
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
 
         // S10 마이 — 로그인 필요(결정-4). 게스트는 화면 안에서 로그인 유도만 본다.
         composable(Routes.MY) {

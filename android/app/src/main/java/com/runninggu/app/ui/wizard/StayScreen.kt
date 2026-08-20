@@ -38,6 +38,7 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SourceBadge
+import com.runninggu.app.data.model.PoiItem
 
 /**
  * S6 숙소 선택. (SPEC §4.9 · AP-11)

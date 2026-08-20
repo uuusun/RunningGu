@@ -8,6 +8,7 @@ import com.runninggu.app.domain.stdEvents
 import com.runninggu.app.ui.model.RaceSummary
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import com.runninggu.app.data.model.PoiItem
 
 /**
  * 위저드(S4~S7) 공유 상태. (SPEC §2.4)

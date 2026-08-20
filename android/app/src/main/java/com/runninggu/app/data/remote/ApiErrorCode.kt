@@ -36,6 +36,9 @@ enum class ApiErrorCode {
     // 404 — `*_NOT_FOUND` 는 리소스마다 다르므로 접미사로 판정한다([isNotFound]).
     NOT_FOUND,
 
+    /** 출발지 검색에 맞는 장소가 없다. 접미사 규칙에 안 걸려 따로 둔다 (§4-4). */
+    NO_RESULT,
+
     // 409
     EMAIL_DUPLICATED,
     NICKNAME_DUPLICATED,
