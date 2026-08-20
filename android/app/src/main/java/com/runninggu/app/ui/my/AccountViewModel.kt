@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.ui.auth.AuthValidation
-import com.runninggu.app.ui.auth.LoginProvider
+import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.ui.auth.apiErrorCode
-import com.runninggu.app.ui.auth.SessionProfile
-import com.runninggu.app.ui.auth.SessionStore
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -34,7 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runninggu.app.ui.auth.SessionProfile
+import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
 

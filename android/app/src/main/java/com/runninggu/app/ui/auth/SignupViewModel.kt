@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
 
 /**
  * A2 회원가입 단계. (SPEC §4.2 — 동의 → 정보 입력 → 이메일 인증 → 완료)
