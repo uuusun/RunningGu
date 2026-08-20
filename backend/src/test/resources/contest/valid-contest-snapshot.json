@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "futureTopLevelField": "ignored",
+  "meta": {
+    "source": "data/races_sample.csv",
+    "sourceSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "sourceRowCount": 2,
+    "canonicalCount": 1,
+    "sourceRecordCount": 2,
+    "eventRecordCount": 2,
+    "skipped": [],
+    "checkedAtMax": "2026-06-14T01:10:00Z",
+    "futureMetaField": true
+  },
+  "contests": [
+    {
+      "canonicalKey": "2026-10-18|서울달리기",
+      "name": "서울 달리기",
+      "region": "서울",
+      "place": "서울광장",
+      "roadAddress": null,
+      "contestDate": "2026-10-18",
+      "startTime": null,
+      "events": ["K10", "K5"],
+      "category": "로드",
+      "applyStart": "2026-07-01",
+      "applyEnd": "2026-09-30",
+      "regStatusFallback": "OPEN",
+      "organizer": "서울시",
+      "officialUrl": "https://example.com/official",
+      "detailUrl": null,
+      "imageUrl": null,
+      "lat": 37.5665000,
+      "lng": 126.9780000,
+      "checkedAt": "2026-06-14T01:10:00Z",
+      "futureContestField": 1,
+      "sources": [
+        {
+          "sourceType": "MARATHON_GO",
+          "externalId": "go-seoul-2026",
+          "sourceUrl": "https://example.com/go-seoul-2026",
+          "fetchedAt": "2026-06-14T01:00:00Z",
+          "lastCheckedDate": "2026-06-14",
+          "rawPayload": {
+            "race_id": "go-seoul-2026",
+            "reg_status": "접수중"
+          },
+          "futureSourceField": "ignored"
+        },
+        {
+          "sourceType": "MARATHON_ONLINE",
+          "externalId": "online-seoul-2026",
+          "sourceUrl": "https://example.com/online-seoul-2026",
+          "fetchedAt": "2026-06-14T01:10:00Z",
+          "lastCheckedDate": "2026-06-14",
+          "rawPayload": {
+            "race_id": "online-seoul-2026",
+            "reg_status": "접수중"
+          }
+        }
+      ]
+    }
+  ]
+}

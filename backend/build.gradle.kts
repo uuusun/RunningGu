@@ -47,3 +47,12 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("contestImport") {
+    group = "application"
+    description = "서버용 대회 snapshot을 검증하고 PostgreSQL에 적재한다"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass = "com.runninggu.server.contest.ContestSnapshotImporterApplication"
+    workingDir = rootProject.projectDir.parentFile
+    project.findProperty("snapshotPath")?.toString()?.let { args(it) }
+}

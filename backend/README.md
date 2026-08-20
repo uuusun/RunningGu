@@ -34,6 +34,26 @@ $env:DB_PASSWORD = '<로컬 비밀번호>'
 아직 구현되지 않은 API 경로는 보안 설정에서 기본 거부한다. 공개·인증 경로는 각 기능을 구현할 때
 API 계약에 맞춰 명시적으로 연다.
 
+## 대회 snapshot 적재
+
+Importer는 서버 시작 때 자동 실행하지 않는다. DB 환경변수를 설정한 뒤 저장소 루트의
+`data/contest_snapshot.json`을 명시적으로 적재한다.
+
+```powershell
+cd backend
+.\gradlew.bat contestImport
+```
+
+다른 파일을 적재할 때는 저장소 루트 기준 또는 절대 경로를 넘긴다.
+
+```powershell
+.\gradlew.bat contestImport -PsnapshotPath=C:\snapshots\contest_snapshot.json
+```
+
+검증 실패, 과거 snapshot, 동일 기준 시각의 다른 snapshot 파일 hash는 전체 롤백한다. 같은
+`snapshot_sha256 + checked_at_max`를 다시 실행하면 성공 no-op다. `source_sha256`은 입력 CSV
+출처 추적용이며 snapshot 식별에는 사용하지 않는다.
+
 ## 검증
 
 통합 테스트는 Testcontainers로 PostgreSQL 17을 실행하므로 Docker가 켜져 있어야 한다.
