@@ -74,6 +74,46 @@ class SessionEpochTest {
     }
 
     @Test
+    fun `토큰과 세대를 한 번에 읽는다`() {
+        // 따로 읽으면 그 사이 계정 전환이 끼어 A 토큰 + B 세대 요청이 만들어진다 (#74 리뷰)
+        SessionStore.signIn(profile("A"), AuthTokens("A1", "AR1"))
+        val a = SessionStore.snapshot()
+
+        SessionStore.signIn(profile("B"), AuthTokens("B1", "BR1"))
+        val b = SessionStore.snapshot()
+
+        assertEquals("A1", a.tokens?.accessToken)
+        assertEquals("B1", b.tokens?.accessToken)
+        // 세대도 함께 움직인다 — 짝이 어긋나지 않는다
+        assertTrue(b.epoch > a.epoch)
+    }
+
+    @Test
+    fun `계정이 바뀐 뒤 도착한 만료 신호로는 로그아웃하지 않는다`() {
+        // A 리프레시가 죽었다고 B 를 튕기면 안 된다 (#74 리뷰)
+        SessionStore.signIn(profile("A"), AuthTokens("A1", "AR1"))
+        val aEpoch = SessionStore.sessionEpoch
+
+        SessionStore.signIn(profile("B"), AuthTokens("B1", "BR1"))
+        val signedOut = SessionStore.signOut(expectedEpoch = aEpoch)
+
+        assertFalse(signedOut)
+        assertTrue(SessionStore.isLoggedIn)
+        assertEquals("B1", SessionStore.tokens?.accessToken)
+    }
+
+    @Test
+    fun `같은 세대의 만료 신호면 로그아웃한다`() {
+        SessionStore.signIn(profile("A"), AuthTokens("A1", "AR1"))
+
+        val signedOut = SessionStore.signOut(expectedEpoch = SessionStore.sessionEpoch)
+
+        assertTrue(signedOut)
+        assertFalse(SessionStore.isLoggedIn)
+        assertNull(SessionStore.tokens)
+    }
+
+    @Test
     fun `세대가 같으면 회전된 토큰 쌍을 갈아끼운다`() {
         SessionStore.signIn(profile("A"), AuthTokens("A1", "AR1"))
 

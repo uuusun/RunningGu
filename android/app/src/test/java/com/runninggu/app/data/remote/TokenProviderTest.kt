@@ -49,7 +49,10 @@ class TokenProviderTest {
     private fun callRegions(spy: HeaderSpy) {
         val api: CourseApi = ApiClient
             .create(
-                tokenProvider = { SessionStore.tokens?.accessToken },
+                sessionProvider = {
+                    val snapshot = SessionStore.snapshot()
+                    ApiClient.Session(snapshot.tokens?.accessToken, snapshot.epoch)
+                },
                 extraInterceptors = listOf(spy),
             )
             .create()
@@ -99,7 +102,10 @@ class TokenProviderTest {
         val spy = HeaderSpy()
         val api: CourseApi = ApiClient
             .create(
-                tokenProvider = { SessionStore.tokens?.accessToken },
+                sessionProvider = {
+                    val snapshot = SessionStore.snapshot()
+                    ApiClient.Session(snapshot.tokens?.accessToken, snapshot.epoch)
+                },
                 extraInterceptors = listOf(spy),
             )
             .create()

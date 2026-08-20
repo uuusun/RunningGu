@@ -57,7 +57,8 @@ private const val HTTP_UNAUTHORIZED = 401
  * @param currentAccessToken 지금 세션의 액세스. 동시 401 에서 "누가 이미 갱신했나" 를 본다.
  * @param currentRefreshToken 지금 리프레시. 없으면(게스트) 재발급하지 않는다.
  * @param onRefreshed 새 토큰 쌍 저장. **세대가 같을 때만 반영**되고, 반영 여부를 돌려준다.
- * @param onGiveUp 리프레시가 죽었다. 세션을 지우는 자리다.
+ * @param onGiveUp 리프레시가 죽었다. **세대를 함께 넘긴다** — 그사이 계정이 바뀌었으면
+ *  그건 A 의 리프레시가 죽은 것이지 B 를 로그아웃시킬 이유가 아니다(#74 리뷰).
  */
 class TokenAuthenticator(
     private val sessionEpoch: () -> Int,
@@ -65,7 +66,7 @@ class TokenAuthenticator(
     private val currentRefreshToken: () -> String?,
     private val refresh: (String) -> RefreshOutcome,
     private val onRefreshed: (Int, RefreshResponseDto) -> Boolean,
-    private val onGiveUp: () -> Unit,
+    private val onGiveUp: (Int) -> Unit,
 ) : Authenticator {
 
     /**
@@ -107,7 +108,8 @@ class TokenAuthenticator(
 
             // 재로그인 신호는 이것 하나뿐이다
             RefreshOutcome.Expired -> {
-                onGiveUp()
+                // 세대가 같을 때만 지운다 — 저장 쪽에서 한 번 더 확인한다
+                onGiveUp(epoch)
                 null
             }
 

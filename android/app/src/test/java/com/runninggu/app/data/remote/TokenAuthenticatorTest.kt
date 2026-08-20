@@ -51,7 +51,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
             onRefreshed = { _, renewed -> saved = renewed; true },
-            onGiveUp = { error("여기 오면 안 된다") },
+            onGiveUp = { _ -> error("여기 오면 안 된다") },
         )
 
         val retry = authenticator.authenticate(null, unauthorized())
@@ -78,7 +78,7 @@ class TokenAuthenticatorTest {
                 RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2"))
             },
             onRefreshed = { _, renewed -> access = renewed.accessToken; true },
-            onGiveUp = { signedOut = true },
+            onGiveUp = { _ -> signedOut = true },
         )
 
         val pool = Executors.newFixedThreadPool(2)
@@ -109,7 +109,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Failed },
             onRefreshed = { _, _ -> error("여기 오면 안 된다") },
-            onGiveUp = { signedOut = true },
+            onGiveUp = { _ -> signedOut = true },
         )
 
         val retry = authenticator.authenticate(null, unauthorized())
@@ -127,7 +127,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Expired }, // 401 INVALID_REFRESH_TOKEN
             onRefreshed = { _, _ -> error("여기 오면 안 된다") },
-            onGiveUp = { signedOut = true },
+            onGiveUp = { _ -> signedOut = true },
         )
 
         val retry = authenticator.authenticate(null, unauthorized())
@@ -145,7 +145,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { null },
             refresh = { refreshed = true; RefreshOutcome.Failed },
             onRefreshed = { _, _ -> true },
-            onGiveUp = { error("게스트 세션을 지울 일은 없다") },
+            onGiveUp = { _ -> error("게스트 세션을 지울 일은 없다") },
         )
 
         val retry = authenticator.authenticate(null, unauthorized(sentToken = null))
@@ -169,7 +169,7 @@ class TokenAuthenticatorTest {
                 applied = epoch == 2
                 false
             },
-            onGiveUp = { error("리프레시가 죽은 게 아니다") },
+            onGiveUp = { _ -> error("리프레시가 죽은 게 아니다") },
         )
 
         // 요청은 세대 1(로그인 상태)에서 만들어졌다
@@ -189,7 +189,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { "B-refresh" },
             refresh = { refreshed = true; RefreshOutcome.Failed },
             onRefreshed = { _, _ -> error("여기 오면 안 된다") },
-            onGiveUp = { error("여기 오면 안 된다") },
+            onGiveUp = { _ -> error("여기 오면 안 된다") },
         )
 
         // A 세대(1)에서 만들어진 요청이 지금 401 로 돌아왔다
@@ -201,6 +201,25 @@ class TokenAuthenticatorTest {
     }
 
     @Test
+    fun `만료로 끝나도 그사이 계정이 바뀌었으면 그 세대로 알린다`() {
+        // A 리프레시가 401 로 죽었는데 그사이 B 로 갈아탔다면, B 를 로그아웃시킬 이유가 없다.
+        // 저장 쪽(SessionStore.signOut(expectedEpoch))이 거절할 수 있게 **세대를 넘긴다** (#74 리뷰)
+        var reportedEpoch: Int? = null
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "A-access" },
+            currentRefreshToken = { "A-refresh" },
+            refresh = { RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> error("여기 오면 안 된다") },
+            onGiveUp = { epoch -> reportedEpoch = epoch },
+        )
+
+        authenticator.authenticate(null, unauthorized(sentToken = "A-access", epoch = 1))
+
+        assertEquals(1, reportedEpoch)
+    }
+
+    @Test
     fun `재발급한 토큰으로도 401 이면 한 번만 시도하고 멈춘다`() {
         var calls = 0
         val authenticator = TokenAuthenticator(
@@ -209,7 +228,7 @@ class TokenAuthenticatorTest {
             currentRefreshToken = { "refresh-1" },
             refresh = { calls++; RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
             onRefreshed = { _, _ -> true },
-            onGiveUp = {},
+            onGiveUp = { _ -> },
         )
 
         val retry = authenticator.authenticate(null, unauthorized(prior = unauthorized()))

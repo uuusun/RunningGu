@@ -37,6 +37,14 @@ data class SessionProfile(
     val marketingAgreed: Boolean = false,
 )
 
+/**
+ * 토큰과 세대를 함께 읽은 값. (#74 리뷰)
+ *
+ * 요청을 만들 때 이 둘은 **같은 순간의 것**이어야 한다 — 따로 읽으면 계정 전환 사이에
+ * 끼어 A 토큰에 B 세대가 붙는다.
+ */
+data class SessionSnapshot(val tokens: AuthTokens?, val epoch: Int)
+
 /** 가입 로그인 방식. (API 명세 §2 `loginProvider` · 결정-22 개정) */
 enum class LoginProvider(val label: String) {
     EMAIL("이메일 가입"),
@@ -79,6 +87,15 @@ object SessionStore {
 
     val sessionEpoch: Int get() = epoch.get()
 
+    /**
+     * 토큰과 세대를 **한 번에** 읽는다. (#74 리뷰)
+     *
+     * 따로 읽으면 두 읽기 사이에 계정이 바뀌어 **A 토큰 + B 세대** 요청이 만들어진다.
+     * 그 요청이 401 을 받으면 세대가 같아 보여서 A 요청을 B 토큰으로 재시도한다.
+     */
+    @Synchronized
+    fun snapshot(): SessionSnapshot = SessionSnapshot(tokens, epoch.get())
+
     val isLoggedIn: Boolean get() = _session.value != null
 
     /**
@@ -114,7 +131,22 @@ object SessionStore {
         return true
     }
 
-    /** 로그아웃·탈퇴 공용. 서버 revoke 는 AP-14 에서 붙는다. */
+    /**
+     * 재발급이 만료로 끝났을 때의 로그아웃. **세대가 같을 때만** 지운다. (#74 리뷰)
+     *
+     * A 토큰 재발급이 `401` 로 끝났는데 그사이 B 로 갈아탔다면, 그건 B 를 로그아웃시킬
+     * 이유가 아니다 — A 의 리프레시가 죽은 것뿐이다.
+     *
+     * @return 지웠으면 true.
+     */
+    @Synchronized
+    fun signOut(expectedEpoch: Int): Boolean {
+        if (epoch.get() != expectedEpoch) return false
+        signOut()
+        return true
+    }
+
+    /** 사용자가 누른 로그아웃·탈퇴. 서버 revoke 는 AP-14 에서 붙는다. */
     @Synchronized
     fun signOut() {
         tokens = null

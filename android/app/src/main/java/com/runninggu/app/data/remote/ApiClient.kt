@@ -19,9 +19,16 @@ import java.util.concurrent.TimeUnit
  */
 object ApiClient {
 
-    /** 액세스 토큰 공급자. AP-08 인증이 들어오면 실제 저장소를 물린다. */
-    fun interface TokenProvider {
-        fun accessToken(): String?
+    /**
+     * 요청 시점의 세션. **토큰과 세대를 한 번에** 준다. (#74 리뷰)
+     *
+     * 따로 읽으면 두 읽기 사이에 계정이 바뀌어 **A 토큰 + B 세대** 요청이 만들어진다.
+     */
+    data class Session(val accessToken: String?, val epoch: Int)
+
+    /** 세션 공급자. 기본값은 세션 개념이 없는 호출(재발급 전용 클라이언트)용이다. */
+    fun interface SessionProvider {
+        fun session(): Session
     }
 
     /**
@@ -33,14 +40,12 @@ object ApiClient {
     data class SessionTag(val epoch: Int)
 
     /** 토큰 없이 도는 기본값 — 게스트도 공개 API 는 쓸 수 있다(§0-2). */
-    private val NoToken = TokenProvider { null }
+    private val NoSession = SessionProvider { Session(accessToken = null, epoch = 0) }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun create(
         baseUrl: String = BuildConfig.BASE_URL,
-        tokenProvider: TokenProvider = NoToken,
-        /** 요청 시점의 세션 세대. 기본값은 세션 개념이 없는 호출(재발급 전용 클라이언트)용이다. */
-        sessionEpoch: () -> Int = { 0 },
+        sessionProvider: SessionProvider = NoSession,
         json: Json = ApiJson,
         extraInterceptors: List<Interceptor> = emptyList(),
         /** `401` 재발급 처리. null 이면 401 이 그대로 화면까지 올라간다. */
@@ -49,7 +54,7 @@ object ApiClient {
         val client = OkHttpClient.Builder()
             .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-            .addInterceptor(authInterceptor(tokenProvider, sessionEpoch))
+            .addInterceptor(authInterceptor(sessionProvider))
             .apply {
                 extraInterceptors.forEach(::addInterceptor)
                 authenticator?.let(::authenticator)
@@ -69,19 +74,18 @@ object ApiClient {
      * 헤더를 붙일 때 **그 시점의 세션 세대를 태그로 함께 단다** — 재발급 후 재시도할 때
      * 이 요청이 아직 같은 세션의 것인지 확인하는 근거다(#74 리뷰).
      */
-    private fun authInterceptor(provider: TokenProvider, sessionEpoch: () -> Int) =
-        Interceptor { chain ->
-            val token = provider.accessToken()
-            val request = if (token.isNullOrBlank()) {
-                chain.request()
-            } else {
-                chain.request().newBuilder()
-                    .header("Authorization", "Bearer $token")
-                    .tag(SessionTag::class.java, SessionTag(sessionEpoch()))
-                    .build()
-            }
-            chain.proceed(request)
-        }
+    private fun authInterceptor(provider: SessionProvider) = Interceptor { chain ->
+        // 토큰과 세대를 **한 번에** 읽는다 — 따로 읽으면 그 사이 계정 전환이 끼어든다
+        val session = provider.session()
+        val builder = chain.request().newBuilder()
+            // 게스트 요청에도 세대를 단다. 로그인 전에 나간 요청이 로그인 뒤에 자동으로
+            // 재실행되면 안 된다(D-27 — 저장·찜을 자동 실행하지 않는다)
+            .tag(SessionTag::class.java, SessionTag(session.epoch))
+        session.accessToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let { builder.header("Authorization", "Bearer $it") }
+        chain.proceed(builder.build())
+    }
 
     private const val JSON_MEDIA_TYPE = "application/json"
 

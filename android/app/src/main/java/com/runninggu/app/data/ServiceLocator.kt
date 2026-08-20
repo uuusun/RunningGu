@@ -45,8 +45,11 @@ object ServiceLocator {
      */
     private val retrofit: Retrofit by lazy {
         ApiClient.create(
-            tokenProvider = { SessionStore.tokens?.accessToken },
-            sessionEpoch = { SessionStore.sessionEpoch },
+            sessionProvider = {
+                // 토큰과 세대를 한 번에 읽는다 (#74 리뷰)
+                val snapshot = SessionStore.snapshot()
+                ApiClient.Session(snapshot.tokens?.accessToken, snapshot.epoch)
+            },
             authenticator = tokenAuthenticator,
         )
     }
@@ -75,7 +78,7 @@ object ServiceLocator {
                 )
             },
             // 리프레시까지 만료·revoked 일 때만 재로그인이다
-            onGiveUp = { SessionStore.signOut() },
+            onGiveUp = { epoch -> SessionStore.signOut(expectedEpoch = epoch) },
         )
     }
 
