@@ -47,7 +47,7 @@ fun SavedCourseDto.toDomain(): SavedCourse = SavedCourse(
     difficulty = difficultyOf(difficulty),
     dataSource = dataSourceOf(dataSource),
     region = region,
-    savedAt = savedAt?.let(::toKstDate),
+    savedAt = toKstDate(savedAt),
 )
 
 fun SavedCourseDetailDto.toDomain(): SavedCourseDetail = SavedCourseDetail(
@@ -60,7 +60,7 @@ fun SavedCourseDetailDto.toDomain(): SavedCourseDetail = SavedCourseDetail(
         difficulty = difficultyOf(difficulty),
         dataSource = dataSourceOf(dataSource),
         region = region,
-        savedAt = savedAt?.let(::toKstDate),
+        savedAt = toKstDate(savedAt),
     ),
     elevationProfileM = elevationProfileM,
     pathPolyline = pathPolyline,

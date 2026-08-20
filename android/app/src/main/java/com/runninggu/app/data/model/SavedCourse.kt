@@ -18,7 +18,8 @@ data class SavedCourse(
     val dataSource: CourseDataSource?,
     val region: String?,
     /** 저장한 날. KST 로 접어 카드에 "MM.DD 저장" 으로 쓴다. */
-    val savedAt: LocalDate?,
+    /** 저장한 날(KST). 서버가 UTC `Z` 로 주고 매퍼가 접는다. */
+    val savedAt: LocalDate,
 )
 
 /**

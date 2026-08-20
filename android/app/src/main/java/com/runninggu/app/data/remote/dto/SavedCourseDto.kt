@@ -43,18 +43,26 @@ data class SaveCourseResponseDto(
     val created: Boolean = true,
 )
 
-/** 저장 코스 목록 항목. **`pathPolyline` 이 없다** — 목록이 LOB 를 안 읽는다(§7-A). */
+/**
+ * 저장 코스 목록 항목. **`pathPolyline` 이 없다** — 목록이 LOB 를 안 읽는다(§7-A).
+ *
+ * 필수 필드에 기본값을 두지 않는다. 두면 서버가 다른 이름으로 주거나(예: `savedAt` 대신
+ * `createdAt`) 아예 빠뜨려도 **`null`·`0` 으로 조용히 통과해 계약 불일치가 숨는다**
+ * (#76 리뷰). 빠지면 역직렬화에서 바로 터지는 편이 낫다.
+ */
 @Serializable
 data class SavedCourseDto(
     val id: Long,
     val courseName: String,
-    val distanceKm: Double = 0.0,
-    val durationMin: Int = 0,
-    val gainM: Int = 0,
+    val distanceKm: Double,
+    val durationMin: Int,
+    val gainM: Int,
+    @Contextual val savedAt: Instant,
+    /** 원본 등급이 없으면 null — 배지를 그리지 않는다. */
     val difficulty: String? = null,
     val dataSource: String? = null,
+    /** 큐레이션만. `OSM_GENERATED` 는 null. */
     val region: String? = null,
-    @Contextual val savedAt: Instant? = null,
 )
 
 /**
@@ -67,14 +75,16 @@ data class SavedCourseDto(
 data class SavedCourseDetailDto(
     val id: Long,
     val courseName: String,
-    val distanceKm: Double = 0.0,
-    val durationMin: Int = 0,
-    val gainM: Int = 0,
+    val distanceKm: Double,
+    val durationMin: Int,
+    val gainM: Int,
+    @Contextual val savedAt: Instant,
     val difficulty: String? = null,
     val dataSource: String? = null,
     val region: String? = null,
+    /** 고도가 없으면 `[]`. 최대 100개로 축약돼 있다. */
     val elevationProfileM: List<Int> = emptyList(),
     val pathPolyline: String? = null,
+    /** 저장 시점 snapshot. 출처가 없으면 `[]` (결정-44). */
     val attributions: List<String> = emptyList(),
-    @Contextual val savedAt: Instant? = null,
 )

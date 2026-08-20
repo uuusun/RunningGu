@@ -5,7 +5,10 @@ import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.SavedCourseDetailDto
+import com.runninggu.app.data.remote.dto.SavedCourseDto
+import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -116,9 +119,38 @@ class SavedCourseMapperTest {
     }
 
     @Test
+    fun `필수 필드가 빠진 목록 응답은 거부한다`() {
+        // 기본값을 두면 서버가 savedAt 대신 createdAt 을 주거나 빠뜨려도 null·0 으로
+        // 조용히 통과해 계약 불일치가 숨는다 (#76 리뷰)
+        val missingSavedAt = """
+            {"id":1,"courseName":"c","distanceKm":5.0,"durationMin":45,"gainM":10}
+        """.trimIndent()
+
+        assertThrows(SerializationException::class.java) {
+            ApiJson.decodeFromString(SavedCourseDto.serializer(), missingSavedAt)
+        }
+    }
+
+    @Test
+    fun `목록 항목을 계약대로 읽는다`() {
+        val raw = """
+            {"id":42,"courseName":"해파랑길 1코스","distanceKm":17.8,"durationMin":162,
+             "gainM":312,"difficulty":"NORMAL","dataSource":"API_GPX","region":"부산",
+             "savedAt":"2026-08-19T15:30:00Z"}
+        """.trimIndent()
+
+        val course = ApiJson.decodeFromString(SavedCourseDto.serializer(), raw).toDomain()
+
+        assertEquals(42L, course.id)
+        assertEquals(LocalDate.of(2026, 8, 20), course.savedAt) // UTC → KST
+        assertEquals("부산", course.region)
+    }
+
+    @Test
     fun `출처가 없으면 빈 목록이다`() {
         // 서버가 [] 로 준다 — null 분기를 만들지 않는다 (결정-44)
-        val raw = """{"id":1,"courseName":"c"}"""
+        val raw = """{"id":1,"courseName":"c","distanceKm":5.0,"durationMin":45,"gainM":10,
+             "savedAt":"2026-08-19T15:30:00Z"}"""
 
         val detail = ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw).toDomain()
 

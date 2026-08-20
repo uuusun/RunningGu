@@ -10,6 +10,7 @@ import com.runninggu.app.data.remote.dto.SaveCourseResponseDto
 import com.runninggu.app.data.remote.dto.SavedCourseDetailDto
 import com.runninggu.app.data.remote.dto.SavedCourseDto
 import kotlinx.coroutines.runBlocking
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -31,11 +32,27 @@ class RemoteSavedCourseRepositoryTest {
         }
 
         override suspend fun list(page: Int?, size: Int?) = PageDto(
-            content = listOf(SavedCourseDto(id = 7, courseName = "해파랑길 1코스", distanceKm = 17.8)),
+            content = listOf(
+                SavedCourseDto(
+                    id = 7,
+                    courseName = "해파랑길 1코스",
+                    distanceKm = 17.8,
+                    durationMin = 162,
+                    gainM = 312,
+                    savedAt = Instant.parse("2026-08-19T15:30:00Z"),
+                ),
+            ),
             page = PageDto.PageMeta(number = 0, size = 20, totalElements = 3, hasNext = false),
         )
 
-        override suspend fun detail(id: Long) = SavedCourseDetailDto(id = id, courseName = "c")
+        override suspend fun detail(id: Long) = SavedCourseDetailDto(
+            id = id,
+            courseName = "c",
+            distanceKm = 5.0,
+            durationMin = 45,
+            gainM = 10,
+            savedAt = Instant.parse("2026-08-19T15:30:00Z"),
+        )
 
         override suspend fun delete(id: Long) {
             deleted = id
