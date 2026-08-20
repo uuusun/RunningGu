@@ -65,4 +65,5 @@ private fun regStatusOf(raw: String?): RegistrationStatus? =
  * `checkedAt` 은 화면에 "확인 MM.DD" 로 나가므로 비즈니스 날짜다.
  * UTC 로 그냥 자르면 한국 시각 오전 9시 이전에 확인한 것이 전날로 보인다.
  */
-private fun toKstDate(instant: Instant): LocalDate = instant.atZone(KST).toLocalDate()
+/** timestamp(UTC)를 KST 비즈니스 날짜로. 대회·저장 코스가 함께 쓴다(AGENTS 2장-4). */
+internal fun toKstDate(instant: Instant): LocalDate = instant.atZone(KST).toLocalDate()

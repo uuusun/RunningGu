@@ -73,10 +73,11 @@ fun CourseDto.toSummary(): CourseSummary = CourseSummary(
 fun CourseRegionsDto.toRegions(): List<CourseRegion> =
     items.map { CourseRegion(it.region, it.count) }
 
-private fun difficultyOf(raw: String?): Difficulty? =
+/** 코스·저장 코스가 함께 쓴다. 모르는 값은 null 로 둔다. */
+internal fun difficultyOf(raw: String?): Difficulty? =
     Difficulty.entries.firstOrNull { it.name == raw }
 
-private fun dataSourceOf(raw: String?): CourseDataSource? =
+internal fun dataSourceOf(raw: String?): CourseDataSource? =
     CourseDataSource.entries.firstOrNull { it.name == raw }
 
 private fun courseSourceOf(raw: String): CourseSource? =
