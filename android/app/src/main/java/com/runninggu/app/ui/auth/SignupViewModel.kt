@@ -150,7 +150,17 @@ class SignupViewModel(
                 nickname = state.nickname.trim(),
                 marketingAgreed = state.marketingAgreed,
             ).fold(
-                onSuccess = { _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) } },
+                onSuccess = {
+                    // 201 = 자동 로그인 (명세 §1-5). TODO(AP-14): 응답의 user 로 채운다.
+                    SessionStore.signIn(
+                        SessionProfile(
+                            nickname = state.nickname.trim(),
+                            email = state.email.trim(),
+                            loginProvider = LoginProvider.EMAIL,
+                        ),
+                    )
+                    _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
+                },
                 onFailure = {
                     _uiState.update {
                         it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
