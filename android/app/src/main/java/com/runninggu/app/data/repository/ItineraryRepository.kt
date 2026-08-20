@@ -14,6 +14,7 @@ import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
 import kotlinx.coroutines.delay
 import java.time.LocalDate
+import com.runninggu.app.data.model.PoiItem
 
 /** `POST /api/itineraries/generate` 요청. (API 명세 §5-1) */
 data class GenerateItineraryRequest(
