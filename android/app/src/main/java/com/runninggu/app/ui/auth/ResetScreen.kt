@@ -110,6 +110,11 @@ fun ResetScreen(
                     label = { Text("이메일") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    isError = state.errorMessage != null,
+                    // 통신 실패는 "보냈어요" 로 덮지 않는다 (§4.3 은 서버 응답을 감추라는 뜻이다).
+                    supportingText = state.errorMessage?.let { message ->
+                        { Text(message, color = MaterialTheme.colorScheme.error) }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(18.dp))
