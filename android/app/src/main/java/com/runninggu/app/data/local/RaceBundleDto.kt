@@ -66,9 +66,31 @@ internal fun RaceBundleDto.toContestOrNull(): Contest? {
         lng = lng,
         category = category.ifBlank { null },
         checked = checked.toLocalDateOrNull(),
-        sources = listOfNotNull(source.ifBlank { null }),
+        sources = sourceTokensOf(source),
     )
 }
+
+/**
+ * 번들의 `source` 를 서버와 같은 원천 토큰으로. (스냅샷 계약 §2.3 · API 명세 §3-1)
+ *
+ * 번들은 병합된 대회를 **한국어 라벨을 `·` 로 이어붙인 문자열 하나**로 준다
+ * ("마라톤GO·마라톤온라인"). 서버 `sources[]` 는 `["MARATHON_GO", "MARATHON_ONLINE"]` 이다.
+ * 같은 [Contest.sources] 에 담기는데 개수도 표기도 달라서, 원천이 번들이냐 서버냐에 따라
+ * 화면이 다른 값을 보게 된다 — 그래서 여기서 서버 쪽 표기로 맞춘다.
+ *
+ * 모르는 라벨은 **버리지 않고 그대로 둔다.** 원천이 새로 늘었을 때 조용히 사라지는 것보다
+ * 낯선 값이 보이는 편이 낫다.
+ */
+private fun sourceTokensOf(raw: String): List<String> =
+    raw.split("·")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { label -> SOURCE_TOKENS[label] ?: label }
+
+private val SOURCE_TOKENS = mapOf(
+    "마라톤GO" to "MARATHON_GO",
+    "마라톤온라인" to "MARATHON_ONLINE",
+)
 
 /** 번들의 접수 상태도 한국어다. 표시에는 쓰지 않고 재계산의 근거로만 쓴다(§5.5). */
 private fun regStatusOfLabel(raw: String): RegistrationStatus? = when (raw) {
