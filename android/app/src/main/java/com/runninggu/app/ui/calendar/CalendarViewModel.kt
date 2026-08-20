@@ -3,6 +3,7 @@ package com.runninggu.app.ui.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.sample.SampleData
 import com.runninggu.app.domain.today
 import kotlinx.coroutines.delay
@@ -18,7 +19,6 @@ import java.time.YearMonth
  * S2 캘린더 ViewModel. (SPEC §2.4 · AP-10)
  *
  * TODO(AP-14): 임시 데이터를 백엔드 대회 API로 교체한다.
- * TODO(AP-21): 찜은 지금 메모리에만 있다. `/me/favorites` 동기화와 게스트 로그인 유도를 붙인다.
  */
 class CalendarViewModel : ViewModel() {
 
@@ -28,6 +28,10 @@ class CalendarViewModel : ViewModel() {
     /** 찜 토글 결과를 스낵바로 알린다. 소비하면 [onMessageShown]으로 비운다. (SPEC §3-4) */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    /** 게스트가 하트를 눌렀다. 화면이 로그인으로 유도한다. (SPEC §4.5 · 결정-4) */
+    private val _loginRequired = MutableStateFlow(false)
+    val loginRequired: StateFlow<Boolean> = _loginRequired.asStateFlow()
 
     private var initialQueryApplied = false
 
@@ -126,14 +130,26 @@ class CalendarViewModel : ViewModel() {
         _uiState.update { it.copy(selectedDate = if (it.selectedDate == date) null else date) }
     }
 
-    /** 하트 토글. 카드 이동과 독립이며 스낵바를 띄운다. (SPEC §4.5 · 결정-16) */
+    /** 하트 토글. 카드 이동과 독립이며 스낵바를 띄운다. (SPEC §4.5 · 결정-16 · AP-21) */
     fun onFavoriteToggle(raceId: String) {
-        // 상태 갱신은 보관소 구독(init)이 받아서 반영한다.
-        _message.value = if (FavoriteStore.toggle(raceId)) "찜했어요" else "찜을 해제했어요"
+        viewModelScope.launch {
+            // 상태 갱신은 보관소 구독(init)이 받아서 반영한다 — 낙관적 갱신이라 즉시 온다.
+            when (val result = FavoriteStore.toggle(raceId)) {
+                FavoriteToggleResult.LoginRequired -> _loginRequired.value = true
+                is FavoriteToggleResult.Done ->
+                    _message.value = if (result.nowFavorite) "찜했어요" else "찜을 해제했어요"
+                FavoriteToggleResult.Failed ->
+                    _message.value = "찜을 저장하지 못했어요. 잠시 후 다시 시도해 주세요."
+            }
+        }
     }
 
     fun onMessageShown() {
         _message.value = null
+    }
+
+    fun onLoginRequiredShown() {
+        _loginRequired.value = false
     }
 
     private companion object {

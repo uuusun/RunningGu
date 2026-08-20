@@ -23,18 +23,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.domain.today
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
 
@@ -55,15 +61,26 @@ fun MyScreen(
     viewModel: MyViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     val profile = state.profile
+
+    // 찜 해제 실패 등을 알린다. 하트는 롤백돼 되돌아오는데 이유가 없으면 오작동으로 보인다.
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onMessageShown()
+        }
+    }
 
     if (profile == null) {
         GuestGate(onLoginRequest = onLoginRequest, modifier = modifier)
         return
     }
 
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
@@ -103,6 +120,8 @@ fun MyScreen(
             )
         }
         Spacer(Modifier.height(24.dp))
+    }
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -284,7 +303,7 @@ private fun CourseList(
     }
 }
 
-// ── [찜한 대회] — S2 카드 재사용 (SPEC §4.13 · 결정-16) ─────────
+// ── [찜한 대회] — S2 카드 재사용 (SPEC §4.13 · 결정-16 · AP-21) ──
 
 @Composable
 private fun FavoriteList(
@@ -298,17 +317,24 @@ private fun FavoriteList(
         BrowseButton("대회 둘러보기", onBrowseRaces)
         return
     }
+    val today = today()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         races.forEach { race ->
+            // 지난 대회는 흐림 처리. **판정은 클라가 한다** 🔒 (API 명세 §7-C · SPEC §4.13).
+            val past = race.date.isBefore(today)
             RaceCard(
                 race = race,
                 isFavorite = true, // 이 목록에 있다는 것 자체가 찜 상태다
                 onClick = { onRaceClick(race.id) },
                 onFavoriteToggle = { onFavoriteToggle(race.id) },
+                modifier = Modifier.alpha(if (past) PAST_RACE_ALPHA else 1f),
             )
         }
     }
 }
+
+/** 지난 대회 흐림 정도. (SPEC §4.13 🔧정책) */
+private const val PAST_RACE_ALPHA = 0.45f
 
 @Composable
 private fun BrowseButton(label: String, onClick: () -> Unit) {

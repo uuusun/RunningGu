@@ -8,6 +8,7 @@ import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.ui.auth.apiErrorCode
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -132,6 +133,8 @@ class AccountViewModel : ViewModel() {
 
     fun onLogout() {
         SessionStore.signOut()
+        // 다음 사용자에게 이전 찜이 보이면 안 된다 (AP-21).
+        FavoriteStore.clear()
         _uiState.update { it.copy(signedOut = true) }
     }
 
@@ -140,6 +143,7 @@ class AccountViewModel : ViewModel() {
         viewModelScope.launch {
             delay(FAKE_DELAY_MS)
             SessionStore.signOut()
+            FavoriteStore.clear()
             _uiState.update { it.copy(signedOut = true) }
         }
     }

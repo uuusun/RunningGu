@@ -62,6 +62,8 @@ class LoginViewModel(
                             ),
                             tokens = tokens,
                         )
+                        // 찜 캐시는 FavoriteStore 가 세션을 구독해 스스로 채운다 —
+                        // 여기서 부르면 화면 전환으로 이 ViewModel 이 죽을 때 취소된다.
                         it.copy(isSubmitting = false, loggedIn = true)
                     },
                     onFailure = { cause ->
