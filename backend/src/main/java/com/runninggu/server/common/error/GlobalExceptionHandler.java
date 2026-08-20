@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -40,6 +41,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 exception.getMessage(),
                 request);
         return problemResponse(problem, exception.errorCode());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request) {
+        String detail = exception.getName() + " 값이 올바르지 않습니다.";
+        ProblemDetail problem = problemDetailFactory.create(
+                ErrorCode.VALIDATION_FAILED,
+                detail,
+                request);
+        return problemResponse(problem, ErrorCode.VALIDATION_FAILED);
     }
 
     @ExceptionHandler(Exception.class)

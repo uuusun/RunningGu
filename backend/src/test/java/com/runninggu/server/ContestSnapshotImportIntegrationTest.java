@@ -18,6 +18,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -97,6 +98,10 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
         ContestSnapshotFile snapshotFile =
                 fileReader.read(Path.of("..", "data", "contest_snapshot.json"));
         ContestSnapshot snapshot = snapshotFile.snapshot();
+        ContestSnapshot.ContestItem timedContest = snapshot.contests().stream()
+                .filter(contest -> contest.startTime() != null)
+                .findFirst()
+                .orElseThrow();
 
         ContestSnapshotImportResult applied = importService.importSnapshot(snapshotFile);
         ContestSnapshotImportResult repeated = importService.importSnapshot(snapshotFile);
@@ -107,6 +112,9 @@ class ContestSnapshotImportIntegrationTest extends PostgreSqlContainerSupport {
         assertThat(count("contest_event")).isEqualTo(snapshot.meta().eventRecordCount().longValue());
         assertThat(repeated.status()).isEqualTo(ContestSnapshotImportResult.Status.NO_OP);
         assertThat(count("contest_snapshot_import")).isEqualTo(1);
+        assertThat(contestRepository.findByCanonicalKey(timedContest.canonicalKey()).orElseThrow()
+                        .getStartTime())
+                .isEqualTo(LocalTime.parse(timedContest.startTime()));
     }
 
     @Test

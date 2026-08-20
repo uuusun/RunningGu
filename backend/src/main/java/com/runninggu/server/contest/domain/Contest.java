@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "contest")
@@ -45,6 +47,8 @@ public class Contest {
     @Column(name = "contest_date", nullable = false)
     private LocalDate contestDate;
 
+    /** 대회 시작 시각은 timezone 변환을 하지 않는 KST 벽시계 값이다. (SPEC §6.6) */
+    @JdbcTypeCode(SqlTypes.LOCAL_TIME)
     @Column(name = "start_time")
     private LocalTime startTime;
 
@@ -154,19 +158,51 @@ public class Contest {
         return name;
     }
 
+    public String getRegion() {
+        return region;
+    }
+
+    public String getPlace() {
+        return place;
+    }
+
     public String getRoadAddress() {
         return roadAddress;
+    }
+
+    public LocalDate getContestDate() {
+        return contestDate;
     }
 
     public LocalTime getStartTime() {
         return startTime;
     }
 
+    public ContestRegistrationStatus getSourceStatus() {
+        return sourceStatus;
+    }
+
+    public LocalDate getApplyStart() {
+        return applyStart;
+    }
+
+    public LocalDate getApplyEnd() {
+        return applyEnd;
+    }
+
     public String getDetailUrl() {
         return detailUrl;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
     public boolean isActive() {
         return active;
+    }
+
+    public Instant getCheckedAt() {
+        return checkedAt;
     }
 }
