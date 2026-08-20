@@ -1,8 +1,19 @@
-package com.runninggu.app.ui.auth
+package com.runninggu.app.data.local
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * 발급받은 토큰 쌍. (API 명세 §1-5 · §1-6)
+ *
+ * `ApiClient.TokenProvider` 가 [SessionStore.tokens] 를 읽어 `Authorization` 헤더를 붙인다.
+ * **로그에 남기지 않는다**(AGENTS 8장).
+ */
+data class AuthTokens(
+    val accessToken: String,
+    val refreshToken: String,
+)
 
 /**
  * 로그인한 사용자 프로필. `GET /me` 응답의 화면 요약본이다 (API 명세 §2 · PR #59 개정).
@@ -34,12 +45,12 @@ enum class LoginProvider(val label: String) {
 /**
  * 세션 보관소. null 이면 게스트다 (SPEC §4.1 게스트 둘러보기 🔒확정).
  *
- * 찜의 [com.runninggu.app.ui.favorite.FavoriteStore] 처럼, 서버가 붙기 전까지 로그인
- * 상태를 화면들이 공유하는 자리다. 프로세스가 죽으면 사라진다.
+ * 화면들이 로그인 상태를 공유하는 자리이자, [com.runninggu.app.data.remote.ApiClient] 가
+ * 토큰을 읽어 가는 자리다. **아직 프로세스가 죽으면 사라진다.**
  *
- * TODO(AP-14): DataStore 세션 영속 + 토큰 보관으로 교체한다. 앱 시작 스플래시가
- *  이 값을 보고 login/home 을 가른다 (SPEC §2.2). 화면은 [session]만 보므로
- *  이 파일 내부만 바뀐다.
+ * TODO(AP-14 후속): DataStore 영속을 붙인다. 그래야 앱을 다시 켰을 때 로그인 상태가 남고,
+ *  시작 화면이 이 값을 보고 login/home 을 가른다(SPEC §2.2). 새 의존성이라 팀 합의가 필요해
+ *  이번에는 넣지 않았다 — 화면은 [session] 만 보므로 이 파일 내부만 바뀐다.
  */
 object SessionStore {
 
@@ -47,10 +58,10 @@ object SessionStore {
     val session: StateFlow<SessionProfile?> = _session.asStateFlow()
 
     /**
-     * 발급받은 토큰. `ApiClient.TokenProvider` 가 읽어 `Authorization` 헤더를 붙일 자리다(#43).
+     * 발급받은 토큰. [com.runninggu.app.data.ServiceLocator] 가 이 값을 읽어
+     * `Authorization: Bearer` 를 붙인다(§0-2 · #43).
      *
-     * TODO(AP-14): DataStore 영속으로 옮기고 `TokenProvider` 에 연결한다. **연결 전까지는
-     *  보관만 하므로 모든 API 호출이 게스트로 나간다.**
+     * 값이 없으면 헤더를 안 붙이므로 공개 API 는 게스트로 정상 동작한다.
      */
     @Volatile
     var tokens: AuthTokens? = null
