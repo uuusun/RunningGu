@@ -3,6 +3,7 @@ package com.runninggu.app.data.remote
 import com.runninggu.app.BuildConfig
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import okhttp3.Authenticator
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -32,12 +33,17 @@ object ApiClient {
         tokenProvider: TokenProvider = NoToken,
         json: Json = ApiJson,
         extraInterceptors: List<Interceptor> = emptyList(),
+        /** `401` 재발급 처리. null 이면 401 이 그대로 화면까지 올라간다. */
+        authenticator: Authenticator? = null,
     ): Retrofit {
         val client = OkHttpClient.Builder()
             .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor(tokenProvider))
-            .apply { extraInterceptors.forEach(::addInterceptor) }
+            .apply {
+                extraInterceptors.forEach(::addInterceptor)
+                authenticator?.let(::authenticator)
+            }
             .build()
 
         return Retrofit.Builder()

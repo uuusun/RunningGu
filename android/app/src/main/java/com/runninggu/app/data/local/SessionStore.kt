@@ -80,6 +80,15 @@ object SessionStore {
         _session.value = profile
     }
 
+    /**
+     * 재발급받은 토큰 쌍으로 갈아끼운다. 프로필은 건드리지 않는다. (§1-9)
+     *
+     * **리프레시가 회전하므로 두 값을 함께** 넣는다 — 액세스만 바꾸면 다음 재발급이 실패한다.
+     */
+    fun updateTokens(tokens: AuthTokens) {
+        this.tokens = tokens
+    }
+
     /** 로그아웃·탈퇴 공용. 서버 revoke 는 AP-14 에서 붙는다. */
     fun signOut() {
         tokens = null
