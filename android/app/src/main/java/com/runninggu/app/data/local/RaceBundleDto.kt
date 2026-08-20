@@ -48,7 +48,10 @@ data class RaceBundleDto(
 internal fun RaceBundleDto.toContestOrNull(): Contest? {
     val day = date.toLocalDateOrNull() ?: return null
     return Contest(
+        // 번들 id 는 크롤 원천의 externalId 다. canonical id 가 아니므로 serverId 는 비운다 —
+        // 서버 상세·찜·동선 생성에 이 값을 보내면 안 된다 (#47 리뷰)
         id = id,
+        serverId = null,
         name = name,
         region = region,
         venue = venue,

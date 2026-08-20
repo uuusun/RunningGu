@@ -49,6 +49,18 @@ class ContestBundleTest {
     }
 
     @Test
+    fun `번들 항목은 서버 id 를 갖지 않는다`() {
+        // 번들 id("roadrun-41543")는 크롤 원천의 externalId 라 canonical id 가 아니다.
+        // 이 값을 서버 상세·찜·동선 생성에 보내면 숫자 변환에서 터진다 (#47 리뷰)
+        val contests = ContestBundle.parse(bundleText()).contests
+
+        assertTrue(contests.none { it.isServerBacked })
+        assertTrue(contests.all { it.serverId == null })
+        // 번들 id 는 숫자로 바꿀 수 없는 모양이다 — 실수로 toLong() 하면 예외가 난다
+        assertTrue(contests.all { it.id.toLongOrNull() == null })
+    }
+
+    @Test
     fun `종목 미표기는 2건뿐이다`() {
         // 번들이 낡으면 이 수가 늘어난다 — PR #47 리뷰에서 실제로 26건짜리 옛 산출물이
         // 들어올 뻔했다. 스크립트를 고쳐 값이 바뀌면 여기도 **의도적으로** 갱신한다.
