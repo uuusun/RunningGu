@@ -2,9 +2,7 @@ package com.runninggu.app.ui.favorite
 
 import com.runninggu.app.ui.auth.SessionStore
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,6 +10,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 찜 토글 결과. 화면이 스낵바 문구와 로그인 유도를 가르는 데 쓴다.
@@ -26,7 +27,7 @@ sealed interface FavoriteToggleResult {
     /** 서버 반영 완료. [nowFavorite] 로 "찜했어요" / "찜을 해제했어요" 를 고른다(결정-16). */
     data class Done(val nowFavorite: Boolean) : FavoriteToggleResult
 
-    /** 서버 실패 — UI 는 이미 원래대로 되돌아갔다. */
+    /** 서버 실패 — UI 는 이미 서버 상태로 되돌아갔다. */
     data object Failed : FavoriteToggleResult
 }
 
@@ -51,19 +52,34 @@ object FavoriteStore {
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
 
     /**
-     * 세션을 직접 구독해 스스로 캐시를 맞춘다.
+     * 서버에 있다고 **확신하는** 찜. 성공한 요청과 조회 결과만 여기에 남는다.
+     *
+     * 낙관적 갱신 때문에 [favoriteIds] 는 아직 서버가 모르는 값일 수 있다. 실패했을 때
+     * 되돌릴 기준이 필요해서 둘을 따로 들고 있는다.
+     */
+    private val confirmed: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** 대회별 자물쇠. 같은 대회의 `PUT`·`DELETE` 가 절대 겹치지 않게 한다. */
+    private val locks = ConcurrentHashMap<String, Mutex>()
+
+    /** 요청이 떠 있는 대회. [refresh] 가 진행 중인 토글을 덮지 않게 하는 데 쓴다. */
+    private val inFlight: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    private var sessionJob: Job? = null
+
+    /**
+     * 세션을 구독해 스스로 캐시를 맞춘다. 앱 시작 시 한 번 부른다.
      *
      * 화면 ViewModel 의 `viewModelScope` 에서 부르면 **로그인 직후 화면이 전환되며 그
      * ViewModel 이 죽어 조회가 취소된다.** 그러면 찜해 둔 대회의 하트가 빈 채로 남는다.
-     * 이 스코프는 앱 수명과 함께 살아 있어 그런 일이 없다.
+     * 그래서 앱 수명과 같은 스코프를 밖에서 받는다([com.runninggu.app.RunningGuApplication]).
+     *
+     * 객체 초기화가 아니라 명시적 호출인 이유는, 클래스가 로드되는 것만으로 메인 디스패처를
+     * 잡으면 단위 테스트에서 이 객체를 건드릴 수조차 없기 때문이다.
      */
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    /** 대회별로 진행 중인 토글 요청. 새 토글이 오면 이전 것을 끊는다. */
-    private val inFlight = mutableMapOf<String, Job>()
-
-    init {
-        scope.launch {
+    fun bind(scope: CoroutineScope) {
+        sessionJob?.cancel()
+        sessionJob = scope.launch {
             SessionStore.session
                 // 같은 사용자의 프로필 변경(닉네임 등)으로 다시 조회하지 않는다.
                 .map { it != null }
@@ -84,19 +100,28 @@ object FavoriteStore {
             _favoriteIds.value = emptySet()
             return
         }
-        repository.loadFavoriteIds().onSuccess { ids -> _favoriteIds.value = ids }
+        repository.loadFavoriteIds().onSuccess { ids ->
+            _favoriteIds.update { current ->
+                // 요청이 떠 있는 대회는 조회 결과보다 화면 값이 최신이다. 조회가 덮으면
+                // 방금 누른 하트가 되돌아갔다가 다시 켜지는 것처럼 깜빡인다.
+                (ids - inFlight) + current.filter { it in inFlight }
+            }
+            confirmed.removeAll { it !in inFlight }
+            confirmed += ids - inFlight
+        }
         // 실패는 조용히 둔다 — 마지막 성공 목록을 계속 보여주는 편이 낫다(§4.13 오프라인 규칙).
     }
 
     /**
      * 찜 토글. 게스트면 [FavoriteToggleResult.LoginRequired] 를 돌려주고 아무것도 바꾸지 않는다.
      *
-     * 서버 호출 전에 UI 를 먼저 바꾸고, 실패하면 되돌린다. 다만 **연타를 고려한다**:
+     * 화면은 즉시 바꾸고 서버 호출은 **대회별로 한 줄로 세운다**. 연타를 취소로 처리하지
+     * 않는 이유가 여기 있다 — 코루틴을 `cancel()` 해도 **이미 서버에 도착한 요청까지
+     * 되돌리지는 못한다.** 취소한 `PUT` 이 서버에서 계속 처리되는 동안 새 `DELETE` 가 먼저
+     * 끝나면 화면은 해제인데 서버는 찜인 상태로 갈린다(#64 리뷰).
      *
-     * - `PUT` 과 `DELETE` 는 서로 다른 연산이라 멱등해도 **도착 순서가 뒤집히면** 서버 최종
-     *   상태가 UI 와 갈린다. 그래서 대회별로 진행 중인 요청을 취소하고 마지막 것만 보낸다.
-     * - 롤백도 조건부다. 찜 → (요청 중) 해제 → 첫 요청 실패 순서에서 무조건 되돌리면
-     *   **사용자가 마지막으로 누른 "해제" 를 덮어쓴다.** 내 요청이 아직 최신일 때만 되돌린다.
+     * 그래서 앞 요청이 **끝난 뒤에** 다음 요청을 보낸다. 왕복이 한 번 더 들지만 서버 최종
+     * 상태가 마지막 탭과 항상 같아진다. 하트 자체는 자물쇠를 기다리지 않으므로 체감은 그대로다.
      */
     suspend fun toggle(raceId: String): FavoriteToggleResult {
         if (!SessionStore.isLoggedIn) return FavoriteToggleResult.LoginRequired
@@ -104,35 +129,55 @@ object FavoriteStore {
         val nowFavorite = raceId !in _favoriteIds.value
         applyLocally(raceId, nowFavorite)
 
-        // 같은 대회의 이전 요청을 끊는다. 마지막 의도만 서버에 남는다.
-        inFlight.remove(raceId)?.cancel()
-
-        val job = scope.launch {
-            val outcome = if (nowFavorite) repository.add(raceId) else repository.remove(raceId)
-            if (outcome.isFailure && _favoriteIds.value.contains(raceId) == nowFavorite) {
-                applyLocally(raceId, !nowFavorite) // 내 결과가 아직 최신일 때만 롤백
+        inFlight += raceId
+        try {
+            locks.computeIfAbsent(raceId) { Mutex() }.withLock {
+                val serverHas = raceId in confirmed
+                // 앞선 토글이 이미 서버를 이 상태로 만들어 놨으면 부를 필요가 없다.
+                if (serverHas != nowFavorite) {
+                    val outcome =
+                        if (nowFavorite) repository.add(raceId) else repository.remove(raceId)
+                    if (outcome.isSuccess) {
+                        if (nowFavorite) confirmed += raceId else confirmed -= raceId
+                    } else {
+                        // 서버는 마지막으로 성공한 상태 그대로다. 화면을 거기에 맞춘다.
+                        applyLocally(raceId, serverHas)
+                    }
+                }
             }
+        } finally {
+            inFlight -= raceId
         }
-        inFlight[raceId] = job
-        job.join()
 
-        return when {
-            job.isCancelled -> FavoriteToggleResult.Done(nowFavorite) // 더 최신 토글이 이어받았다
-            _favoriteIds.value.contains(raceId) == nowFavorite -> FavoriteToggleResult.Done(nowFavorite)
-            else -> FavoriteToggleResult.Failed
+        // 서버가 내 의도대로 됐는지로만 판단한다. 뒤이은 토글이 상태를 또 바꿨더라도
+        // 그 호출자가 자기 결과를 따로 알린다.
+        return if ((raceId in confirmed) == nowFavorite) {
+            FavoriteToggleResult.Done(nowFavorite)
+        } else {
+            FavoriteToggleResult.Failed
         }
     }
 
-    /** 로그아웃·탈퇴 시 캐시를 비운다. 진행 중인 요청도 끊는다. */
+    /** 로그아웃·탈퇴 시 캐시를 비운다. 다음 사용자에게 이전 찜이 보이면 계정 사고다. */
     fun clear() {
-        inFlight.values.forEach { it.cancel() }
-        inFlight.clear()
         _favoriteIds.value = emptySet()
+        confirmed.clear()
     }
 
     private fun applyLocally(raceId: String, favorite: Boolean) {
         _favoriteIds.update { current ->
             if (favorite) current + raceId else current - raceId
         }
+    }
+
+    /** 테스트 전용. 스텁 저장소를 갈아끼우고 캐시를 비운다. */
+    internal fun resetForTest(repository: FavoriteRepository) {
+        sessionJob?.cancel()
+        sessionJob = null
+        this.repository = repository
+        _favoriteIds.value = emptySet()
+        confirmed.clear()
+        locks.clear()
+        inFlight.clear()
     }
 }
