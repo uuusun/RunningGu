@@ -1,12 +1,12 @@
-%% 런닝구 논리 ERD v4 — SPEC v4 · API 명세 v2.5 기준 (2026-08-20)
+%% 런닝구 논리 ERD v4.2 — SPEC v4 · API 명세 v2.7 기준 (2026-08-20)
 %% P0: USER~SAVED_COURSE 13개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
-%% 이 문서는 논리 계약이다. 아래 남은 TBD를 확정하기 전에는 Flyway 물리 스키마로 옮기지 않는다.
+%% 이 문서는 논리 계약이다. 아래 남은 TBD-DB-01을 확정하기 전에는 관련 컬럼을 Flyway 물리 스키마로 옮기지 않는다.
 %% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
 %% TBD-DB-01 route_fingerprint 좌표 정규화 정밀도와 elevation_profile_m PostgreSQL 저장 타입
-%% TBD-DB-02 저장 코스 상세의 attributions 보존 방식
+%% 확정-DB-02 SAVED_COURSE.attributions=JSONB NOT NULL DEFAULT '[]', 서버 생성 완성 문구 snapshot, 상세만 반환, fingerprint 제외
 %% 확정-DB-03 USER:LOGIN_IDENTITY=1:1, 가입 시 EMAIL/KAKAO 중 하나, P0 연결·추가·전환 미지원
-%% TBD-DB-04 ITINERARY contestName·region·recovery의 snapshot 저장 또는 조회 시 파생 정책
-%% TBD-DB-05 주간 대회 snapshot에서 사라진 canonical/source의 삭제·비활성화·유지 정책
+%% 확정-DB-04 ITINERARY region·recovery·트리/RACE는 snapshot, contestName·현재 대회 메타는 CONTEST 파생, needs_regeneration은 비교 파생
+%% 확정-DB-05 검증 완료 full snapshot 2회 연속 누락 시 SOURCE 비활성, 활성 SOURCE가 없는 CONTEST 비활성, 재등장 즉시 복구, 물리 삭제 없음
 %% 확정-DB-06 externalId/external_id, SIGNUP/PASSWORD_RESET, fetchedAt/fetched_at, organizer 명칭 통일
 %% 확정-DB-07 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum VARCHAR+CHECK, 좌표 NUMERIC(10,7), nullable 명시
 %% DB-07 타입 규약: nickname VARCHAR(12), email VARCHAR(320), Enum VARCHAR(32), key/name/title/place VARCHAR(255), URL VARCHAR(2048), token hash VARCHAR(64), password/code hash VARCHAR(255), 거리 NUMERIC(8,3), 자유문 TEXT
@@ -103,6 +103,7 @@ erDiagram
         varchar official_url "nullable"
         varchar image_url "nullable"
         varchar category "CHECK ROAD / TRAIL / WALK / NIGHT"
+        boolean active "DEFAULT true, 활성 source가 하나라도 있으면 true"
         timestamptz checked_at "원천 중 최신 확인 시각"
         timestamptz updated_at
     }
@@ -114,6 +115,8 @@ erDiagram
         varchar external_id "UNIQUE(source_type, external_id)"
         varchar source_url "nullable"
         varchar raw_status "nullable, 원천 상태"
+        boolean active "DEFAULT true, 재등장 시 true"
+        int consecutive_missing_count "DEFAULT 0, CHECK 0..2"
         timestamptz fetched_at
         jsonb raw_payload "감사·재병합용 원천 스냅샷"
     }
@@ -143,9 +146,12 @@ erDiagram
         varchar hotel_name "nullable, 선택 숙소 스냅샷"
         numeric hotel_lat "nullable, NUMERIC(10,7)"
         numeric hotel_lng "nullable, NUMERIC(10,7)"
-        derived contest_name "API 필드, snapshot/CONTEST join TBD"
-        derived region "API 필드, snapshot/CONTEST join TBD"
-        derived recovery "label/note, snapshot/규칙 파생 TBD"
+        varchar region_snapshot "저장 시점 17개 시도"
+        varchar recovery_label "nullable, 저장 시점"
+        text recovery_note "nullable, 저장 시점"
+        derived contest_name "현재 CONTEST.name"
+        derived current_contest "현재 날짜·시간·장소·지역·좌표·active"
+        derived needs_regeneration "이름·active 제외, RACE/region snapshot과 현재값 비교"
         timestamptz created_at
         timestamptz updated_at "user_id, contest_id, start_date, end_date 복합 UNIQUE"
     }
@@ -189,6 +195,7 @@ erDiagram
         varchar difficulty "CHECK EASY / NORMAL / HARD"
         int gain_m
         int_array elevation_profile_m "최대 100개 논리 배열, DB 타입 TBD"
+        jsonb attributions "NOT NULL DEFAULT '[]', 서버 생성 완성 문구 snapshot"
         numeric entry_lat "NUMERIC(10,7)"
         numeric entry_lng "NUMERIC(10,7)"
         text path_polyline

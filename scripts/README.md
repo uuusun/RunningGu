@@ -89,6 +89,14 @@ python scripts/build_courses.py --sources "durunubi,gpx:100대명산" --regeocod
 4. 원천 행의 `latitude/longitude` 빈 값·숫자 변환 실패가 0건인지 검증한다.
 5. 중복·필수값·제외 경고를 검토한 뒤 승인된 CSV만 `data/races_sample.csv`로 승격한다.
 6. `build_races_json.py`를 두 번 실행해 결과가 같고 병합 결과의 `lat/lng` 누락이 0건인지 확인한다.
-7. 한 단계라도 실패하면 새 데이터를 배포하지 않고 이전 정상 canonical을 유지한다.
+7. `build_contest_snapshot.py`를 두 번 실행해 같은 입력에서 바이트가 같고 `meta` 집계가 실제
+   배열 길이와 일치하는지 확인한다.
+8. 한 단계라도 실패하거나 설정 원천 중 일부만 수집됐으면 새 snapshot을 승격·Import하지 않고
+   이전 정상 canonical을 유지한다.
+
+승인된 완전 snapshot에서 같은 원천 `(sourceType, externalId)`가 **2회 연속 누락**될 때만
+Importer가 해당 source를 비활성화한다. 첫 누락은 활성 유지, 실패·부분 snapshot은 횟수 미반영,
+재등장은 즉시 활성화·0회 초기화다. 같은 snapshot 재적재는 누락 횟수를 중복 증가시키지 않는다
+(SPEC 결정-46 · `docs/contest-snapshot-contract.md` §1.2).
 
 > **현재 코드 주의:** `geocode.py`는 `KAKAO_REST_KEY` 환경변수와 키 없음 fail-fast를 사용하지만, `add_coordinates.py`는 아직 빈 `KAKAO_REST_API_KEY` 상수를 사용한다. 후속 P0 코드 작업에서 환경변수 방식으로 통일하고 fail-fast를 넣기 전까지 3단계 결과를 운영 데이터로 승격하지 않는다.
