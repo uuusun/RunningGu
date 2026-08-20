@@ -497,17 +497,18 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 ### 6.2 canonical Contest 계약
 
 ```
-Contest { id, name, region, venue, date('YYYY-MM-DD'), startTime('HH:MM'),
+Contest { id, name, region, venue, roadAddress?, date('YYYY-MM-DD'), startTime?('HH:MM'),
        eventTypes[풀|하프|10K|5K],                 // §5.4로 표준화
        regStatus, regStart, regEnd,               // 표시는 regStatusOf()로 재계산 (§5.5)
        organizer, sources[], checkedAt,            // canonical + 출처별 원본 (A3)
-       officialUrl, detailUrl, imageUrl?, lat?, lng?, category(로드|트레일|걷기|야간) }
+       officialUrl, detailUrl?, imageUrl?, lat?, lng?, category(로드|트레일|걷기|야간) }
 ContestSource { contestId, sourceType, externalId, rawPayload, fetchedAt, sourceUrl }
 ```
 
 - 원천 snake_case(`race_id`·`event_date`·`latitude`…) → camelCase 정규화 (원본: normalize.js).
 - 필터용 **regionCode 17종**(서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주)을 `sido`에서 파생, 비표준 값('충청' 등)은 주소로 보정 🔧정책.
 - `imageUrl`은 P0부터 nullable로 제공하고 없으면 앱 placeholder를 사용한다. 현재 원천 271건과 canonical 153건의 좌표 누락은 0건이지만 전송 DTO의 `lat/lng`는 nullable로 방어한다. 좌표 없는 항목은 동선 생성에 사용할 수 없다.
+- `startTime`은 원천에 출발 시각이 없거나 형식이 올바르지 않으면 nullable이다. PostgreSQL `CONTEST`는 `start_time`·`road_address`·`detail_url`을 nullable로 저장해 서버용 snapshot의 canonical 필드를 손실 없이 보존한다(결정-47).
 - Kotlin: `@Serializable data class` + Retrofit/assets 공용 🔧정책.
 
 ### 6.3 POI · 일정 · 저장 계약
@@ -679,6 +680,7 @@ emailAuth     { email, purpose: SIGNUP|PASSWORD_RESET, tokenHash, expiresAt, att
 - 사용자는 canonical 대회 레코드를 생성·수정·삭제할 수 없다. 관리자/배치만 갱신한다.
 - 재수집 주기 주 1회 🔧정책. 접수상태는 서버 공통 정책으로 조회 시점 파생하고 목록·월 집계·마감 임박에서 같은 함수를 사용한다(§5.5).
 - **누락 비활성화** 🔒확정(결정-46, 이슈 #56): 모든 설정 원천 수집과 기존 집계 검증을 완료한 정상 full snapshot만 누락 판정에 사용한다. 원천 레코드가 1회 누락되면 `consecutiveMissingCount=1`로 유지하고, **2회 연속 누락**되면 해당 `CONTEST_SOURCE.active=false`로 전환한다. 실패·부분 snapshot은 횟수를 올리지 않으며, 같은 `(sourceType, externalId)`가 다시 나타나면 즉시 활성화하고 횟수를 0으로 초기화한다. canonical `CONTEST.active`는 활성 source가 하나라도 있으면 true이고 모두 비활성이면 false다. 과거·비활성 대회와 이를 참조하는 찜·저장 동선은 물리 삭제하지 않는다.
+- **적용 snapshot 이력** 🔒확정(결정-47): 백엔드는 성공한 snapshot의 `schemaVersion`·`meta.sourceSha256`·`meta.checkedAtMax`·적용 시각을 `CONTEST_SNAPSHOT_IMPORT`에 같은 트랜잭션으로 기록한다. 같은 `(sourceSha256, checkedAtMax)` 재적재는 성공 no-op, 마지막 성공본보다 이르거나 같은 `checkedAtMax`의 다른 hash는 거부해 누락 상태 후퇴를 막는다. 검증·적재 실패 시 이력도 남기지 않는다.
 - 좌표 보정 도구는 `KAKAO_REST_KEY` 환경변수만 사용하고 키가 없으면 fail-fast한다. 재수집 → 좌표 보정 → 병합 후 좌표 누락 0건을 검증하며, 누락이 있으면 새 canonical로 교체하지 않고 이전 정상본을 유지한다 🔒확정.
 
 ### 8.3 M3 축제
@@ -925,10 +927,11 @@ app/src/main/java/com/runninggu/app/
 | 결정-44 | 저장 코스의 attribution은 서버가 원천 메타데이터에서 완성 문구 배열로 생성해 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존한다. 상세 API에만 반환하고 목록·`routeFingerprint`에서는 제외하며, 문구 변경을 기존 저장 데이터에 소급하지 않는다. 지역별 `GET /api/courses`도 실제 사용 원천의 `attributions[]`를 반환한다 | 앱이 원천 코드로 라이선스 문구를 추측하지 않게 하고 저장 당시 출처를 재현하면서, 문구 변경 때문에 동일 geometry의 멱등 판정이 흔들리지 않게 한다(이슈 #54) | §4.11 · §6.4 |
 | 결정-45 | 저장 동선은 지역·회복·전체 트리와 RACE 날짜·시간·장소를 snapshot으로 보존하고 대회명·현재 canonical 메타데이터는 조회 시 파생한다. 이름 외 일정·장소·지역·좌표 변경은 `needsRegeneration=true`로 알리되 자동 재배치하지 않으며, 재생성 결과를 사용자가 최종 저장할 때 `PUT /itineraries/{id}`로 같은 id의 트리를 교체한다 | canonical 변경으로 사용자 편집 동선이 예고 없이 바뀌는 것을 막고, 최신 대회 정보와 저장 당시 계획을 함께 설명할 수 있게 한다(이슈 #55) | §4.10 · §4.13 · §6.3 |
 | 결정-46 | 검증 완료 full snapshot에서 원천이 **2회 연속 누락**되면 source를 비활성화하고, 활성 source가 없는 canonical만 비활성화한다. 실패·부분 snapshot은 누락 횟수에 포함하지 않고 재등장 시 즉시 활성화한다. 물리 삭제 없이 공개 목록에서 제외하되 기존 찜·동선의 상세 조회는 유지한다 | 일시 수집 장애로 대회가 사라지는 것을 막으면서 장기 미제공 항목은 공개 탐색에서 제거한다(이슈 #56) | §4.5~4.6 · §4.13 · §8.2 |
+| 결정-47 | `CONTEST.start_time`·`road_address`·`detail_url`은 nullable로 저장하고, 성공한 대회 snapshot의 버전·hash·기준 시각·적용 시각을 `CONTEST_SNAPSHOT_IMPORT`에 원자적으로 기록한다. 같은 snapshot은 no-op, 과거 snapshot과 같은 기준 시각의 다른 hash는 거부한다 | 파일 계약의 nullable 필드를 물리 ERD에서 잃지 않고, 같은 파일 재적재나 과거 파일 적용이 source 누락 횟수와 `active`를 후퇴시키지 않게 한다 | §6.2 · §8.2 · 대회 snapshot 계약 |
 
 ### 12.5 남은 미결
 
-**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성은 차단하되 정확한 HTTP status·오류 `code`는 이슈 #56의 추가 리뷰 후 API 계약에 확정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
+**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로, 대회 snapshot 물리 저장과 적용 이력은 결정-47로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성은 차단하되 정확한 HTTP status·오류 `code`는 이슈 #56의 추가 리뷰 후 API 계약에 확정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
 
 > 구 미결 1~13번은 전부 12.1의 결정으로 해소되었다 (번호는 문서 내 참조 보존을 위해 재사용하지 않음).
 

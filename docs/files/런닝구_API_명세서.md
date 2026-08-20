@@ -1,6 +1,6 @@
-# 런닝구 백엔드 API 명세서 v2.7
+# 런닝구 백엔드 API 명세서 v2.8
 
-> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.2·수정 DFD
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
@@ -270,7 +270,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ## 3. 대회 API `/api/contests` (공개)
 
-**데이터 적재 계약 🔒(결정-39·40·46)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 검증 완료 full snapshot에서 source가 2회 연속 누락될 때만 비활성화하고, 실패·부분 snapshot은 누락 횟수에 포함하지 않으며 재등장 시 즉시 활성화한다. canonical은 활성 source 존재 여부로 `active`를 파생·갱신하고 물리 삭제하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다. **스냅샷 파일 계약(경로 `data/contest_snapshot.json`·스키마·유일키·Importer 검증 의무)은 `docs/contest-snapshot-contract.md`가 SSOT다.**
+**데이터 적재 계약 🔒(결정-39·40·46·47)**: 크롤 원천의 정규화·중복 병합은 Python 데이터 파이프라인이 수행한다. P0에서는 canonical·`events[]`·원천 `sources[]`를 포함한 서버용 JSON 스냅샷을 생성하고, 백엔드 Importer가 이를 검증해 `CONTEST`·`CONTEST_EVENT`·`CONTEST_SOURCE`에 트랜잭션으로 멱등 적재한다. 성공한 적용 이력은 `CONTEST_SNAPSHOT_IMPORT`에 같은 트랜잭션으로 기록해 동일 snapshot을 no-op 처리하고 과거 snapshot 또는 동일 기준 시각의 다른 hash를 거부한다. `CONTEST.start_time`·`road_address`·`detail_url`은 nullable로 저장한다. Python은 운영 핵심 테이블에 직접 쓰지 않는다. 현재 목업용 `reference-web/public/data/races.json`은 서버 스냅샷으로 직접 사용하지 않는다. 검증 완료 full snapshot에서 source가 2회 연속 누락될 때만 비활성화하고, 실패·부분 snapshot은 누락 횟수에 포함하지 않으며 재등장 시 즉시 활성화한다. canonical은 활성 source 존재 여부로 `active`를 파생·갱신하고 물리 삭제하지 않는다. 향후 자동화는 인증된 내부 수집 API 또는 스테이징 테이블 후 백엔드 승격 방식 중 하나로 전환한다. **스냅샷 파일 계약(경로 `data/contest_snapshot.json`·스키마·유일키·Importer 검증 의무)은 `docs/contest-snapshot-contract.md`가 SSOT다.**
 
 ### 3-1 `GET /api/contests` — 목록 (커서 페이징) 🔒
 
@@ -311,6 +311,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 - 대회는 관리 배치가 `CONTEST_SOURCE` 원본을 정규화·중복 제거해 `CONTEST` canonical 레코드로 만든다. 공개 API는 canonical만 읽고 사용자는 생성·수정·삭제할 수 없다.
 - `applyStart`와 `applyEnd`는 nullable이다. 앱은 Room에 캐시한 목록을 오프라인에서 표시할 때 두 날짜를 오늘(KST) 기준 접수상태 재계산 근거로 사용한다(SPEC §5.5).
+- `startTime`은 nullable이다. 원천에 출발 시각이 없거나 형식이 올바르지 않으면 `null`을 반환한다.
 - `regStatus`는 **저장값이 아니라 공통 함수로 조회 시점 파생** 🔒: `applyEnd != null && applyEnd < 오늘 → CLOSED` / `applyStart != null && 오늘 < applyStart → BEFORE` / `applyStart != null && applyStart <= 오늘 → OPEN` / **`applyEnd`만 알고 아직 지나지 않았으면 날짜만으로 `OPEN`을 단정하지 않고 최신 원본 상태** / 그 밖에 날짜만으로 판단할 수 없으면 최신 원본 상태 / 그것도 없으면 `UNKNOWN`.
 - `events`가 빈 배열이면 클라가 "종목 미표기" 배지 표시.
 - `favorite`: 로그인 시 실제 찜 여부, 게스트는 항상 `false`.
