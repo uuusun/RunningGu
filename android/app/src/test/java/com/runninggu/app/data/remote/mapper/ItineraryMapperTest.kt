@@ -10,7 +10,9 @@ import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -141,7 +143,7 @@ class ItineraryMapperTest {
     @Test
     fun `생성 조건을 버리지 않고 들고 있는다`() {
         // §5-2 저장 요청이 §5-1 응답 구조를 그대로 쓴다 — 버리면 저장·재생성을 못 만든다 (#66 리뷰)
-        val snapshot = checkNotNull(parse().request)
+        val snapshot = parse().request
 
         assertEquals(153L, snapshot.contestId)
         assertEquals(listOf("TOUR", "FOOD"), snapshot.themes)
@@ -175,7 +177,8 @@ class ItineraryMapperTest {
     fun `모르는 분류는 관광지로 떨어뜨린다`() {
         // 서버가 분류를 새로 추가해도 블록이 사라지면 안 된다 (부록 C)
         val raw = """
-            {"title":"t","event":"HALF","days":[
+            {"title":"t","event":"HALF","contestId":153,"themes":["TOUR"],
+             "startDate":"2026-08-21","endDate":"2026-08-21","days":[
               {"dayIndex":0,"date":"2026-08-21","dayLabel":"D-1","blocks":[
                 {"startTime":"10:00","title":"새 분류","category":"MUSEUM_TOUR"}]}]}
         """.trimIndent()
@@ -187,9 +190,21 @@ class ItineraryMapperTest {
     }
 
     @Test
+    fun `저장에 필요한 필드가 빠진 응답은 거부한다`() {
+        // contestId·themes·기간은 §5-2 저장 요청의 필수 입력이다. nullable 로 두면
+        // 빠진 응답이 조용히 통과해 저장 단계에서 터진다 (#66 리뷰)
+        val raw = """{"title":"t","event":"HALF","days":[]}"""
+
+        assertThrows(SerializationException::class.java) {
+            ApiJson.decodeFromString(GenerateItineraryResponse.serializer(), raw)
+        }
+    }
+
+    @Test
     fun `표시할 블록이 없는 정상 응답은 빈 목록이다`() {
         // 200 + days 빈 배열은 Empty 이지 Error 가 아니다 (§5-1)
-        val raw = """{"title":"t","event":"HALF","days":[]}"""
+        val raw = """{"title":"t","event":"HALF","contestId":153,"themes":["TOUR"],
+             "startDate":"2026-08-21","endDate":"2026-08-21","days":[]}"""
 
         val result = ApiJson.decodeFromString(GenerateItineraryResponse.serializer(), raw).toResult()
 

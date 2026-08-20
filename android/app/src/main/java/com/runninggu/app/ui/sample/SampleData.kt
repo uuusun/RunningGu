@@ -30,9 +30,6 @@ object SampleData {
         organizer: String = "$region 육상연맹",
     ) = RaceSummary(
         id = id,
-        // 데모 데이터라 canonical id 가 없다. 서버 대회로 교체되기 전까지 화면 흐름을
-        // 막지 않으려고 문자열에서 안정적인 숫자를 만든다 (AP-14 연동 시 서버 값으로 바뀐다)
-        serverId = demoServerId(id),
         name = name,
         region = region,
         venue = venue,
@@ -117,8 +114,4 @@ object SampleData {
         FestivalSummary("fest-sejong", "세종 호수공원 물빛축제", "세종", "08.20~08.24", isOngoing = false),
         FestivalSummary("fest-pyeongchang", "평창 백일홍축제", "강원", "08.28~09.13", isOngoing = false),
     )
-
-    /** 데모 전용 canonical id. 같은 문자열이면 항상 같은 숫자가 나온다. */
-    private fun demoServerId(id: String): Long =
-        id.fold(0L) { acc, c -> (acc * 31 + c.code) % 100_000 } + 1
 }

@@ -37,6 +37,15 @@ class ResultViewModel(
     private val _uiState = MutableStateFlow(ResultUiState())
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
+    /**
+     * 스텁 저장소로 데모를 돌릴 때 쓰는 대회 id. **서버 저장소에서는 null 이다.**
+     *
+     * 샘플·번들 대회에는 canonical id 가 없어서(#66 리뷰) 서버 생성을 부를 수 없다.
+     * 데모 화면이 멈추지 않게 스텁 경로에서만 이 값을 쓴다 — 서버로는 절대 안 나간다.
+     */
+    private val demoContestId: Long? =
+        if (repository === FakeItineraryRepository) DEMO_CONTEST_ID else null
+
     private var lastRequest: GenerateItineraryRequest? = null
     private var lastRegion: String = ""
 
@@ -50,7 +59,7 @@ class ResultViewModel(
 
     /** 위저드 상태로 생성을 요청한다. 같은 조건이면 다시 부르지 않는다. */
     fun generate(wizard: WizardUiState) {
-        val request = wizard.toRequestOrNull() ?: return
+        val request = wizard.toRequestOrNull(demoContestId) ?: return
         // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다.
         sheetCenter = wizard.stay?.let { it.lat to it.lng } ?: (0.0 to 0.0)
         // LOADING 중 LaunchedEffect 재발화(회전·재진입)로 같은 요청이 두 번 나가는 것도 막는다.
@@ -257,11 +266,18 @@ class ResultViewModel(
     }
 }
 
-/** 위저드 상태 → 생성 요청. 일정이 덜 정해졌으면 null. */
-private fun WizardUiState.toRequestOrNull(): GenerateItineraryRequest? {
+/** 스텁 데모 전용 대회 id. 서버 요청에는 실리지 않는다. */
+private const val DEMO_CONTEST_ID = 1L
+
+/**
+ * 위저드 상태 → 생성 요청. 일정이 덜 정해졌으면 null.
+ *
+ * @param demoContestId 스텁 저장소로 데모를 돌릴 때만 쓰는 값. 서버 저장소에서는 null 이라
+ *  canonical id 가 없는 대회(샘플·번들)로는 생성을 부르지 않는다 (#66 리뷰 · 결정-41).
+ */
+private fun WizardUiState.toRequestOrNull(demoContestId: Long?): GenerateItineraryRequest? {
     val race = race ?: return null
-    // 서버가 만드는 동선이라 canonical id 가 없으면 부를 수 없다 (#66 리뷰 · 결정-41)
-    val contestId = race.serverId ?: return null
+    val contestId = race.serverId ?: demoContestId ?: return null
     val start = start ?: return null
     val end = end ?: return null
     return GenerateItineraryRequest(
@@ -274,3 +290,4 @@ private fun WizardUiState.toRequestOrNull(): GenerateItineraryRequest? {
         hotel = stay?.let { HotelInput(it.name, it.lat, it.lng) },
     )
 }
+
