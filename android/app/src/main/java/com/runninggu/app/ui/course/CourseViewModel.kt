@@ -41,6 +41,9 @@ class CourseViewModel(
     /** 검색 버튼 연타도 마지막 것만 남긴다. */
     private var searchJob: Job? = null
 
+    /** 지역별 목록에서 지금까지 받은 페이지 번호. 지역을 바꾸면 0 으로 돌아간다. */
+    private var regionPage = 0
+
     init {
         loadRegions()
         // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 내 주변이라 미리 부르면 헛 호출이다
@@ -179,17 +182,17 @@ class CourseViewModel(
         }
     }
 
+    /** 첫 장부터 다시. 지역을 바꿨거나 오류에서 재시도할 때다. */
     fun loadRegionCourses() {
         regionJob?.cancel()
+        regionPage = 0
         regionJob = viewModelScope.launch {
             _uiState.update { it.copy(regionCourses = RegionCoursesState.Loading) }
             val state = try {
-                val page = repository.byRegion(_uiState.value.selectedRegion)
+                val page = repository.byRegion(_uiState.value.selectedRegion, page = 0)
                 if (page.courses.isEmpty()) {
                     RegionCoursesState.Empty
                 } else {
-                    // TODO(AP-12 후속): 21건 이상인 지역은 hasNext 를 살려 더 불러온다.
-                    //  지금은 첫 20건만 보이고 N 은 전체 건수를 그대로 쓴다
                     RegionCoursesState.Content(
                         courses = page.courses,
                         hasNext = page.hasNext,
@@ -199,6 +202,41 @@ class CourseViewModel(
                 }
             } catch (e: ApiException) {
                 RegionCoursesState.Error(e.userMessageOrDefault())
+            }
+            _uiState.update { it.copy(regionCourses = state) }
+        }
+    }
+
+    /**
+     * [더 보기] — 다음 장을 받아 **뒤에 이어 붙인다**. (§4.11-b)
+     *
+     * 한 번에 20건씩 오므로 코스가 많은 지역은 이걸 눌러야 21번째부터 볼 수 있다.
+     * 실패해도 **이미 받은 목록은 두고** 문구만 붙인다 — 보이던 게 사라지면 안 된다.
+     */
+    fun loadMoreRegionCourses() {
+        val current = _uiState.value.regionCourses as? RegionCoursesState.Content ?: return
+        if (!current.canLoadMore) return
+        regionJob?.cancel()
+        regionJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(regionCourses = current.copy(loadingMore = true, moreMessage = null))
+            }
+            val state = try {
+                val next = repository.byRegion(_uiState.value.selectedRegion, page = regionPage + 1)
+                regionPage += 1
+                current.copy(
+                    courses = current.courses + next.courses,
+                    hasNext = next.hasNext,
+                    // 총 건수는 서버가 매 응답에 준다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
+                    totalElements = next.totalElements,
+                    // 출처는 **화면에 보이는 코스 전체** 기준이다. 이어 붙인 장에 새 원천이
+                    // 섞이면 그것도 표시해야 한다 (§6-2 · 결정-44)
+                    attributions = (current.attributions + next.attributions).distinct(),
+                    loadingMore = false,
+                    moreMessage = null,
+                )
+            } catch (e: ApiException) {
+                current.copy(loadingMore = false, moreMessage = e.userMessageOrDefault())
             }
             _uiState.update { it.copy(regionCourses = state) }
         }
