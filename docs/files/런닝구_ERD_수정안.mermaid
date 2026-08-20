@@ -1,5 +1,5 @@
-%% 런닝구 논리 ERD v4.2 — SPEC v4 · API 명세 v2.7 기준 (2026-08-20)
-%% P0: USER~SAVED_COURSE 13개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
+%% 런닝구 논리 ERD v4.3 — SPEC v4 · API 명세 v2.8 기준 (2026-08-20)
+%% P0: USER~SAVED_COURSE + CONTEST_SNAPSHOT_IMPORT 14개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
 %% 이 문서는 논리 계약이다. 아래 남은 TBD-DB-01을 확정하기 전에는 관련 컬럼을 Flyway 물리 스키마로 옮기지 않는다.
 %% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
 %% TBD-DB-01 route_fingerprint 좌표 정규화 정밀도와 elevation_profile_m PostgreSQL 저장 타입
@@ -9,6 +9,7 @@
 %% 확정-DB-05 검증 완료 full snapshot 2회 연속 누락 시 SOURCE 비활성, 활성 SOURCE가 없는 CONTEST 비활성, 재등장 즉시 복구, 물리 삭제 없음
 %% 확정-DB-06 externalId/external_id, SIGNUP/PASSWORD_RESET, fetchedAt/fetched_at, organizer 명칭 통일
 %% 확정-DB-07 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum VARCHAR+CHECK, 좌표 NUMERIC(10,7), nullable 명시
+%% 확정-DB-08 CONTEST start_time·road_address·detail_url nullable, 적용 snapshot 이력은 CONTEST_SNAPSHOT_IMPORT에 원자 기록
 %% DB-07 타입 규약: nickname VARCHAR(12), email VARCHAR(320), Enum VARCHAR(32), key/name/title/place VARCHAR(255), URL VARCHAR(2048), token hash VARCHAR(64), password/code hash VARCHAR(255), 거리 NUMERIC(8,3), 자유문 TEXT
 %% DB-07 null 규약: "nullable" 표기가 없는 저장 컬럼은 NOT NULL, derived는 DB 컬럼이 아님
 %% DB-07 CHECK: LOGIN_IDENTITY는 EMAIL(password_hash·email_verified_at 필수, email_snapshot null) 또는 KAKAO(password_hash·email_verified_at null)
@@ -92,15 +93,17 @@ erDiagram
         varchar name
         varchar region "17개 시도"
         varchar place
+        varchar road_address "nullable"
         numeric lat "nullable, NUMERIC(10,7), WGS84"
         numeric lng "nullable, NUMERIC(10,7), WGS84"
         date contest_date "KST 비즈니스 날짜"
-        time start_time
+        time start_time "nullable"
         varchar source_status "nullable, 날짜 판정 불가 시 폴백"
         date apply_start "nullable"
         date apply_end "nullable"
         varchar organizer "nullable"
         varchar official_url "nullable"
+        varchar detail_url "nullable"
         varchar image_url "nullable"
         varchar category "CHECK ROAD / TRAIL / WALK / NIGHT"
         boolean active "DEFAULT true, 활성 source가 하나라도 있으면 true"
@@ -125,6 +128,15 @@ erDiagram
         bigint id PK
         bigint contest_id FK "ON DELETE CASCADE"
         varchar event_type "CHECK K5 / K10 / HALF / FULL, UNIQUE(contest_id, event_type)"
+    }
+
+    CONTEST_SNAPSHOT_IMPORT {
+        bigint id PK
+        int schema_version
+        varchar snapshot_sha256 "VARCHAR(64), UNIQUE(snapshot_sha256, checked_at_max)"
+        varchar source_sha256 "VARCHAR(64), 입력 CSV 출처 추적용"
+        timestamptz checked_at_max UK "UTC, 과거·동일 시각 다른 snapshot hash 거부"
+        timestamptz applied_at "UTC, 성공 트랜잭션 완료 시각"
     }
 
     FAVORITE {

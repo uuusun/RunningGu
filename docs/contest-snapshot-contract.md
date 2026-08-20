@@ -1,4 +1,4 @@
-# 서버용 대회 스냅샷 계약 (결정-39·40·46)
+# 서버용 대회 스냅샷 계약 (결정-39·40·46·47·48)
 
 > **지위**: 데이터 파이프라인(Python) ↔ 백엔드 Importer 사이의 파일 계약.
 > 생산자는 `scripts/build_contest_snapshot.py`, 소비자는 백엔드 Importer(AP-07)다.
@@ -40,6 +40,13 @@
    - ③ 둘 다 없으면 신규 insert.
    - 별도 승계 필드를 스냅샷에 넣지 않는 이유: 생성기는 DB 이전 상태를 모르므로 승계는
      소비자(Importer)만 판정할 수 있다.
+   - **승계 충돌은 fail-closed한다**(결정-48). Importer는 DB를 바꾸기 전에 snapshot 전체의
+     승계 대상을 먼저 계산한다. 재병합 시 최대 source 겹침 수가 둘 이상 기존 canonical에서
+     동률이거나, 한 기존 canonical이 둘 이상의 새 canonical의 승계 대상으로 중복 선택되는
+     분리 상황이면 어느 PK도 임의로 고르지 않고 snapshot 전체를 거부한다. 이때 canonical·
+     source·event·누락 횟수·`active`·적용 이력을 모두 기존 상태로 유지한다. 한 canonical에
+     `MARATHON_GO`와 `MARATHON_ONLINE` source가 함께 있는 정상적인 다중 원천은 거부 사유가
+     아니다.
 2. **스냅샷에 있는 하위만 갱신한다.** `CONTEST_EVENT`는 현재 canonical의 `events[]`로 완전
    대체한다. `CONTEST_SOURCE`는 `(sourceType, externalId)`로 upsert하고, 다른 canonical로
    재병합됐으면 `contest_id`를 옮긴다. 이번 스냅샷에 나타난 source는 `active=true`,
@@ -52,12 +59,38 @@
    - DB의 기존 source가 첫 번째 승인 스냅샷에서 보이지 않으면
      `consecutive_missing_count=1`, `active=true`로 유지한다. 다음 **서로 다른 승인 스냅샷**에도
      연속 누락되면 count를 2로 고정하고 `active=false`로 바꾼다.
-   - 같은 스냅샷을 재적재해도 누락 횟수를 다시 올리지 않는다. Importer는
-     `meta.sourceSha256 + meta.checkedAtMax`로 이미 적용한 스냅샷을 식별하고, 이전 스냅샷을
-     다시 적용한 누락 상태 후퇴도 금지한다.
+   - 같은 스냅샷을 재적재해도 누락 횟수를 다시 올리지 않는다. Importer는 읽은 snapshot 파일
+     바이트의 SHA-256과 `meta.checkedAtMax`로 이미 적용한 스냅샷을 식별하고, 이전 스냅샷을
+     다시 적용한 누락 상태 후퇴도 금지한다. `meta.sourceSha256`은 입력 CSV 해시이므로 snapshot
+     식별에 쓰지 않는다. 물리 판정 규칙은 1.3을 따른다.
    - `CONTEST.active`는 연결된 source 중 하나라도 active면 true, 모두 inactive면 false다.
      비활성 canonical과 과거 대회, 이를 참조하는 찜·저장 동선은 물리 삭제하지 않는다.
      공개 목록·검색·월간 건수·마감 임박만 active 대회로 제한하고 id 상세 조회는 유지한다.
+
+### 1.3 적용 snapshot 이력 — `CONTEST_SNAPSHOT_IMPORT` (결정-47)
+
+Importer는 성공적으로 적용한 snapshot을 다음 물리 계약으로 기록한다.
+
+| 컬럼 | PostgreSQL 타입 | 제약·의미 |
+|---|---|---|
+| `id` | `BIGINT` | PK |
+| `schema_version` | `INTEGER` | snapshot 최상위 `schemaVersion`, NOT NULL |
+| `snapshot_sha256` | `VARCHAR(64)` | Importer가 읽은 snapshot 파일 바이트의 SHA-256, NOT NULL |
+| `source_sha256` | `VARCHAR(64)` | `meta.sourceSha256`, NOT NULL. 출처 추적용이며 식별·UNIQUE에 쓰지 않음 |
+| `checked_at_max` | `TIMESTAMPTZ` | `meta.checkedAtMax`, NOT NULL, UTC 저장 |
+| `applied_at` | `TIMESTAMPTZ` | 서버 적용 완료 시각, NOT NULL, UTC 저장 |
+
+- `(snapshot_sha256, checked_at_max)`와 `checked_at_max`는 각각 UNIQUE다. 같은 기준 시각에
+  서로 다른 snapshot을 둘 수 없다.
+- 같은 쌍이 이미 있으면 성공 no-op로 끝내며 canonical·누락 횟수·`active`를 변경하지 않는다.
+- `checked_at_max`가 마지막 성공 이력보다 이르면 거부한다. 마지막 성공 이력과 시각은 같지만
+  `snapshot_sha256`이 다를 때도 순서를 판정할 수 없으므로 거부한다.
+- 전체 검증과 `CONTEST`·`CONTEST_SOURCE`·`CONTEST_EVENT` 갱신, 이력 insert는 한 트랜잭션이다.
+  검증·적재·이력 기록 중 하나라도 실패하면 모두 롤백한다.
+- 동시 Importer 실행은 `CONTEST_SNAPSHOT_IMPORT` 잠금 또는 동등한 DB 잠금으로 직렬화해
+  최신 이력 확인과 새 이력 insert 사이의 경쟁을 막는다.
+- 이 결정은 DB 소비 계약을 구체화한 것이며 snapshot JSON 필드는 바뀌지 않으므로
+  파일 `schemaVersion`은 1을 유지한다.
 
 ## 2. 최상위 구조
 
@@ -74,7 +107,7 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `source` | string | 입력 파일 저장소 상대 경로 (`data/races_sample.csv`) |
-| `sourceSha256` | string | 입력 CSV 파일 바이트의 SHA-256 (hex) |
+| `sourceSha256` | string | 입력 CSV 파일 바이트의 SHA-256 (hex). 출처 추적용이며 snapshot 식별자가 아님 — 식별은 snapshot 파일 바이트 해시로 함(1.3) |
 | `sourceRowCount` | int | 입력 CSV 데이터 행 수 (헤더 제외) |
 | `canonicalCount` | int | `contests[]` 길이 |
 | `sourceRecordCount` | int | 모든 `sources[]` 길이 합 = `sourceRowCount − len(skipped)` |
@@ -95,9 +128,9 @@
 | `name` | string | ✗ | 대회명 (병합 우선 레코드 기준, §5.4) |
 | `region` | string | ✗ | 17개 시도 단축명 (서울·부산·…·제주, SPEC §6.2) 외 값 금지 |
 | `place` | string | ✗ | 대회장 (CSV `venue`). API 명세 3-1의 `place` |
-| `roadAddress` | string | ✓ | 도로명 주소 |
+| `roadAddress` | string | ✓ | 도로명 주소 → `CONTEST.road_address NULL` |
 | `contestDate` | string | ✗ | `YYYY-MM-DD` (KST 기준 날짜) |
-| `startTime` | string | ✓ | `HH:MM`. 형식 불일치 시 null |
+| `startTime` | string | ✓ | `HH:MM`. 형식 불일치 시 null → `CONTEST.start_time NULL` |
 | `events` | string[] | ✗(빈 배열 허용) | `FULL·HALF·K10·K5` (API 명세 부록 enum). 순서는 이 고정 순서. 빈 배열 = 종목 미표기(§8.2 정책, 현재 2건) → `CONTEST_EVENT` 행 없음 |
 | `category` | string | ✗ | `로드·트레일·걷기·야간` (SPEC §6.2) |
 | `applyStart` | string | ✓ | `YYYY-MM-DD`. 형식 불일치 시 null |
@@ -105,7 +138,7 @@
 | `regStatusFallback` | string | ✗ | `OPEN·CLOSED·BEFORE·UNKNOWN`. 서버 `regStatus`는 날짜로 파생(§5.5)하고, 날짜로 판단 불가할 때 이 값을 쓴다(API 명세 3-1). 원천 `접수중→OPEN` `마감→CLOSED` `접수전→BEFORE` `미정/빈값→UNKNOWN` |
 | `organizer` | string | ✓ | 주최 |
 | `officialUrl` | string | ✓ | 공식 홈페이지 |
-| `detailUrl` | string | ✓ | 병합 우선 원천의 상세 페이지 |
+| `detailUrl` | string | ✓ | 병합 우선 원천의 상세 페이지 → `CONTEST.detail_url NULL` |
 | `imageUrl` | string | ✓ | 포스터. null이면 앱 placeholder(D-24) |
 | `lat` / `lng` | number | ✗ | WGS84. **생성기는 좌표 없는 canonical을 만들지 않는다** — 좌표 누락 원천이 생기면 생성이 실패하므로 `add_coordinates.py`를 먼저 돌린다 (SPEC D-09: 재수집 0건 검증) |
 | `checkedAt` | string | ✗ | 이 대회 `sources[].fetchedAt`의 최댓값 (UTC `Z`) |
@@ -139,7 +172,8 @@
 
 1. `schemaVersion` 지원 여부, UTF-8 디코딩
 2. `canonicalKey` 유일 · `(sourceType, externalId)` 유일
-3. 필수 필드 non-null · `region`/`events`/`category`/`regStatusFallback` enum 값
+3. 필수 필드 non-null · `region`/`events`/`category`/`regStatusFallback` enum 값.
+   `startTime`은 null을 허용하고 값이 있으면 `HH:MM`, `roadAddress`·`detailUrl`은 null 또는 string인지 검증
 4. `lat/lng` 존재와 위경도 범위 (대한민국 개략 범위 33≤lat≤39, 124≤lng≤132)
 5. `meta` 집계 일치 (PR #41 리뷰 반영):
    - `canonicalCount` = `contests[]` 길이
@@ -149,7 +183,10 @@
      `sources[].fetchedAt` 최댓값
 6. 모든 설정 원천 수집이 완료된 승인 full snapshot인지 배포 게이트에서 확인. 실패·부분 산출물은
    기존 `data/contest_snapshot.json`을 교체하지 않고 Importer를 실행하지 않음
-7. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical·누락 횟수·active 유지 (SPEC §8.2)
+7. 1.3의 적용 이력으로 동일 snapshot no-op·과거 snapshot·동일 기준 시각의 다른 hash 거부를 판정
+8. 하나라도 실패하면 트랜잭션 롤백으로 이전 canonical·누락 횟수·active·적용 이력 유지 (SPEC §8.2)
+9. 전체 canonical의 승계 대상을 DB 변경 전에 계산하고, 최대 source 겹침 동률 또는 하나의 기존
+   canonical을 둘 이상의 새 canonical이 승계하려는 충돌이면 전체 적재 거부(결정-48)
 
 적재는 멱등이다: 같은 스냅샷을 두 번 적재해도 데이터와 누락 횟수가 같다. 첫 승인 누락은
 count 1/active, 서로 다른 다음 승인 스냅샷의 연속 누락은 count 2/inactive, 재등장은 count 0/active가

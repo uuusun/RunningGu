@@ -1,8 +1,8 @@
-# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.3
+# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.4
 
 > **검증일**: 2026-08-20
-> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-44·45·46 포함) · API 명세 v2.7 · 화면–API 매핑표 v1.8 · 논리 ERD v4.2 · 수정 DFD
-> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07 계약은 정렬됐다. 남은 `TBD-DB-01`과 `TBD-P1-01`은 해당 물리 컬럼·P1 계약 전에 닫는다.
+> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-44·45·46·47 포함) · API 명세 v2.8 · 화면–API 매핑표 v1.8 · 논리 ERD v4.3 · 수정 DFD
+> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08 계약은 정렬됐다. 남은 `TBD-DB-01`과 `TBD-P1-01`은 해당 물리 컬럼·P1 계약 전에 닫는다.
 
 ---
 
@@ -11,11 +11,11 @@
 | 단계 | 엔티티 | 상태 |
 |---|---|---|
 | P0 | `USER`, `LOGIN_IDENTITY`, `USER_AGREEMENT`, `EMAIL_VERIFICATION`, `REFRESH_TOKEN` | 논리 계약 반영 |
-| P0 | `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT`, `FAVORITE` | 논리 계약 반영 |
+| P0 | `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT`, `CONTEST_SNAPSHOT_IMPORT`, `FAVORITE` | 논리 계약 반영 |
 | P0 | `ITINERARY`, `ITINERARY_DAY`, `ITINERARY_BLOCK`, `SAVED_COURSE` | 논리 계약 반영 |
 | P1 | `RUN_RECORD`, `RUN_TRACK` | 예약 초안. saved/ran 통합 계약은 P1 착수 시 재논의 |
 
-총 15개를 한 ERD에서 보되, **P0 확정 13개와 P1 계약 초안 2개를 같은 확정도로 취급하지 않는다**.
+총 16개를 한 ERD에서 보되, **P0 확정 14개와 P1 계약 초안 2개를 같은 확정도로 취급하지 않는다**.
 
 ---
 
@@ -37,11 +37,13 @@
 - 백엔드 Importer는 전체 snapshot을 검증하고 `CONTEST`·`CONTEST_SOURCE`·`CONTEST_EVENT`를 한 트랜잭션에서 멱등 upsert한다. Python이 운영 DB를 직접 수정하지 않는다.
 - canonical은 `canonical_key`, 원천은 `(source_type, external_id)` 논리 유일키를 가진다.
 - 종목은 `K5/K10/HALF/FULL` 4종이며 원천 트레일 표기는 거리 버킷으로 정규화한다.
-- `CONTEST.lat/lng`와 이미지·주최·공식 URL은 nullable이다.
+- `CONTEST.start_time`, `road_address`, `detail_url`, `lat/lng`와 이미지·주최·공식 URL은 nullable이다.
 - `FAVORITE(user_id, contest_id)`는 복합 UNIQUE다.
 - 대회 원천 식별자는 `externalId/external_id`, 수집 시각은 `fetchedAt/fetched_at`, 주최자는 `organizer`로 통일했다.
 - 승인된 완전 snapshot에서 source가 1회 누락되면 count 1/활성 유지, 서로 다른 다음 승인 snapshot에도 연속 누락되면 count 2/비활성이다. 실패·부분 snapshot과 같은 파일 재적재는 횟수를 올리지 않고, 재등장은 count 0/활성으로 복구한다.
 - canonical `active`는 활성 source 존재 여부로 결정한다. 비활성·과거 canonical을 물리 삭제하지 않고 공개 탐색에서만 제외하며 찜·동선의 상세 참조는 유지한다(확정-DB-05, 이슈 #56).
+- 성공한 snapshot은 `CONTEST_SNAPSHOT_IMPORT(schema_version, snapshot_sha256, source_sha256, checked_at_max, applied_at)`에 같은 트랜잭션으로 기록한다. `snapshot_sha256`은 Importer가 읽은 snapshot 파일 바이트의 해시이고 `source_sha256`은 입력 CSV 출처 추적용이다. 같은 `(snapshot_sha256, checked_at_max)`는 no-op, 과거 기준 시각과 동일 기준 시각의 다른 `snapshot_sha256`은 거부하며 실패한 적재는 이력을 남기지 않는다. 동시 실행은 DB 잠금으로 직렬화한다(확정-DB-08, 결정-47).
+- 한 canonical의 마라톤GO·마라톤온라인 다중 원천은 정상 수용한다. 다만 최대 source 겹침이 동률이거나 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 snapshot 전체를 거부해 기존 PK 참조·누락 상태·적용 이력을 보존한다(결정-48).
 
 ### 2.3 저장 동선
 
@@ -134,6 +136,7 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - `DB-05`: 승인 full snapshot 2회 연속 source 누락 비활성, 실패·부분 미반영, 재등장 복구, canonical·참조 물리 삭제 없음
 - `DB-06`: `externalId`, `PASSWORD_RESET`, `fetchedAt`, `organizer` 명칭 통일
 - `DB-07`: 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum CHECK, 좌표 `NUMERIC(10,7)`, 거리 `NUMERIC(8,3)`, 문자열 용도별 길이·nullable·주요 조회 인덱스 명시
+- `DB-08`: 대회 출발 시각·도로명 주소·상세 URL nullable 저장, snapshot 파일 바이트 해시를 사용한 성공 적용 이력의 원자 기록과 동일/과거 snapshot 차단
 
 ---
 
@@ -148,6 +151,7 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - 같은 대회를 여러 원천에서 수집해도 canonical 1개와 source 복수를 유지.
 - 잘못된 대회 snapshot은 전체 롤백하고 이전 정상 canonical 유지.
 - source 첫 승인 누락 → active/count 1, 두 번째 연속 승인 누락 → inactive/count 2, 같은 snapshot 재적재 → 변화 없음, 재등장 → active/count 0.
+- 같은 snapshot 재적재 → 성공 no-op·이력 1행 유지, 과거 snapshot 또는 동일 `checked_at_max`의 다른 `snapshot_sha256` → 적재 거부, 적재 실패 → 이력 미생성.
 - canonical의 source 중 하나만 active여도 canonical active 유지; 모두 inactive일 때만 공개 탐색 제외하고 id 상세는 유지.
 - 같은 경로 snapshot을 반복 저장하면 `SAVED_COURSE` 1행과 기존 id 유지.
 - 같은 geometry의 attribution 문구가 달라져도 fingerprint는 같고, 기존 저장 행의 attribution snapshot은 소급 변경하지 않음.
@@ -160,5 +164,5 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 - 논리 ERD: **P0+P1 범위 정렬 완료**
 - DFD: **현재 SPEC/API 흐름과 정렬 완료**
-- 물리 ERD·Flyway: **DB-02·04·05 계약 반영 가능, TBD-DB-01 관련 컬럼은 결정 전 확정 금지**
+- 물리 ERD·Flyway: **DB-02·04·05·08 계약 반영 가능, TBD-DB-01 관련 컬럼은 결정 전 확정 금지**
 - API: **핵심 계약 정렬, 화면–API 매핑표 §11 상세화 항목 유지**
