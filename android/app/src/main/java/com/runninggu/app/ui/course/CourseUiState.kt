@@ -19,6 +19,8 @@ data class CourseUiState(
     val origin: OriginState = OriginState.Undecided,
     /** 목표 거리(km). 범위·단위는 [CourseTargetKm] 이 유일한 출처다. (SPEC §4.11-2) */
     val targetKm: Double = CourseTargetKm.DEFAULT,
+    /** 출발지 검색 입력·결과. (SPEC §4.11-1 ②) */
+    val originSearch: OriginSearchState = OriginSearchState(),
     val nearby: NearbyState = NearbyState.Idle,
     val regions: RegionsState = RegionsState.Loading,
     /** 지역 칩 선택. null 이면 전국이다. 재탭하면 해제된다. (§4.11-b) */
@@ -51,6 +53,22 @@ sealed interface OriginState {
     ) : OriginState {
         enum class Source { GPS, SEARCH, PRESET, ITINERARY }
     }
+}
+
+/**
+ * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
+ *
+ * 서버가 **카카오 키워드 첫 결과 하나**만 주므로 후보 목록이 없다 — 찾으면 바로 출발지가 된다.
+ * 그래서 이 상태에는 결과가 없고 진행 상황과 실패 문구만 있다.
+ */
+data class OriginSearchState(
+    val query: String = "",
+    val searching: Boolean = false,
+    /** 실패 문구. 없으면 null. `404 NO_RESULT` 와 그 밖의 실패를 다르게 적는다. */
+    val message: String? = null,
+) {
+    /** 공백만 넣고 누르면 부르지 않는다. */
+    val canSubmit: Boolean get() = query.isNotBlank() && !searching
 }
 
 /**

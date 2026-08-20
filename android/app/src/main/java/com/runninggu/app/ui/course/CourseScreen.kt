@@ -15,11 +15,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -30,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.CourseSummary
@@ -144,6 +152,10 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
 
         Spacer(Modifier.height(8.dp))
 
+        OriginSearchField(state.originSearch, viewModel)
+
+        Spacer(Modifier.height(8.dp))
+
         // 위치 권한을 거부해도 여기로 고를 수 있다 (NFR-15)
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -156,6 +168,51 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
                     label = { Text(preset.name) },
                 )
             }
+        }
+    }
+}
+
+/**
+ * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
+ *
+ * 서버가 첫 결과 하나만 주므로 후보 목록을 그리지 않는다 — 찾으면 곧바로 출발지가 된다.
+ */
+@Composable
+private fun OriginSearchField(state: OriginSearchState, viewModel: CourseViewModel) {
+    Column {
+        OutlinedTextField(
+            value = state.query,
+            onValueChange = viewModel::onOriginQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !state.searching,
+            placeholder = { Text("장소나 주소로 찾기") },
+            isError = state.message != null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { viewModel.onOriginSearch() }),
+            trailingIcon = {
+                IconButton(onClick = viewModel::onOriginSearch, enabled = state.canSubmit) {
+                    Icon(Icons.Default.Search, contentDescription = "출발지 검색")
+                }
+            },
+        )
+
+        if (state.searching) {
+            Text(
+                text = "찾는 중…",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
+        state.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }

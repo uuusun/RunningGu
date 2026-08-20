@@ -9,6 +9,8 @@ import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeCourseRepository
+import com.runninggu.app.data.repository.FakeGeocodeRepository
+import com.runninggu.app.data.repository.GeocodeRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,7 @@ import kotlin.math.roundToInt
  */
 class CourseViewModel(
     private val repository: CourseRepository,
+    private val geocodeRepository: GeocodeRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseUiState())
@@ -34,6 +37,9 @@ class CourseViewModel(
 
     /** 칩을 빠르게 두 번 누르면 먼저 보낸 응답이 늦게 도착해 목록이 어긋난다 — 같은 이유로 끊는다. */
     private var regionJob: Job? = null
+
+    /** 검색 버튼 연타도 마지막 것만 남긴다. */
+    private var searchJob: Job? = null
 
     init {
         loadRegions()
@@ -50,6 +56,51 @@ class CourseViewModel(
     fun onOriginChange(origin: OriginState) {
         _uiState.update { it.copy(origin = origin) }
         if (origin is OriginState.Fixed) refreshNearby()
+    }
+
+    fun onOriginQueryChange(query: String) {
+        // 입력을 고치면 앞선 실패 문구는 지운다 — 새 시도를 하는 중이다
+        _uiState.update { it.copy(originSearch = it.originSearch.copy(query = query, message = null)) }
+    }
+
+    /**
+     * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
+     *
+     * 서버가 카카오 키워드 **첫 결과 하나**를 주므로 찾으면 곧바로 출발지로 삼고 조회까지 간다.
+     * 후보 목록을 보여주고 고르게 하지 않는다.
+     */
+    fun onOriginSearch() {
+        val query = _uiState.value.originSearch.query.trim()
+        if (query.isBlank()) return
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(originSearch = it.originSearch.copy(searching = true, message = null))
+            }
+            try {
+                val place = geocodeRepository.search(query)
+                _uiState.update {
+                    it.copy(originSearch = it.originSearch.copy(searching = false, message = null))
+                }
+                onOriginChange(
+                    OriginState.Fixed(
+                        name = place.name,
+                        lat = place.lat,
+                        lng = place.lng,
+                        from = OriginState.Fixed.Source.SEARCH,
+                    ),
+                )
+            } catch (e: ApiException) {
+                _uiState.update {
+                    it.copy(
+                        originSearch = it.originSearch.copy(
+                            searching = false,
+                            message = e.searchMessage(),
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -120,8 +171,11 @@ class CourseViewModel(
          * 백엔드가 준비되면 [com.runninggu.app.data.repository.RemoteCourseRepository] 로 바꾼다.
          * 화면은 안 건드린다 — Repository 인터페이스만 보기 때문이다(AGENTS 4장).
          */
-        fun factory(repository: CourseRepository = FakeCourseRepository) = viewModelFactory {
-            initializer { CourseViewModel(repository) }
+        fun factory(
+            repository: CourseRepository = FakeCourseRepository,
+            geocodeRepository: GeocodeRepository = FakeGeocodeRepository,
+        ) = viewModelFactory {
+            initializer { CourseViewModel(repository, geocodeRepository) }
         }
     }
 
@@ -168,6 +222,18 @@ internal fun ApiException.nearbyMessage(): String = when {
     this is ApiException.Network -> "네트워크에 연결할 수 없어요."
     this is ApiException.Http && code == ApiErrorCode.COURSE_SOURCES_UNAVAILABLE ->
         "코스 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    else -> userMessageOrDefault()
+}
+
+/**
+ * 출발지 검색 실패 문구. (§4-4)
+ *
+ * **못 찾은 것과 못 부른 것을 나눈다** — 전자는 검색어를 바꾸면 되고 후자는 다시 눌러야 한다.
+ */
+internal fun ApiException.searchMessage(): String = when {
+    this is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    this is ApiException.Http && code == ApiErrorCode.NO_RESULT ->
+        "그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요."
     else -> userMessageOrDefault()
 }
 
