@@ -2,8 +2,8 @@ package com.runninggu.app.ui.my
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runninggu.app.ui.auth.SessionProfile
-import com.runninggu.app.ui.auth.SessionStore
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.model.RaceSummary

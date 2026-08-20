@@ -41,7 +41,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runninggu.app.ui.auth.LoginProvider
+import com.runninggu.app.data.local.LoginProvider
 
 /**
  * 계정 관리 — 마이 설정에서 여는 별도 화면. (SPEC §4.13 정보 수정 · D-22 · AP-13)

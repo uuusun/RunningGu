@@ -1,6 +1,6 @@
 package com.runninggu.app.ui.favorite
 
-import com.runninggu.app.ui.auth.SessionStore
+import com.runninggu.app.data.local.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow

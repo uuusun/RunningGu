@@ -1,19 +1,9 @@
 package com.runninggu.app.ui.auth
 
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.remote.ApiException
 import kotlinx.coroutines.delay
-
-/**
- * 로그인·가입 성공 시 받는 토큰 쌍. (API 명세 §1-5 · §1-6)
- *
- * 액세스 30분 · 리프레시 14일이고 리프레시는 회전한다(§0-2). 앱은 두 값을 원자적으로
- * 교체해야 하므로 하나로 묶어 다룬다.
- */
-data class AuthTokens(
-    val accessToken: String,
-    val refreshToken: String,
-)
 
 /**
  * 인증 API 창구. (API 명세 §1 · SPEC §4.1~4.3)
