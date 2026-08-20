@@ -3,6 +3,7 @@ package com.runninggu.app.data.local
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 발급받은 토큰 쌍. (API 명세 §1-5 · §1-6)
@@ -67,6 +68,17 @@ object SessionStore {
     var tokens: AuthTokens? = null
         private set
 
+    /**
+     * 세션 세대. **로그인·계정 전환·로그아웃마다 올라간다.**
+     *
+     * 토큰 재발급은 왕복이 길어서 그 사이에 세션이 바뀔 수 있다. 세대를 함께 들고 다녀야
+     * A 계정 요청을 B 토큰으로 재시도하거나, 로그아웃한 뒤 도착한 A 토큰이 세션을 되살리는
+     * 일을 막는다(#74 리뷰 — 찜의 `sessionEpoch` 와 같은 장치다).
+     */
+    private val epoch = AtomicInteger(0)
+
+    val sessionEpoch: Int get() = epoch.get()
+
     val isLoggedIn: Boolean get() = _session.value != null
 
     /**
@@ -75,23 +87,39 @@ object SessionStore {
      * [tokens] 를 넘기지 않으면 기존 토큰을 유지한다 — 프로필만 갱신하는 호출에서
      * 세션이 끊기면 안 된다.
      */
+    @Synchronized
     fun signIn(profile: SessionProfile, tokens: AuthTokens? = null) {
-        if (tokens != null) this.tokens = tokens
+        if (tokens != null) {
+            // 새 로그인·계정 전환이다. 진행 중이던 재발급 결과는 이제 남의 것이 된다
+            this.tokens = tokens
+            epoch.incrementAndGet()
+        }
         _session.value = profile
     }
 
     /**
      * 재발급받은 토큰 쌍으로 갈아끼운다. 프로필은 건드리지 않는다. (§1-9)
      *
+     * **[expectedEpoch] 이 지금 세대와 같을 때만** 반영한다. 재발급 왕복 중에 로그아웃이나
+     * 계정 전환이 일어났으면 그 토큰은 이미 남의 것이라 버려야 한다(#74 리뷰).
+     *
      * **리프레시가 회전하므로 두 값을 함께** 넣는다 — 액세스만 바꾸면 다음 재발급이 실패한다.
+     *
+     * @return 반영했으면 true. false 면 세션이 바뀐 것이라 호출부는 재시도하지 않는다.
      */
-    fun updateTokens(tokens: AuthTokens) {
+    @Synchronized
+    fun updateTokens(expectedEpoch: Int, tokens: AuthTokens): Boolean {
+        if (epoch.get() != expectedEpoch) return false
         this.tokens = tokens
+        return true
     }
 
     /** 로그아웃·탈퇴 공용. 서버 revoke 는 AP-14 에서 붙는다. */
+    @Synchronized
     fun signOut() {
         tokens = null
+        // 진행 중이던 재발급이 끝나도 이 세대에는 반영되지 않는다
+        epoch.incrementAndGet()
         _session.value = null
     }
 }

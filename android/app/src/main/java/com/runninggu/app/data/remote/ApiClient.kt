@@ -24,6 +24,14 @@ object ApiClient {
         fun accessToken(): String?
     }
 
+    /**
+     * 요청을 만들 때의 세션 세대. (#74 리뷰)
+     *
+     * 재발급 왕복 중에 로그아웃·계정 전환이 일어나면 이 값이 달라진다 —
+     * [TokenAuthenticator] 가 그걸 보고 **남의 세션 요청을 재시도하지 않는다.**
+     */
+    data class SessionTag(val epoch: Int)
+
     /** 토큰 없이 도는 기본값 — 게스트도 공개 API 는 쓸 수 있다(§0-2). */
     private val NoToken = TokenProvider { null }
 
@@ -31,6 +39,8 @@ object ApiClient {
     fun create(
         baseUrl: String = BuildConfig.BASE_URL,
         tokenProvider: TokenProvider = NoToken,
+        /** 요청 시점의 세션 세대. 기본값은 세션 개념이 없는 호출(재발급 전용 클라이언트)용이다. */
+        sessionEpoch: () -> Int = { 0 },
         json: Json = ApiJson,
         extraInterceptors: List<Interceptor> = emptyList(),
         /** `401` 재발급 처리. null 이면 401 이 그대로 화면까지 올라간다. */
@@ -39,7 +49,7 @@ object ApiClient {
         val client = OkHttpClient.Builder()
             .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SEC, TimeUnit.SECONDS)
-            .addInterceptor(authInterceptor(tokenProvider))
+            .addInterceptor(authInterceptor(tokenProvider, sessionEpoch))
             .apply {
                 extraInterceptors.forEach(::addInterceptor)
                 authenticator?.let(::authenticator)
@@ -53,16 +63,25 @@ object ApiClient {
             .build()
     }
 
-    /** `Authorization: Bearer {accessToken}`. 토큰이 없으면 헤더를 붙이지 않는다(§0-2). */
-    private fun authInterceptor(provider: TokenProvider) = Interceptor { chain ->
-        val token = provider.accessToken()
-        val request = if (token.isNullOrBlank()) {
-            chain.request()
-        } else {
-            chain.request().newBuilder().header("Authorization", "Bearer $token").build()
+    /**
+     * `Authorization: Bearer {accessToken}`. 토큰이 없으면 헤더를 붙이지 않는다(§0-2).
+     *
+     * 헤더를 붙일 때 **그 시점의 세션 세대를 태그로 함께 단다** — 재발급 후 재시도할 때
+     * 이 요청이 아직 같은 세션의 것인지 확인하는 근거다(#74 리뷰).
+     */
+    private fun authInterceptor(provider: TokenProvider, sessionEpoch: () -> Int) =
+        Interceptor { chain ->
+            val token = provider.accessToken()
+            val request = if (token.isNullOrBlank()) {
+                chain.request()
+            } else {
+                chain.request().newBuilder()
+                    .header("Authorization", "Bearer $token")
+                    .tag(SessionTag::class.java, SessionTag(sessionEpoch()))
+                    .build()
+            }
+            chain.proceed(request)
         }
-        chain.proceed(request)
-    }
 
     private const val JSON_MEDIA_TYPE = "application/json"
 

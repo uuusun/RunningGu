@@ -46,6 +46,7 @@ object ServiceLocator {
     private val retrofit: Retrofit by lazy {
         ApiClient.create(
             tokenProvider = { SessionStore.tokens?.accessToken },
+            sessionEpoch = { SessionStore.sessionEpoch },
             authenticator = tokenAuthenticator,
         )
     }
@@ -62,12 +63,16 @@ object ServiceLocator {
      */
     private val tokenAuthenticator by lazy {
         TokenAuthenticator(
+            sessionEpoch = { SessionStore.sessionEpoch },
             currentAccessToken = { SessionStore.tokens?.accessToken },
             currentRefreshToken = { SessionStore.tokens?.refreshToken },
             refresh = ::refreshTokens,
-            onRefreshed = { renewed ->
-                // 리프레시가 회전한다 — 둘 다 갈아끼운다 (§1-9)
-                SessionStore.updateTokens(AuthTokens(renewed.accessToken, renewed.refreshToken))
+            onRefreshed = { epoch, renewed ->
+                // 리프레시가 회전한다 — 둘 다 갈아끼운다. 세대가 바뀌었으면 false 가 온다 (§1-9)
+                SessionStore.updateTokens(
+                    expectedEpoch = epoch,
+                    tokens = AuthTokens(renewed.accessToken, renewed.refreshToken),
+                )
             },
             // 리프레시까지 만료·revoked 일 때만 재로그인이다
             onGiveUp = { SessionStore.signOut() },

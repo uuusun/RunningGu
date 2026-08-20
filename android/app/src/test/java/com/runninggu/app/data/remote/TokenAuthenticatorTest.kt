@@ -21,10 +21,17 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class TokenAuthenticatorTest {
 
-    private fun unauthorized(sentToken: String? = "access-1", prior: Response? = null): Response {
+    private fun unauthorized(
+        sentToken: String? = "access-1",
+        prior: Response? = null,
+        epoch: Int? = 1,
+    ): Response {
         val request = Request.Builder()
             .url("https://api.test/me/courses")
-            .apply { sentToken?.let { header("Authorization", "Bearer $it") } }
+            .apply {
+                sentToken?.let { header("Authorization", "Bearer $it") }
+                epoch?.let { tag(ApiClient.SessionTag::class.java, ApiClient.SessionTag(it)) }
+            }
             .build()
         return Response.Builder()
             .request(request)
@@ -39,10 +46,11 @@ class TokenAuthenticatorTest {
     fun `401 이면 재발급하고 새 토큰으로 다시 보낸다`() {
         var saved: RefreshResponseDto? = null
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { "access-1" },
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
-            onRefreshed = { saved = it },
+            onRefreshed = { _, renewed -> saved = renewed; true },
             onGiveUp = { error("여기 오면 안 된다") },
         )
 
@@ -61,6 +69,7 @@ class TokenAuthenticatorTest {
         var access = "access-1"
         var signedOut = false
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { access },
             currentRefreshToken = { "refresh-1" },
             refresh = {
@@ -68,7 +77,7 @@ class TokenAuthenticatorTest {
                 Thread.sleep(30) // 회전 왕복을 흉내낸다
                 RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2"))
             },
-            onRefreshed = { access = it.accessToken },
+            onRefreshed = { _, renewed -> access = renewed.accessToken; true },
             onGiveUp = { signedOut = true },
         )
 
@@ -95,10 +104,11 @@ class TokenAuthenticatorTest {
         // 지하철에서 잠깐 끊긴 것뿐인데 세션을 지우면 찜 캐시까지 날아간다 (§4.13)
         var signedOut = false
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { "access-1" },
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Failed },
-            onRefreshed = { error("여기 오면 안 된다") },
+            onRefreshed = { _, _ -> error("여기 오면 안 된다") },
             onGiveUp = { signedOut = true },
         )
 
@@ -112,10 +122,11 @@ class TokenAuthenticatorTest {
     fun `리프레시가 만료됐을 때만 세션을 지운다`() {
         var signedOut = false
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { "access-1" },
             currentRefreshToken = { "refresh-1" },
             refresh = { RefreshOutcome.Expired }, // 401 INVALID_REFRESH_TOKEN
-            onRefreshed = { error("여기 오면 안 된다") },
+            onRefreshed = { _, _ -> error("여기 오면 안 된다") },
             onGiveUp = { signedOut = true },
         )
 
@@ -129,10 +140,11 @@ class TokenAuthenticatorTest {
     fun `게스트는 재발급을 시도하지 않는다`() {
         var refreshed = false
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { null },
             currentRefreshToken = { null },
             refresh = { refreshed = true; RefreshOutcome.Failed },
-            onRefreshed = {},
+            onRefreshed = { _, _ -> true },
             onGiveUp = { error("게스트 세션을 지울 일은 없다") },
         )
 
@@ -144,13 +156,59 @@ class TokenAuthenticatorTest {
     }
 
     @Test
+    fun `재발급 중 로그아웃하면 토큰을 되살리지 않는다`() {
+        // 왕복이 끝나기 전에 로그아웃하면 그 토큰은 이미 남의 것이다 (#74 리뷰)
+        var applied = false
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 2 }, // 로그아웃으로 세대가 올라간 뒤
+            currentAccessToken = { null },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
+            onRefreshed = { epoch, _ ->
+                // SessionStore 가 세대를 보고 거절한다
+                applied = epoch == 2
+                false
+            },
+            onGiveUp = { error("리프레시가 죽은 게 아니다") },
+        )
+
+        // 요청은 세대 1(로그인 상태)에서 만들어졌다
+        val retry = authenticator.authenticate(null, unauthorized(epoch = 1))
+
+        assertNull(retry)
+        assertFalse(applied)
+    }
+
+    @Test
+    fun `재발급 중 계정이 바뀌면 원 요청을 재시도하지 않는다`() {
+        // A 요청을 B 토큰으로 다시 보내면 계정 간 데이터 오염이다 (#74 리뷰)
+        var refreshed = false
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 2 }, // B 로 로그인해 세대가 올라갔다
+            currentAccessToken = { "B-access" },
+            currentRefreshToken = { "B-refresh" },
+            refresh = { refreshed = true; RefreshOutcome.Failed },
+            onRefreshed = { _, _ -> error("여기 오면 안 된다") },
+            onGiveUp = { error("여기 오면 안 된다") },
+        )
+
+        // A 세대(1)에서 만들어진 요청이 지금 401 로 돌아왔다
+        val retry = authenticator.authenticate(null, unauthorized(sentToken = "A-access", epoch = 1))
+
+        assertNull(retry)
+        // B 의 리프레시를 A 요청 때문에 쓰지도 않는다
+        assertFalse(refreshed)
+    }
+
+    @Test
     fun `재발급한 토큰으로도 401 이면 한 번만 시도하고 멈춘다`() {
         var calls = 0
         val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
             currentAccessToken = { "access-1" },
             currentRefreshToken = { "refresh-1" },
             refresh = { calls++; RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
-            onRefreshed = {},
+            onRefreshed = { _, _ -> true },
             onGiveUp = {},
         )
 

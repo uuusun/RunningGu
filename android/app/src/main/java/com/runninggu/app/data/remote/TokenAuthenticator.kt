@@ -48,16 +48,23 @@ private const val HTTP_UNAUTHORIZED = 401
  * 이게 없으면 액세스(30분)가 만료된 뒤 **로그인 상태로 보이는데 아무것도 안 되는** 상태에
  * 갇힌다.
  *
+ * **세션이 바뀌면 아무것도 하지 않는다.** `@Synchronized` 는 재발급끼리만 줄 세울 뿐,
+ * 로그아웃·계정 전환과는 경쟁한다 — 그래서 요청에 실린 세션 세대를 함께 본다.
+ * A 계정 요청을 B 토큰으로 재시도하거나, 로그아웃 뒤 도착한 A 토큰이 세션을 되살리면
+ * **계정 간 데이터 오염**이 된다(#74 리뷰).
+ *
+ * @param sessionEpoch 지금 세션 세대. 요청에 실린 세대와 다르면 그 요청은 남의 것이다.
  * @param currentAccessToken 지금 세션의 액세스. 동시 401 에서 "누가 이미 갱신했나" 를 본다.
  * @param currentRefreshToken 지금 리프레시. 없으면(게스트) 재발급하지 않는다.
- * @param onRefreshed 새 토큰 쌍 저장. **리프레시가 회전하므로 둘 다** 넘어온다.
+ * @param onRefreshed 새 토큰 쌍 저장. **세대가 같을 때만 반영**되고, 반영 여부를 돌려준다.
  * @param onGiveUp 리프레시가 죽었다. 세션을 지우는 자리다.
  */
 class TokenAuthenticator(
+    private val sessionEpoch: () -> Int,
     private val currentAccessToken: () -> String?,
     private val currentRefreshToken: () -> String?,
     private val refresh: (String) -> RefreshOutcome,
-    private val onRefreshed: (RefreshResponseDto) -> Unit,
+    private val onRefreshed: (Int, RefreshResponseDto) -> Boolean,
     private val onGiveUp: () -> Unit,
 ) : Authenticator {
 
@@ -74,6 +81,12 @@ class TokenAuthenticator(
         // 재발급한 토큰으로도 401 이면 서버 문제다 — 무한 재시도를 막는다
         if (response.priorResponseCount() >= MAX_RETRY) return null
 
+        // 이 요청을 만들 때의 세션과 지금 세션이 다르면 남의 요청이다 — 손대지 않는다.
+        // 로그아웃했거나 다른 계정으로 갈아탄 뒤라 재시도하면 계정이 섞인다
+        val epoch = sessionEpoch()
+        val requestEpoch = response.request.tag(ApiClient.SessionTag::class.java)?.epoch
+        if (requestEpoch != null && requestEpoch != epoch) return null
+
         // 게스트는 재발급할 게 없다. 공개 API 의 401 은 그대로 화면까지 올린다
         val refreshToken = currentRefreshToken() ?: return null
 
@@ -84,8 +97,12 @@ class TokenAuthenticator(
 
         return when (val outcome = refresh(refreshToken)) {
             is RefreshOutcome.Renewed -> {
-                onRefreshed(outcome.tokens)
-                response.request.retryWith(outcome.tokens.accessToken)
+                // 왕복 중에 로그아웃·계정 전환이 있었으면 이 토큰은 이미 남의 것이다
+                if (!onRefreshed(epoch, outcome.tokens)) {
+                    null
+                } else {
+                    response.request.retryWith(outcome.tokens.accessToken)
+                }
             }
 
             // 재로그인 신호는 이것 하나뿐이다
