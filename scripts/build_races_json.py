@@ -41,12 +41,52 @@ SIDO_TO_REGION = {
 EVENT_ORDER = ["풀", "하프", "10K", "5K"]
 
 
+def std_event_km(km):
+    """거리(km) → 표준 종목. SPEC §5.4 `stdEventKm` — ≥32 풀 · ≥18 하프 · ≥9 10K · 그 외 5K."""
+    if km >= 32:
+        return "풀"
+    if km >= 18:
+        return "하프"
+    if km >= 9:
+        return "10K"
+    return "5K"
+
+
 def std_events(row):
-    """has_* 플래그 우선, event_types 토큰은 명확한 패턴만 보강 (불명 토큰을 5K로 강제하지 않음)."""
+    """SPEC §5.4 `eventsFromContest` — ① has_* 플래그 ∪ ② distances 버킷 ∪ ③ event_types 토큰.
+
+    셋은 우선순위가 아니라 합집합이다. 앞 단계가 뒤를 가리면 has_5k=true 인 대회의
+    distances=[42,21,10,5] 가 5K 하나로 줄어든다.
+
+    ② 를 빼면 `15km` 같은 토큰이 어느 종목인지 알 수 없다. 문자열 패턴만으로는
+    `15km` 의 `5k`, `110km` 의 `10k` 를 오매칭하거나(구 동작) 아무것도 못 잡는다.
+    거리는 이미 `distances` 컬럼에 숫자로 있으므로 그걸 버킷에 넣는 게 정답이다.
+
+    토큰 단계는 거리로 못 채운 것만 보강한다. **불명 토큰을 5K 로 강제하지 않는다** —
+    SPEC 의 `stdEvent` 는 "그 외 5K" 지만 그건 종목 하나를 표준화할 때의 규칙이고,
+    여기서는 종목 목록을 만드는 중이라 모르는 토큰을 5K 로 넣으면 없는 종목이 생긴다.
+    """
     ev = set()
+
+    # ① has_* 플래그
     for col, label in (("has_full", "풀"), ("has_half", "하프"), ("has_10k", "10K"), ("has_5k", "5K")):
         if (row.get(col) or "").strip().lower() == "true":
             ev.add(label)
+
+    # ② 거리 버킷
+    try:
+        distances = json.loads(row.get("distances") or "[]")
+    except json.JSONDecodeError:
+        distances = []
+    for d in distances:
+        try:
+            km = float(d)
+        except (TypeError, ValueError):
+            continue
+        if km > 0:
+            ev.add(std_event_km(km))
+
+    # ③ 토큰 보강
     try:
         tokens = json.loads(row.get("event_types") or "[]")
     except json.JSONDecodeError:
