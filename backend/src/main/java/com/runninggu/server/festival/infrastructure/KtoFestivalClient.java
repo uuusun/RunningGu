@@ -147,36 +147,48 @@ public class KtoFestivalClient implements FestivalProvider {
         String name = textOrNull(item.path("title"));
         String startDateText = textOrNull(item.path("eventstartdate"));
         String endDateText = textOrNull(item.path("eventenddate"));
-        String lngText = textOrNull(item.path("mapx"));
-        String latText = textOrNull(item.path("mapy"));
         if (contentId == null
                 || name == null
                 || startDateText == null
-                || endDateText == null
-                || latText == null
-                || lngText == null) {
+                || endDateText == null) {
             return Optional.empty();
         }
 
         try {
             LocalDate startDate = LocalDate.parse(startDateText, KTO_DATE);
             LocalDate endDate = LocalDate.parse(endDateText, KTO_DATE);
-            BigDecimal lat = new BigDecimal(latText);
-            BigDecimal lng = new BigDecimal(lngText);
-            if (endDate.isBefore(startDate) || !validCoordinates(lat, lng)) {
+            if (endDate.isBefore(startDate)) {
                 return Optional.empty();
             }
+            Coordinates coordinates = coordinatesOf(item);
             return Optional.of(new Festival(
                     contentId,
                     name,
                     startDate,
                     endDate,
-                    lat,
-                    lng,
+                    coordinates.lat(),
+                    coordinates.lng(),
                     textOrNull(item.path("firstimage")),
                     textOrEmpty(item.path("addr1"))));
-        } catch (DateTimeException | NumberFormatException exception) {
+        } catch (DateTimeException exception) {
             return Optional.empty();
+        }
+    }
+
+    private Coordinates coordinatesOf(JsonNode item) {
+        String lngText = textOrNull(item.path("mapx"));
+        String latText = textOrNull(item.path("mapy"));
+        if (latText == null || lngText == null) {
+            return Coordinates.missing();
+        }
+        try {
+            BigDecimal lat = new BigDecimal(latText);
+            BigDecimal lng = new BigDecimal(lngText);
+            return validCoordinates(lat, lng)
+                    ? new Coordinates(lat, lng)
+                    : Coordinates.missing();
+        } catch (NumberFormatException exception) {
+            return Coordinates.missing();
         }
     }
 
@@ -216,4 +228,11 @@ public class KtoFestivalClient implements FestivalProvider {
             List<Festival> festivals,
             int rawItemCount,
             int totalCount) {}
+
+    private record Coordinates(BigDecimal lat, BigDecimal lng) {
+
+        private static Coordinates missing() {
+            return new Coordinates(null, null);
+        }
+    }
 }

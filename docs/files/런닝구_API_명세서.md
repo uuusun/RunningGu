@@ -367,11 +367,13 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 파라미터 | 설명 |
 |---|---|
-| `yearMonth` | `2026-08` 🔧 기본 = 이번 달 (정리본 "조회 월 기준") |
-| `size` | 기본 6 🔧 |
+| `yearMonth` | `YYYY-MM`(예: `2026-08`) 🔧 기본 = KST 이번 달. 형식이 다르면 `400 VALIDATION_FAILED` |
+| `size` | 기본 6 🔧 · 허용 범위 `1~20`. 범위를 벗어나면 `400 VALIDATION_FAILED` |
 
-응답 항목: `{contentId, name, startDate, endDate, region, imageUrl, inProgress}` — `inProgress` = start ≤ 오늘 ≤ end (진행중 배지).
+응답은 `{"items": [...]}`이고 항목은 정확히 `{contentId, name, startDate, endDate, region, imageUrl, inProgress}`다. `inProgress` = start ≤ KST 오늘 ≤ end (진행중 배지).
 조회 월과 겹치는 전국 축제를 진행 중 우선, 시작일 오름차순으로 반환한다. 홈에서는 위치 권한과 사용자 좌표를 사용하지 않는다. 서버가 KTO `searchFestival2`를 호출·캐시하며 앱은 우리 서버만 호출한다.
+
+`region`은 KTO `addr1`의 첫 토큰을 17개 시도 단축명(서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주)으로 정규화한 값이다. `addr1`이 없거나 17개 시도로 판별할 수 없는 항목은 홈 응답에서 제외한다. 좌표·주소·상세 이동 키·`fetchedAt/cachedAt/source` 같은 추적 메타데이터는 응답에 추가하지 않는다.
 
 **P0에서 홈 축제 카드는 표시 전용이다** — 축제 상세로 이동하는 동작도, 그 화면으로 가는 route도 없다(결정 D-05). 그래서 응답에 상세 조회용 키를 더 넣지 않는다.
 

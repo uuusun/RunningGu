@@ -56,6 +56,8 @@ public class NearbyFestivalService {
                         festival.endDate(),
                         windowStart,
                         windowEnd))
+                // 홈 월간 목록은 좌표 없는 축제도 쓰지만, 거리 계산에는 두 좌표가 모두 필요하다.
+                .filter(Festival::hasCoordinates)
                 .map(festival -> withDistance(contest, festival))
                 .filter(festival -> festival.distanceKm() <= MAX_DISTANCE_KM)
                 .sorted(Comparator.comparingDouble(NearbyFestival::distanceKm))

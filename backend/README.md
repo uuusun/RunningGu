@@ -35,8 +35,8 @@ $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 `502 EXTERNAL_API_ERROR`를 반환한다.
 
 `KTO_SERVICE_KEY`는 HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한다. 키가
-없으면 대회 인근 축제 API는 `502 EXTERNAL_API_ERROR`를 반환하고 다른 공개 API는 계속
-동작한다.
+없으면 홈·대회 인근 축제 API는 `502 EXTERNAL_API_ERROR`를 반환하고 다른 공개 API는 계속
+동작한다. 홈 축제는 전국 월간 결과를 5분, 대회 인근 축제는 대회별 결과를 하루 캐시한다.
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>
