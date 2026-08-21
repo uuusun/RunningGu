@@ -137,5 +137,33 @@ data class CalendarUiState(
     /** 목록 끝에 "더 받기" 자리를 둘 것인가. 남은 장이 있으면 목록이 비어도 둔다. */
     val showsLoadMore: Boolean get() = hasNext
 
+    /**
+     * 목록 헤더 옆에 붙이는 건수. (#85 리뷰)
+     *
+     * 캘린더 뷰에서 날짜를 안 고른 상태의 헤더는 "9월 대회" 처럼 **그 달 전체**를 가리키므로
+     * 달력의 점과 같은 값(`daily-counts`)을 쓴다. `listedRaces.size` 를 쓰면 아직 안 받은
+     * 장이 빠져서, 점을 세면 27 인 달에 헤더만 12 로 나온다 — **한 화면 안에서 두 숫자가
+     * 어긋나고, 사용자는 어느 쪽이 맞는지 알 방법이 없다.**
+     *
+     * 나머지는 받아온 목록을 그대로 센다. 선택일 헤더("9.6 (일) 대회")는 그날 것을 이미 다
+     * 받은 상태이고, 리스트 뷰 헤더에는 월 개념이 없다.
+     *
+     * 건수를 못 불러왔으면(로딩·실패) 받아온 만큼이라도 센다. 그때는 점도 없으므로 어긋날
+     * 것이 없다.
+     */
+    val headerRaceCount: Int
+        get() = when {
+            viewMode == CalendarViewMode.CALENDAR && selectedDate == null ->
+                when (val counts = dailyCounts) {
+                    is DailyCountsState.Content ->
+                        counts.counts
+                            .filterKeys { YearMonth.from(it) == currentMonth }
+                            .values
+                            .sum()
+                    else -> listedRaces.size
+                }
+            else -> listedRaces.size
+        }
+
     fun isFavorite(raceId: String): Boolean = raceId in favoriteIds
 }

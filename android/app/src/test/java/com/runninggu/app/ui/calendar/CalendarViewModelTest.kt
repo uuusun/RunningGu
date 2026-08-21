@@ -24,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import com.runninggu.app.ui.model.RaceSummary
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -213,6 +214,82 @@ class CalendarViewModelTest {
         assertEquals("중복이 남았다", ids.size, ids.toSet().size)
         assertEquals(first + 1, ids.size)
     }
+
+    // ---- 헤더 건수 (#85 리뷰) ----
+
+    @Test
+    fun `캘린더 뷰에서 날짜를 안 고르면 헤더는 그 달 전체 건수를 쓴다`() {
+        // 목록은 커서로 나뉘어 와서 9월분 2건만 받은 상태인데, 달력 점은 27건을 찍는다.
+        // 헤더가 받아온 것만 세면 한 화면에서 두 숫자가 어긋난다.
+        val state = CalendarUiState(
+            allRaces = listOf(race("a", LocalDate.of(2026, 9, 5)), race("b", LocalDate.of(2026, 9, 6))),
+            viewMode = CalendarViewMode.CALENDAR,
+            currentMonth = YearMonth.of(2026, 9),
+            selectedDate = null,
+            hasNext = true,
+            dailyCounts = DailyCountsState.Content(
+                mapOf(LocalDate.of(2026, 9, 5) to 2, LocalDate.of(2026, 9, 6) to 25),
+            ),
+        )
+
+        assertEquals(2, state.listedRaces.size)
+        assertEquals(27, state.headerRaceCount)
+    }
+
+    @Test
+    fun `날짜를 고르면 헤더는 그날 목록을 센다`() {
+        val state = CalendarUiState(
+            allRaces = listOf(race("a", LocalDate.of(2026, 9, 5)), race("b", LocalDate.of(2026, 9, 6))),
+            viewMode = CalendarViewMode.CALENDAR,
+            currentMonth = YearMonth.of(2026, 9),
+            selectedDate = LocalDate.of(2026, 9, 5),
+            dailyCounts = DailyCountsState.Content(mapOf(LocalDate.of(2026, 9, 5) to 2)),
+        )
+
+        assertEquals(1, state.headerRaceCount)
+    }
+
+    @Test
+    fun `리스트 뷰 헤더는 받아온 목록을 센다`() {
+        // 월 개념이 없는 헤더라 그 달 건수를 쓸 자리가 아니다.
+        val state = CalendarUiState(
+            allRaces = listOf(race("a", LocalDate.of(2026, 9, 5))),
+            viewMode = CalendarViewMode.LIST,
+            currentMonth = YearMonth.of(2026, 9),
+            dailyCounts = DailyCountsState.Content(mapOf(LocalDate.of(2026, 9, 5) to 25)),
+        )
+
+        assertEquals(1, state.headerRaceCount)
+    }
+
+    @Test
+    fun `건수를 못 불러왔으면 받아온 만큼이라도 센다`() {
+        // 점이 안 찍히는 상태라 어긋날 것이 없다.
+        val state = CalendarUiState(
+            allRaces = listOf(race("a", LocalDate.of(2026, 9, 5))),
+            viewMode = CalendarViewMode.CALENDAR,
+            currentMonth = YearMonth.of(2026, 9),
+            selectedDate = null,
+            dailyCounts = DailyCountsState.Error,
+        )
+
+        assertEquals(1, state.headerRaceCount)
+    }
+
+    private fun race(id: String, date: LocalDate) = RaceSummary(
+        id = id,
+        name = "대회 $id",
+        region = "세종",
+        venue = "세종중앙공원",
+        date = date,
+        startTime = "09:00",
+        regStart = null,
+        regEnd = null,
+        eventTypes = listOf("풀"),
+        source = "마라톤GO",
+        checked = null,
+        regStatusFallback = RegistrationStatus.OPEN,
+    )
 }
 
 /** 넘겨받은 조건을 기록하는 가짜 저장소. */

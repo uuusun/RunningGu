@@ -408,7 +408,7 @@ private fun ListHeader(uiState: CalendarUiState, modifier: Modifier = Modifier) 
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = uiState.listedRaces.size.toString(),
+            text = uiState.headerRaceCount.toString(),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
