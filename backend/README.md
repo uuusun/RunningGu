@@ -25,10 +25,15 @@ $env:SPRING_PROFILES_ACTIVE = 'local'
 $env:DB_URL = 'jdbc:postgresql://localhost:5432/runninggu'
 $env:DB_USERNAME = 'runninggu'
 $env:DB_PASSWORD = '<로컬 비밀번호>'
+$env:JWT_SECRET = '<Base64로 인코딩한 32바이트 이상 키>'
 $env:KAKAO_REST_KEY = '<서버용 REST API 키>'
 $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 .\gradlew.bat bootRun
 ```
+
+`JWT_SECRET`은 HS256 서명 키이며 Base64 디코딩 결과가 최소 32바이트여야 한다. 로컬용 키는
+`[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`로 생성할 수
+있고 저장소에 커밋하지 않는다. 누락·Base64 형식 오류·길이 미달이면 서버는 기동하지 않는다.
 
 `KAKAO_REST_KEY`는 지오코딩·POI 등 카카오 로컬 프록시에만 사용하며 앱이나 저장소에
 포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
