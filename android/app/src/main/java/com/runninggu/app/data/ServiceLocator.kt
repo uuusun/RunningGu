@@ -1,13 +1,19 @@
 package com.runninggu.app.data
 
+import android.content.Context
 import com.runninggu.app.data.local.AuthTokens
+import com.runninggu.app.data.local.FusedLocationProvider
+import com.runninggu.app.data.local.LocationProvider
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiClient
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.RefreshOutcome
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.asRefreshFailure
+import com.runninggu.app.data.local.SessionValidator
+import com.runninggu.app.data.remote.ApiSessionValidator
 import com.runninggu.app.data.remote.ContestApi
+import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
@@ -36,6 +42,29 @@ import retrofit2.create
  * 늘어 손이 가면 그때 팀에 물어 도입한다.
  */
 object ServiceLocator {
+
+    /**
+     * 기기에서 값을 얻는 것들(위치 등)이 Context 를 필요로 한다. 앱 시작 때 한 번 물린다.
+     *
+     * **Application context 만 받는다** — Activity 를 들고 있으면 화면 회전에서 샌다.
+     */
+    private var appContext: Context? = null
+
+    fun bind(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * "내 위치". (SPEC §4.11-1 ①)
+     *
+     * 서버가 아니라 기기에서 오는 값이지만, 화면이 의존성을 찾는 자리를 둘로 나누면
+     * 어디를 봐야 할지 헷갈린다 — 여기 함께 둔다.
+     */
+    val locationProvider: LocationProvider by lazy {
+        FusedLocationProvider(
+            requireNotNull(appContext) { "ServiceLocator.bind(context) 를 먼저 불러야 한다" },
+        )
+    }
 
     /**
      * 프로세스에 하나만 둔다 — OkHttp 커넥션 풀과 스레드를 재사용해야 한다.
@@ -97,6 +126,22 @@ object ServiceLocator {
         // 401 만 재로그인이다. 네트워크·5xx 는 이번 요청만 실패시키고 세션은 지킨다
         e.asRefreshFailure()
     }
+
+    val meApi: MeApi by lazy { retrofit.create() }
+
+    /**
+     * 앱 시작 세션 검증. (`screen-api-matrix` A0 · API 명세 §2)
+     *
+     * 판정 규칙과 시간 제한은 [ApiSessionValidator] 가 갖는다 — 기기 없이 테스트하려고
+     * 갈라 두었다.
+     */
+    val sessionValidator: SessionValidator by lazy {
+        ApiSessionValidator(
+            me = { apiCall { meApi.me() } },
+            isSignedOut = { SessionStore.tokens == null },
+        )
+    }
+
 
     val contestApi: ContestApi by lazy { retrofit.create() }
     val courseApi: CourseApi by lazy { retrofit.create() }

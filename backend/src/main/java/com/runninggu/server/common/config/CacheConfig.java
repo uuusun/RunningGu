@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 public class CacheConfig {
 
     public static final String GEOCODE_CACHE = "geocode";
+    public static final String NEARBY_FESTIVALS_CACHE = "nearbyFestivals";
 
     @Bean
     public CacheManager cacheManager() {
@@ -24,6 +25,12 @@ public class CacheConfig {
                 Caffeine.newBuilder()
                         .maximumSize(500)
                         .expireAfterWrite(Duration.ofMinutes(5))
+                        .build());
+        cacheManager.registerCustomCache(
+                NEARBY_FESTIVALS_CACHE,
+                Caffeine.newBuilder()
+                        .maximumSize(500)
+                        .expireAfterWrite(Duration.ofDays(1))
                         .build());
         return cacheManager;
     }

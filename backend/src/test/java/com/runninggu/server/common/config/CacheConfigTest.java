@@ -27,4 +27,24 @@ class CacheConfigTest {
                         .getExpiresAfter(TimeUnit.MINUTES))
                 .isEqualTo(5);
     }
+
+    @Test
+    void 인근_축제_캐시는_대회별_최대_500건을_하루간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        var springCache =
+                (CaffeineCache) cacheManager.getCache(CacheConfig.NEARBY_FESTIVALS_CACHE);
+        @SuppressWarnings("unchecked")
+        Cache<Object, Object> nativeCache = (Cache<Object, Object>) springCache.getNativeCache();
+
+        assertThat(nativeCache.policy()
+                        .eviction()
+                        .orElseThrow()
+                        .getMaximum())
+                .isEqualTo(500);
+        assertThat(nativeCache.policy()
+                        .expireAfterWrite()
+                        .orElseThrow()
+                        .getExpiresAfter(TimeUnit.HOURS))
+                .isEqualTo(24);
+    }
 }

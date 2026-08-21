@@ -3,11 +3,13 @@ package com.runninggu.app.ui.favorite
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -108,12 +110,14 @@ class FavoriteStoreTest {
     fun `로그아웃하면 늦게 끝난 요청이 이전 찜을 되살리지 않는다`() = runBlocking {
         // 요청이 떠 있는 동안 로그아웃한다. 서버는 클라 취소를 모르니 저장은 끝까지 된다 —
         // 그 결과가 다음 사용자 화면에 닿으면 계정 사고다. (#64 리뷰)
-        repository.delaysMs = ArrayDeque(listOf(300L))
+        val addGate = repository.gate("add")
 
         val toggling = async { FavoriteStore.toggle(RACE) }
-        delay(50)
+        yield() // 요청이 서버에 닿은 상태로 만든다
         FavoriteStore.clear() // 로그아웃·탈퇴가 부르는 것
 
+        // 로그아웃 뒤에 서버가 응답한다 — 늦게 끝난 요청이 이번 세션을 건드리면 안 된다.
+        addGate.complete(Unit)
         toggling.await()
         assertFalse(
             "로그아웃 뒤에 이전 세션의 찜이 화면에 되살아났다",
@@ -146,13 +150,15 @@ class FavoriteStoreTest {
     @Test
     fun `조회가 진행 중인 토글을 덮지 않는다`() = runBlocking {
         // 서버에는 아직 찜이 없다. 그 목록이 방금 누른 하트를 지우면 안 된다.
-        repository.delaysMs = ArrayDeque(listOf(300L))
+        // PUT 을 붙잡아 두면 "요청이 떠 있는 동안" 이 시간이 아니라 상태로 정해진다.
+        val addGate = repository.gate("add")
 
         val toggling = async { FavoriteStore.toggle(RACE) }
-        delay(50) // 요청이 떠 있는 동안
+        yield() // 토글이 요청을 보내는 데까지 가게 한다
         FavoriteStore.refresh()
         assertTrue("조회 결과가 진행 중인 토글을 덮었다", RACE in FavoriteStore.favoriteIds.value)
 
+        addGate.complete(Unit)
         toggling.await()
         assertTrue(RACE in FavoriteStore.favoriteIds.value)
     }
@@ -163,20 +169,25 @@ class FavoriteStoreTest {
         //
         // 이때 서버 목록에는 PUT 만 반영돼 있어 '찜' 으로 온다. 그걸 화면에 씌우면
         // DELETE 가 성공해도 성공 경로는 화면을 다시 손대지 않아 그대로 갈린다.
-        repository.delaysMs = ArrayDeque(listOf(50L, 300L))
+        // DELETE 를 붙잡아 둔다. 그러면 "PUT 은 끝났고 DELETE 는 아직" 이 시간이 아니라
+        // 상태로 정해진다 — 머신이 바빠도 전제가 안 깨진다.
+        val removeGate = repository.gate("remove")
 
         val first = async { FavoriteStore.toggle(RACE) }
         val second = async { FavoriteStore.toggle(RACE) }
 
-        delay(150) // PUT 은 끝났고 DELETE 는 아직인 시점
-        assertTrue("PUT 이 아직 안 끝났다 — 타이밍 전제가 깨졌다", RACE in repository.stored)
+        // 첫 요청이 끝날 때까지 기다린다. 이 시점에 두 번째는 이미 inFlight 에 들어가
+        // 있고(토글 시작부가 동기라서) DELETE 는 게이트에 걸려 있다.
+        first.await()
+        assertTrue("PUT 이 반영되지 않았다 — 전제가 깨졌다", RACE in repository.stored)
+
         FavoriteStore.refresh()
         assertFalse(
             "먼저 끝난 요청이 id 를 지워 조회가 진행 중인 해제를 덮었다",
             RACE in FavoriteStore.favoriteIds.value,
         )
 
-        first.await()
+        removeGate.complete(Unit)
         second.await()
         assertFalse(RACE in FavoriteStore.favoriteIds.value)
         assertFalse(RACE in repository.stored)
@@ -201,7 +212,25 @@ private class RecordingFavoriteRepository : FavoriteRepository {
     var failNext = false
     var delaysMs: ArrayDeque<Long> = ArrayDeque()
 
+    /**
+     * 이 연산을 붙잡아 둔다. 테스트가 완료시킬 때까지 서버가 응답하지 않는 상태다.
+     *
+     * **`delay` 로 "그쯤이면 끝났겠지" 를 하지 않기 위해서다.** 실측 시간에 기대면 머신이
+     * 바쁠 때 전제가 깨져서 테스트가 간헐 실패한다(실제로 하루에 세 번 깨졌다). 게이트는
+     * "언제" 가 아니라 "무엇이 끝났는가" 로 순서를 정한다.
+     */
+    val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
+
+    /** 그 연산이 서버에 반영된 순간 완료된다. 테스트가 이걸 기다린다. */
+    val applied = mutableMapOf<String, CompletableDeferred<Unit>>()
+
     private var running = 0
+
+    fun gate(op: String): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { gates[op] = it }
+
+    fun appliedSignal(op: String): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { applied[op] = it }
 
     override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(stored.toSet())
 
@@ -222,10 +251,13 @@ private class RecordingFavoriteRepository : FavoriteRepository {
                 withContext(NonCancellable) { delay(wait) }
                 return Result.failure(IllegalStateException("서버 오류"))
             }
+            // 게이트가 걸려 있으면 테스트가 풀어 줄 때까지 서버가 응답하지 않는 것으로 본다.
+            gates[op]?.await()
             withContext(NonCancellable) {
                 delay(wait)
                 apply()
             }
+            applied[op]?.complete(Unit)
             return Result.success(Unit)
         } finally {
             running--

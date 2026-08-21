@@ -49,3 +49,8 @@ runninggu:
       rest-key: ${KAKAO_REST_KEY:}
       connect-timeout: 1s
       read-timeout: 2500ms
+    kto-festival:
+      base-url: https://apis.data.go.kr/B551011/KorService2
+      service-key: ${KTO_SERVICE_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
