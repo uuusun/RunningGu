@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.LocationProvider
@@ -358,11 +359,6 @@ internal fun ApiException.searchMessage(): String = when {
         "그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요."
     else -> userMessageOrDefault()
 }
-
-/** 서버가 준 문구가 있으면 그걸 쓰고, 없으면 기본 문구. (§0-3 — detail 은 개발자용이라 안 쓴다) */
-internal fun ApiException.userMessageOrDefault(): String =
-    (this as? ApiException.Http)?.userMessage ?: "정보를 불러오지 못했어요."
-
 /**
  * [내 위치] 실패 문구. (SPEC §4.11-1 ① · NFR-15)
  *

@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.domain.today
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -46,7 +45,11 @@ private val SaturdayBlue = Color(0xFF2B5CFF)
 @Composable
 fun MonthCalendar(
     month: YearMonth,
-    racesByDate: Map<LocalDate, List<RaceSummary>>,
+    /**
+     * 날짜별 대회 수. **목록이 아니라 건수다** — 셀은 개수만 쓰는데 목록을 넘기면
+     * 받아온 페이지에 있는 대회만 점이 찍힌다(#85 리뷰 · API 명세 §3-2).
+     */
+    dailyCounts: Map<LocalDate, Int>,
     selectedDate: LocalDate?,
     onMonthChange: (Long) -> Unit,
     onDateSelect: (LocalDate) -> Unit,
@@ -59,7 +62,7 @@ fun MonthCalendar(
         Spacer(Modifier.height(4.dp))
         DayGrid(
             month = month,
-            racesByDate = racesByDate,
+            dailyCounts = dailyCounts,
             selectedDate = selectedDate,
             onDateSelect = onDateSelect,
         )
@@ -114,7 +117,7 @@ private fun WeekdayHeader(modifier: Modifier = Modifier) {
 @Composable
 private fun DayGrid(
     month: YearMonth,
-    racesByDate: Map<LocalDate, List<RaceSummary>>,
+    dailyCounts: Map<LocalDate, Int>,
     selectedDate: LocalDate?,
     onDateSelect: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
@@ -133,7 +136,7 @@ private fun DayGrid(
                         if (date != null) {
                             DayCell(
                                 date = date,
-                                races = racesByDate[date].orEmpty(),
+                                raceCount = dailyCounts[date] ?: 0,
                                 isSelected = date == selectedDate,
                                 isToday = date == today,
                                 onClick = { onDateSelect(date) },
@@ -153,13 +156,13 @@ private fun DayGrid(
 @Composable
 private fun DayCell(
     date: LocalDate,
-    races: List<RaceSummary>,
+    raceCount: Int,
     isSelected: Boolean,
     isToday: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val hasRace = races.isNotEmpty()
+    val hasRace = raceCount > 0
     Column(
         modifier = modifier
             .height(46.dp)
@@ -208,9 +211,9 @@ private fun DayCell(
                         .background(MaterialTheme.colorScheme.primary, CircleShape),
                 )
                 // 2건 이상이면 건수를 함께 보여준다.
-                if (races.size > 1) {
+                if (raceCount > 1) {
                     Text(
-                        text = races.size.toString(),
+                        text = raceCount.toString(),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
