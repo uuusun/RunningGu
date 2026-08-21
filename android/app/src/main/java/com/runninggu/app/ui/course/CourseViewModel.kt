@@ -121,10 +121,6 @@ class CourseViewModel(
         }
     }
 
-    fun onLocationMessageShown() {
-        _uiState.update { it.copy(locationMessage = null) }
-    }
-
     /** 조회 전 출발지로 되돌린다. 이미 고른 프리셋이 [내 위치] 실패로 날아가면 안 된다. */
     private fun restoreOrigin(previous: OriginState, message: String) {
         _uiState.update { it.copy(origin = previous, locationMessage = message) }
@@ -138,6 +134,9 @@ class CourseViewModel(
      */
     fun onOriginChange(origin: OriginState) {
         locationRequestId++
+        // 출발지가 정해졌으면 "아래에서 골라 주세요" 안내는 할 일을 다 했다. 그대로 두면
+        // 사용자가 안내대로 골랐는데도 문구가 남아 뭔가 덜 된 것처럼 읽힌다 (#92 리뷰)
+        _uiState.update { it.copy(locationMessage = null) }
         _uiState.update { it.copy(origin = origin) }
         if (origin is OriginState.Fixed) refreshNearby()
     }

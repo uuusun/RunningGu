@@ -129,6 +129,22 @@ class MyLocationRaceTest {
     }
 
     @Test
+    fun `출발지를 고르면 실패 안내가 사라진다`() = runTest(dispatcher) {
+        // 안내대로 아래에서 골랐는데 "권한이 없어요" 가 남아 있으면 덜 된 것처럼 읽힌다
+        val denied = SlowLocationProvider(delayMs = 0, result = LocationResult.PermissionDenied)
+        val viewModel = viewModel(denied)
+
+        viewModel.onUseMyLocation()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.locationMessage != null)
+
+        viewModel.onOriginChange(picked)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.locationMessage)
+    }
+
+    @Test
     fun `끼어든 뒤에는 GPS 를 다시 눌러야 반영된다`() = runTest(dispatcher) {
         // 무효화가 영구히 막아 버리면 [내 위치] 가 죽은 버튼이 된다
         val gps = SlowLocationProvider(
