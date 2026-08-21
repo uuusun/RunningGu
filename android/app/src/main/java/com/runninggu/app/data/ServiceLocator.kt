@@ -10,7 +10,10 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.RefreshOutcome
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.asRefreshFailure
+import com.runninggu.app.data.local.SessionValidator
+import com.runninggu.app.data.remote.ApiSessionValidator
 import com.runninggu.app.data.remote.ContestApi
+import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
@@ -123,6 +126,22 @@ object ServiceLocator {
         // 401 만 재로그인이다. 네트워크·5xx 는 이번 요청만 실패시키고 세션은 지킨다
         e.asRefreshFailure()
     }
+
+    val meApi: MeApi by lazy { retrofit.create() }
+
+    /**
+     * 앱 시작 세션 검증. (`screen-api-matrix` A0 · API 명세 §2)
+     *
+     * 판정 규칙과 시간 제한은 [ApiSessionValidator] 가 갖는다 — 기기 없이 테스트하려고
+     * 갈라 두었다.
+     */
+    val sessionValidator: SessionValidator by lazy {
+        ApiSessionValidator(
+            me = { apiCall { meApi.me() } },
+            isSignedOut = { SessionStore.tokens == null },
+        )
+    }
+
 
     val contestApi: ContestApi by lazy { retrofit.create() }
     val courseApi: CourseApi by lazy { retrofit.create() }

@@ -14,6 +14,7 @@ public enum ErrorCode {
     CONTEST_NOT_FOUND(HttpStatus.NOT_FOUND, "대회를 찾을 수 없습니다."),
     NO_RESULT(HttpStatus.NOT_FOUND, "검색 결과를 찾을 수 없습니다."),
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
+    CONTEST_LOCATION_UNAVAILABLE(HttpStatus.CONFLICT, "대회장 위치를 확인할 수 없습니다."),
     SEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "인증 메일 재발송 대기 중입니다."),
     TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "인증 시도 횟수를 초과했습니다."),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수를 초과했습니다."),
