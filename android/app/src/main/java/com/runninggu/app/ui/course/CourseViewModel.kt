@@ -48,6 +48,15 @@ class CourseViewModel(
     /** [내 위치] 연타. 앞 조회를 끊고 마지막 것만 남긴다. */
     private var locationJob: Job? = null
 
+    /**
+     * 위치 조회 세대. **출발지가 바뀔 때마다 올라간다.**
+     *
+     * GPS 는 최대 6초가 걸리는데 그동안 사용자가 프리셋이나 검색으로 출발지를 고를 수 있다.
+     * 그때 늦게 도착한 GPS 결과가 사용자의 선택을 덮으면, 화면에 보이는 출발지와 서버에
+     * 조회한 좌표가 어긋난다(#92 리뷰). 세대가 다르면 결과를 버린다.
+     */
+    private var locationRequestId = 0
+
     /** 지역별 목록에서 지금까지 받은 페이지 번호. 지역을 바꾸면 0 으로 돌아간다. */
     private var regionPage = 0
 
@@ -74,11 +83,18 @@ class CourseViewModel(
      */
     fun onUseMyLocation() {
         locationJob?.cancel()
+        val requestId = ++locationRequestId
         locationJob = viewModelScope.launch {
             val previous = _uiState.value.origin
             _uiState.update { it.copy(origin = OriginState.Locating, locationMessage = null) }
 
-            when (val result = locationProvider.current()) {
+            val result = locationProvider.current()
+
+            // 조회하는 동안 사용자가 직접 출발지를 골랐으면 **그 선택이 이긴다** (#92 리뷰).
+            // 성공이든 실패든 손대지 않는다 — 실패 복구도 사용자의 선택을 되돌리는 셈이다
+            if (requestId != locationRequestId) return@launch
+
+            when (result) {
                 is LocationResult.Found -> onOriginChange(
                     OriginState.Fixed(
                         name = MY_LOCATION_LABEL,
@@ -114,8 +130,14 @@ class CourseViewModel(
         _uiState.update { it.copy(origin = previous, locationMessage = message) }
     }
 
-    /** 출발지가 정해지면 바로 조회한다. (§4.11-1) */
+    /**
+     * 출발지가 정해지면 바로 조회한다. (§4.11-1)
+     *
+     * 프리셋·검색·S7 연계가 모두 여기로 온다. **진행 중이던 GPS 조회는 여기서 무효가 된다**
+     * — 사용자가 직접 고른 것이 늦게 온 GPS 결과보다 우선이다(#92 리뷰).
+     */
     fun onOriginChange(origin: OriginState) {
+        locationRequestId++
         _uiState.update { it.copy(origin = origin) }
         if (origin is OriginState.Fixed) refreshNearby()
     }
