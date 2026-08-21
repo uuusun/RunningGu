@@ -1,6 +1,7 @@
 package com.runninggu.server;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,5 +28,18 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.traceId").isString())
                 .andExpect(jsonPath("$.instance").value("/api/not-yet-implemented"));
+    }
+
+    @Test
+    void 인증_사전_API만_공개하고_아직_구현하지_않은_가입_API는_거부한다() throws Exception {
+        mockMvc.perform(get("/api/auth/email/exists")
+                        .param("email", "runner@example.com"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 }

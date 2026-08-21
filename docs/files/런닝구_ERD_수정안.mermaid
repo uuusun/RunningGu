@@ -10,6 +10,7 @@
 %% 확정-DB-06 externalId/external_id, SIGNUP/PASSWORD_RESET, fetchedAt/fetched_at, organizer 명칭 통일
 %% 확정-DB-07 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum VARCHAR+CHECK, 좌표 NUMERIC(10,7), nullable 명시
 %% 확정-DB-08 CONTEST start_time·road_address·detail_url nullable, 적용 snapshot 이력은 CONTEST_SNAPSHOT_IMPORT에 원자 기록
+%% 확정-DB-09 물리 USER 테이블명 app_user, nickname_key=trim 후 ASCII lowercase UNIQUE, EMAIL_VERIFICATION(email,purpose) UNIQUE
 %% DB-07 타입 규약: nickname VARCHAR(12), email VARCHAR(320), Enum VARCHAR(32), key/name/title/place VARCHAR(255), URL VARCHAR(2048), token hash VARCHAR(64), password/code hash VARCHAR(255), 거리 NUMERIC(8,3), 자유문 TEXT
 %% DB-07 null 규약: "nullable" 표기가 없는 저장 컬럼은 NOT NULL, derived는 DB 컬럼이 아님
 %% DB-07 CHECK: LOGIN_IDENTITY는 EMAIL(password_hash·email_verified_at 필수, email_snapshot null) 또는 KAKAO(password_hash·email_verified_at null)
@@ -38,7 +39,8 @@ erDiagram
 
     USER {
         bigint id PK
-        varchar nickname UK "2~12자"
+        varchar nickname "trim 후 코드포인트 2~12자, 표시 표기 보존"
+        varchar nickname_key UK "ASCII 영문 대소문자 무시 중복 키"
         derived representative_email "EMAIL=subject, KAKAO=snapshot|null; null이면 UI 행 숨김"
         timestamptz created_at "UTC 저장"
         timestamptz updated_at "UTC 저장"
@@ -67,8 +69,8 @@ erDiagram
 
     EMAIL_VERIFICATION {
         bigint id PK
-        varchar email "가입 전이라 USER FK 없음"
-        varchar purpose "CHECK SIGNUP / PASSWORD_RESET"
+        varchar email UK "정규화 이메일, 가입 전이라 USER FK 없음"
+        varchar purpose UK "UNIQUE(email,purpose), CHECK SIGNUP / PASSWORD_RESET"
         varchar code_hash "nullable, SIGNUP 6자리 코드 해시"
         varchar token_hash "nullable, PASSWORD_RESET 토큰 해시"
         int attempts "최대 5회"

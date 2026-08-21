@@ -114,15 +114,21 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ### 1-1 · 1-2 중복 확인
 
 `GET /api/auth/email/exists?email=` · `GET /api/auth/nickname/exists?nickname=` → `200 {"exists": true}`
-닉네임 규칙: 2~12자 🔒. (가입 2단계 인라인 검증용 — 정리본 "숨은 값: 이메일 중복 여부")
+이메일은 앞뒤 Unicode 공백 제거 후 전체 소문자화하며 최대 320자, `^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$` 형식이다. Gmail 점·`+tag` 같은 공급자별 변환은 하지 않는다. KAKAO의 `email_snapshot`은 EMAIL 중복으로 세지 않는다.
+닉네임은 앞뒤 공백 제거 후 Unicode 코드포인트 2~12자이고 내부 공백·Unicode를 허용한다. 표시 문자열은 보존하되 중복 키는 ASCII 영문 대소문자를 무시하며 NFC/NFKC 변환은 하지 않는다. (가입 2단계 인라인 검증용 — 이슈 #97)
+
+두 API는 공개 이메일 존재 조회라는 의도된 비대칭을 가진다. IP 합산 30회/분, 정규화 이메일·닉네임별 5회/분을 단일 서버 Caffeine에서 제한하고 초과 시 `429 RATE_LIMITED`를 반환한다. 조회 실패·제한은 앱의 `DuplicateCheck.Error`이며 가입 진행을 막지 않고, 발송·가입의 유니크 오류가 최종 방어다.
 
 ### 1-3 `POST /auth/email/send-code`
 
 ```json
 { "email": "runner@test.com" }
 ```
-`204` — 6자리 코드 메일 발송. **유효 10분 · 재발송 쿨다운 60초 · 5회 실패 시 재발송 요구** 🔒(NFR-10).
-오류: `409 EMAIL_DUPLICATED`(이미 가입) · `429 SEND_COOLDOWN`
+`204` — 6자리 코드 메일 발송. **유효 10분 · 재발송 쿨다운 60초 · 5번째 오입력부터 재발송 요구** 🔒(NFR-10).
+코드는 BCrypt strength 10 해시만 저장한다. 재발송은 이전 코드·검증 상태를 무효화하고 실패 횟수를 0으로 초기화한다. 인증 메일은 UTF-8 일반 텍스트이며 코드를 공백·하이픈 없이 표시한다.
+오류: `409 EMAIL_DUPLICATED`(이미 가입) · `429 SEND_COOLDOWN` · `502 EXTERNAL_API_ERROR`(SMTP 실패, 코드·쿨다운 미반영)
+
+SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수로 하며 connect/read/write timeout은 각 5초, 애플리케이션 재시도는 하지 않는다. `MAIL_ENABLED` 기본값은 `false`이고 운영은 `true`로 설정하며 `SMTP_HOST`, `SMTP_PORT`(기본 587), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME`(기본 런닝구)을 환경변수로 받는다. outbox를 두지 않는 P0 계약상 SMTP 성공 뒤 DB commit이 실패하면 먼저 도착한 코드는 검증할 수 없고 사용자가 즉시 재발송해야 하는 잔여 위험을 허용한다.
 
 ### 1-4 `POST /auth/email/verify`
 
@@ -130,7 +136,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 { "email": "runner@test.com", "code": "483920" }
 ```
 `200 {"verified": true}` — 서버가 해당 이메일을 '인증 완료(30분 내 가입 유효 🔧)'로 마킹.
-오류: `400 INVALID_CODE` · `400 CODE_EXPIRED` · `429 TOO_MANY_ATTEMPTS`(5회 초과 → 재발송부터)
+6자리 숫자 형식 자체가 아니면 `400 VALIDATION_FAILED`이며 횟수를 올리지 않는다. 발송 이력이 없거나 인증 완료 후 30분이 지나면 `400 CODE_EXPIRED`다. 형식은 맞지만 코드가 다르면 1~4번째는 `400 INVALID_CODE`, 5번째부터는 시도 횟수를 5로 보존하고 `429 TOO_MANY_ATTEMPTS`다. 성공한 같은 코드는 인증 완료 후 30분 동안 멱등 `200`이고, 성공 후 다른 코드는 인증 상태·횟수를 바꾸지 않고 `INVALID_CODE`다. 재발송 후 이전 코드는 `INVALID_CODE`다.
 
 ### 1-5 `POST /auth/signup`
 
@@ -779,6 +785,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
+| `RATE_LIMITED` | 429 | 공개 중복 확인 IP 30회/분 또는 정규화 입력 5회/분 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
 | `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |

@@ -137,6 +137,7 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - `DB-06`: `externalId`, `PASSWORD_RESET`, `fetchedAt`, `organizer` 명칭 통일
 - `DB-07`: 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum CHECK, 좌표 `NUMERIC(10,7)`, 거리 `NUMERIC(8,3)`, 문자열 용도별 길이·nullable·주요 조회 인덱스 명시
 - `DB-08`: 대회 출발 시각·도로명 주소·상세 URL nullable 저장, snapshot 파일 바이트 해시를 사용한 성공 적용 이력의 원자 기록과 동일/과거 snapshot 차단
+- `DB-09`: 물리 회원 테이블은 예약어를 피한 `app_user`, 표시 닉네임과 ASCII 대소문자 무시 `nickname_key`를 분리해 UNIQUE, 인증 상태는 `UNIQUE(email,purpose)` 한 행을 재발송 때 갱신
 
 ---
 
@@ -144,6 +145,8 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 - 같은 `user_id`에 두 번째 LOGIN_IDENTITY 삽입 → UNIQUE 위반.
 - EMAIL/KAKAO별 필수·null 필드 조합 위반 → CHECK 위반.
+- ASCII 대소문자만 다른 닉네임 키 삽입 → UNIQUE 위반, Unicode 코드포인트 2~12자 검증은 서버 정책으로 동일 적용.
+- 같은 정규화 이메일·목적의 두 번째 EMAIL_VERIFICATION 삽입 → UNIQUE 위반, 재발송은 기존 행 갱신.
 - 가입 방식과 다른 provider로 탈퇴 재인증 → `409 REAUTH_PROVIDER_MISMATCH`.
 - RACE 블록 PATCH/DELETE/이동 → `409 SYSTEM_BLOCK_IMMUTABLE`.
 - canonical 이름만 변경 → 저장 동선 `needsRegeneration=false`; 날짜·시간·장소·지역·좌표 변경 → true이며 기존 RACE snapshot 유지.

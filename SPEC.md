@@ -222,11 +222,12 @@ root
 가입 흐름(회의 확정): **정보 입력(이메일·비밀번호·닉네임) → 이메일 인증 → 가입 완료**. **정보 동의 필수**.
 
 1. **약관·개인정보 동의** — 필수 2종(이용약관/개인정보 수집·이용) + 선택(마케팅) 🔧정책. 전체 동의 제공. 필수 미동의 시 진행 불가. 동의 이력 서버 저장(NFR-12).
-2. **정보 입력** — 이메일(형식+중복 확인) · 비밀번호(+확인, 8자 이상 영문+숫자 🔧정책) · 닉네임(2~12자, 중복 불가 🔧정책).
-3. **이메일 인증** — [인증 메일 발송] → 6자리 코드 입력(유효 10분·재발송 쿨다운 60초·5회 실패 시 재발송 🔧정책). 성공 시에만 가입 확정.
+2. **정보 입력** — 이메일(형식+중복 확인) · 비밀번호(+확인, 8자 이상 영문+숫자 🔧정책) · 닉네임(앞뒤 공백 제거 후 Unicode 코드포인트 2~12자, 내부 공백·Unicode 허용, ASCII 영문 대소문자 무시 중복 🔧정책).
+3. **이메일 인증** — [인증 메일 발송] → 구분 기호 없는 6자리 숫자 코드 입력(유효 10분·재발송 쿨다운 60초·5번째 실패부터 재발송 🔧정책). 성공 시 가입 자격은 30분 동안 유효하며, 같은 코드는 그동안 멱등 성공한다.
 4. **완료** — 스낵바 후 A1(또는 자동 로그인 🔧정책).
 
 - **카카오로 가입**: SDK 로그인 → 프로필 닉네임 초기값 → 약관 동의(1번 동일) → 완료. **이메일 인증 생략** 🔧정책. 카카오 이메일은 nullable 프로필 스냅샷이며 로그인 키로 사용하지 않는다.
+- **입력·중복 계약** 🔒확정(결정-49, 이슈 #97): 앱은 입력 표기를 유지하고 서버가 이메일을 앞뒤 Unicode 공백 제거 후 전체 소문자로 정규화한다. Gmail 점·`+tag` 같은 공급자별 변환은 하지 않는다. 이메일·닉네임 중복 확인 API를 모두 P0에서 제공하고 발송·가입의 유니크 오류는 최종 방어로 유지한다. 공개 이메일 중복 확인은 가입 UX를 위한 의도된 존재 노출이며 IP·정규화 입력별 1분 제한으로 대량 열거를 완화한다.
 
 ### 4.3 A3 비밀번호 찾기 — **재설정 링크 방식** 🔒확정
 
@@ -559,17 +560,19 @@ favoriteContest { userId, contestId, savedAt }                               // 
 ### 6.5 회원 계약 🆕회의 (**Spring Boot + PostgreSQL** 🔒확정 — 구현 시 테이블 상세화)
 
 ```
-user          { id, nickname, representativeEmail?, createdAt, updatedAt }
+user          { id, nickname, nicknameKey, representativeEmail?, createdAt, updatedAt }
 loginIdentity { id, userId(unique), provider: EMAIL|KAKAO, providerSubject,
                 emailSnapshot?, passwordHash?, emailVerifiedAt?, createdAt, lastLoginAt }
 userAgreement { userId, type: TOS|PRIVACY|MARKETING, version, agreed, changedAt }
-emailAuth     { email, purpose: SIGNUP|PASSWORD_RESET, tokenHash, expiresAt, attempts, verifiedAt? }
+emailVerification { email, purpose: SIGNUP|PASSWORD_RESET, codeHash?, tokenHash?, attempts,
+                    sentAt, expiresAt, verifiedAt?, consumedAt? }
 ```
 
 - USER는 로그인 주체, LOGIN_IDENTITY는 가입 시 선택한 로그인 방법이다. `USER:LOGIN_IDENTITY`는 1:1이며 `LOGIN_IDENTITY.userId`와 `(provider, providerSubject)`는 각각 UNIQUE다. P0에서는 로그인 방법 연결·추가·전환을 지원하지 않는다.
 - 대표 이메일은 EMAIL 가입자면 정규화된 `providerSubject`, KAKAO 가입자면 nullable `emailSnapshot`에서 파생한다. USER에 이메일을 중복 저장하지 않는다. `GET /me`는 `email` 키를 항상 포함해 `string|null`로 반환한다.
 - EMAIL 수단은 `passwordHash`와 `emailVerifiedAt`이 필수이고 `emailSnapshot`은 null이다. KAKAO 수단은 비밀번호·자체 이메일 인증 시각이 null이며 카카오 회원번호를 로그인 식별자로 사용한다. 카카오가 이메일을 제공하지 않아도 가입할 수 있고, 별도 이메일 입력·자체 인증을 추가하지 않는다.
 - `(provider, providerSubject)`는 전역 유일하다. 동일 이메일 자동 병합을 금지하고 P0에서는 provider 연결·전환 API를 두지 않는다.
+- `nicknameKey`는 앞뒤 공백 제거 후 ASCII 영문만 소문자로 접은 중복 키다. `(email, purpose)` 인증 상태는 한 행으로 유지하며 SIGNUP은 `codeHash`, PASSWORD_RESET은 `tokenHash`만 사용한다.
 
 - ~~communityPost·raceView~~ — 커뮤니티 제외(결정-13)·인기 섹션 제거(결정-11)로 **삭제**.
 
@@ -943,6 +946,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-46 | 검증 완료 full snapshot에서 원천이 **2회 연속 누락**되면 source를 비활성화하고, 활성 source가 없는 canonical만 비활성화한다. 실패·부분 snapshot은 누락 횟수에 포함하지 않고 재등장 시 즉시 활성화한다. 물리 삭제 없이 공개 목록에서 제외하되 기존 찜·동선의 상세 조회는 유지한다 | 일시 수집 장애로 대회가 사라지는 것을 막으면서 장기 미제공 항목은 공개 탐색에서 제거한다(이슈 #56) | §4.5~4.6 · §4.13 · §8.2 |
 | 결정-47 | `CONTEST.start_time`·`road_address`·`detail_url`은 nullable로 저장하고, 성공한 대회 snapshot의 버전·snapshot 파일 바이트 hash·입력 CSV hash·기준 시각·적용 시각을 `CONTEST_SNAPSHOT_IMPORT`에 원자적으로 기록한다. snapshot 파일 hash로 같은 snapshot을 식별해 no-op 처리하고, 과거 snapshot과 같은 기준 시각의 다른 snapshot 파일 hash는 거부한다. 입력 CSV hash는 출처 추적에만 쓴다 | 파일 계약의 nullable 필드를 물리 ERD에서 잃지 않고, 같은 파일 재적재나 과거 파일 적용이 source 누락 횟수와 `active`를 후퇴시키지 않게 한다. 입력 CSV가 같아도 생성기 수정으로 snapshot 내용이 달라질 수 있으므로 파일 자체를 식별한다 | §6.2 · §8.2 · 대회 snapshot 계약 |
 | 결정-48 | Importer는 snapshot 전체의 canonical 승계 대상을 DB 변경 전에 계산하고, 최대 source 겹침 동률 또는 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 전체 적재를 거부한다. 정상적인 다중 원천은 허용한다 | 근거 없이 기존 PK를 고르면 찜·저장 동선 참조가 다른 대회로 바뀔 수 있으므로, 애매한 승계는 원자적으로 실패시켜 기존 참조를 보존한다 | §8.2 · 대회 snapshot 계약 |
+| 결정-49 | EMAIL은 서버가 `strip + lowercase(Locale.ROOT)`로 정규화하고 공급자별 별칭 변환은 하지 않는다. 닉네임은 trim 후 Unicode 코드포인트 2~12자이며 ASCII 영문 대소문자를 무시해 중복 판정한다. 이메일·닉네임 중복 확인은 모두 P0 공개 API로 유지하되 IP 30회/분·정규화 입력 5회/분 제한을 적용한다. 인증 코드는 BCrypt strength 10 해시만 저장하고 5번째 오입력부터 잠그며, 성공 후 30분 동안 같은 코드 검증은 멱등 성공한다 | 앱·서버의 입력 판정 차이와 늦은 중복 응답을 막고, 가입 전 확인 UX를 유지하면서 공개 이메일 존재 조회의 대량 열거 비용을 높인다(이슈 #97) | §4.2 · §6.5 · §9.3 · NFR-9~10 |
 
 ### 12.5 남은 미결
 
