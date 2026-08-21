@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.ui.auth.AuthValidation
 import com.runninggu.app.data.local.LoginProvider
-import com.runninggu.app.ui.auth.apiErrorCode
+import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
