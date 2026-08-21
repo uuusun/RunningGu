@@ -4,6 +4,7 @@ import com.runninggu.server.common.error.ApiProblemWriter;
 import com.runninggu.server.common.error.ErrorCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -34,6 +35,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(OPENAPI_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/contests").permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, cause) ->
