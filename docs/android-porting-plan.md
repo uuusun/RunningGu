@@ -34,13 +34,36 @@ PR #22의 `ItineraryEngine`은 구현돼 있지만 결정-41에 따라 운영 �
 | `constants.js` | `domain/Recovery.kt` `Cats.kt` `Patterns.kt` | 회복 룰·취향 카테고리·일정 패턴 상수 |
 | `events.js` | `domain/EventStd.kt` | 종목 표준화 (`풀`/`하프`/`10K`/`5K`) |
 | `dates.js` | `domain/KstDates.kt` | KST 기준 날짜 계산 (§6.6) |
-| `normalize.js` | `domain/RaceNormalizer.kt` | 크롤 레코드 → 표준 대회 |
+| `normalize.js` | **만들지 않는다** | 크롤 레코드 정규화는 Python 파이프라인이 한다 — 2.1 참고 |
 | `engine.js` | 백엔드 `ItineraryGenerationService` | 서버 동선 조립. 앱 `ItineraryEngine.kt`는 참고 구현·테스트 기준만 유지 |
 | `edits.js` | `domain/ItineraryEdits.kt` | 동선 편집 연산 (불변) |
 | `courses.js` | `domain/CourseBuilder.kt` | 코스 왕복 자르기 (오프라인 폴백용) |
 | `tourapi.js` · `poi.js` | **만들지 않는다** | 서버가 한다 — 3장 참고 |
 
-### 2.1 동선 생성은 앱 포팅 대상이 아니다
+### 2.1 정규화도 앱 포팅 대상이 아니다
+
+`normalize.js`(크롤 레코드 → 표준 대회)를 `domain/RaceNormalizer.kt` 로 옮기려던 계획을 **취소한다.**
+
+**결정-39 가 정규화·중복 병합의 주인을 Python 데이터 파이프라인으로 못 박았기 때문이다.**
+백엔드조차 "같은 병합 알고리즘을 Java 로 중복 구현하지 않는다" 고 되어 있다. 앱에 또 옮기면
+같은 규칙이 **세 벌**(Python · Java · Kotlin)이 되고, 갈라졌을 때 어느 쪽이 맞는지 알 수 없다.
+
+**앱은 크롤 레코드를 볼 일이 아예 없다.** 들어오는 경로가 둘뿐인데 둘 다 이미 정규화된 것이다.
+
+| 경로 | 정규화한 주체 |
+|---|---|
+| `GET /api/contests` 등 서버 API | Python 스냅샷 → 백엔드 적재 (결정-39) |
+| `assets/races.json` 번들 | `scripts/build_races_json.py` |
+
+번들을 읽는 `RaceBundleDto` 가 하는 일(한국어 라벨 → 원천 토큰, 접수 상태 문자열 해석)은
+**이미 정규화된 값의 표기를 맞추는 것**이지 크롤 레코드를 표준화하는 것이 아니다.
+
+§5.5 접수 상태 재계산은 `domain/RegistrationStatus.kt` 로 **이미 옮겼다** — 그건 조회 시점마다
+다시 계산해야 하는 값이라 앱에도 있어야 한다. 정규화와는 다른 이야기다.
+
+> 이 결정으로 **AP-04 는 남은 항목이 없다.**
+
+### 2.2 동선 생성은 앱 포팅 대상이 아니다
 
 원본 `buildItinerary`의 운영 이식 위치는 백엔드다. 서버는 외부 POI 어댑터와 순수 규칙 모듈을 분리하고, 앱은 `POST /itineraries/generate` 한 번으로 완성된 `days[]`·`blocks[]`를 받는다.
 
@@ -155,7 +178,7 @@ SPEC §2.4 대로 **화면마다 ViewModel + `StateFlow<UiState>`** 를 둔다.
 상수와 저장 전 편집은 먼저 진행할 수 있다.
 
 **1단계 · 상수와 계산기** (의존성 없음)
-`Recovery` `Cats` `Patterns` `EventStd` `KstDates` `RaceNormalizer`.
+`Recovery` `Cats` `Patterns` `EventStd` `KstDates`. (`RaceNormalizer` 는 2.1 대로 만들지 않는다)
 값이 SPEC 표와 한 글자도 다르면 안 되므로 단위 테스트를 같이 쓴다.
 
 **2단계 · 생성 DTO 모델과 저장 전 편집** (1단계 필요)
