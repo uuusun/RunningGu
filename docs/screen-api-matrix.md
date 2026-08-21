@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.8
+# 런닝구 화면–API 매핑표 v1.9
 
-> 갱신일: 2026-08-20
+> 갱신일: 2026-08-21
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.8(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v2.10(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -271,10 +271,13 @@ Compose 화면
 
 | 행동 | API/로컬 | 요청 | 응답·원천 | 상태 |
 |---|---|---|---|---|
-| 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items, 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
-| 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | POI items | Android 500ms debounce, 2자 미만은 호출 안 함 |
+| 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items(`provider=KAKAO|KTO`, `(name,lat,lng)` 조합 유일), 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
+| 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | 같은 POI item 계약 | Android 500ms debounce, 2자 미만은 호출 안 함 |
 | 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
 | 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 비활성은 생성 차단(status/code는 #56 추가 리뷰 대기). 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
+
+S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `(name, lat, lng)` 조합을 사용한다.
+주소는 원천에 없으면 빈 문자열일 수 있으므로 `key`에 사용하지 않는다.
 
 `generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다. 앱은 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않으며, 서버 응답 표시와 저장 전 USER 블록 편집만 담당한다(SPEC 결정-41).
 
@@ -283,7 +286,7 @@ Compose 화면
 | 행동 | API/로컬 | 요청/응답 | 저장 | 상태 |
 |---|---|---|---|---|
 | 새 결과 표시 | 로컬 | generate DTO | 저장 전 없음 | 날짜 탭, 지도 핀, 회복 배지 |
-| POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | 영구 저장 없음 | 시트 Loading/Empty/Error |
+| POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | `provider` 포함 장소 snapshot 후보, `placeId/fetchedAt/cachedAt` 없음 | 시트 Loading/Empty/Error |
 | 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서 | ResultUiState | RACE 편집 UI 미노출 |
 | 새 동선 저장 | `POST /api/itineraries` | 편집된 전체 DTO→201 id 또는 200 replaced | PostgreSQL | 게스트 modal, 성공→보관함 |
 | 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | Room cache | RACE는 저장 당시 값 유지. 변경 시 안내/재생성 CTA, 403/404/Error |
@@ -514,6 +517,7 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 - `GET /api/me`의 단일 `loginProvider`와 로그인 수단 연결·해제 API 제거
+- `GET /api/pois`의 항목별 `provider(KAKAO|KTO)`, `placeId`·추적 timestamp 제외, 8→20km 확대·원천 보충·부분 실패·5분 캐시 계약
 
 ### 남은 springdoc 상세화 항목
 
@@ -521,7 +525,6 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 
 | API | 보완할 계약 |
 |---|---|
-| `GET /api/pois` | 항목별 provider(KTO/KAKAO), fetchedAt/cachedAt, 안정적 placeId 필요 여부 |
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
 | `PATCH /api/me` | 성공 status와 응답 body |
 | `PATCH /api/me/agreements` | 성공 status와 응답 body |

@@ -1,5 +1,9 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.repository.AuthRepository
+import com.runninggu.app.data.repository.FakeAuthRepository
+import com.runninggu.app.data.repository.apiErrorCode
+import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
@@ -179,17 +183,12 @@ class SignupViewModel(
                 nickname = state.nickname.trim(),
                 marketingAgreed = state.marketingAgreed,
             ).fold(
-                onSuccess = { tokens ->
-                    // 201 = 자동 로그인 (명세 §1-5). TODO(AP-14): 응답의 user 로 채운다.
+                onSuccess = { session ->
+                    // 201 = 자동 로그인 (명세 §1-5). 응답의 user 를 그대로 쓴다.
+                    // 마케팅 동의는 가입 때 고른 값이다 — 계정 관리 토글의 초기값이 된다
                     SessionStore.signIn(
-                        SessionProfile(
-                            nickname = state.nickname.trim(),
-                            email = state.email.trim(),
-                            loginProvider = LoginProvider.EMAIL,
-                            // 가입 때 고른 값을 그대로 물려준다 — 계정 관리 토글의 초기값이 된다.
-                            marketingAgreed = state.marketingAgreed,
-                        ),
-                        tokens = tokens,
+                        session.profile.copy(marketingAgreed = state.marketingAgreed),
+                        tokens = session.tokens,
                     )
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },

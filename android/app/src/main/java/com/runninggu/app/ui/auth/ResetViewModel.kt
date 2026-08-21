@@ -1,5 +1,8 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.repository.AuthRepository
+import com.runninggu.app.data.repository.FakeAuthRepository
+import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
