@@ -186,7 +186,7 @@ Compose 화면
 |---|---|---|---|---|
 | 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화 | 가입 완료 전 로컬 |
 | 정보 입력·검증 | 로컬 + 중복 API | email, password, confirm, nickname | exists/validation | 가입 완료 전 로컬 |
-| 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | exists | 없음 |
+| 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | `Unchecked/Checking/Available/Duplicate/Error`; 입력 변경 시 이전 응답 무효화 | 없음 |
 | 코드 발송 | `POST /api/auth/email/send-code` | email | 204, 60초 타이머 | 서버 검증 상태 |
 | 코드 확인 | `POST /api/auth/email/verify` | email, code | verified | 서버 검증 상태 |
 | 이메일 가입 | `POST /api/auth/signup` | email, password, nickname, agreements | token pair + user | PostgreSQL |
@@ -484,6 +484,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
+| D-30 / SPEC 결정-50 | 이메일·닉네임 중복 확인은 모두 P0에서 호출한다. `Checking` 동안 인증 메일 발송을 막고 `Available`에서 허용하며, `Duplicate`만 확정 차단한다. `Unchecked`·네트워크/`RATE_LIMITED` `Error`는 발송·가입의 서버 유니크 방어를 믿고 진행을 막지 않는다. 입력 변경 시 결과를 즉시 무효화하고 늦은 응답은 버린다 |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |
 | DB-05 / SPEC 결정-46 | 승인된 full snapshot에서 source 2회 연속 누락 시 비활성. 실패·부분 snapshot은 미반영, 재등장은 즉시 복구, canonical은 활성 source가 없을 때만 비활성. 공개 탐색 제외·참조 상세 유지 |
