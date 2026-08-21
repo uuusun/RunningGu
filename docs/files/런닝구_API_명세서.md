@@ -324,7 +324,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 3-3 `GET /api/contests/closing-soon` — 홈 마감 임박
 
-`?limit=4` 🔒(홈 기본 4건 확정) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
+`?limit=4` 🔒(기본 4, 허용 범위 1~4) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
+범위를 벗어난 `limit`은 `400 VALIDATION_FAILED`.
 응답 항목 = 3-1 카드 + `"dDayApply": 11` (applyEnd − 오늘, "마감 D-n" 배지용).
 
 ### 3-4 `GET /api/contests/{id}` — 상세
