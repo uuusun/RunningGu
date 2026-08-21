@@ -2,6 +2,12 @@ package com.runninggu.app.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -152,6 +158,20 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
 
         Spacer(Modifier.height(8.dp))
 
+        MyLocationButton(state = state, viewModel = viewModel)
+
+        // 못 잡아도 화면을 막지 않는다. 아래 검색·프리셋으로 계속 갈 수 있다 (NFR-15)
+        state.locationMessage?.let { message ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         OriginSearchField(state.originSearch, viewModel)
 
         Spacer(Modifier.height(8.dp))
@@ -171,6 +191,54 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
         }
     }
 }
+
+/**
+ * [내 위치]. (SPEC §4.11-1 ① · NFR-15)
+ *
+ * **권한을 물어보는 자리는 여기뿐이다.** 화면에 있어야 시스템 대화상자를 띄울 수 있어서
+ * ViewModel 이 못 한다. 허용되면 조회를 맡기고, 거부되면 그 사실만 넘긴다.
+ *
+ * 정밀·대략 둘 다 요청하되 **하나만 허용해도 진행한다** — 코스 추천은 반경 8km 기준이라
+ * 대략 위치로 충분하다.
+ */
+@Composable
+private fun MyLocationButton(state: CourseUiState, viewModel: CourseViewModel) {
+    val context = LocalContext.current
+    val locating = state.origin == OriginState.Locating
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        if (granted.values.any { it }) {
+            viewModel.onUseMyLocation()
+        } else {
+            viewModel.onLocationPermissionDenied()
+        }
+    }
+
+    OutlinedButton(
+        onClick = {
+            val alreadyGranted = LOCATION_PERMISSIONS.any { permission ->
+                ContextCompat.checkSelfPermission(context, permission) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
+            // 이미 있으면 다시 묻지 않는다 — 물어봐도 대화상자가 안 뜨고 콜백만 온다
+            if (alreadyGranted) {
+                viewModel.onUseMyLocation()
+            } else {
+                permissionLauncher.launch(LOCATION_PERMISSIONS)
+            }
+        },
+        enabled = !locating,
+    ) {
+        Text(if (locating) "위치를 확인하는 중…" else "내 위치")
+    }
+}
+
+private val LOCATION_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+)
 
 /**
  * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)

@@ -399,6 +399,13 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 ### 5.4 종목 표준화
 
+> **이 규칙의 주인은 Python 데이터 파이프라인이다** 🔒확정(결정-39 · PR #90).
+> `stdEventKm` · `eventsFromContest` 처럼 **크롤 레코드**(`has_*` · `distances` · `event_types`)를
+> 받는 단계는 `scripts/` 에만 있다. 백엔드도 앱도 중복 구현하지 않는다 — 두 벌이던 시절에
+> 앱만 낡아 무주 풀코스가 종목 하나로 줄어 있었다(이슈 #61).
+> 앱에 들어오는 대회는 서버 API 든 번들이든 **이미 표준화된 종목 배열**을 갖고 오며, 앱의
+> `domain/EventType.kt` 에는 그 표기를 enum 으로 바꾸는 `stdEvent` · `stdEvents` 만 둔다.
+
 - `stdEvent`: `풀|full|42→풀` · `하프|half|21→하프` · `10k|단독10→10K` · 그 외 `5K`. 순서 `[풀,하프,10K,5K]`.
 - `stdEventKm`(거리 버킷): **≥32→풀 · ≥18→하프 · ≥9→10K · 그 외 5K**.
 - `eventsFromContest` **합집합**: ① `has_*` 플래그 ∪ ② `distances` 버킷 ∪ ③ `event_types` 토큰.
