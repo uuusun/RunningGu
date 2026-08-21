@@ -2,9 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 대회·관광 API 호출용. 위치 권한은 지도 작업 시작할 때 추가한다. -->
+    <!-- 대회·관광 API 호출용 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      S8 "내 위치" 출발지. (SPEC §4.11-1 ①)
+      둘 다 선언하되 **거부해도 화면은 동작한다** — 검색·프리셋으로 출발지를 정할 수 있다(NFR-15).
+      배경 위치는 요청하지 않는다. 앱이 보이는 동안 한 번 조회할 뿐이다.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:name=".RunningGuApplication"
