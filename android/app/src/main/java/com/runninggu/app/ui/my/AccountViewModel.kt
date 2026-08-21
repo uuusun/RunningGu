@@ -139,7 +139,12 @@ class AccountViewModel : ViewModel() {
      */
     fun onLogout() {
         viewModelScope.launch {
-            SessionStore.signOutAndAwait()
+            // **지워진 것을 확인하기 전에는 완료로 넘기지 않는다** (#89 리뷰).
+            // 못 지웠는데 로그인 화면으로 보내면, 다음 실행에 이전 계정이 되살아난다
+            if (!SessionStore.signOutAndAwait()) {
+                _uiState.update { it.copy(message = LOGOUT_FAILED_MESSAGE) }
+                return@launch
+            }
             // 다음 사용자에게 이전 찜이 보이면 안 된다 (AP-21).
             FavoriteStore.clear()
             _uiState.update { it.copy(signedOut = true) }
@@ -150,8 +155,11 @@ class AccountViewModel : ViewModel() {
     fun onWithdraw(reauthPassword: String) {
         viewModelScope.launch {
             delay(FAKE_DELAY_MS)
-            // 탈퇴도 같다 — 지워질 때까지 기다린다 (#89 리뷰)
-            SessionStore.signOutAndAwait()
+            // 탈퇴도 같다 — 지워진 것을 확인하기 전에는 완료가 아니다 (#89 리뷰)
+            if (!SessionStore.signOutAndAwait()) {
+                _uiState.update { it.copy(message = LOGOUT_FAILED_MESSAGE) }
+                return@launch
+            }
             FavoriteStore.clear()
             _uiState.update { it.copy(signedOut = true) }
         }
@@ -162,6 +170,9 @@ class AccountViewModel : ViewModel() {
     }
 
     private companion object {
+        /** 기기에서 못 지웠다. 로그인 상태를 유지한 채 다시 시도하게 한다 (#89 리뷰). */
+        const val LOGOUT_FAILED_MESSAGE = "기기에서 로그아웃 정보를 지우지 못했어요. 다시 시도해 주세요."
+
         const val FAKE_DELAY_MS = 300L
     }
 }

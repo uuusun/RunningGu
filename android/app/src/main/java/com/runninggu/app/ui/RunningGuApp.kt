@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -43,12 +45,17 @@ fun RunningGuApp(
 ) {
     val restored by SessionStore.restored.collectAsStateWithLifecycle()
     if (!restored) {
-        // 스피너를 두지 않는다 — 로컬 파일 한 번 읽는 시간이라, 떴다 사라지는 게 더 어수선하다
+        // **로컬 파일 한 번이 아니다.** A0 계약이 `GET /api/me` 로 세션을 확인하게 되어 있어
+        // (screen-api-matrix) 네트워크 왕복이 낀다. 오프라인이면 검증이 제한 시간까지 가므로
+        // 빈 화면으로 두면 그동안 멈춘 것처럼 보인다 (#89 리뷰).
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
         return
     }
 

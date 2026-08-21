@@ -208,24 +208,31 @@ object SessionStore {
     }
 
     /**
-     * 사용자가 누른 로그아웃·탈퇴. **디스크에서 지워질 때까지 기다린다.** (#89 리뷰)
+     * 사용자가 누른 로그아웃·탈퇴. **디스크에서 지워진 것을 확인하고 돌아온다.** (#89 리뷰)
      *
-     * 예약만 하고 돌아오면, 화면이 로그인으로 넘어간 직후 프로세스가 죽었을 때 **다음 실행에
-     * 이전 리프레시 토큰이 되살아난다.** 남의 기기에 계정이 남는 쪽이라 여기서는 기다린다.
+     * **디스크를 먼저 지우고 메모리를 비운다.** 순서가 중요하다 — 반대로 하면 디스크
+     * 삭제가 실패했을 때 "로그아웃된 것처럼 보이는데 다음 실행에 계정이 되살아나는" 상태가
+     * 된다. 이 순서면 못 지웠을 때 **아무것도 안 바뀐 상태로** 돌아가므로 화면이 그대로
+     * 다시 시도할 수 있다.
      *
-     * 지우기가 실패해도 **메모리 세션은 이미 비운다.** 이번 실행에서 토큰이 다시 나가는 일은
-     * 없고, 서버 revoke 를 함께 부르므로(AP-14) 디스크에 남은 토큰도 다음 시작의 A0 검증에서
-     * `Expired` 로 걸린다.
+     * 지운 뒤 죽어도 안전하다. 디스크가 비었으니 다음 실행은 게스트다.
+     *
+     * @return 지웠으면 true. false 면 **로그아웃이 안 된 것**이라 화면은 완료로 넘기면 안 된다
      */
-    suspend fun signOutAndAwait() {
-        signOut()
-        try {
-            persistence?.clear()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // 기록은 저장소 구현이 남긴다
+    suspend fun signOutAndAwait(): Boolean {
+        val store = persistence
+        if (store != null) {
+            try {
+                store.clear()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // 기록은 저장소 구현이 남긴다. 메모리는 건드리지 않는다
+                return false
+            }
         }
+        signOut()
+        return true
     }
 
     /**
@@ -308,7 +315,10 @@ object SessionStore {
         persistence = null
     }
 
-    /** 사용자가 누른 로그아웃·탈퇴. 서버 revoke 는 AP-14 에서 붙는다. */
+    /**
+     * 세션을 비운다. **디스크는 예약만 된다** — 지워진 것을 확인해야 하면
+     * [signOutAndAwait] 를 쓴다. 서버 revoke 연결은 이슈 #99 · #106 에서 붙는다.
+     */
     @Synchronized
     fun signOut() {
         tokens = null

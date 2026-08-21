@@ -18,7 +18,7 @@ private const val STORE_NAME = "session"
 private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataStore(STORE_NAME)
 
 /**
- * 세션을 DataStore 에 남긴다. (SPEC §2.2 · AP-14)
+ * 세션을 DataStore 에 남긴다. (SPEC §2.2 · NFR-11)
  *
  * **평문으로 저장한다.** `androidx.security-crypto` 로 감싸는 방안을 이슈 #77 에서 논의했고
  * "P0 는 지금 그대로" 로 정했다 — 그 라이브러리가 deprecated 이고, 앱을 뜯을 수 있는 기기는
@@ -87,12 +87,16 @@ class DataStoreSessionPersistence(context: Context) : SessionPersistence {
         }
     }
 
+    /**
+     * **실패를 삼키지 않는다.** 로그아웃은 지워졌는지가 곧 결과다 — 못 지웠는데 지운 척하면
+     * 다음 실행에 이전 계정이 되살아난다(#89 리뷰).
+     */
     override suspend fun clear() {
-        edit { it.clear() }
+        store.edit { it.clear() }
     }
 
     /**
-     * 쓰기 실패는 삼킨다. 저장에 실패해도 이번 실행의 로그인은 그대로 살아 있고,
+     * **저장** 실패는 삼킨다. 저장에 실패해도 이번 실행의 로그인은 그대로 살아 있고,
      * 다음에 앱을 켰을 때 다시 로그인하면 될 뿐이다 — 여기서 예외를 올리면 로그인
      * 성공 직후에 앱이 죽는다.
      */

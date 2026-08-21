@@ -16,7 +16,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * 세션 영속. (SPEC §2.2 · AP-14)
+ * 세션 영속. (SPEC §2.2 · NFR-11)
  *
  * 여기가 깨지면 앱을 껐다 켤 때마다 로그인이 풀리거나, 반대로 **로그아웃한 계정으로
  * 되돌아간다.** 뒤쪽이 더 나쁘다 — 남의 기기에 계정이 남는다.
@@ -243,9 +243,10 @@ class SessionStoreTest {
         SessionStore.signIn(profile, tokens)
         awaitPersisted { persistence.stored != null }
 
-        SessionStore.signOutAndAwait()
+        val cleared = SessionStore.signOutAndAwait()
 
         // 기다렸으니 돌아온 시점에 이미 없어야 한다
+        assertTrue(cleared)
         assertNull(persistence.stored)
         assertTrue(persistence.cleared)
         assertFalse(SessionStore.isLoggedIn)
@@ -271,17 +272,20 @@ class SessionStoreTest {
     }
 
     @Test
-    fun `지우기가 실패해도 메모리 세션은 비운다`() = runBlocking {
+    fun `지우기가 실패하면 로그아웃하지 않고 실패를 알린다`() = runBlocking {
+        // 못 지웠는데 로그인 화면으로 보내면, 다음 실행에 이전 계정이 되살아난다 (#89 리뷰).
+        // 디스크를 먼저 지우고 메모리를 비우므로, 실패하면 **아무것도 안 바뀐 상태**로 돌아온다
         bind()
         awaitRestored()
         SessionStore.signIn(profile, tokens)
         awaitPersisted { persistence.stored != null }
         persistence.throwOnClear = true
 
-        SessionStore.signOutAndAwait()
+        val cleared = SessionStore.signOutAndAwait()
 
-        assertFalse(SessionStore.isLoggedIn)
-        assertNull(SessionStore.tokens)
+        assertFalse("실패를 성공으로 돌려줬다", cleared)
+        assertTrue("로그인 상태가 유지돼야 다시 시도할 수 있다", SessionStore.isLoggedIn)
+        assertEquals(tokens, SessionStore.tokens)
     }
 
 }
