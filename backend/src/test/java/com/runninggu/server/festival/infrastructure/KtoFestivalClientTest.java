@@ -77,14 +77,16 @@ class KtoFestivalClientTest {
                                   "eventstartdate":"20260820",
                                   "eventenddate":"20260825",
                                   "mapx":"",
-                                  "mapy":""
+                                  "mapy":"",
+                                  "addr1":"서울특별시 종로구"
                                 }]
                                 """),
                         MediaType.APPLICATION_JSON));
 
         List<Festival> result = client.searchStartingFrom(EVENT_START_DATE);
 
-        assertThat(result).singleElement().satisfies(festival -> {
+        assertThat(result).hasSize(2);
+        assertThat(result.getFirst()).satisfies(festival -> {
             assertThat(festival.contentId()).isEqualTo("2764321");
             assertThat(festival.name()).isEqualTo("세종 빛 축제");
             assertThat(festival.startDate()).isEqualTo("2026-08-20");
@@ -93,6 +95,12 @@ class KtoFestivalClientTest {
             assertThat(festival.lng()).isEqualByComparingTo("127.2714");
             assertThat(festival.imageUrl()).isNull();
             assertThat(festival.address()).isEmpty();
+        });
+        assertThat(result.get(1)).satisfies(festival -> {
+            assertThat(festival.contentId()).isEqualTo("invalid");
+            assertThat(festival.lat()).isNull();
+            assertThat(festival.lng()).isNull();
+            assertThat(festival.address()).isEqualTo("서울특별시 종로구");
         });
         server.verify();
     }

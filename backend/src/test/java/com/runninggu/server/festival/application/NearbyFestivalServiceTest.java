@@ -57,7 +57,8 @@ class NearbyFestivalServiceTest {
                 festival("end-boundary", windowStart.minusDays(2), windowStart, "37.0200000"),
                 festival("too-early", windowStart.minusDays(2), windowStart.minusDays(1), "37.0100000"),
                 festival("too-late", windowEnd.plusDays(1), windowEnd.plusDays(2), "37.0100000"),
-                festival("too-far", windowStart, windowEnd, "37.3700000")));
+                festival("too-far", windowStart, windowEnd, "37.3700000"),
+                festivalWithoutCoordinates("no-coordinates", windowStart, windowEnd)));
 
         List<NearbyFestival> result = service.findNearby(CONTEST_ID);
 
@@ -175,6 +176,21 @@ class NearbyFestivalServiceTest {
                 CONTEST_LNG,
                 null,
                 "");
+    }
+
+    private Festival festivalWithoutCoordinates(
+            String contentId,
+            LocalDate startDate,
+            LocalDate endDate) {
+        return new Festival(
+                contentId,
+                "축제 " + contentId,
+                startDate,
+                endDate,
+                null,
+                null,
+                null,
+                "서울특별시 종로구");
     }
 
     private void assertErrorCode(ThrowingCall call, ErrorCode expected) {
