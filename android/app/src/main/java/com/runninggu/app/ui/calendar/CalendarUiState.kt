@@ -49,6 +49,21 @@ data class CalendarUiState(
     val currentMonth: YearMonth = YearMonth.now(),
     val selectedDate: LocalDate? = null,
     val favoriteIds: Set<String> = emptySet(),
+    /**
+     * 다음 페이지 커서. **앱은 해석하지 않는다** — 서버가 준 문자열 그대로 되돌려준다(§0-4).
+     * null 이면 마지막 장이다. (API 명세 §3-1)
+     */
+    val nextCursor: String? = null,
+    val hasNext: Boolean = false,
+    /** 다음 장을 받는 중. 목록은 그대로 두고 하단 표시만 바꾼다. */
+    val loadingMore: Boolean = false,
+    /**
+     * 월간 뷰 날짜별 대회 수. (API 명세 §3-2)
+     *
+     * [racesByDate] 와 달리 **받아온 페이지에 없는 대회도 센다.** 목록은 커서로 나눠 오지만
+     * 달력의 점은 그 달 전체를 알아야 맞기 때문이다.
+     */
+    val dailyCounts: Map<LocalDate, Int> = emptyMap(),
 ) {
     enum class Phase { LOADING, ERROR, LOADED }
 
