@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.calendar
 
 import com.runninggu.app.data.model.Contest
+import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ClosingSoon
 import com.runninggu.app.data.repository.ContestFilter
@@ -245,6 +246,9 @@ private class RecordingContestRepository : ContestRepository {
     override suspend fun closingSoon(limit: Int): List<ClosingSoon> = emptyList()
 
     override suspend fun detail(id: Long): Contest = contest(id.toString(), LocalDate.of(2026, 8, 22))
+
+    /** 캘린더는 인근 축제를 쓰지 않는다. S3 상세 전용이다(§3-5). */
+    override suspend fun festivals(id: Long): List<NearbyFestival> = emptyList()
 
     private fun contest(id: String, date: LocalDate) = Contest(
         id = id,
