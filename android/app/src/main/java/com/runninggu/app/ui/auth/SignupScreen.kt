@@ -31,8 +31,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -150,15 +155,21 @@ private fun AgreeRow(
 private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
     StepTitle("가입 정보를 입력해 주세요", "이메일로 인증 코드를 보내드려요.")
 
+    val emailFormatError = state.email.isNotEmpty() && !state.isEmailValid
     OutlinedTextField(
         value = state.email,
         onValueChange = viewModel::onEmailChange,
         label = { Text("이메일") },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        isError = state.email.isNotEmpty() && !state.isEmailValid,
-        supportingText = inlineHint(state.email.isNotEmpty() && !state.isEmailValid, "이메일 형식을 확인해 주세요"),
-        modifier = Modifier.fillMaxWidth(),
+        isError = emailFormatError || state.emailCheck == DuplicateCheck.Duplicate,
+        // 형식 오류가 먼저다 — 형식이 틀리면 중복 확인을 아예 부르지 않는다.
+        supportingText = inlineHint(emailFormatError, "이메일 형식을 확인해 주세요")
+            ?: duplicateHint(state.emailCheck, EMAIL_HINTS),
+        modifier = Modifier
+            .fillMaxWidth()
+            // 포커스가 빠질 때 한 번 확인한다 (D-30 · 이슈 #97)
+            .onFocusLost(viewModel::onEmailFocusLost),
     )
     Spacer(Modifier.height(8.dp))
     OutlinedTextField(
@@ -185,14 +196,18 @@ private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(8.dp))
+    val nicknameFormatError = state.nickname.isNotEmpty() && !state.isNicknameValid
     OutlinedTextField(
         value = state.nickname,
         onValueChange = viewModel::onNicknameChange,
         label = { Text("닉네임 (2~12자)") },
         singleLine = true,
-        isError = state.nickname.isNotEmpty() && !state.isNicknameValid,
-        supportingText = inlineHint(state.nickname.isNotEmpty() && !state.isNicknameValid, "2~12자로 지어 주세요"),
-        modifier = Modifier.fillMaxWidth(),
+        isError = nicknameFormatError || state.nicknameCheck == DuplicateCheck.Duplicate,
+        supportingText = inlineHint(nicknameFormatError, "2~12자로 지어 주세요")
+            ?: duplicateHint(state.nicknameCheck, NICKNAME_HINTS),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusLost(viewModel::onNicknameFocusLost),
     )
 
     state.errorMessage?.let { message ->
@@ -318,6 +333,55 @@ private fun CtaButton(
         }
     }
     Spacer(Modifier.height(24.dp))
+}
+
+/**
+ * 중복 확인 결과 안내. (D-30 · 이슈 #97 합의 문구)
+ *
+ * **[DuplicateCheck.Error] 는 안내만 하고 재시도 버튼을 두지 않는다** — 포커스가 다시
+ * 빠질 때 자동으로 다시 부른다. 필드마다 버튼이 붙으면 폼이 복잡해진다.
+ */
+@Composable
+private fun duplicateHint(check: DuplicateCheck, hints: DuplicateHints): (@Composable () -> Unit)? =
+    when (check) {
+        DuplicateCheck.Unchecked -> null
+        DuplicateCheck.Checking -> ({ Text(hints.checking) })
+        DuplicateCheck.Available -> ({
+            Text(hints.available, color = MaterialTheme.colorScheme.primary)
+        })
+        DuplicateCheck.Duplicate -> ({ Text(hints.duplicate) })
+        // 진행을 막지 않으므로 오류 색을 쓰지 않는다 — 사용자가 할 일이 없다.
+        DuplicateCheck.Error -> ({
+            Text("확인하지 못했어요. 그대로 진행할 수 있어요.")
+        })
+    }
+
+/** 필드별 중복 확인 문구. */
+private data class DuplicateHints(val checking: String, val available: String, val duplicate: String)
+
+private val EMAIL_HINTS = DuplicateHints(
+    checking = "확인 중…",
+    available = "사용할 수 있는 이메일이에요.",
+    duplicate = "이미 가입된 이메일이에요.",
+)
+
+private val NICKNAME_HINTS = DuplicateHints(
+    checking = "확인 중…",
+    available = "사용할 수 있는 닉네임이에요.",
+    duplicate = "이미 사용 중인 닉네임이에요.",
+)
+
+/** 포커스를 얻었다가 잃는 순간 한 번 부른다. 처음 그려질 때는 부르지 않는다. */
+private fun Modifier.onFocusLost(action: () -> Unit): Modifier = composed {
+    var hadFocus by remember { mutableStateOf(false) }
+    onFocusChanged { focusState ->
+        if (focusState.isFocused) {
+            hadFocus = true
+        } else if (hadFocus) {
+            hadFocus = false
+            action()
+        }
+    }
 }
 
 private fun inlineHint(show: Boolean, message: String): (@Composable () -> Unit)? =

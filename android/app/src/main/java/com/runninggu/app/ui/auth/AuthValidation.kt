@@ -33,9 +33,21 @@ object AuthValidation {
             password.any { it.isLetter() } &&
             password.any { it.isDigit() }
 
-    /** 2~12자. (명세 §1-2) */
-    fun isNicknameValid(nickname: String): Boolean =
-        nickname.trim().length in NICKNAME_MIN..NICKNAME_MAX
+    /**
+     * 2~12자. **코드포인트로 센다.** (명세 §1-2 · 이슈 #97)
+     *
+     * `String.length` 는 UTF-16 코드 단위라 이모지가 2자 이상으로 셌다 — `🏃` 는 2,
+     * `🏃‍♂️`(ZWJ 조합)는 5 다. 서버(`NicknamePolicy`)가 `codePointCount` 로 세므로
+     * 그대로 두면 **같은 닉네임을 앱은 막고 서버는 받는다.** 사용자에게는 "12자 이내인데
+     * 왜 안 되지" 로만 보인다.
+     *
+     * 자소 클러스터가 사람 직관에 제일 가깝지만 `BreakIterator` 가 필요해 P0 에는 과하다 —
+     * 서버와 같은 기준으로 맞추는 것이 먼저다.
+     */
+    fun isNicknameValid(nickname: String): Boolean {
+        val trimmed = nickname.trim()
+        return trimmed.codePointCount(0, trimmed.length) in NICKNAME_MIN..NICKNAME_MAX
+    }
 
     fun isCodeValid(code: String): Boolean =
         code.length == CODE_LENGTH && code.all { it.isDigit() }
