@@ -10,17 +10,20 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.runninggu.server.contest.application.ContestCursor;
+import com.runninggu.server.contest.application.ContestDailyCount;
 import com.runninggu.server.contest.application.ContestSearchCondition;
 import com.runninggu.server.contest.domain.Contest;
 import com.runninggu.server.contest.domain.ContestEventType;
 import com.runninggu.server.contest.domain.ContestRegistrationStatus;
 import com.runninggu.server.contest.domain.ContestSourceType;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
@@ -51,6 +54,52 @@ public class ContestQueryRepository {
                 .where(where)
                 .orderBy(contest.contestDate.asc(), contest.id.asc())
                 .limit(size + 1L)
+                .fetch();
+    }
+
+    /** 목록과 동일한 공개 필터를 적용해 요청 월의 날짜별 대회 수를 센다. (API 명세 §3-2) */
+    public List<ContestDailyCount> findDailyCounts(
+            ContestSearchCondition condition,
+            YearMonth yearMonth,
+            LocalDate today) {
+        BooleanBuilder where = filterPredicate(condition, today);
+        where.and(contest.contestDate.between(
+                yearMonth.atDay(1),
+                yearMonth.atEndOfMonth()));
+
+        return queryFactory
+                .select(contest.contestDate, contest.id.count())
+                .from(contest)
+                .where(where)
+                .groupBy(contest.contestDate)
+                .orderBy(contest.contestDate.asc())
+                .fetch()
+                .stream()
+                .map(row -> new ContestDailyCount(
+                        row.get(contest.contestDate),
+                        row.get(contest.id.count())))
+                .toList();
+    }
+
+    /** 활성 예정 대회 중 파생 접수상태가 OPEN이고 마감일이 있는 대회만 반환한다. (API 명세 §3-3) */
+    public List<Contest> findClosingSoon(int limit, LocalDate today) {
+        ContestSearchCondition openCondition = new ContestSearchCondition(
+                null,
+                Set.of(),
+                true,
+                Set.of(),
+                null);
+        BooleanBuilder where = filterPredicate(openCondition, today);
+        where.and(contest.applyEnd.isNotNull());
+
+        return queryFactory
+                .selectFrom(contest)
+                .where(where)
+                .orderBy(
+                        contest.applyEnd.asc(),
+                        contest.contestDate.asc(),
+                        contest.id.asc())
+                .limit(limit)
                 .fetch();
     }
 
