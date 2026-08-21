@@ -88,7 +88,7 @@ KTO courseList 전체 페이지 ── 성공한 전체 응답만 courseId로 �
 | `sources` | `key` 오름차순 원천 메타 배열. `key`는 파일 안에서 유일하다 |
 | `sources[].attribution` | API 응답에 그대로 사용할 검증 완료 완성 문구 |
 | `sources[].license` | 원본 라이선스 확인 결과. 빈 문자열 금지 |
-| `sources[].derivable` | P0 서버 번들에는 `true` 원천만 허용한다 |
+| `sources[].derivable` | 라이선스상 코스 절단·축약 등 파생 경로 제작·배포가 허용됨을 확인했으면 `true`다. 변경 금지 또는 허용 여부 미확인 원천은 `false`이며 P0 서버 번들에서 제외한다 |
 | `courses` | `courseId` 오름차순의 코스 배열 |
 
 `generatedAt`처럼 실행 시각에 따라 달라지는 필드는 두지 않는다. 같은 입력과 옵션은 UTF-8
