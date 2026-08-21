@@ -76,10 +76,14 @@ class RemoteAuthRepository(private val api: AuthApi) : AuthRepository {
      * 예외를 `Result` 로 옮긴다.
      *
      * 이 인터페이스만 `Result` 를 쓰는 이유는 [AuthRepository] KDoc 에 적어 두었다.
-     * **`ApiException` 만 담는다** — 다른 예외는 우리 계약이 아니라 프로그래밍 오류다.
+     *
+     * **먼저 [apiCall] 로 감싼다**(#106 리뷰). Retrofit 이 던지는 것은 `HttpException` ·
+     * `IOException` 이지 `ApiException` 이 아니다. 바로 `catch (e: ApiException)` 만 두면
+     * 그 둘이 catch 를 지나가고, 호출부는 `viewModelScope.launch` 안이라 **잡히지 않은 예외로
+     * 앱이 죽는다.** `apiCall` 이 우리 계약(`ApiException`)으로 바꿔 준 뒤에 담는다.
      */
-    private inline fun <T> call(block: () -> T): Result<T> = try {
-        Result.success(block())
+    private suspend fun <T> call(block: suspend () -> T): Result<T> = try {
+        Result.success(apiCall(block))
     } catch (e: ApiException) {
         Result.failure(e)
     }
