@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -186,6 +187,8 @@ private fun HomeContent(
             state = uiState.festivals,
             errorMessage = "축제 정보를 불러오지 못했어요",
             onRetry = onRetryFestivals,
+            // 퀵바 [관광]이 이 섹션으로 스크롤한다 — 비어도 자리를 남겨야 겨냥할 곳이 있다
+            empty = { FestivalSectionFrame { EmptyState(title = "추천할 축제가 없어요.") } },
         ) { festivals ->
             FestivalSection(festivals = festivals)
         }
@@ -204,11 +207,18 @@ private fun <T> LazyListScope.section(
     state: SectionState<T>,
     errorMessage: String,
     onRetry: () -> Unit,
+    /**
+     * 비었을 때 자리를 남길 것인가. 기본은 접는다.
+     *
+     * **퀵액션이 겨냥하는 섹션만 넘긴다**(#102 리뷰). 접히면 스크롤할 자리가 사라져서
+     * 버튼이 죽거나 엉뚱한 섹션으로 간다.
+     */
+    empty: (@Composable () -> Unit)? = null,
     content: @Composable (T) -> Unit,
 ) {
     when (state) {
         SectionState.Loading -> item { LoadingState(message = "불러오는 중…") }
-        SectionState.Empty -> Unit
+        SectionState.Empty -> empty?.let { item { it() } } ?: Unit
         is SectionState.Error -> item {
             // 서버가 준 문구가 있으면 그걸 쓴다. 없을 때만 영역 기본 문구다 (§0-3)
             ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)
@@ -414,16 +424,12 @@ private fun ClosingSoonSection(
             modifier = Modifier.padding(horizontal = ScreenPadding),
         )
         Spacer(Modifier.height(12.dp))
-        if (races.isEmpty()) {
-            EmptyState(title = "마감이 임박한 대회가 없어요.")
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(races, key = { it.id }) { race ->
-                    ClosingSoonCard(race = race, onClick = { onRaceClick(race.id) })
-                }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(races, key = { it.id }) { race ->
+                ClosingSoonCard(race = race, onClick = { onRaceClick(race.id) })
             }
         }
     }
@@ -486,10 +492,15 @@ private fun ClosingSoonCard(
     }
 }
 
+/**
+ * 축제 섹션의 제목까지. 내용과 빈 자리가 **같은 머리를 쓰도록** 갈라 두었다 (#102 리뷰).
+ *
+ * 비었을 때도 제목이 남아야 퀵바 [관광]이 데려다 놓은 자리가 무엇인지 알 수 있다.
+ */
 @Composable
-private fun FestivalSection(
-    festivals: List<FestivalSummary>,
+private fun FestivalSectionFrame(
     modifier: Modifier = Modifier,
+    body: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = modifier) {
         SectionHeader(
@@ -497,26 +508,32 @@ private fun FestivalSection(
             modifier = Modifier.padding(horizontal = ScreenPadding),
         )
         Spacer(Modifier.height(12.dp))
-        if (festivals.isEmpty()) {
-            EmptyState(title = "추천할 축제가 없어요.")
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(festivals, key = { it.id }) { festival ->
-                    FestivalCard(festival = festival)
-                }
+        body()
+    }
+}
+
+@Composable
+private fun FestivalSection(
+    festivals: List<FestivalSummary>,
+    modifier: Modifier = Modifier,
+) {
+    FestivalSectionFrame(modifier = modifier) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(festivals, key = { it.id }) { festival ->
+                FestivalCard(festival = festival)
             }
-            Spacer(Modifier.height(10.dp))
-            // 출처 표기는 한국관광공사 고정. (NFR-7)
-            Text(
-                text = "출처 · 한국관광공사",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = ScreenPadding),
-            )
         }
+        Spacer(Modifier.height(10.dp))
+        // 출처 표기는 한국관광공사 고정. (NFR-7)
+        Text(
+            text = "출처 · 한국관광공사",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = ScreenPadding),
+        )
     }
 }
 
