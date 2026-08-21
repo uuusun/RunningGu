@@ -10,7 +10,7 @@ import com.runninggu.app.domain.LatLng
  */
 data class MapScene(
     /** 좌표가 있는 항목만. 순서대로 번호 핀이 되고 서로 이어진다. */
-    val pins: List<MapPin> = emptyList(),
+    val pins: List<MapMarker> = emptyList(),
     /**
      * 코스 경로선. **핀과 독립적으로 그린다** — 러닝코스(S8)는 핀 없이 경로만 그린다(§3-8).
      * 2점 미만이면 선이 아니라서 그리지 않는다.
@@ -40,10 +40,14 @@ data class MapScene(
 /**
  * 방문 순서 번호 핀. (SPEC §3-8)
  *
+ * `domain.MapPin` 과 **다른 타입이다.** 저쪽은 동선 도메인의 핀(`BlockCategory` 를 안다)이고
+ * 이쪽은 지도에 그리는 것만 안다 — `ui/map` 이 동선 개념을 알면 S8 러닝코스(동선이 없는
+ * 화면)까지 동선 타입에 묶인다. 같은 파일에서 둘을 쓰는 화면이 셋이라 이름을 갈랐다(#88 리뷰).
+ *
  * @param order 1부터. 핀 안에 그대로 찍힌다.
  * @param recovery 회복일인가. 액센트가 파랑 대신 주황이 된다(§3-8 범례).
  */
-data class MapPin(
+data class MapMarker(
     val id: String,
     val order: Int,
     val lat: Double,

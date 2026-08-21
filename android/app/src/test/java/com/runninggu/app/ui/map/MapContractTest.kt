@@ -14,7 +14,7 @@ import org.junit.Test
 class MapContractTest {
 
     private fun pin(id: String, order: Int, lat: Double, lng: Double, recovery: Boolean = false) =
-        MapPin(id = id, order = order, lat = lat, lng = lng, recovery = recovery)
+        MapMarker(id = id, order = order, lat = lat, lng = lng, recovery = recovery)
 
     private val threePins = listOf(
         pin("a", 1, 37.5665, 126.9780),
