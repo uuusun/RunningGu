@@ -1,6 +1,8 @@
 package com.runninggu.app
 
 import android.app.Application
+import com.runninggu.app.data.local.DataStoreSessionPersistence
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,5 +21,7 @@ class RunningGuApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FavoriteStore.bind(appScope)
+        // 저장된 세션을 올린다. 시작 화면이 SessionStore.restored 를 기다린다 (SPEC §2.2)
+        SessionStore.bind(DataStoreSessionPersistence(this), appScope)
     }
 }
