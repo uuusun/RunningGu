@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.data.model.listKey
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -131,7 +132,7 @@ fun StayScreen(
                     StayUiState.Phase.CONTENT -> LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(state.items, key = { it.name + it.address }) { item ->
+                        items(state.items, key = { it.listKey }) { item ->
                             StayRow(
                                 item = item,
                                 selected = wizard.stay == item,
