@@ -33,18 +33,19 @@ import com.runninggu.app.ui.wizard.WizardViewModel
 /**
  * root 그래프 — auth(A1~A3) + main(S1~S10). (SPEC §2.2)
  *
- * 시작은 auth 그래프다. 세션이 있으면 `home` 으로 바로 가는 스플래시 게이트는
- * 세션 영속(DataStore)이 붙는 AP-14 연동에서 처리한다 — 지금은 세션 저장이 없어
- * 항상 로그인부터 시작한다(게스트 둘러보기로 즉시 통과 가능).
+ * **시작 지점은 셸이 정해서 넘긴다**(`RunningGuApp`). 저장된 세션이 있으면 `home`,
+ * 없으면 auth 그래프다(SPEC §2.2). 여기서 세션을 직접 보지 않는 이유는, 세션을 다 읽기
+ * 전에 그래프가 만들어지면 로그인 화면이 한 번 번쩍이기 때문이다.
  */
 @Composable
 fun RunningGuNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    startDestination: String = Routes.authGraph(),
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.authGraph(),
+        startDestination = startDestination,
         modifier = modifier,
     ) {
         authGraph(navController)

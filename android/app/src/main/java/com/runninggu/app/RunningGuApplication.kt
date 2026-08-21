@@ -2,6 +2,8 @@ package com.runninggu.app
 
 import android.app.Application
 import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.DataStoreSessionPersistence
+import com.runninggu.app.data.local.SessionStore
 import android.util.Log
 import com.kakao.vectormap.KakaoMapSdk
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -22,8 +24,16 @@ class RunningGuApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FavoriteStore.bind(appScope)
-        // 기기에서 값을 얻는 것들(위치)이 Context 를 필요로 한다
+        // 기기에서 값을 얻는 것들(위치)이 Context 를 필요로 한다.
+        // **세션 복원보다 먼저** 물린다 — 아래 bind 가 ServiceLocator 에서 검증기를 꺼낸다
         ServiceLocator.bind(this)
+        // 저장된 세션을 올린다. 시작 화면이 SessionStore.restored 를 기다린다 (SPEC §2.2)
+        SessionStore.bind(
+            persistence = DataStoreSessionPersistence(this),
+            scope = appScope,
+            // A0 — 디스크에 남은 토큰이 아직 쓸 수 있는지 서버에 물어본다
+            validator = ServiceLocator.sessionValidator,
+        )
         initKakaoMap()
     }
 
