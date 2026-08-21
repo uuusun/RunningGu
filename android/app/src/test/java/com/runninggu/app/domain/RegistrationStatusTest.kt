@@ -74,7 +74,8 @@ class RegistrationStatusTest {
     @Test
     fun `마감일만 알고 아직 안 지났으면 단정하지 않는다`() {
         // 마감일이 미래라는 것만으로는 접수중이라고 할 수 없다 — 아직 접수 시작 전일 수 있다.
-        // API 명세 §3-1 목록 응답에 applyStart 가 없어 실제로 생기는 상황이다.
+        // §3-1 응답의 applyStart 는 있지만 nullable 이고(#84), 로컬 번들의 regStart 도 비어
+        // 있을 수 있다. 그래서 시작일을 모르는 채 마감일만 아는 경우가 실제로 생긴다.
         assertEquals(
             RegistrationStatus.BEFORE,
             regStatusOf(
