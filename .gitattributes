@@ -2,3 +2,7 @@
 # 결정성 검증(같은 입력 → 같은 산출물, 계약 §1·AP-24)이 CRLF 변환에 깨지지 않는다.
 data/contest_snapshot.json text eol=lf
 reference-web/public/data/races.json text eol=lf
+
+# 파일 해시를 그대로 비교하는 fixture — Windows 에서 CRLF 로 체크아웃되면 SHA-256 이 갈려
+# ContestSnapshotFileContractTest 가 그 PC 에서만 깨진다 (결정-47 Importer 해시 · AP-24).
+backend/src/test/resources/contest/*.json text eol=lf

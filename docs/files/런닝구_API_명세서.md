@@ -324,7 +324,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 3-3 `GET /api/contests/closing-soon` — 홈 마감 임박
 
-`?limit=4` 🔒(홈 기본 4건 확정) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
+`?limit=4` 🔒(기본 4, 허용 범위 1~4) → 파생 접수상태 `OPEN` ∧ `applyEnd not null`, `applyEnd ASC`.
+범위를 벗어난 `limit`은 `400 VALIDATION_FAILED`.
 응답 항목 = 3-1 카드 + `"dDayApply": 11` (applyEnd − 오늘, "마감 D-n" 배지용).
 
 ### 3-4 `GET /api/contests/{id}` — 상세
@@ -354,6 +355,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ```
 빈 배열 = 목업 빈 상태("대회 기간에 열리는 인근 축제가 없어요") · `502` = 로딩 실패 상태 매핑. 출처 표기 "한국관광공사"는 클라 고정 문구(NFR-7). 대회 좌표가 없으면 외부 API를 호출하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
 
+`409 CONTEST_LOCATION_UNAVAILABLE`은 **빈 상태가 아니라 재시도 버튼이 없는 별도 오류 상태**로 그린다 — 문구는 "인근 축제를 확인할 수 없어요"로 고정한다. 좌표는 다시 눌러도 생기지 않으므로 [다시 시도]를 붙이면 헛돌고, 그렇다고 "축제가 없어요"로 적으면 사실과 다르다.
+
+**수집·캐시 추적 메타데이터(`fetchedAt`·`cachedAt`·KTO 원천 구분)는 응답에 넣지 않는다.** 서버 내부 로그·모니터링에서만 관리한다 — 어느 화면도 그 값을 그리지 않기 때문이다(출처 표기는 위와 같이 클라 고정 문구다). 앱은 위 일곱 필드만 받는다.
+
 ---
 
 ## 4. 축제 · POI 프록시 API (공개)
@@ -367,6 +372,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 응답 항목: `{contentId, name, startDate, endDate, region, imageUrl, inProgress}` — `inProgress` = start ≤ 오늘 ≤ end (진행중 배지).
 조회 월과 겹치는 전국 축제를 진행 중 우선, 시작일 오름차순으로 반환한다. 홈에서는 위치 권한과 사용자 좌표를 사용하지 않는다. 서버가 KTO `searchFestival2`를 호출·캐시하며 앱은 우리 서버만 호출한다.
+
+**P0에서 홈 축제 카드는 표시 전용이다** — 축제 상세로 이동하는 동작도, 그 화면으로 가는 route도 없다(결정 D-05). 그래서 응답에 상세 조회용 키를 더 넣지 않는다.
+
+**수집·캐시 추적 메타데이터(`fetchedAt`·`cachedAt`·KTO 원천 구분)는 응답에 넣지 않는다.** 서버 내부 로그·모니터링에서만 관리한다 — §3-5와 같은 정책이며, 어느 화면도 그 값을 그리지 않는다. 앱은 위 일곱 필드만 받는다. (오프라인 표시에 쓰는 `cachedAt`은 기기 Room 읽기 캐시의 것이라 이 응답 필드와 다른 이야기다.)
 
 ### 4-2 `GET /api/pois` — 위저드 숙소 · 동선 슬롯 · 교체/추가 시트
 
@@ -403,6 +412,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ### 4-4 `GET /api/geocode` — 출발지 검색
 
 `?query=해운대해수욕장` → `200 {"name": "해운대해수욕장", "address": "부산 해운대구 ...", "lat": 35.1587, "lng": 129.1604}` (카카오 키워드 첫 결과 🔒 §4.11-1). `404 NO_RESULT`.
+`query`는 필수이며 서버가 앞뒤 공백을 제거한다. 누락됐거나 공백뿐이면 `400 VALIDATION_FAILED`다.
 
 ---
 
@@ -763,6 +773,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `EMAIL_NOT_VERIFIED` | 403 | 인증 미완료 상태로 가입 시도 |
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
+| `NO_RESULT` | 404 | 지오코딩 검색 결과 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
 | `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |

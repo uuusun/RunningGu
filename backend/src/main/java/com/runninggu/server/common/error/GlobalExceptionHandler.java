@@ -12,6 +12,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -84,6 +85,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 request,
                 errors);
 
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_FAILED.status())
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException exception,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest webRequest) {
+        HttpServletRequest request = ((ServletWebRequest) webRequest).getRequest();
+        ProblemDetail problem = problemDetailFactory.create(
+                ErrorCode.VALIDATION_FAILED,
+                exception.getParameterName() + " 값이 필요합니다.",
+                request);
         return ResponseEntity
                 .status(ErrorCode.VALIDATION_FAILED.status())
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)

@@ -25,6 +25,25 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.info.title").value("런닝구 API"))
                 .andExpect(jsonPath("$.info.version").value("v2.9"))
                 .andExpect(jsonPath("$['paths']['/api/contests']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/contests/daily-counts']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/contests/closing-soon']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/contests/{id}']['get']").exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/contests/daily-counts']['get']['parameters']"
+                                        + "[?(@.name == 'year' && @.required == true)]")
+                        .isNotEmpty())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/contests/daily-counts']['get']['parameters']"
+                                        + "[?(@.name == 'month' && @.required == true)]")
+                        .isNotEmpty())
+                .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.active")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.lat")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.lng")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.dDay")
+                        .exists())
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type")
                         .value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")
