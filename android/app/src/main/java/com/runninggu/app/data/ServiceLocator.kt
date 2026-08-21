@@ -7,13 +7,16 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.RefreshOutcome
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.asRefreshFailure
+import com.runninggu.app.data.remote.AuthApi
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
 import com.runninggu.app.data.remote.TokenApi
 import com.runninggu.app.data.remote.TokenAuthenticator
+import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.ContestRepository
+import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
 import com.runninggu.app.data.repository.RemoteCourseRepository
@@ -98,8 +101,18 @@ object ServiceLocator {
         e.asRefreshFailure()
     }
 
+    val authApi: AuthApi by lazy { retrofit.create() }
+
     val contestApi: ContestApi by lazy { retrofit.create() }
     val courseApi: CourseApi by lazy { retrofit.create() }
+
+    /**
+     * 인증. (API 명세 §1)
+     *
+     * **서버에 §1 엔드포인트가 아직 없다.** 화면은 아직 `FakeAuthRepository` 를 기본값으로
+     * 쓰고, 서면 화면의 기본값만 이걸로 바꾼다 — 계약이 맞는지는 DTO 테스트가 지킨다.
+     */
+    val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi) }
 
     /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
