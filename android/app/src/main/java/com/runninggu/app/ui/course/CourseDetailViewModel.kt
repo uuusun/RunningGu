@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.SavedCourseRepository
+// #85 가 `ui/course` 에서 `ui` 로 올렸다 — 캘린더도 같은 게 필요해졌기 때문이다.
+import com.runninggu.app.ui.userMessageOrDefault
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
