@@ -241,7 +241,7 @@ Compose 화면
 |---|---|---|---|---|
 | 상세 본문 | `GET /api/contests/{contestId}` | 카드 필드, nullable imageUrl, organizer, officialUrl, nullable lat/lng, dDay, favorite, active | SERVER_DB/Room | 비활성도 404가 아닌 Content: 흐림+"정보 제공 종료". 이미지 null은 placeholder |
 | 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복 |
-| 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | active일 때만 호출. 본문과 독립 Loading/Empty/502/504 |
+| 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | active일 때만 호출. 본문과 독립 Loading/Empty/502/504. `409 CONTEST_LOCATION_UNAVAILABLE` = **재시도 버튼 없는 별도 오류**("인근 축제를 확인할 수 없어요") — 좌표는 재시도로 생기지 않는다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null이면 버튼 숨김 |
 | 공유 | Android 공유 | 대회 요약·URL | 저장 없음 | P1/AP-17 |
 | 동선 만들기 | S4 이동 | contestId | WizardUiState | 좌표 null 또는 active=false면 CTA 비활성, 좌표 전용 안내 UX는 P1 |
@@ -521,7 +521,6 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 | API | 보완할 계약 |
 |---|---|
 | `GET /api/festivals` | 카드 tap 없음 명시, KTO 원천·fetchedAt/cachedAt 추적 필드 |
-| `GET /api/contests/{id}/festivals` | KTO 원천·fetchedAt/cachedAt 추적 필드 |
 | `GET /api/pois` | 항목별 provider(KTO/KAKAO), fetchedAt/cachedAt, 안정적 placeId 필요 여부 |
 | `GET /api/me/courses` | saved 목록 projection의 정확한 필드와 page 예시 |
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
