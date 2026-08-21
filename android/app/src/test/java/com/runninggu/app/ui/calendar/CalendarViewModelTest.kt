@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.calendar
 
 import com.runninggu.app.data.model.Contest
+import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ClosingSoon
 import com.runninggu.app.data.repository.ContestFilter
 import com.runninggu.app.data.repository.ContestPage
@@ -15,6 +16,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -114,6 +117,73 @@ class CalendarViewModelTest {
     }
 
     @Test
+    fun `받을 장이 남았으면 목록이 비어도 Empty 로 확정하지 않는다`() = runTest(dispatcher) {
+        // 9월 대회가 다음 장에 있는데 9월을 열면 지금까지 받은 것 중에는 하나도 없다.
+        // 그걸 Empty 로 굳히면 달력엔 점이 있는데 아래는 "없어요" 가 된다 (#85 리뷰)
+        repository.hasSecondPage = true
+        val viewModel = CalendarViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onViewModeChange(CalendarViewMode.CALENDAR)
+        viewModel.onMonthChange(1)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue("이 달 목록이 비어 있어야 하는 전제가 깨졌다", state.listedRaces.isEmpty())
+        assertFalse("아직 받을 장이 남았는데 Empty 로 확정했다", state.showsEmpty)
+        assertTrue("더 받기 자리가 없어 다음 장을 받을 방법이 없다", state.showsLoadMore)
+    }
+
+    @Test
+    fun `다 받았고 목록이 비면 그때 Empty 다`() = runTest(dispatcher) {
+        val viewModel = CalendarViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onViewModeChange(CalendarViewMode.CALENDAR)
+        viewModel.onMonthChange(6)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.listedRaces.isEmpty())
+        assertTrue(state.showsEmpty)
+    }
+
+    @Test
+    fun `다음 장이 실패하면 자동 재시도하지 않고 안내를 남긴다`() = runTest(dispatcher) {
+        // 자동 재시도로 두면 네트워크가 끊긴 동안 같은 요청을 계속 던진다
+        repository.hasSecondPage = true
+        repository.failNextPage = true
+        val viewModel = CalendarViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.loadMore()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse("로딩 표시가 남았다", state.loadingMore)
+        assertTrue("실패 안내가 없다", state.loadMoreError != null)
+        assertTrue("다시 받을 수 있어야 한다", state.showsLoadMore)
+    }
+
+    @Test
+    fun `다시 시도하면 실패 안내를 지우고 이어 받는다`() = runTest(dispatcher) {
+        repository.hasSecondPage = true
+        repository.failNextPage = true
+        val viewModel = CalendarViewModel(repository)
+        advanceUntilIdle()
+        viewModel.loadMore()
+        advanceUntilIdle()
+
+        repository.failNextPage = false
+        viewModel.loadMore()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.loadMoreError)
+        assertEquals(2, state.allRaces.size)
+    }
+
+    @Test
     fun `다음 장은 목록에 이어 붙고 중복은 한 번만 남는다`() = runTest(dispatcher) {
         repository.hasSecondPage = true
         val viewModel = CalendarViewModel(repository)
@@ -140,6 +210,9 @@ private class RecordingContestRepository : ContestRepository {
     /** true 면 첫 장에 다음 커서를 붙인다. */
     var hasSecondPage = false
 
+    /** true 면 다음 장 조회만 실패시킨다. */
+    var failNextPage = false
+
     override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage {
         listCalls++
         lastFilter = filter
@@ -150,6 +223,7 @@ private class RecordingContestRepository : ContestRepository {
                 hasNext = hasSecondPage,
             )
         } else {
+            if (failNextPage) throw ApiException.Network(java.io.IOException("끊김"))
             // 첫 장의 1 번이 다시 온다 — 조회 중 원천이 갱신되면 실제로 생기는 일이다
             ContestPage(
                 contests = listOf(

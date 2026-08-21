@@ -74,6 +74,13 @@ data class CalendarUiState(
     /** 다음 장을 받는 중. 목록은 그대로 두고 하단 표시만 바꾼다. */
     val loadingMore: Boolean = false,
     /**
+     * 다음 장 조회가 실패한 이유. null 이면 정상이다. (#85 리뷰)
+     *
+     * **실패하면 자동으로 다시 부르지 않는다.** 끝에 닿은 것만으로 다시 시도하면 네트워크가
+     * 끊긴 동안 같은 요청을 계속 던진다. 사용자가 [다시 시도] 를 눌러야 한다.
+     */
+    val loadMoreError: String? = null,
+    /**
      * 월간 뷰 날짜별 대회 수. (API 명세 §3-2)
      *
      * 목록([allRaces])과 달리 **받아온 페이지에 없는 대회도 센다.** 목록은 커서로 나눠
@@ -117,6 +124,18 @@ data class CalendarUiState(
                 else -> filteredRaces.filter { it.date == day }
             }
         }
+
+    /**
+     * "이 달엔 대회가 없어요" 를 확정해도 되는가. (#85 리뷰)
+     *
+     * **아직 받을 장이 남았으면 모르는 것이다.** 목록은 커서로 나뉘어 오는데, 9월 대회가
+     * 다음 장에 있는 상태로 9월을 열면 지금까지 받은 것 중에는 하나도 없다. 그걸 Empty 로
+     * 확정하면 달력에는 점이 찍혔는데 아래는 "없어요" 가 된다.
+     */
+    val showsEmpty: Boolean get() = listedRaces.isEmpty() && !hasNext
+
+    /** 목록 끝에 "더 받기" 자리를 둘 것인가. 남은 장이 있으면 목록이 비어도 둔다. */
+    val showsLoadMore: Boolean get() = hasNext
 
     fun isFavorite(raceId: String): Boolean = raceId in favoriteIds
 }

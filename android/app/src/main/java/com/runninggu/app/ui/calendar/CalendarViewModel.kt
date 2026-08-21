@@ -157,7 +157,7 @@ class CalendarViewModel(
         if (state.phase != CalendarUiState.Phase.LOADED) return
 
         moreJob = viewModelScope.launch {
-            _uiState.update { it.copy(loadingMore = true) }
+            _uiState.update { it.copy(loadingMore = true, loadMoreError = null) }
             try {
                 val page = repository.list(filter = _uiState.value.toContestFilter(), cursor = cursor)
                 val today = today()
@@ -176,8 +176,11 @@ class CalendarViewModel(
                     )
                 }
             } catch (e: ApiException) {
-                _uiState.update { it.copy(loadingMore = false) }
-                _message.value = e.userMessageOrDefault()
+                // 스낵바 대신 목록 끝에 남긴다 — 사용자가 [다시 시도] 를 눌러야 다시 부른다.
+                // 자동 재시도로 두면 네트워크가 끊긴 동안 같은 요청을 계속 던진다 (#85 리뷰)
+                _uiState.update {
+                    it.copy(loadingMore = false, loadMoreError = e.userMessageOrDefault())
+                }
             }
         }
     }
