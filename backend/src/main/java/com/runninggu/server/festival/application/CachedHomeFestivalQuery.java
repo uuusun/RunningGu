@@ -11,7 +11,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -45,7 +44,6 @@ public class CachedHomeFestivalQuery {
                         monthStart,
                         monthEnd))
                 .map(festival -> toHomeFestival(festival, today))
-                .flatMap(Optional::stream)
                 .sorted(DISPLAY_ORDER)
                 .toList();
     }
@@ -65,16 +63,17 @@ public class CachedHomeFestivalQuery {
         }
     }
 
-    private Optional<HomeFestival> toHomeFestival(Festival festival, LocalDate today) {
-        return FestivalRegion.fromAddress(festival.address())
-                .map(region -> new HomeFestival(
-                        festival.contentId(),
-                        festival.name(),
-                        festival.startDate(),
-                        festival.endDate(),
-                        region,
-                        festival.imageUrl(),
-                        isInProgress(festival, today)));
+    /** 지역을 정규화하지 못해도 유효한 축제를 유지하고 빈 문자열을 반환한다. (API 명세 §4-1) */
+    private HomeFestival toHomeFestival(Festival festival, LocalDate today) {
+        String region = FestivalRegion.fromAddress(festival.address()).orElse("");
+        return new HomeFestival(
+                festival.contentId(),
+                festival.name(),
+                festival.startDate(),
+                festival.endDate(),
+                region,
+                festival.imageUrl(),
+                isInProgress(festival, today));
     }
 
     private boolean overlaps(

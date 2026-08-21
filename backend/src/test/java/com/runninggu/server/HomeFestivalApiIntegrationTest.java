@@ -84,11 +84,11 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
 
         MockHttpServletRequestBuilder request = get("/api/festivals")
                 .param("yearMonth", "2026-08")
-                .param("size", "2");
+                .param("size", "3");
         mockMvc.perform(request)
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items.length()").value(3))
                 .andExpect(jsonPath("$.items[0].contentId").value("ongoing"))
                 .andExpect(jsonPath("$.items[0].name").value("진행 중 축제"))
                 .andExpect(jsonPath("$.items[0].startDate").value("2026-08-20"))
@@ -103,9 +103,12 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items[0].source").doesNotExist())
                 .andExpect(jsonPath("$.items[0].fetchedAt").doesNotExist())
                 .andExpect(jsonPath("$.items[0].cachedAt").doesNotExist())
-                .andExpect(jsonPath("$.items[1].contentId").value("upcoming"))
-                .andExpect(jsonPath("$.items[1].region").value("부산"))
-                .andExpect(jsonPath("$.items[1].inProgress").value(false));
+                .andExpect(jsonPath("$.items[1].contentId").value("unknown"))
+                .andExpect(jsonPath("$.items[1].region").value(""))
+                .andExpect(jsonPath("$.items[1].inProgress").value(false))
+                .andExpect(jsonPath("$.items[2].contentId").value("upcoming"))
+                .andExpect(jsonPath("$.items[2].region").value("부산"))
+                .andExpect(jsonPath("$.items[2].inProgress").value(false));
 
         mockMvc.perform(get("/api/festivals")
                         .param("yearMonth", "2026-08")

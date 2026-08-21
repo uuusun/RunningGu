@@ -35,26 +35,33 @@ class CachedHomeFestivalQueryTest {
     }
 
     @Test
-    void 월_겹침과_지역을_필터하고_진행중_우선_시작일순으로_정렬한다() {
+    void 월_겹침을_필터하고_지역이_없어도_축제를_유지하며_표시순으로_정렬한다() {
         given(festivalProvider.searchStartingFrom(YEAR_MONTH.atDay(1))).willReturn(List.of(
                 festival("upcoming", LocalDate.of(2026, 8, 22), LocalDate.of(2026, 8, 23), "대구광역시 중구"),
                 festival("ended", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2), "부산광역시 해운대구"),
                 festival("ongoing", LocalDate.of(2026, 8, 20), LocalDate.of(2026, 8, 25), "서울특별시 종로구"),
                 festival("cross-boundary", LocalDate.of(2026, 7, 30), LocalDate.of(2026, 8, 1), "인천광역시 남동구"),
                 festival("outside", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 2), "경기도 수원시"),
-                festival("unknown-region", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 4), "알수없는지역 행사장")));
+                festival("unknown-region", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 4), "알수없는지역 행사장"),
+                festival("missing-region", LocalDate.of(2026, 8, 4), LocalDate.of(2026, 8, 5), null)));
 
         List<HomeFestival> result = query.find(YEAR_MONTH, TODAY);
 
         assertThat(result)
                 .extracting(HomeFestival::contentId)
-                .containsExactly("ongoing", "cross-boundary", "ended", "upcoming");
+                .containsExactly(
+                        "ongoing",
+                        "cross-boundary",
+                        "ended",
+                        "unknown-region",
+                        "missing-region",
+                        "upcoming");
         assertThat(result)
                 .extracting(HomeFestival::region)
-                .containsExactly("서울", "인천", "부산", "대구");
+                .containsExactly("서울", "인천", "부산", "", "", "대구");
         assertThat(result)
                 .extracting(HomeFestival::inProgress)
-                .containsExactly(true, false, false, false);
+                .containsExactly(true, false, false, false, false, false);
     }
 
     @Test

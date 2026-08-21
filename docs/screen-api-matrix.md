@@ -215,7 +215,7 @@ Compose 화면
 | 달력·러닝코스·관광 아이콘 | Navigation/scroll | 없음 | 없음 | LOCAL_STATE | 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
-| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목 제외, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
 
