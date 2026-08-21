@@ -1,5 +1,7 @@
 package com.runninggu.app.data.model
 
+import com.runninggu.app.domain.LatLng
+
 /**
  * 코스 난이도. (API 명세 부록 C · SPEC §5.8)
  *
@@ -57,8 +59,20 @@ sealed interface NearbyItem {
         val elevationProfileM: List<Int>,
         /** 목표보다 300m 넘게 짧다 — 화면이 "목표보다 짧게 짜였어요" 안내를 붙인다. */
         val shortfall: Boolean,
-        /** 인코딩된 왕복 경로. 지도 폴리라인에 쓴다. */
+        /**
+         * 인코딩된 왕복 경로 **원문**. (API 명세 §6-1)
+         *
+         * **저장 요청에는 이 값을 그대로 다시 보낸다**(§7-A). 풀었다 다시 묶으면 서버의
+         * `routeFingerprint` 가 달라져 같은 코스가 중복 저장된다. 지도에 그릴 때는
+         * 아래 [path] 를 쓴다.
+         */
         val pathPolyline: String?,
+        /**
+         * 지도에 그릴 좌표열. `data/remote` 매퍼가 [pathPolyline] 을 풀어 채운다 (#129).
+         *
+         * 못 풀었거나 경로가 없으면 비어 있다 — 화면은 "경로 없음" 으로 다룬다.
+         */
+        val path: List<LatLng> = emptyList(),
         // 큐레이션 경로에만 있다. OSM 생성 경로는 원본이 없어 생략된다
         val sourceCourseId: String? = null,
         val sido: String? = null,
