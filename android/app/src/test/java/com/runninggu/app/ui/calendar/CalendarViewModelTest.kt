@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiException
@@ -10,6 +11,7 @@ import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -36,6 +38,7 @@ class CalendarViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: RecordingContestRepository
+    private val viewModels = mutableListOf<CalendarViewModel>()
 
     @Before
     fun setUp() {
@@ -44,13 +47,25 @@ class CalendarViewModelTest {
     }
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        viewModels.forEach { it.viewModelScope.cancel() }
+        viewModels.clear()
+        Dispatchers.resetMain()
+    }
+
+    /**
+     * ViewModel 은 만들면 **끝나지 않는 구독**을 하나 연다 — `FavoriteStore.favoriteIds` 다.
+     *
+     * 테스트마다 끊지 않으면 `resetMain()` 뒤에도 살아남아, 나중에 다른 테스트가 찜을 바꿀 때
+     * 사라진 Main 으로 재개되면서 **엉뚱한 테스트를 깨뜨린다**(`FavoriteStoreTest` 가 그랬다).
+     */
+    private fun newViewModel() = CalendarViewModel(repository).also { viewModels += it }
 
     @Test
     fun `홈에서 넘어온 검색어가 첫 서버 조회에 들어간다`() = runTest(dispatcher) {
         // 검색어 없이 받은 첫 20건을 앱에서 다시 걸러 봐야, 찾는 대회가 그 밖에 있으면
         // 조건에 맞는데도 빈 화면이 된다 (#85 리뷰)
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.applyInitialQuery("세종")
@@ -62,7 +77,7 @@ class CalendarViewModelTest {
     @Test
     fun `검색어가 비어 있으면 다시 조회하지 않는다`() = runTest(dispatcher) {
         // 홈에서 그냥 캘린더 탭으로 들어온 경우다. 헛 왕복을 만들지 않는다
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         val callsAfterInit = repository.listCalls
 
@@ -76,7 +91,7 @@ class CalendarViewModelTest {
     @Test
     fun `날짜 선택을 해제해도 보고 있던 달이 유지된다`() = runTest(dispatcher) {
         // 10월을 보다가 재탭으로 해제했는데 8월로 튀면, 해제가 달을 옮기는 동작이 된다
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.onViewModeChange(CalendarViewMode.CALENDAR)
@@ -99,7 +114,7 @@ class CalendarViewModelTest {
     @Test
     fun `첫 조회는 결과가 있는 달을 연다`() = runTest(dispatcher) {
         // 달을 고정하는 것과 처음부터 빈 달을 여는 것은 다르다
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         assertEquals(YearMonth.of(2026, 8), viewModel.uiState.value.currentMonth)
@@ -107,7 +122,7 @@ class CalendarViewModelTest {
 
     @Test
     fun `필터를 바꾸면 서버 조건도 바뀐다`() = runTest(dispatcher) {
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.onFilterApply(RaceFilter(events = setOf("풀"), openOnly = true))
@@ -122,7 +137,7 @@ class CalendarViewModelTest {
         // 9월 대회가 다음 장에 있는데 9월을 열면 지금까지 받은 것 중에는 하나도 없다.
         // 그걸 Empty 로 굳히면 달력엔 점이 있는데 아래는 "없어요" 가 된다 (#85 리뷰)
         repository.hasSecondPage = true
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.onViewModeChange(CalendarViewMode.CALENDAR)
@@ -137,7 +152,7 @@ class CalendarViewModelTest {
 
     @Test
     fun `다 받았고 목록이 비면 그때 Empty 다`() = runTest(dispatcher) {
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.onViewModeChange(CalendarViewMode.CALENDAR)
@@ -154,7 +169,7 @@ class CalendarViewModelTest {
         // 자동 재시도로 두면 네트워크가 끊긴 동안 같은 요청을 계속 던진다
         repository.hasSecondPage = true
         repository.failNextPage = true
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.loadMore()
@@ -170,7 +185,7 @@ class CalendarViewModelTest {
     fun `다시 시도하면 실패 안내를 지우고 이어 받는다`() = runTest(dispatcher) {
         repository.hasSecondPage = true
         repository.failNextPage = true
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.loadMore()
         advanceUntilIdle()
@@ -187,7 +202,7 @@ class CalendarViewModelTest {
     @Test
     fun `다음 장은 목록에 이어 붙고 중복은 한 번만 남는다`() = runTest(dispatcher) {
         repository.hasSecondPage = true
-        val viewModel = CalendarViewModel(repository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         val first = viewModel.uiState.value.allRaces.size
 
