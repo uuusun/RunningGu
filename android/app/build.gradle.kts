@@ -97,6 +97,8 @@ dependencies {
     implementation(libs.okhttp)
     debugImplementation(libs.okhttp.logging.interceptor)
 
+    testImplementation(libs.kotlinx.coroutines.test)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

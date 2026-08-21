@@ -6,7 +6,7 @@ import com.runninggu.app.data.local.SessionStore
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,6 +22,11 @@ import org.junit.Test
  * 오면 이전 `Job` 을 `cancel()` 했는데, 이미 서버에 도착한 `PUT` 은 그대로 처리된다.
  * 그 `PUT` 이 늦게 끝나면 화면은 해제인데 서버는 찜인 상태로 갈린다. 그래서 여기 스텁은
  * **클라이언트 취소를 무시하고** 요청을 끝까지 처리한다 — 실제 서버와 같은 조건이다.
+ *
+ * `runTest` 의 **가상 시간**으로 돌린다. 예전에는 `runBlocking` + 실제 `delay` 라서
+ * "300ms 요청이 도는 동안 150ms 시점에 조회한다" 같은 전제가 **머신이 바쁘면 깨졌다** —
+ * CI 와 전체 실행에서 간헐적으로 빨간불이 났다. 가상 시간에서는 순서가 코드에 적힌 대로
+ * 고정되고, 덤으로 테스트가 즉시 끝난다.
  */
 class FavoriteStoreTest {
 
@@ -47,7 +52,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `연타해도 같은 대회 요청이 겹치지 않는다`() = runBlocking {
+    fun `연타해도 같은 대회 요청이 겹치지 않는다`() = runTest {
         // 첫 요청(PUT)이 느리고 두 번째(DELETE)가 빠른, 순서가 뒤집히기 딱 좋은 조건.
         repository.delaysMs = ArrayDeque(listOf(300L, 10L))
 
@@ -62,7 +67,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `연타 후 서버 상태가 마지막 탭과 같다`() = runBlocking {
+    fun `연타 후 서버 상태가 마지막 탭과 같다`() = runTest {
         repository.delaysMs = ArrayDeque(listOf(300L, 10L))
 
         val first = async { FavoriteStore.toggle(RACE) }
@@ -76,7 +81,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `세 번 눌러도 마지막 의도만 남는다`() = runBlocking {
+    fun `세 번 눌러도 마지막 의도만 남는다`() = runTest {
         repository.delaysMs = ArrayDeque(listOf(200L, 10L, 10L))
 
         val jobs = List(3) { async { FavoriteStore.toggle(RACE) } }
@@ -89,7 +94,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `첫 요청이 실패해도 마지막 의도가 화면에 남는다`() = runBlocking {
+    fun `첫 요청이 실패해도 마지막 의도가 화면에 남는다`() = runTest {
         // 찜 → 해제 → 찜 을 연타하고 첫 PUT 이 실패한다. (#64 리뷰)
         //
         // 실패를 그 자리에서 되돌리면 롤백이 마지막 '찜' 을 미찜으로 덮는다. 뒤이은 PUT 은
@@ -105,7 +110,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `로그아웃하면 늦게 끝난 요청이 이전 찜을 되살리지 않는다`() = runBlocking {
+    fun `로그아웃하면 늦게 끝난 요청이 이전 찜을 되살리지 않는다`() = runTest {
         // 요청이 떠 있는 동안 로그아웃한다. 서버는 클라 취소를 모르니 저장은 끝까지 된다 —
         // 그 결과가 다음 사용자 화면에 닿으면 계정 사고다. (#64 리뷰)
         repository.delaysMs = ArrayDeque(listOf(300L))
@@ -122,7 +127,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `실패하면 서버 상태로 되돌리고 Failed 를 준다`() = runBlocking {
+    fun `실패하면 서버 상태로 되돌리고 Failed 를 준다`() = runTest {
         repository.failNext = true
 
         val result = FavoriteStore.toggle(RACE)
@@ -133,7 +138,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `게스트는 서버를 부르지 않는다`() = runBlocking {
+    fun `게스트는 서버를 부르지 않는다`() = runTest {
         SessionStore.signOut()
 
         val result = FavoriteStore.toggle(RACE)
@@ -144,7 +149,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `조회가 진행 중인 토글을 덮지 않는다`() = runBlocking {
+    fun `조회가 진행 중인 토글을 덮지 않는다`() = runTest {
         // 서버에는 아직 찜이 없다. 그 목록이 방금 누른 하트를 지우면 안 된다.
         repository.delaysMs = ArrayDeque(listOf(300L))
 
@@ -158,7 +163,7 @@ class FavoriteStoreTest {
     }
 
     @Test
-    fun `앞 요청이 끝나도 뒤 요청이 남아 있으면 조회가 덮지 않는다`() = runBlocking {
+    fun `앞 요청이 끝나도 뒤 요청이 남아 있으면 조회가 덮지 않는다`() = runTest {
         // 연타 → 첫 요청(PUT) 완료 → 두 번째(DELETE) 진행 중에 조회. (#64 리뷰)
         //
         // 이때 서버 목록에는 PUT 만 반영돼 있어 '찜' 으로 온다. 그걸 화면에 씌우면
