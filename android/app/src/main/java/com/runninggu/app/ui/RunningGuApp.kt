@@ -55,6 +55,11 @@ fun RunningGuApp(
     /**
      * 시작 지점은 **복원 직후 한 번만** 정한다. 이후 로그아웃으로 세션이 비어도 여기서
      * 다시 계산하면 앱 전체가 갈아엎어진다 — 로그아웃 뒤 이동은 내비게이션이 처리한다(D-27).
+     *
+     * TODO(이슈 #99): **지금은 로컬 세션만 보고 정한다.** A0 계약(`screen-api-matrix`)은
+     *  `GET /api/me` 로 검증한 뒤 정하는 것인데 서버에 그 엔드포인트가 아직 없다. 그래서
+     *  폐기된 세션도 일단 홈으로 열리고, 첫 인증 요청이 `401` 을 받아야 로그인으로 간다
+     *  (#74 `TokenAuthenticator`). 엔드포인트가 서면 검증 결과를 여기 끼운다.
      */
     val startDestination = remember {
         if (SessionStore.isLoggedIn) Routes.HOME else Routes.authGraph()

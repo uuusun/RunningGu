@@ -252,6 +252,25 @@ class SessionStoreTest {
     }
 
     @Test
+    fun `지우는 중에 scope 가 취소돼도 디스크에서 지워진다`() = runBlocking {
+        // 로그아웃 직후 화면이 사라지면 앱 scope 가 끊길 수 있다. 그때 예약해 둔 삭제만
+        // 믿으면 토큰이 남는다 — signOutAndAwait 이 자기 호출자 안에서 끝내야 하는 이유다
+        bind()
+        awaitRestored()
+        SessionStore.signIn(profile, tokens)
+        awaitPersisted { persistence.stored != null }
+
+        // 저장·복원을 돌리던 scope 를 먼저 끊는다
+        scope.cancel()
+
+        SessionStore.signOutAndAwait()
+
+        assertNull(persistence.stored)
+        assertTrue(persistence.cleared)
+        assertFalse(SessionStore.isLoggedIn)
+    }
+
+    @Test
     fun `지우기가 실패해도 메모리 세션은 비운다`() = runBlocking {
         bind()
         awaitRestored()

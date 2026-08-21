@@ -61,6 +61,9 @@ enum class LoginProvider(val label: String) {
  * 화면들이 로그인 상태를 공유하는 자리이자, [com.runninggu.app.data.remote.ApiClient] 가
  * 토큰을 읽어 가는 자리다.
  *
+ * 세션 영속은 SPEC §2.2(시작 화면 분기) · NFR-11 을 따른다. 시작 시 서버 검증(A0)은
+ * `GET /api/me` 가 서면 붙인다 — 이슈 #99.
+ *
  * **메모리가 기준이고 디스크는 사본이다.** 읽기는 전부 메모리에서 즉시 끝난다 — OkHttp 의
  * `Authenticator` 가 블로킹 계약이라 토큰을 읽으려고 코루틴을 기다릴 수 없기 때문이다.
  * 쓰기만 [bind] 로 받은 저장소에 뒤따라 반영한다.
