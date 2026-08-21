@@ -53,7 +53,7 @@ class HomeViewModel : ViewModel() {
             _uiState.update { it.copy(closingSoon = SectionState.Loading) }
             delay(LOADING_DELAY_MS) // 임시 — 실제 조회로 교체하면 제거한다.
 
-            // 접수중 ∧ regEnd 임박순 상위 6건. (SPEC §4.4-3)
+            // 접수중 ∧ regEnd 임박순 상위 4건. (SPEC §4.4-3 · 결정-28)
             val races = SampleData.races
                 .filter { it.registrationStatus() == RegistrationStatus.OPEN && it.regEnd != null }
                 .sortedBy { it.regEnd }
@@ -76,7 +76,14 @@ class HomeViewModel : ViewModel() {
 
     private companion object {
         const val LOADING_DELAY_MS = 400L
-        const val CLOSING_SOON_LIMIT = 6
+        /**
+         * 홈 마감 임박 노출 건수. (SPEC §4.4-3 🔒 · 결정-28)
+         *
+         * **서버 계약과 같은 값이어야 한다.** `GET /api/contests/closing-soon` 의 `limit` 은
+         * 허용 범위가 `1~4` 라, 이 값이 넘으면 붙는 순간 `400 VALIDATION_FAILED` 다
+         * (API 명세 §3-3 · #102 리뷰).
+         */
+        const val CLOSING_SOON_LIMIT = 4
     }
 }
 

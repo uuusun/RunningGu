@@ -19,7 +19,7 @@ import com.runninggu.app.ui.model.RaceSummary
  * 그래서 화면 전체 `phase` 없이 영역 상태 둘만 둔다 — 층위 구분은 [SectionState] 참고.
  */
 data class HomeUiState(
-    /** 마감 임박 대회 — 접수중 ∧ regEnd 임박순 상위 6건. (SPEC §4.4-3) */
+    /** 마감 임박 대회 — 접수중 ∧ regEnd 임박순 상위 4건. (SPEC §4.4-3 🔒 · 결정-28) */
     val closingSoon: SectionState<List<RaceSummary>> = SectionState.Loading,
     /** 축제·지역 관광 추천. (SPEC §4.4-4) */
     val festivals: SectionState<List<FestivalSummary>> = SectionState.Loading,
