@@ -94,7 +94,7 @@ KAKAO_NATIVE_APP_KEY=
 > 자기 것을 뽑는 법:
 >
 > ```bash
-> keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore >   -storepass android -keypass android | openssl sha1 -binary | openssl base64
+> keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android -keypass android | openssl sha1 -binary | openssl base64
 > ```
 >
 > Windows 는 `keytool` 이 PATH 에 없어서 JBR 것을 직접 부른다 —
