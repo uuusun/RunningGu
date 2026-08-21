@@ -15,6 +15,7 @@ public class CacheConfig {
 
     public static final String GEOCODE_CACHE = "geocode";
     public static final String NEARBY_FESTIVALS_CACHE = "nearbyFestivals";
+    public static final String POI_CACHE = "poi";
 
     @Bean
     public CacheManager cacheManager() {
@@ -31,6 +32,12 @@ public class CacheConfig {
                 Caffeine.newBuilder()
                         .maximumSize(500)
                         .expireAfterWrite(Duration.ofDays(1))
+                        .build());
+        cacheManager.registerCustomCache(
+                POI_CACHE,
+                Caffeine.newBuilder()
+                        .maximumSize(2_000)
+                        .expireAfterWrite(Duration.ofMinutes(5))
                         .build());
         return cacheManager;
     }
