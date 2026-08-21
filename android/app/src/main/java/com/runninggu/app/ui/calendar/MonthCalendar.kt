@@ -165,7 +165,8 @@ private fun DayCell(
     val hasRace = raceCount > 0
     Column(
         modifier = modifier
-            .height(46.dp)
+            // 원(28) + 사이(3) + 점·건수 줄(16) = 47. 나머지는 상하 여백이다.
+            .height(54.dp)
             // 대회가 없는 날은 선택할 수 없다.
             .clickable(enabled = hasRace, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -200,7 +201,10 @@ private fun DayCell(
         }
         Spacer(Modifier.height(3.dp))
         Row(
-            modifier = Modifier.height(6.dp),
+            // 점만 있을 때 기준(6dp)으로 잡았더니 건수 숫자가 아래로 잘렸다 — `labelSmall` 은
+            // 줄높이가 16sp 라 6dp 상자를 넘는다. **모든 칸이 같은 높이여야** 날짜 숫자가
+            // 가로로 나란히 서므로, 늘리되 고정으로 둔다 (#85 리뷰).
+            modifier = Modifier.height(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
