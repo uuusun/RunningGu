@@ -107,4 +107,56 @@ class MapContractTest {
 
         assertEquals(CameraCommand.None, cameraCommandFor(before, after))
     }
+
+    @Test
+    fun `핀 좌표만 바뀌어도 카메라를 다시 맞춘다`() {
+        // 예전에는 id 만 비교해서, 같은 항목이 다른 좌표로 갱신돼도 카메라가 그대로였다
+        val before = MapScene(pins = threePins)
+        val after = MapScene(pins = threePins.map { it.copy(lat = it.lat + 0.05) })
+
+        assertTrue(cameraCommandFor(before, after) is CameraCommand.FitBounds)
+    }
+
+    @Test
+    fun `경로의 가운데만 바뀌어도 카메라를 다시 맞춘다`() {
+        // 같은 지점을 도는 다른 코스다. 개수와 양 끝점이 같아 예전에는 못 잡았다 (#88 리뷰)
+        val start = LatLng(37.50, 126.90)
+        val end = LatLng(37.53, 126.93)
+        val before = MapScene(route = listOf(start, LatLng(37.51, 126.91), end))
+        val after = MapScene(route = listOf(start, LatLng(37.58, 126.99), end))
+
+        assertTrue(cameraCommandFor(before, after) is CameraCommand.FitBounds)
+    }
+
+    @Test
+    fun `핀을 잇는 설정이면 핀 좌표열이 선이 된다`() {
+        // S7 동선의 "항목을 잇는 폴리라인" (SPEC §3-8)
+        val scene = MapScene(pins = threePins, connectPins = true)
+
+        assertEquals(3, scene.pinPath.size)
+        assertEquals(LatLng(37.5665, 126.9780), scene.pinPath.first())
+    }
+
+    @Test
+    fun `잇지 않기로 하면 선을 그리지 않는다`() {
+        // 흩어진 장소 목록은 이어 봐야 의미가 없다
+        val scene = MapScene(pins = threePins, connectPins = false)
+
+        assertTrue(scene.pinPath.isEmpty())
+    }
+
+    @Test
+    fun `핀이 하나면 선이 되지 않는다`() {
+        val scene = MapScene(pins = threePins.take(1), connectPins = true)
+
+        assertTrue(scene.pinPath.isEmpty())
+    }
+
+    @Test
+    fun `잇기 설정이 바뀌면 카메라를 다시 맞춘다`() {
+        val before = MapScene(pins = threePins, connectPins = true)
+        val after = MapScene(pins = threePins, connectPins = false)
+
+        assertTrue(cameraCommandFor(before, after) is CameraCommand.FitBounds)
+    }
 }

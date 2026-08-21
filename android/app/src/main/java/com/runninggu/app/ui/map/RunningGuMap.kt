@@ -39,6 +39,7 @@ import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
 import com.kakao.vectormap.route.RouteLine
+import com.kakao.vectormap.route.RouteLineLayer
 import com.kakao.vectormap.route.RouteLineOptions
 import com.kakao.vectormap.route.RouteLineSegment
 import com.kakao.vectormap.route.RouteLineStyle
@@ -160,6 +161,9 @@ private class ScenePainter {
     private var labels: List<Label> = emptyList()
     private var routeLine: RouteLine? = null
 
+    /** 핀을 잇는 선. 코스 경로선과 따로 관리한다 — 한쪽만 있는 화면이 있다(§3-8). */
+    private var pinLine: RouteLine? = null
+
     /** 직전 장면. 카메라를 전체로 맞출지 이동만 할지 가르는 근거다. */
     private var previous: MapScene? = null
 
@@ -179,6 +183,7 @@ private class ScenePainter {
         onPinClick = null
         labels = emptyList()
         routeLine = null
+        pinLine = null
         previous = null
     }
 
@@ -192,20 +197,34 @@ private class ScenePainter {
         previous = scene
     }
 
-    /** 코스 경로선. 핀과 독립이라 핀이 없어도 그린다(§3-8). */
+    /**
+     * 선 두 종류를 그린다. (SPEC §3-8)
+     *
+     * - **코스 경로선**(`scene.route`) — 핀과 독립이라 핀이 없어도 그린다. S8 러닝코스가 이것만 쓴다
+     * - **핀을 잇는 선**(`scene.pinPath`) — S7 동선의 "항목을 잇는 폴리라인". 흩어진 장소
+     *   목록은 `connectPins` 를 꺼서 안 그린다
+     *
+     * 둘을 따로 두는 이유는 한쪽만 있는 화면이 있어서다. 같은 객체로 돌려 쓰면 S7 에서
+     * 경로선이 생기는 순간 핀 선이 사라진다.
+     */
     private fun drawRoute(map: KakaoMap, scene: MapScene) {
         val layer = map.routeLineManager?.layer ?: return
-        routeLine?.let { layer.remove(it) }
-        routeLine = null
 
-        val points = scene.route
-        if (points.size < MIN_ROUTE_POINTS) return
+        routeLine?.let { layer.remove(it) }
+        routeLine = drawLine(layer, scene.route)
+
+        pinLine?.let { layer.remove(it) }
+        pinLine = drawLine(layer, scene.pinPath)
+    }
+
+    private fun drawLine(layer: RouteLineLayer, points: List<LatLng>): RouteLine? {
+        if (points.size < MIN_ROUTE_POINTS) return null
 
         val stylesSet = RouteLineStylesSet.from(
             RouteLineStyles.from(RouteLineStyle.from(ROUTE_WIDTH_DP, Blue.toArgb())),
         )
         val segment = RouteLineSegment.from(points.map { it.toKakao() }, stylesSet.getStyles(0))
-        routeLine = layer.addRouteLine(RouteLineOptions.from(segment))
+        return layer.addRouteLine(RouteLineOptions.from(segment))
     }
 
     /**

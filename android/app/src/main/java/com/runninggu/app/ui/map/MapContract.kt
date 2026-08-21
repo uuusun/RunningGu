@@ -22,15 +22,17 @@ data class MapScene(
     val connectPins: Boolean = true,
 ) {
     /**
-     * 카메라를 다시 맞춰야 하는 "구성" 의 지문.
+     * 카메라가 담아야 할 선. 핀을 잇는 설정이면 핀 좌표열이 곧 선이다(§3-8).
      *
-     * 활성 핀은 **일부러 뺐다.** 카드를 스크롤해 활성만 바뀔 때 지도가 매번 전체로
-     * 줌아웃되면 따라가기 어렵다 — 그때는 그 핀으로 이동만 한다(§3-8).
+     * S7 동선이 이걸로 그려진다 — "좌표 있는 항목만 번호 핀 + **항목을 잇는 폴리라인**".
+     * 흩어진 장소 목록은 [connectPins] 를 꺼서 선을 안 그린다.
      */
-    internal val layoutKey: String
-        get() = pins.joinToString(",") { it.id } + "|" + route.size +
-            (route.firstOrNull()?.let { "|${it.lat},${it.lng}" } ?: "") +
-            (route.lastOrNull()?.let { "|${it.lat},${it.lng}" } ?: "")
+    internal val pinPath: List<LatLng>
+        get() = if (connectPins && pins.size >= MIN_ROUTE_POINTS) {
+            pins.map { LatLng(it.lat, it.lng) }
+        } else {
+            emptyList()
+        }
 
     /** 카메라가 담아야 할 좌표. 경로가 있으면 경로가 기준이다(§3-8 · 목업 MapView). */
     internal val cameraTargets: List<LatLng>
@@ -79,7 +81,7 @@ internal fun cameraCommandFor(previous: MapScene?, next: MapScene): CameraComman
     val targets = next.cameraTargets
     if (targets.isEmpty()) return CameraCommand.None
 
-    if (previous == null || previous.layoutKey != next.layoutKey) {
+    if (previous == null || previous.layoutDiffersFrom(next)) {
         return CameraCommand.FitBounds(targets)
     }
 
@@ -89,6 +91,18 @@ internal fun cameraCommandFor(previous: MapScene?, next: MapScene): CameraComman
     val pin = next.pins.firstOrNull { it.id == activeId } ?: return CameraCommand.None
     return CameraCommand.MoveTo(LatLng(pin.lat, pin.lng))
 }
+
+/**
+ * 카메라를 다시 맞춰야 할 만큼 "구성" 이 달라졌는가.
+ *
+ * **좌표까지 본다.** 예전에는 핀 id 와 경로의 양 끝점만 비교해서, 개수와 양 끝이 같고
+ * 가운데만 바뀐 경로(같은 지점을 도는 다른 코스)에 카메라가 그대로 있었다(#88 리뷰).
+ *
+ * 활성 핀은 **일부러 뺐다.** 카드를 스크롤해 활성만 바뀔 때 지도가 매번 전체로 줌아웃되면
+ * 따라가기 어렵다 — 그때는 그 핀으로 이동만 한다(§3-8).
+ */
+private fun MapScene.layoutDiffersFrom(other: MapScene): Boolean =
+    pins != other.pins || route != other.route || connectPins != other.connectPins
 
 /** 선이 되려면 두 점은 있어야 한다. */
 internal const val MIN_ROUTE_POINTS = 2
