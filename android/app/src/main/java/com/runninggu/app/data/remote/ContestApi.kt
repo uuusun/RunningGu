@@ -3,6 +3,7 @@ package com.runninggu.app.data.remote
 import com.runninggu.app.data.remote.dto.ClosingSoonDto
 import com.runninggu.app.data.remote.dto.ContestDto
 import com.runninggu.app.data.remote.dto.ContestListDto
+import com.runninggu.app.data.remote.dto.NearbyFestivalListDto
 import com.runninggu.app.data.remote.dto.DailyCountsDto
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -53,6 +54,15 @@ interface ContestApi {
     suspend fun closingSoon(@Query("limit") limit: Int = DEFAULT_CLOSING_SOON_LIMIT): ClosingSoonDto
 
     /** 상세. 없으면 `404 CONTEST_NOT_FOUND`. (§3-4) */
+    /**
+     * 대회 인근 축제. (§3-5 · M3 프록시)
+     *
+     * 서버가 KTO `searchFestival2` 를 부르고 기간·반경 40km 필터와 거리순 정렬까지 한다.
+     * 대회 좌표가 없으면 외부 API 를 부르지 않고 `409 CONTEST_LOCATION_UNAVAILABLE` 이다.
+     */
+    @GET("contests/{id}/festivals")
+    suspend fun festivals(@Path("id") id: Long): NearbyFestivalListDto
+
     @GET("contests/{id}")
     suspend fun detail(@Path("id") id: Long): ContestDto
 
