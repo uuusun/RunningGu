@@ -41,3 +41,11 @@ springdoc:
 logging:
   pattern:
     level: "%5p [traceId=%X{traceId:-}]"
+
+runninggu:
+  external:
+    kakao-local:
+      base-url: https://dapi.kakao.com
+      rest-key: ${KAKAO_REST_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
