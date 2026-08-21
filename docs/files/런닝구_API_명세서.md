@@ -117,7 +117,9 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 이메일은 앞뒤 Unicode 공백 제거 후 전체 소문자화하며 최대 320자, `^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$` 형식이다. Gmail 점·`+tag` 같은 공급자별 변환은 하지 않는다. KAKAO의 `email_snapshot`은 EMAIL 중복으로 세지 않는다.
 닉네임은 앞뒤 공백 제거 후 Unicode 코드포인트 2~12자이고 내부 공백·Unicode를 허용한다. 표시 문자열은 보존하되 중복 키는 ASCII 영문 대소문자를 무시하며 NFC/NFKC 변환은 하지 않는다. (가입 2단계 인라인 검증용 — 이슈 #97)
 
-두 API는 공개 이메일 존재 조회라는 의도된 비대칭을 가진다. IP 합산 30회/분, 정규화 이메일·닉네임별 5회/분을 단일 서버 Caffeine에서 제한하고 초과 시 `429 RATE_LIMITED`를 반환한다. 조회 실패·제한은 앱의 `DuplicateCheck.Error`이며 가입 진행을 막지 않고, 발송·가입의 유니크 오류가 최종 방어다.
+두 API는 공개 이메일 존재 조회라는 의도된 비대칭을 가진다. IP 합산 30회/분, 정규화 이메일·닉네임별 5회/분을 단일 서버 Caffeine에서 제한하고 초과 시 `429 RATE_LIMITED`를 반환한다. P0 응답에는 `Retry-After` 헤더나 남은 시간을 넣지 않으며 앱은 카운트다운 없이 일반 재시도 안내를 표시한다. 조회 실패·제한은 앱의 `DuplicateCheck.Error`이며 가입 진행을 막지 않고, 발송·가입의 유니크 오류가 최종 방어다.
+
+IP는 Spring 전달 헤더 처리 후 `request.getRemoteAddr()`를 사용한다. 로컬·직접 연결은 `FORWARD_HEADERS_STRATEGY=none`, 신뢰 가능한 프록시 뒤 운영은 `framework`로 설정한다. 프록시는 외부 전달 헤더를 제거·재설정하고 원본 서버 직접 접근을 차단해야 한다. 프록시 배포에서 `none`이면 모든 사용자가 프록시 IP 버킷을 공유하고, 신뢰 경계 없이 `framework`를 켜면 헤더 위조로 제한을 우회할 수 있다.
 
 ### 1-3 `POST /auth/email/send-code`
 
