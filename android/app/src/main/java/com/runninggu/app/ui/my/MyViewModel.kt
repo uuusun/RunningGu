@@ -2,8 +2,12 @@ package com.runninggu.app.ui.my
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.model.SavedCourse
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.model.RaceSummary
@@ -40,13 +44,15 @@ data class SavedItinerary(
     val placeCount: Int,
 )
 
-/** 저장한 러닝코스 카드 한 장. P0는 saved만이다 (SPEC §4.13 · 결정 D-25). */
-data class SavedCourse(
-    val id: String,
-    val name: String,
-    val distanceKm: Double,
-    val gainM: Int,
-)
+/**
+ * 저장한 러닝코스는 `data/model` 의 [SavedCourse] 를 그대로 쓴다. P0는 saved만이다
+ * (SPEC §4.13 · 결정 D-25).
+ *
+ * 화면 전용 모델을 따로 두지 않는 이유는, 카드가 쓰는 값이 서버 응답의 부분집합이고
+ * **상세로 넘길 canonical id(`Long`)** 가 그대로 필요하기 때문이다. 옮겨 담으면 id 를
+ * 문자열로 바꿨다 되돌리는 일만 생긴다.
+ */
+
 
 /**
  * S10 마이의 UI 계약. (SPEC §4.13 · §3-5)
@@ -68,7 +74,9 @@ data class MyUiState(
  * 저장소 SSOT는 서버다 — 동선·코스 목록은 TODO(AP-14) Retrofit + Room 읽기 캐시로
  * 교체한다. 찜은 [FavoriteStore]를 그대로 읽어 S2 카드·S3 상세와 같은 값을 보인다.
  */
-class MyViewModel : ViewModel() {
+class MyViewModel(
+    private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
     val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
@@ -85,11 +93,12 @@ class MyViewModel : ViewModel() {
                         profile = profile,
                         // 데모 목록은 로그인 상태에서만 보인다 — 게스트 화면 검증을 막지 않게.
                         itineraries = if (profile != null) SAMPLE_ITINERARIES else emptyList(),
-                        courses = if (profile != null) SAMPLE_COURSES else emptyList(),
+                        courses = if (profile == null) emptyList() else it.courses,
                     )
                 }
                 // 서버 SSOT 를 다시 읽는다. 게스트면 캐시를 비운다 (SPEC §4.13 · AP-21).
                 FavoriteStore.refresh()
+                if (profile != null) loadCourses()
             }
         }
         viewModelScope.launch {
@@ -105,6 +114,28 @@ class MyViewModel : ViewModel() {
 
     fun onSegmentSelect(segment: MySegment) {
         _uiState.update { it.copy(segment = segment) }
+    }
+
+    /**
+     * 저장 코스 목록. (API 명세 §7-A · SPEC §4.13)
+     *
+     * 실패는 조용히 둔다 — 세 세그먼트 중 하나라서 화면 전체를 오류로 덮으면 동선·찜까지
+     * 못 본다(§3-5 영역 단위 부분 실패). 다시 들어오면 재조회된다.
+     *
+     * 상세에서 삭제하고 돌아왔을 때도 이걸 다시 부른다 — 목록에서 빠진 것을 보여야 한다.
+     */
+    fun loadCourses() {
+        viewModelScope.launch {
+            val courses = try {
+                savedCourseRepository.list().courses
+            } catch (e: ApiException) {
+                // 서버 문구 대신 이 자리에서 뭘 못 불렀는지 말한다 — 마이는 세그먼트가
+                // 셋이라 "정보를 불러오지 못했어요" 로는 어느 탭인지 알 수 없다.
+                _message.value = "저장한 코스를 불러오지 못했어요."
+                return@launch
+            }
+            _uiState.update { it.copy(courses = courses) }
+        }
     }
 
     /** [동선] 카드의 [삭제]. (SPEC §4.13 🔧정책) */
@@ -153,9 +184,6 @@ class MyViewModel : ViewModel() {
                 placeCount = 6,
             ),
         )
-        val SAMPLE_COURSES = listOf(
-            SavedCourse(id = "c_1", name = "여의도 한강 순환 5km", distanceKm = 5.0, gainM = 12),
-            SavedCourse(id = "c_2", name = "해파랑길 1코스 구간", distanceKm = 7.5, gainM = 88),
-        )
+        // 저장 코스는 SavedCourseRepository 가 준다 — 데모 목록을 여기 두지 않는다.
     }
 }

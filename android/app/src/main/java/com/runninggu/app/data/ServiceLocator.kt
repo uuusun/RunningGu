@@ -15,6 +15,8 @@ import com.runninggu.app.data.remote.TokenApi
 import com.runninggu.app.data.remote.TokenAuthenticator
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.CourseRepository
+import com.runninggu.app.data.repository.FakeSavedCourseRepository
+import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
 import com.runninggu.app.data.repository.RemoteCourseRepository
 import kotlinx.coroutines.runBlocking
@@ -104,4 +106,12 @@ object ServiceLocator {
     /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
     val courseRepository: CourseRepository by lazy { RemoteCourseRepository(courseApi) }
+
+    /**
+     * 저장 코스. **아직 스텁이다** — 백엔드에 `/api/me/courses` 가 없다(§7-A · AP-07).
+     *
+     * 다른 항목처럼 `Remote…` 로 바꾸면 화면은 그대로 붙는다. 그때까지 스텁으로 두는 이유는,
+     * 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을 확인할 수 없기 때문이다.
+     */
+    val savedCourseRepository: SavedCourseRepository by lazy { FakeSavedCourseRepository }
 }

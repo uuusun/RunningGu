@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.ui.common.Attributions
 import com.runninggu.app.ui.common.ElevationLine
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
@@ -497,14 +498,3 @@ private fun NoticeRow(message: String) {
     )
 }
 
-/** 출처는 **순서·문구를 바꾸지 않고** 그대로 낸다 — 공공누리·ODbL 의무다. (§4.11-5) */
-@Composable
-private fun Attributions(attributions: List<String>) {
-    if (attributions.isEmpty()) return
-    Text(
-        text = "출처 · " + attributions.joinToString(" · "),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-    )
-}

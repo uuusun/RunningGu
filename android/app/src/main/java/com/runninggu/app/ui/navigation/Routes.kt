@@ -50,6 +50,21 @@ object Routes {
     fun raceDetail(raceId: String): String = "raceDetail/${Uri.encode(raceId)}"
 
     /**
+     * S8-D 코스 상세. **조회 종류마다 route 를 나눈다** (matrix D-20).
+     *
+     * 예전 계획인 `courseDetail/{type}/{id}` 를 폐기한 이유는, 세 종류가 **id 의 의미도
+     * 데이터 출처도 다르기** 때문이다. `type` 을 문자열로 받으면 화면이 그걸 다시 갈라야 하고,
+     * 잘못된 조합(`near` 인데 id 가 있다)이 컴파일에 안 걸린다.
+     *
+     * `near` 는 **route 에 id 가 없다.** 목록에서 고른 항목의 snapshot 을 그래프 상태로
+     * 넘긴다 — OSM 생성 경로는 서버에 저장돼 있지 않아 다시 조회할 id 자체가 없다.
+     */
+    const val ARG_SAVED_COURSE_ID = "savedCourseId"
+    const val COURSE_DETAIL_SAVED_PATTERN = "courseDetail/saved/{$ARG_SAVED_COURSE_ID}"
+
+    fun courseDetailSaved(savedCourseId: Long): String = "courseDetail/saved/$savedCourseId"
+
+    /**
      * 위저드 그래프(S4~S7). (SPEC §2.2)
      *
      * 그래프 자체에 route를 주는 이유는 ViewModel 스코프 때문이다 — 이 route로

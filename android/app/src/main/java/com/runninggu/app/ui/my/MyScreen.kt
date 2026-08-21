@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.model.SavedCourse
 import com.runninggu.app.domain.today
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
@@ -55,6 +56,7 @@ fun MyScreen(
     onLoginRequest: () -> Unit,
     onOpenAccount: () -> Unit,
     onRaceClick: (String) -> Unit,
+    onCourseClick: (Long) -> Unit,
     onBrowseRaces: () -> Unit,
     onBrowseCourses: () -> Unit,
     modifier: Modifier = Modifier,
@@ -109,6 +111,7 @@ fun MyScreen(
 
             MySegment.COURSE -> CourseList(
                 items = state.courses,
+                onCourseClick = onCourseClick,
                 onBrowseCourses = onBrowseCourses,
             )
 
@@ -269,6 +272,7 @@ private fun ItineraryList(
 @Composable
 private fun CourseList(
     items: List<SavedCourse>,
+    onCourseClick: (Long) -> Unit,
     onBrowseCourses: () -> Unit,
 ) {
     if (items.isEmpty()) {
@@ -279,7 +283,8 @@ private fun CourseList(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { course ->
             Surface(
-                // TODO(AP-12/14): 탭 → 경로 지도 상세 (D-20 sealed CourseDetailKey).
+                // 탭 → 저장 코스 상세. 경로·고도·출처는 거기서만 본다 (matrix S8-D · D-20).
+                onClick = { onCourseClick(course.id) },
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 1.dp,
@@ -287,12 +292,13 @@ private fun CourseList(
             ) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
-                        text = course.name,
+                        text = course.courseName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
+                        // 출처(attributions)는 카드에 안 낸다 — 상세 응답에만 온다(결정-44).
                         text = "왕복 ${course.distanceKm}km · 상승 ${course.gainM}m",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
