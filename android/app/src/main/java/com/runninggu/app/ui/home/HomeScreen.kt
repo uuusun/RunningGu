@@ -542,13 +542,17 @@ private fun FestivalCard(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "${festival.period} · ${festival.region}",
+                text = festivalPeriodAndRegion(festival.period, festival.region),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
+
+/** 지역을 제공하지 않은 축제는 구분점 없이 기간만 표시한다. (API 명세 §4-1) */
+internal fun festivalPeriodAndRegion(period: String, region: String): String =
+    if (region.isBlank()) period else "$period · $region"
 
 // ── 날짜 표시 도우미 ──
 // TODO(AP-04): 도메인 포팅(dates.kt·KST 규칙)이 들어오면 그쪽으로 옮긴다.
