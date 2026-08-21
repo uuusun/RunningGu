@@ -77,6 +77,29 @@ Android Studio 로 프로젝트를 열면 자동 생성된다.
 | Android Studio (Windows) | `C\:\\Users\\<이름>\\AppData\\Local\\Android\\Sdk` |
 | Homebrew 커맨드라인 툴 | `/opt/homebrew/share/android-commandlinetools` |
 
+같은 파일에 **카카오 네이티브 앱 키**도 넣는다. 지도(§3-8)와 카카오 로그인(§4.1)이 이걸 쓴다.
+
+```properties
+KAKAO_NATIVE_APP_KEY=
+```
+
+값은 저장소·이슈·PR 어디에도 적지 않는다(AGENTS 8장). 팀에 물어 따로 받는다.
+`app/build.gradle.kts` 가 읽어서 `BuildConfig.KAKAO_NATIVE_APP_KEY` 와 매니페스트
+플레이스홀더 `kakaoNativeAppKey` 로 넣어 준다.
+
+**키가 없어도 빌드와 단위 테스트는 돌아간다** — CI 에 키가 없기 때문이다. 대신 지도를
+띄우는 화면만 오류로 떨어진다.
+
+> 카카오 콘솔에는 **개발 PC 마다 디버그 키 해시를 따로 등록**해야 그 PC 에서 지도가 뜬다.
+> 자기 것을 뽑는 법:
+>
+> ```bash
+> keytool -exportcert -alias androiddebugkey -keystore ~/.android/debug.keystore >   -storepass android -keypass android | openssl sha1 -binary | openssl base64
+> ```
+>
+> Windows 는 `keytool` 이 PATH 에 없어서 JBR 것을 직접 부른다 —
+> `"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe"`.
+
 데이터 스크립트를 돌릴 때만:
 
 ```bash
