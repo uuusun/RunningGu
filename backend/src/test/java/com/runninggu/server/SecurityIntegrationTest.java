@@ -31,7 +31,7 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 인증_사전_API만_공개하고_아직_구현하지_않은_가입_API는_거부한다() throws Exception {
+    void 인증_API는_공개하고_잘못된_가입_요청은_검증오류다() throws Exception {
         mockMvc.perform(get("/api/auth/email/exists")
                         .param("email", "runner@example.com"))
                 .andExpect(status().isOk());
@@ -39,6 +39,18 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void 게스트_생성과_회원_경로를_분리한다() throws Exception {
+        mockMvc.perform(post("/api/itineraries/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }

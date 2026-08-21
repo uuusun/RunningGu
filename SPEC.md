@@ -221,8 +221,8 @@ root
 
 가입 흐름(회의 확정): **정보 입력(이메일·비밀번호·닉네임) → 이메일 인증 → 가입 완료**. **정보 동의 필수**.
 
-1. **약관·개인정보 동의** — 필수 2종(이용약관/개인정보 수집·이용) + 선택(마케팅) 🔧정책. 전체 동의 제공. 필수 미동의 시 진행 불가. 동의 이력 서버 저장(NFR-12).
-2. **정보 입력** — 이메일(형식+중복 확인) · 비밀번호(+확인, 8자 이상 영문+숫자 🔧정책) · 닉네임(앞뒤 공백 제거 후 Unicode 코드포인트 2~12자, 내부 공백·Unicode 허용, ASCII 영문 대소문자 무시 중복 🔧정책).
+1. **약관·개인정보 동의** — 필수 2종(이용약관/개인정보 수집·이용) + 선택(마케팅) 🔧정책. 전체 동의 제공. 필수 미동의 시 진행 불가. 활성 버전은 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`이고 서버가 세 항목을 같은 변경 시각으로 이력 저장한다(NFR-12, 결정-52, 이슈 #111).
+2. **정보 입력** — 이메일(형식+중복 확인) · 비밀번호(+확인, 8자 이상 영문+숫자, UTF-8 기준 최대 72바이트 🔒확정) · 닉네임(앞뒤 공백 제거 후 Unicode 코드포인트 2~12자, 내부 공백·Unicode 허용, ASCII 영문 대소문자 무시 중복 🔧정책).
 3. **이메일 인증** — [인증 메일 발송] → 구분 기호 없는 6자리 숫자 코드 입력(유효 10분·재발송 쿨다운 60초·5번째 실패부터 재발송 🔧정책). 성공 시 가입 자격은 30분 동안 유효하며, 같은 코드는 그동안 멱등 성공한다.
 4. **완료** — 스낵바 후 A1(또는 자동 로그인 🔧정책).
 
@@ -566,6 +566,7 @@ loginIdentity { id, userId(unique), provider: EMAIL|KAKAO, providerSubject,
 userAgreement { userId, type: TOS|PRIVACY|MARKETING, version, agreed, changedAt }
 emailVerification { email, purpose: SIGNUP|PASSWORD_RESET, codeHash?, tokenHash?, attempts,
                     sentAt, expiresAt, verifiedAt?, consumedAt? }
+refreshToken { userId, familyId, tokenHash, expiresAt, revokedAt?, createdAt }
 ```
 
 - USER는 로그인 주체, LOGIN_IDENTITY는 가입 시 선택한 로그인 방법이다. `USER:LOGIN_IDENTITY`는 1:1이며 `LOGIN_IDENTITY.userId`와 `(provider, providerSubject)`는 각각 UNIQUE다. P0에서는 로그인 방법 연결·추가·전환을 지원하지 않는다.
@@ -573,6 +574,7 @@ emailVerification { email, purpose: SIGNUP|PASSWORD_RESET, codeHash?, tokenHash?
 - EMAIL 수단은 `passwordHash`와 `emailVerifiedAt`이 필수이고 `emailSnapshot`은 null이다. KAKAO 수단은 비밀번호·자체 이메일 인증 시각이 null이며 카카오 회원번호를 로그인 식별자로 사용한다. 카카오가 이메일을 제공하지 않아도 가입할 수 있고, 별도 이메일 입력·자체 인증을 추가하지 않는다.
 - `(provider, providerSubject)`는 전역 유일하다. 동일 이메일 자동 병합을 금지하고 P0에서는 provider 연결·전환 API를 두지 않는다.
 - `nicknameKey`는 앞뒤 공백 제거 후 ASCII 영문만 소문자로 접은 중복 키다. `(email, purpose)` 인증 상태는 한 행으로 유지하며 SIGNUP은 `codeHash`, PASSWORD_RESET은 `tokenHash`만 사용한다.
+- 리프레시 토큰은 기기 로그인마다 새 `familyId`를 만들고 회전 전 토큰을 revoke한 뒤 같은 family의 후속 토큰을 발급한다. revoke된 과거 토큰이 다시 제시되면 해당 family의 활성 토큰을 모두 revoke하며 다른 기기의 family는 유지한다. 원문은 저장하지 않고 SHA-256 lowercase hex만 저장한다(결정-51).
 
 - ~~communityPost·raceView~~ — 커뮤니티 제외(결정-13)·인기 섹션 제거(결정-11)로 **삭제**.
 
@@ -746,7 +748,7 @@ app/src/main/java/com/runninggu/app/
 
 회원(U1~U3)·canonical 대회·마이/찜·동선·**외부 API 프록시(REST 키 격리 🔒확정)** ·큐레이션 코스 동기화·OSM 경로 생성을 서버가 담당한다. 러닝 기록(R1)은 AP-22 P1에서 추가한다.
 
-- 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security(Access JWT + Refresh JWT, HS256, 액세스 30분·리프레시 14일, 회전 발급·DB 해시 저장 🔒확정) + 서버 내부 **GraphHopper 별도 프로세스** 🔒확정(결정-42).
+- 스택: **Spring Boot(Java 21) + PostgreSQL** + Flyway + Spring Mail(SMTP — 가입 인증 코드·재설정 링크) + Spring Security Resource Server(`BearerTokenAuthenticationFilter`) 기반 Access JWT 인증(HS256, 액세스 30분) + Refresh JWT(14일, family 회전·DB 해시 저장·재사용 탐지 🔒확정, 결정-51) + 서버 내부 **GraphHopper 별도 프로세스** 🔒확정(결정-42). JWT claim은 `sub=String(userId)`, `iss=runninggu`, `aud=runninggu-api`, `type=ACCESS|REFRESH`, `jti=UUID`, `iat`, `exp`로 고정한다.
 - 테스트: JUnit 5 + Testcontainers(PostgreSQL 통합 테스트) 🔒확정.
 - 외부 API TTL 캐시는 단일 서버 MVP에서 Spring Cache + Caffeine을 사용하고 Redis는 사용하지 않는다 🔒확정.
 - 서버 역할: ① USER+LOGIN_IDENTITY 인증·회원 ② canonical 대회·출처 배치 ③ **P0 동선 생성 규칙 엔진** + 마이(동선·저장 코스)·찜 SSOT, P1 러닝 기록 ④ **KTO·카카오 REST 프록시** — POI·축제·지오코딩·걷기 스팟·이동시간 ⑤ 두루누비 메타+큐레이션 GPX 결합 ⑥ 적격 큐레이션 경로가 없는 위치의 OSM 순환 경로 생성·품질 상한 적용. 프록시에는 서버 캐싱·레이트리밋을 둔다.
@@ -798,9 +800,9 @@ app/src/main/java/com/runninggu/app/
 | NFR-6 | 신뢰성 표기 — 출처·최근확인일 상시 노출 |
 | NFR-7 | 저작권 — KTO 이미지 `cpyrhtDivCd` 준수, "한국관광공사" 크레딧 |
 | NFR-8 | 좌표 규율 — §6.6 위반 금지, 변환은 리모트 매퍼 단일 계층 |
-| NFR-9 | 비밀번호 단방향 해시(bcrypt/argon2) — 평문·가역 저장 금지. 재설정 토큰도 해시로만 저장 |
+| NFR-9 | 비밀번호는 UTF-8 기준 최대 72바이트로 제한하고 BCrypt strength 10 단방향 해시로만 저장한다. 재설정·리프레시 토큰도 원문이 아닌 해시로만 저장한다 |
 | NFR-10 | 인증 코드 보호 — 10분 만료·5회 제한·재발송 쿨다운 60초 |
-| NFR-11 | 세션 — JWT(액세스+리프레시 🔧정책) DataStore 보관. 로그아웃·만료·**비밀번호 재설정 시 전체 세션 무효화** 처리 필수 |
+| NFR-11 | 세션 — Access 30분·Refresh 14일 JWT를 DataStore에 보관한다. Refresh는 기기별 family 회전·재사용 탐지로 해당 family를 폐기한다. 로그아웃은 Refresh credential만 받는 공개·멱등 `204`이며 해당 family만 revoke하고 Access blacklist는 두지 않는다. 비밀번호 재설정·변경·탈퇴는 전체 세션 무효화 |
 | NFR-12 | 개인정보 — 최소 수집, 필수/선택 동의 분리 + 이력 저장, 탈퇴 시 삭제, 카카오 프로필 최소 수집 |
 | NFR-13 🔒확정 | **GPS 기록 안전장치** — 기록 중 포그라운드 서비스+상시 알림(OS 강제 종료 방지), 기록 데이터는 본인 계정만 접근, 좌표는 한국 영역 검증 🔧정책. (구 UGC 항목은 커뮤니티 제외로 대체) |
 | NFR-14 🔒확정 | **API 키 격리** — KTO·카카오 REST 키는 백엔드 전용(앱 미포함). 앱은 카카오 네이티브 앱 키만 BuildConfig 주입(패키지명+키 해시로 보호). 하드코딩·커밋 금지. 릴리스 빌드 R8 활성 🔧정책 |
@@ -948,6 +950,8 @@ app/src/main/java/com/runninggu/app/
 | 결정-48 | Importer는 snapshot 전체의 canonical 승계 대상을 DB 변경 전에 계산하고, 최대 source 겹침 동률 또는 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 전체 적재를 거부한다. 정상적인 다중 원천은 허용한다 | 근거 없이 기존 PK를 고르면 찜·저장 동선 참조가 다른 대회로 바뀔 수 있으므로, 애매한 승계는 원자적으로 실패시켜 기존 참조를 보존한다 | §8.2 · 대회 snapshot 계약 |
 | 결정-49 | `GET /api/pois`는 항목별 실제 원천 `provider(KAKAO|KTO)`를 반환하되 별도 POI 마스터를 만들지 않으므로 `placeId`를 두지 않고, `fetchedAt/cachedAt`은 서버 내부 정보로 유지한다. 8km에서 3건 미만이면 20km로 확대하고 부족분은 카테고리별 폴백 원천으로 보충하며, 한 원천의 부분 실패는 다른 원천의 표시 결과가 있을 때만 `200`으로 격리한다 | 앱이 실제 출처를 표시하면서도 사용하지 않는 식별자·서버 캐시 정보를 계약으로 굳히지 않고, 희소 지역과 부분 장애에서도 빈 상태와 오류를 사실대로 구분한다 | §8.1 · §9.3 · API 명세 §4-2 |
 | 결정-50 | EMAIL은 서버가 `strip + lowercase(Locale.ROOT)`로 정규화하고 공급자별 별칭 변환은 하지 않는다. 닉네임은 trim 후 Unicode 코드포인트 2~12자이며 ASCII 영문 대소문자를 무시해 중복 판정한다. 이메일·닉네임 중복 확인은 모두 P0 공개 API로 유지하되 IP 30회/분·정규화 입력 5회/분 제한을 적용한다. 인증 코드는 BCrypt strength 10 해시만 저장하고 5번째 오입력부터 잠그며, 성공 후 30분 동안 같은 코드 검증은 멱등 성공한다 | 앱·서버의 입력 판정 차이와 늦은 중복 응답을 막고, 가입 전 확인 UX를 유지하면서 공개 이메일 존재 조회의 대량 열거 비용을 높인다(이슈 #97) | §4.2 · §6.5 · §9.3 · NFR-9~10 |
+| 결정-51 | JWT는 HS256과 `sub/iss/aud/type/jti/iat/exp` claim 계약을 사용하고 Access 30분·Refresh 14일로 발급한다. Refresh 원문은 SHA-256 lowercase hex로만 저장하며 기기별 family 회전과 과거 토큰 재사용 탐지 시 해당 family 전체 revoke를 적용한다. 로그아웃은 Refresh만 받는 공개·멱등 `204`이고 Access blacklist는 두지 않는다 | 앱 재발급 계약과 서버 인증 필터의 책임을 고정하고 탈취된 회전 전 토큰 재사용을 같은 기기 세션 안에서 차단한다 | §6.5 · §9.2~9.3 · NFR-11 |
+| 결정-52 | 활성 가입 약관 버전은 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`이며 가입 시 선택 동의를 포함한 세 항목을 같은 시각으로 append-only 저장한다. 앱은 버전을 보내지 않고 동의 boolean만 전송한다 | 앱 카피와 서버 이력 버전이 독립적으로 어긋나지 않게 하며, 이후 버전 변경은 앱·서버 계약 변경으로 함께 리뷰한다(이슈 #111) | §4.2 · §6.5 · NFR-12 |
 
 ### 12.5 남은 미결
 

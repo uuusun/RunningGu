@@ -4,7 +4,7 @@
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.11(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v3.0(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -165,7 +165,7 @@ Compose 화면
 |---|---|---|---|---|---|
 | 세션 읽기 | DataStore | token, guest | 세션 분기 | token 없음→로그인 | 기기 |
 | 세션 검증 | `GET /api/me` | Bearer token | user profile | 401→refresh | 서버 DB 조회 |
-| 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 회전된 token pair | 실패→세션 삭제·로그인 | 서버 hash + DataStore |
+| 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 같은 기기 family에서 회전된 token pair | 실패→세션 삭제·로그인, 과거 토큰 재사용이면 해당 family 폐기 | 서버 SHA-256 hash + DataStore |
 | 게스트 저장·찜 차단 | Android guard | 원래 route와 동작 종류 | 로그인 모달 | 로그인 후 원래 화면 복귀, **자동 실행하지 않음** | route 임시 상태 |
 | 공통 API 오류 | Problem Details parser | status, code | 화면별 Error | Empty로 강등 금지 | 저장 없음 |
 | 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 | 쓰기 비활성 | 기기 캐시 |
@@ -184,7 +184,7 @@ Compose 화면
 
 | 단계/행동 | 처리/API | 입력 | 응답·다음 상태 | 저장 |
 |---|---|---|---|---|
-| 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화 | 가입 완료 전 로컬 |
+| 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화. 활성 카피 버전 `TOS/PRIVACY/MARKETING=1.0` | 가입 완료 전 로컬, 가입 시 서버가 버전 포함 3행 저장 |
 | 정보 입력·검증 | 로컬 + 중복 API | email, password, confirm, nickname | exists/validation | 가입 완료 전 로컬 |
 | 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | `Unchecked/Checking/Available/Duplicate/Error`; 입력 변경 시 이전 응답 무효화 | 없음 |
 | 코드 발송 | `POST /api/auth/email/send-code` | email | 204, 60초 타이머 | 서버 검증 상태 |
@@ -374,7 +374,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 마케팅 동의 | `PATCH /api/me/agreements` | marketing | 응답 계약 보완 필요 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
-| 로그아웃 | `POST /api/auth/logout` | refreshToken | 세션 삭제→로그인 |
+| 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
 | 탈퇴 재인증 | `POST /api/me/reauth` | EMAIL password 또는 KAKAO SDK token | 5분 reauthToken |
 | 회원 탈퇴 | 확인 modal→`DELETE /api/me` | `X-Reauth-Token` | 204→모든 세션·사용자 캐시 삭제→로그인 |
 
@@ -485,6 +485,8 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
 | D-30 / SPEC 결정-50 | 이메일·닉네임 중복 확인은 모두 P0에서 호출한다. `Checking` 동안 인증 메일 발송을 막고 `Available`에서 허용하며, `Duplicate`만 확정 차단한다. `Unchecked`·네트워크/`RATE_LIMITED` `Error`는 발송·가입의 서버 유니크 방어를 믿고 진행을 막지 않는다. 입력 변경 시 결과를 즉시 무효화하고 늦은 응답은 버린다 |
+| D-31 / SPEC 결정-51 | Access 30분·Refresh 14일, 기기별 refresh family 회전·재사용 탐지를 적용한다. 로그아웃은 Access 없이 Authenticator가 붙지 않는 클라이언트로 호출하고 non-blank refresh 결과와 무관하게 204를 받으면 로컬 세션을 삭제한다 |
+| D-32 / SPEC 결정-52 | 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 계약 PR에서 함께 확인한다(이슈 #111) |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |
 | DB-05 / SPEC 결정-46 | 승인된 full snapshot에서 source 2회 연속 누락 시 비활성. 실패·부분 snapshot은 미반영, 재등장은 즉시 복구, canonical은 활성 source가 없을 때만 비활성. 공개 탐색 제외·참조 상세 유지 |
