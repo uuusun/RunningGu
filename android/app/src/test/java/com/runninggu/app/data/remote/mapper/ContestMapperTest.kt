@@ -87,12 +87,14 @@ class ContestMapperTest {
         // 찜·저장 동선에서 진입한 상세는 삭제하지 않고 돌려준다 (결정-46)
         val contest = ApiJson.decodeFromString(
             ContestDto.serializer(),
-            """{"id":153,"name":"n","region":"서울","venue":"v",
-               "contestDate":"2026-09-04","active":false}""",
+            """{"id":153,"name":"n","region":"서울","place":"서울광장",
+               "contestDate":"2026-09-04","active":false,"events":[],
+               "sources":[],"favorite":false,"dDay":-3}""",
         ).toContest()
 
         assertEquals(false, contest.active)
         assertEquals(153L, contest.serverId)
+        assertEquals("서울광장", contest.venue)
     }
 
     @Test
@@ -201,13 +203,17 @@ class ContestMapperTest {
     @Test
     fun `상세는 좌표와 주최를 더 준다`() {
         val raw = """
-            {"items":[{"id":153,"name":"n","contestDate":"2026-08-22",
-                       "organizer":"세종시","officialUrl":"https://example.test",
-                       "lat":36.48,"lng":127.28,"dDay":11}]}
+            {"id":153,"active":true,"name":"n","region":"세종","place":"세종중앙공원",
+             "contestDate":"2026-08-22","startTime":"08:00","events":["FULL"],
+             "regStatus":"OPEN","applyStart":"2026-04-01","applyEnd":"2026-08-10",
+             "sources":["MARATHON_ONLINE"],"checkedAt":"2026-07-15T04:30:00Z",
+             "favorite":false,"organizer":"세종시","officialUrl":"https://example.test",
+             "lat":36.48,"lng":127.28,"dDay":11}
         """.trimIndent()
-        val c = ApiJson.decodeFromString(ContestListDto.serializer(), raw).items.single().toContest()
+        val c = ApiJson.decodeFromString(ContestDto.serializer(), raw).toContest()
 
         assertEquals("세종시", c.organizer)
+        assertEquals("세종중앙공원", c.venue)
         assertTrue(c.hasLocation)
         assertEquals(36.48, c.lat!!, 1e-9)
     }
