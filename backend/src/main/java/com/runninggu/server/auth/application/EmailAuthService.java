@@ -21,9 +21,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class EmailAuthService {
 
     private static final EmailVerificationPurpose SIGNUP = EmailVerificationPurpose.SIGNUP;

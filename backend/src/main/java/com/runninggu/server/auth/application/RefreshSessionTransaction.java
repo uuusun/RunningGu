@@ -6,10 +6,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class RefreshSessionTransaction {
 
     private final RefreshTokenRepository repository;

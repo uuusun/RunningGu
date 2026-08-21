@@ -2,9 +2,11 @@ package com.runninggu.server.auth.application;
 
 import com.runninggu.server.common.error.ApiException;
 import com.runninggu.server.common.error.ErrorCode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class RefreshSessionService {
 
     private final RefreshSessionTransaction transaction;
