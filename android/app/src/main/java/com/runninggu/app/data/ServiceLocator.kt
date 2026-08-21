@@ -7,7 +7,11 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.RefreshOutcome
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.asRefreshFailure
+import com.runninggu.app.data.local.SessionValidation
+import com.runninggu.app.data.local.SessionValidator
 import com.runninggu.app.data.remote.ContestApi
+import com.runninggu.app.data.remote.MeApi
+import com.runninggu.app.data.remote.mapper.toSessionProfile
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
@@ -97,6 +101,32 @@ object ServiceLocator {
         // 401 만 재로그인이다. 네트워크·5xx 는 이번 요청만 실패시키고 세션은 지킨다
         e.asRefreshFailure()
     }
+
+    val meApi: MeApi by lazy { retrofit.create() }
+
+    /**
+     * 앱 시작 세션 검증. (`screen-api-matrix` A0 · API 명세 §2)
+     *
+     * **`401` 만 죽은 세션이다.** 여기까지 온 `401` 은 [tokenAuthenticator] 가 재발급까지
+     * 시도한 뒤의 결과라 재로그인 말고는 방법이 없다.
+     *
+     * 네트워크·5xx 는 [SessionValidation.Unknown] 이다 — 지하철에서 앱을 켰다고 로그아웃되면
+     * 안 된다(#89 리뷰). 응답 모양이 계약과 다른 경우(모르는 `loginProvider`)도 세션을
+     * 죽이지 않는다. 그건 서버 배포 사고지 사용자 세션 문제가 아니다.
+     */
+    val sessionValidator = SessionValidator {
+        try {
+            SessionValidation.Valid(apiCall { meApi.me() }.toSessionProfile())
+        } catch (e: ApiException.Http) {
+            if (e.status == HTTP_UNAUTHORIZED) SessionValidation.Expired else SessionValidation.Unknown
+        } catch (e: ApiException) {
+            SessionValidation.Unknown
+        } catch (e: IllegalArgumentException) {
+            SessionValidation.Unknown
+        }
+    }
+
+    private const val HTTP_UNAUTHORIZED = 401
 
     val contestApi: ContestApi by lazy { retrofit.create() }
     val courseApi: CourseApi by lazy { retrofit.create() }

@@ -85,6 +85,10 @@ object SessionStore {
     /** 쓰기를 한 줄로 세우는 자리. 값 하나가 곧 "지금 남겨야 할 전체 상태" 다. */
     private val pending = MutableStateFlow<PersistCommand?>(null)
 
+    /** 로그아웃에서 **지워질 때까지 기다리려면** 저장소를 직접 들고 있어야 한다. */
+    @Volatile
+    private var persistence: SessionPersistence? = null
+
     /**
      * 발급받은 토큰. [com.runninggu.app.data.ServiceLocator] 가 이 값을 읽어
      * `Authorization: Bearer` 를 붙인다(§0-2 · #43).
@@ -121,9 +125,14 @@ object SessionStore {
      * [scope] 는 앱 수명과 함께 사는 것이라야 한다. 화면 `viewModelScope` 에 매면 화면이
      * 사라질 때 저장이 중간에 끊긴다.
      */
-    fun bind(persistence: SessionPersistence, scope: CoroutineScope) {
+    fun bind(
+        persistence: SessionPersistence,
+        scope: CoroutineScope,
+        validator: SessionValidator = NoSessionValidator,
+    ) {
+        this.persistence = persistence
         scope.launch {
-            restore(persistence)
+            restore(persistence, validator)
             // 복원이 끝난 뒤부터 쓰기를 받는다 — 순서가 뒤집히면 복원이 새 로그인을 덮는다
             pending.filterNotNull().collect { command ->
                 try {
@@ -148,7 +157,7 @@ object SessionStore {
      * 읽는 동안 사용자가 로그인했으면 **덮지 않는다.** 게스트로 둘러보다 로그인한 사람이
      * 디스크에 남아 있던 이전 계정으로 되돌아가면 안 된다.
      */
-    private suspend fun restore(persistence: SessionPersistence) {
+    private suspend fun restore(persistence: SessionPersistence, validator: SessionValidator) {
         try {
             val saved = persistence.load()
             if (saved != null) {
@@ -159,6 +168,7 @@ object SessionStore {
                     }
                 }
             }
+            validateRestored(validator)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -166,6 +176,52 @@ object SessionStore {
         } finally {
             // **무슨 일이 있어도 올린다.** 여기서 못 올리면 시작 화면이 영영 안 열린다
             _restored.value = true
+        }
+    }
+
+    /**
+     * 복원한 세션이 아직 쓸 수 있는지 서버에 물어본다. (A0 계약 · #89 리뷰)
+     *
+     * 토큰이 없으면(게스트) 물어볼 것도 없다.
+     *
+     * **네트워크 오류로는 로그아웃하지 않는다.** 지하철에서 앱을 켰다고 세션이 날아가면
+     * 안 된다 — 정말 죽은 토큰이면 다음 요청이 `401` 을 받고 그때 정리된다(#74).
+     */
+    private suspend fun validateRestored(validator: SessionValidator) {
+        val epoch = synchronized(this) { if (tokens == null) return else this.epoch.get() }
+
+        when (val result = validator.validate()) {
+            is SessionValidation.Valid -> synchronized(this) {
+                // 물어보는 사이 로그인·로그아웃이 있었으면 남의 응답이다
+                if (this.epoch.get() == epoch) {
+                    _session.value = result.profile
+                    schedulePersist()
+                }
+            }
+
+            SessionValidation.Expired -> signOut(expectedEpoch = epoch)
+            SessionValidation.Unknown -> Unit
+        }
+    }
+
+    /**
+     * 사용자가 누른 로그아웃·탈퇴. **디스크에서 지워질 때까지 기다린다.** (#89 리뷰)
+     *
+     * 예약만 하고 돌아오면, 화면이 로그인으로 넘어간 직후 프로세스가 죽었을 때 **다음 실행에
+     * 이전 리프레시 토큰이 되살아난다.** 남의 기기에 계정이 남는 쪽이라 여기서는 기다린다.
+     *
+     * 지우기가 실패해도 **메모리 세션은 이미 비운다.** 이번 실행에서 토큰이 다시 나가는 일은
+     * 없고, 서버 revoke 를 함께 부르므로(AP-14) 디스크에 남은 토큰도 다음 시작의 A0 검증에서
+     * `Expired` 로 걸린다.
+     */
+    suspend fun signOutAndAwait() {
+        signOut()
+        try {
+            persistence?.clear()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 기록은 저장소 구현이 남긴다
         }
     }
 
@@ -246,6 +302,7 @@ object SessionStore {
         _session.value = null
         _restored.value = false
         pending.value = null
+        persistence = null
     }
 
     /** 사용자가 누른 로그아웃·탈퇴. 서버 revoke 는 AP-14 에서 붙는다. */

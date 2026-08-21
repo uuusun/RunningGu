@@ -1,6 +1,7 @@
 package com.runninggu.app
 
 import android.app.Application
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.DataStoreSessionPersistence
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -22,6 +23,11 @@ class RunningGuApplication : Application() {
         super.onCreate()
         FavoriteStore.bind(appScope)
         // 저장된 세션을 올린다. 시작 화면이 SessionStore.restored 를 기다린다 (SPEC §2.2)
-        SessionStore.bind(DataStoreSessionPersistence(this), appScope)
+        SessionStore.bind(
+            persistence = DataStoreSessionPersistence(this),
+            scope = appScope,
+            // A0 — 디스크에 남은 토큰이 아직 쓸 수 있는지 서버에 물어본다
+            validator = ServiceLocator.sessionValidator,
+        )
     }
 }

@@ -131,18 +131,27 @@ class AccountViewModel : ViewModel() {
         }
     }
 
+    /**
+     * 로그아웃. **디스크에서 토큰이 지워진 뒤에** 화면을 넘긴다. (#89 리뷰)
+     *
+     * 예약만 하고 넘기면, 로그인 화면으로 이동한 직후 프로세스가 죽었을 때 **다음 실행에
+     * 이전 리프레시 토큰이 되살아난다.** 남의 기기에 계정이 남는 쪽이라 여기서는 기다린다.
+     */
     fun onLogout() {
-        SessionStore.signOut()
-        // 다음 사용자에게 이전 찜이 보이면 안 된다 (AP-21).
-        FavoriteStore.clear()
-        _uiState.update { it.copy(signedOut = true) }
+        viewModelScope.launch {
+            SessionStore.signOutAndAwait()
+            // 다음 사용자에게 이전 찜이 보이면 안 된다 (AP-21).
+            FavoriteStore.clear()
+            _uiState.update { it.copy(signedOut = true) }
+        }
     }
 
     /** 회원 탈퇴 — 재인증(D-23) 후 삭제. Fake 는 입력만 받고 통과시킨다. */
     fun onWithdraw(reauthPassword: String) {
         viewModelScope.launch {
             delay(FAKE_DELAY_MS)
-            SessionStore.signOut()
+            // 탈퇴도 같다 — 지워질 때까지 기다린다 (#89 리뷰)
+            SessionStore.signOutAndAwait()
             FavoriteStore.clear()
             _uiState.update { it.copy(signedOut = true) }
         }
