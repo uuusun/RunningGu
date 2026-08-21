@@ -1,6 +1,7 @@
 package com.runninggu.app
 
 import android.app.Application
+import com.runninggu.app.data.ServiceLocator
 import android.util.Log
 import com.kakao.vectormap.KakaoMapSdk
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -21,6 +22,8 @@ class RunningGuApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FavoriteStore.bind(appScope)
+        // 기기에서 값을 얻는 것들(위치)이 Context 를 필요로 한다
+        ServiceLocator.bind(this)
         initKakaoMap()
     }
 
