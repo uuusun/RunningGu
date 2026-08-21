@@ -215,7 +215,7 @@ Compose 화면
 | 달력·러닝코스·관광 아이콘 | Navigation/scroll | 없음 | 없음 | LOCAL_STATE | 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
-| 홈 축제 | `GET /api/festivals` | yearMonth, size | contentId, name, 기간, region, imageUrl, inProgress | KTO_LIVE/TTL cache | 전국 월간, 위치 권한 없음, 영역별 Loading/Empty/502/504 |
+| 홈 축제 | `GET /api/festivals` | yearMonth, size | contentId, name, 기간, region, imageUrl, inProgress | KTO_LIVE/TTL cache | 전국 월간, 위치 권한 없음, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
 
@@ -520,7 +520,6 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 
 | API | 보완할 계약 |
 |---|---|
-| `GET /api/festivals` | 카드 tap 없음 명시, KTO 원천·fetchedAt/cachedAt 추적 필드 |
 | `GET /api/pois` | 항목별 provider(KTO/KAKAO), fetchedAt/cachedAt, 안정적 placeId 필요 여부 |
 | `GET /api/me/courses` | saved 목록 projection의 정확한 필드와 page 예시 |
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |

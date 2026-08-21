@@ -371,6 +371,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 응답 항목: `{contentId, name, startDate, endDate, region, imageUrl, inProgress}` — `inProgress` = start ≤ 오늘 ≤ end (진행중 배지).
 조회 월과 겹치는 전국 축제를 진행 중 우선, 시작일 오름차순으로 반환한다. 홈에서는 위치 권한과 사용자 좌표를 사용하지 않는다. 서버가 KTO `searchFestival2`를 호출·캐시하며 앱은 우리 서버만 호출한다.
 
+**P0에서 홈 축제 카드는 표시 전용이다** — 축제 상세로 이동하는 동작도, 그 화면으로 가는 route도 없다(결정 D-05). 그래서 응답에 상세 조회용 키를 더 넣지 않는다.
+
+**수집·캐시 추적 메타데이터(`fetchedAt`·`cachedAt`·KTO 원천 구분)는 응답에 넣지 않는다.** 서버 내부 로그·모니터링에서만 관리한다 — §3-5와 같은 정책이며, 어느 화면도 그 값을 그리지 않는다. 앱은 위 일곱 필드만 받는다. (오프라인 표시에 쓰는 `cachedAt`은 기기 Room 읽기 캐시의 것이라 이 응답 필드와 다른 이야기다.)
+
 ### 4-2 `GET /api/pois` — 위저드 숙소 · 동선 슬롯 · 교체/추가 시트
 
 | 파라미터 | 설명 |
