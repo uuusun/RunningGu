@@ -25,8 +25,13 @@ $env:SPRING_PROFILES_ACTIVE = 'local'
 $env:DB_URL = 'jdbc:postgresql://localhost:5432/runninggu'
 $env:DB_USERNAME = 'runninggu'
 $env:DB_PASSWORD = '<로컬 비밀번호>'
+$env:KAKAO_REST_KEY = '<서버용 REST API 키>'
 .\gradlew.bat bootRun
 ```
+
+`KAKAO_REST_KEY`는 지오코딩·POI 등 카카오 로컬 프록시에만 사용하며 앱이나 저장소에
+포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
+`502 EXTERNAL_API_ERROR`를 반환한다.
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>

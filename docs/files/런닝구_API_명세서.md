@@ -412,6 +412,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ### 4-4 `GET /api/geocode` — 출발지 검색
 
 `?query=해운대해수욕장` → `200 {"name": "해운대해수욕장", "address": "부산 해운대구 ...", "lat": 35.1587, "lng": 129.1604}` (카카오 키워드 첫 결과 🔒 §4.11-1). `404 NO_RESULT`.
+`query`는 필수이며 서버가 앞뒤 공백을 제거한다. 누락됐거나 공백뿐이면 `400 VALIDATION_FAILED`다.
 
 ---
 
@@ -772,6 +773,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `EMAIL_NOT_VERIFIED` | 403 | 인증 미완료 상태로 가입 시도 |
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
+| `NO_RESULT` | 404 | 지오코딩 검색 결과 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
 | `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |

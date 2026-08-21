@@ -1,9 +1,30 @@
 package com.runninggu.server.common.config;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /** 단일 서버 MVP의 외부 API TTL 캐시는 Caffeine을 사용한다. (SPEC §9.2) */
 @Configuration
 @EnableCaching
-public class CacheConfig {}
+public class CacheConfig {
+
+    public static final String GEOCODE_CACHE = "geocode";
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        cacheManager.setAllowNullValues(false);
+        cacheManager.registerCustomCache(
+                GEOCODE_CACHE,
+                Caffeine.newBuilder()
+                        .maximumSize(500)
+                        .expireAfterWrite(Duration.ofMinutes(5))
+                        .build());
+        return cacheManager;
+    }
+}
