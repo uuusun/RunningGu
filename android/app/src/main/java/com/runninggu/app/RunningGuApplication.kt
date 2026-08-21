@@ -43,11 +43,17 @@ class RunningGuApplication : Application() {
         }
         try {
             KakaoMapSdk.init(this, appKey)
-        } catch (e: Throwable) {
-            // **Exception 이 아니라 Throwable 로 받는다.** SDK 가 네이티브 라이브러리를 여는데,
-            // 실패하면 UnsatisfiedLinkError — Exception 이 아닌 Error 라 catch(Exception) 을 빠져나가
+        } catch (e: LinkageError) {
+            // **Exception 과 따로 받는다.** SDK 가 네이티브 라이브러리를 여는데, 실패하면
+            // UnsatisfiedLinkError — Exception 이 아닌 Error 라 catch(Exception) 을 빠져나가
             // 앱이 통째로 죽었다. x86_64 에뮬레이터에는 카카오맵이 그 ABI 용 .so 를 주지 않아
             // 항상 이 경로로 온다(arm64-v8a · armeabi-v7a 만 있다).
+            //
+            // **Throwable 로 넓히지 않는다**(#110 리뷰). OutOfMemoryError 처럼 복구할 수 없는
+            // 것까지 "지도만 끕니다" 로 삼키면 앱이 망가진 채로 계속 돈다. LinkageError 는
+            // 클래스·네이티브 적재 실패만 묶으므로 여기서 감당할 수 있는 범위와 같다.
+            Log.w(TAG, "카카오맵 네이티브 라이브러리를 열지 못해 지도를 끕니다", e)
+        } catch (e: Exception) {
             Log.w(TAG, "카카오맵 SDK 초기화 실패 — 지도만 비활성화됩니다", e)
         }
     }
