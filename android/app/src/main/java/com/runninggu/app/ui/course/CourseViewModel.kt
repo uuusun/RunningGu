@@ -8,6 +8,9 @@ import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.CourseRepository
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.LocationProvider
+import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.repository.FakeCourseRepository
 import com.runninggu.app.data.repository.FakeGeocodeRepository
 import com.runninggu.app.data.repository.GeocodeRepository
@@ -27,6 +30,7 @@ import kotlin.math.roundToInt
 class CourseViewModel(
     private val repository: CourseRepository,
     private val geocodeRepository: GeocodeRepository,
+    private val locationProvider: LocationProvider = ServiceLocator.locationProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseUiState())
@@ -41,6 +45,9 @@ class CourseViewModel(
     /** 검색 버튼 연타도 마지막 것만 남긴다. */
     private var searchJob: Job? = null
 
+    /** [내 위치] 연타. 앞 조회를 끊고 마지막 것만 남긴다. */
+    private var locationJob: Job? = null
+
     /** 지역별 목록에서 지금까지 받은 페이지 번호. 지역을 바꾸면 0 으로 돌아간다. */
     private var regionPage = 0
 
@@ -53,6 +60,58 @@ class CourseViewModel(
         _uiState.update { it.copy(tab = tab) }
         // 지역별을 처음 열 때 한 번만 부른다. 이후 갱신은 칩 선택·재시도가 맡는다
         if (tab == CourseUiState.Tab.BY_REGION && regionJob == null) loadRegionCourses()
+    }
+
+    /**
+     * [내 위치]. (SPEC §4.11-1 ①)
+     *
+     * **실패해도 화면을 막지 않는다.** 출발지는 검색·프리셋으로도 정할 수 있어서(NFR-15),
+     * 여기서 못 잡으면 안내만 하고 원래 상태로 돌려놓는다.
+     *
+     * 실패 종류마다 할 말이 다르다 — 권한을 거부한 사람에게 "잠시 뒤 다시" 는 눌러도
+     * 계속 실패하고, 위치가 늦게 잡히는 사람에게 "권한을 허용해 주세요" 는 이미 허용한
+     * 걸 또 하라는 말이 된다.
+     */
+    fun onUseMyLocation() {
+        locationJob?.cancel()
+        locationJob = viewModelScope.launch {
+            val previous = _uiState.value.origin
+            _uiState.update { it.copy(origin = OriginState.Locating, locationMessage = null) }
+
+            when (val result = locationProvider.current()) {
+                is LocationResult.Found -> onOriginChange(
+                    OriginState.Fixed(
+                        name = MY_LOCATION_LABEL,
+                        lat = result.point.lat,
+                        lng = result.point.lng,
+                        from = OriginState.Fixed.Source.GPS,
+                    ),
+                )
+
+                // 실패 종류별 문구는 순수 함수로 빼 두었다 — 기기 없이 고정할 수 있다
+                else -> restoreOrigin(previous, result.originFailureMessage())
+            }
+        }
+    }
+
+    /**
+     * 권한 요청 자체를 거부당했다. 화면이 시스템 대화상자 결과를 그대로 넘긴다.
+     *
+     * 조회를 시작하지 않았으므로 출발지는 건드리지 않는다.
+     */
+    fun onLocationPermissionDenied() {
+        _uiState.update {
+            it.copy(locationMessage = LocationResult.PermissionDenied.originFailureMessage())
+        }
+    }
+
+    fun onLocationMessageShown() {
+        _uiState.update { it.copy(locationMessage = null) }
+    }
+
+    /** 조회 전 출발지로 되돌린다. 이미 고른 프리셋이 [내 위치] 실패로 날아가면 안 된다. */
+    private fun restoreOrigin(previous: OriginState, message: String) {
+        _uiState.update { it.copy(origin = previous, locationMessage = message) }
     }
 
     /** 출발지가 정해지면 바로 조회한다. (§4.11-1) */
@@ -174,11 +233,15 @@ class CourseViewModel(
          * 백엔드가 준비되면 [com.runninggu.app.data.repository.RemoteCourseRepository] 로 바꾼다.
          * 화면은 안 건드린다 — Repository 인터페이스만 보기 때문이다(AGENTS 4장).
          */
+        /** 좌표를 그대로 보여줄 수는 없다. 목업도 "내 위치" 로 적는다. */
+        private const val MY_LOCATION_LABEL = "내 위치"
+
         fun factory(
             repository: CourseRepository = FakeCourseRepository,
             geocodeRepository: GeocodeRepository = FakeGeocodeRepository,
+            locationProvider: LocationProvider = ServiceLocator.locationProvider,
         ) = viewModelFactory {
-            initializer { CourseViewModel(repository, geocodeRepository) }
+            initializer { CourseViewModel(repository, geocodeRepository, locationProvider) }
         }
     }
 
@@ -278,3 +341,21 @@ internal fun ApiException.searchMessage(): String = when {
 /** 서버가 준 문구가 있으면 그걸 쓰고, 없으면 기본 문구. (§0-3 — detail 은 개발자용이라 안 쓴다) */
 internal fun ApiException.userMessageOrDefault(): String =
     (this as? ApiException.Http)?.userMessage ?: "정보를 불러오지 못했어요."
+
+/**
+ * [내 위치] 실패 문구. (SPEC §4.11-1 ① · NFR-15)
+ *
+ * **종류마다 사용자가 할 일이 다르다.** 권한을 거부한 사람에게 "잠시 뒤 다시" 라고 하면
+ * 눌러도 계속 실패하고, 위치가 늦게 잡히는 사람에게 "권한을 허용해 주세요" 라고 하면
+ * 이미 허용한 걸 또 하라는 말이 된다.
+ *
+ * 어느 문구든 **아래에서 고르라고 함께 알린다** — 출발지는 검색·프리셋으로도 정할 수 있고,
+ * 그게 이 화면이 권한 거부에도 동작하는 이유다.
+ */
+internal fun LocationResult.originFailureMessage(): String = when (this) {
+    // 못 잡은 게 아니라 잡은 것이다. 호출부가 이 가지로 오면 안 된다
+    is LocationResult.Found -> ""
+    LocationResult.PermissionDenied -> "위치 권한이 없어요. 아래에서 출발지를 골라 주세요."
+    LocationResult.Timeout -> "위치를 확인하지 못했어요. 다시 시도하거나 아래에서 골라 주세요."
+    LocationResult.Unavailable -> "위치 서비스가 꺼져 있어요. 켜거나 아래에서 골라 주세요."
+}

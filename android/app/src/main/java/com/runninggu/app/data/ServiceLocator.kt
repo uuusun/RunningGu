@@ -1,6 +1,9 @@
 package com.runninggu.app.data
 
+import android.content.Context
 import com.runninggu.app.data.local.AuthTokens
+import com.runninggu.app.data.local.FusedLocationProvider
+import com.runninggu.app.data.local.LocationProvider
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiClient
 import com.runninggu.app.data.remote.ApiException
@@ -36,6 +39,29 @@ import retrofit2.create
  * 늘어 손이 가면 그때 팀에 물어 도입한다.
  */
 object ServiceLocator {
+
+    /**
+     * 기기에서 값을 얻는 것들(위치 등)이 Context 를 필요로 한다. 앱 시작 때 한 번 물린다.
+     *
+     * **Application context 만 받는다** — Activity 를 들고 있으면 화면 회전에서 샌다.
+     */
+    private var appContext: Context? = null
+
+    fun bind(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * "내 위치". (SPEC §4.11-1 ①)
+     *
+     * 서버가 아니라 기기에서 오는 값이지만, 화면이 의존성을 찾는 자리를 둘로 나누면
+     * 어디를 봐야 할지 헷갈린다 — 여기 함께 둔다.
+     */
+    val locationProvider: LocationProvider by lazy {
+        FusedLocationProvider(
+            requireNotNull(appContext) { "ServiceLocator.bind(context) 를 먼저 불러야 한다" },
+        )
+    }
 
     /**
      * 프로세스에 하나만 둔다 — OkHttp 커넥션 풀과 스레드를 재사용해야 한다.

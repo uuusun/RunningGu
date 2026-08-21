@@ -1,6 +1,7 @@
 package com.runninggu.app
 
 import android.app.Application
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,5 +20,7 @@ class RunningGuApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FavoriteStore.bind(appScope)
+        // 기기에서 값을 얻는 것들(위치)이 Context 를 필요로 한다
+        ServiceLocator.bind(this)
     }
 }

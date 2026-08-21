@@ -28,6 +28,13 @@ data class CourseUiState(
     val regionCourses: RegionCoursesState = RegionCoursesState.Loading,
     /** 목록에서 고른 항목. 지도 폴리라인이 이걸 따라간다. (§4.11-4) */
     val selectedRouteId: String? = null,
+    /**
+     * [내 위치] 가 실패한 이유. (SPEC §4.11-1 ① · NFR-15)
+     *
+     * 화면 전체를 막지 않는다 — 출발지는 검색·프리셋으로도 정할 수 있다. 한 번 보여주고
+     * [onLocationMessageShown] 으로 비운다.
+     */
+    val locationMessage: String? = null,
 ) {
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
