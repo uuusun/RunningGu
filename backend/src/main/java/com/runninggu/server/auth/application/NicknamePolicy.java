@@ -21,7 +21,7 @@ public class NicknamePolicy {
         return normalized;
     }
 
-    /** 표시 표기는 보존하고 ASCII 영문만 소문자로 접어 중복 키를 만든다. (SPEC 결정-49) */
+    /** 표시 표기는 보존하고 ASCII 영문만 소문자로 접어 중복 키를 만든다. (SPEC 결정-50) */
     public String duplicateKey(String nickname) {
         String display = normalizeDisplay(nickname);
         StringBuilder key = new StringBuilder(display.length());

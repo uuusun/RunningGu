@@ -13,7 +13,7 @@ public class EmailNormalizer {
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[A-Za-z]{2,}$");
 
-    /** 이메일 정규화는 서버 한 곳에서 수행한다. (SPEC §4.2, 결정-49) */
+    /** 이메일 정규화는 서버 한 곳에서 수행한다. (SPEC §4.2, 결정-50) */
     public String normalize(String email) {
         String normalized = email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
         int codePoints = normalized.codePointCount(0, normalized.length());

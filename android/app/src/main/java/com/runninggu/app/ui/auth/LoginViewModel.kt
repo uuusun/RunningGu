@@ -1,5 +1,8 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.repository.AuthRepository
+import com.runninggu.app.data.repository.FakeAuthRepository
+import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,16 +55,10 @@ class LoginViewModel(
             val outcome = repository.login(state.email.trim(), state.password)
             _uiState.update {
                 outcome.fold(
-                    onSuccess = { tokens ->
-                        // TODO(AP-14): 로그인 응답의 user 로 채운다 (명세 §1-6). 지금은 이메일에서 파생.
-                        SessionStore.signIn(
-                            SessionProfile(
-                                nickname = state.email.trim().substringBefore('@'),
-                                email = state.email.trim(),
-                                loginProvider = LoginProvider.EMAIL,
-                            ),
-                            tokens = tokens,
-                        )
+                    onSuccess = { session ->
+                        // 응답의 user 를 그대로 쓴다 (명세 §1-6). 이메일에서 닉네임을
+                        // 파생하면 서버가 아는 진짜 이름과 달라진다
+                        SessionStore.signIn(session.profile, tokens = session.tokens)
                         // 찜 캐시는 FavoriteStore 가 세션을 구독해 스스로 채운다 —
                         // 여기서 부르면 화면 전환으로 이 ViewModel 이 죽을 때 취소된다.
                         it.copy(isSubmitting = false, loggedIn = true)

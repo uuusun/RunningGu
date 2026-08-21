@@ -31,12 +31,11 @@ $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 ```
 
 `KAKAO_REST_KEY`는 지오코딩·POI 등 카카오 로컬 프록시에만 사용하며 앱이나 저장소에
-포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
-`502 EXTERNAL_API_ERROR`를 반환한다.
-
-`KTO_SERVICE_KEY`는 HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한다. 키가
-없으면 대회 인근 축제 API는 `502 EXTERNAL_API_ERROR`를 반환하고 다른 공개 API는 계속
-동작한다.
+포함하지 않는다. `KTO_SERVICE_KEY`는 대회 인근 축제와 POI의 한국관광공사 클라이언트가
+함께 사용하며, HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한다. 키가 없으면
+대회 인근 축제 API는 `502 EXTERNAL_API_ERROR`를 반환한다. POI는 KTO 원천을 실패로
+처리하고, 다른 원천에서 한 건 이상 표시할 수 있을 때만 부분 성공 `200`을 반환한다. 다른
+공개 API는 계속 동작한다.
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>

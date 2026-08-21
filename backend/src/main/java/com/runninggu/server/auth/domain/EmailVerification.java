@@ -69,7 +69,7 @@ public class EmailVerification {
         return verification;
     }
 
-    /** 재발송은 이전 코드·실패 횟수·인증 상태를 모두 무효화한다. (SPEC §4.2, 결정-49) */
+    /** 재발송은 이전 코드·실패 횟수·인증 상태를 모두 무효화한다. (SPEC §4.2, 결정-50) */
     public void reissue(String codeHash, Instant sentAt) {
         this.codeHash = codeHash;
         this.tokenHash = null;

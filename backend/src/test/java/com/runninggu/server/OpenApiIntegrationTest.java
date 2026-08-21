@@ -23,7 +23,7 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("런닝구 API"))
-                .andExpect(jsonPath("$.info.version").value("v2.9"))
+                .andExpect(jsonPath("$.info.version").value("v2.10"))
                 .andExpect(jsonPath("$['paths']['/api/contests']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/contests/daily-counts']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/contests/closing-soon']['get']").exists())

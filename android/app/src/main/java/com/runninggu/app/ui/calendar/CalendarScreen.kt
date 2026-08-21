@@ -2,6 +2,9 @@ package com.runninggu.app.ui.calendar
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -107,6 +110,7 @@ fun CalendarScreen(
             onFilterApply = viewModel::onFilterApply,
             onFilterChipRemove = viewModel::onFilterChipRemove,
             onResetAll = viewModel::onResetAll,
+            onLoadMore = viewModel::loadMore,
             onMonthChange = viewModel::onMonthChange,
             onDateSelect = viewModel::onDateSelect,
             onFavoriteToggle = viewModel::onFavoriteToggle,
@@ -130,6 +134,7 @@ private fun CalendarContent(
     onFavoriteToggle: (String) -> Unit,
     onRetry: () -> Unit,
     onRaceClick: (String) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var filterSheetVisible by remember { mutableStateOf(false) }
@@ -171,6 +176,7 @@ private fun CalendarContent(
                 onRaceClick = onRaceClick,
                 onFavoriteToggle = onFavoriteToggle,
                 onResetAll = onResetAll,
+                onLoadMore = onLoadMore,
             )
         }
     }
@@ -195,6 +201,7 @@ private fun RaceList(
     onRaceClick: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     onResetAll: () -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val races = uiState.listedRaces
@@ -207,17 +214,29 @@ private fun RaceList(
             item {
                 MonthCalendar(
                     month = uiState.currentMonth,
-                    racesByDate = uiState.racesByDate,
+                    dailyCounts = uiState.dailyCounts.countsOrEmpty,
                     selectedDate = uiState.selectedDate,
                     onMonthChange = onMonthChange,
                     onDateSelect = onDateSelect,
                 )
             }
+            // 점이 하나도 없는 게 "대회 없는 달" 로 읽히면 안 된다 (#85 리뷰)
+            if (uiState.dailyCounts is DailyCountsState.Error) {
+                item {
+                    Text(
+                        text = "이 달의 대회 수를 불러오지 못했어요. 아래 목록은 그대로 볼 수 있어요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
 
         item { ListHeader(uiState = uiState) }
 
-        if (races.isEmpty()) {
+        // **아직 받을 장이 남았으면 Empty 를 확정하지 않는다** — 이 달 대회가 다음 장에
+        // 있을 수 있다. 그때는 아래 "더 받기" 자리가 이어서 받는다 (#85 리뷰)
+        if (uiState.showsEmpty) {
             item { EmptyBody(uiState = uiState, onResetAll = onResetAll) }
         } else {
             items(races, key = { it.id }) { race ->
@@ -225,15 +244,58 @@ private fun RaceList(
                     race = race,
                     isFavorite = uiState.isFavorite(race.id),
                     // featured는 '목록 첫 항목이면서 접수중'일 때만. (SPEC §4.5)
-                    featured = race.id == races.first().id &&
+                    featured = race.id == races.firstOrNull()?.id &&
                         race.registrationStatus() == RegistrationStatus.OPEN,
                     onClick = { onRaceClick(race.id) },
                     onFavoriteToggle = { onFavoriteToggle(race.id) },
                 )
             }
         }
+
+        // 목록이 커서로 나뉘어 온다. **목록이 비어 있어도 남은 장이 있으면 둔다** (§3-1)
+        if (uiState.showsLoadMore) {
+            item(key = LOAD_MORE_KEY) { LoadMoreRow(uiState = uiState, onLoadMore = onLoadMore) }
+        }
     }
 }
+
+/**
+ * 목록 끝의 "더 받기" 자리. (API 명세 §3-1 · #85 리뷰)
+ *
+ * **실패하면 자동으로 다시 부르지 않는다.** 끝에 닿은 것만으로 재시도하면 네트워크가 끊긴
+ * 동안 같은 요청을 계속 던지고, 화면에는 실제 요청이 없는데 로딩만 도는 것처럼 보인다.
+ */
+@Composable
+private fun LoadMoreRow(uiState: CalendarUiState, onLoadMore: () -> Unit) {
+    val failure = uiState.loadMoreError
+
+    if (failure == null) {
+        // 이 항목이 화면에 들어오는 순간이 곧 "끝까지 스크롤했다" 는 신호다
+        LaunchedEffect(uiState.nextCursor) { onLoadMore() }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (failure == null) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        } else {
+            Text(
+                text = failure,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onLoadMore) { Text("다시 시도") }
+        }
+    }
+}
+
+/** 더 받기 항목의 안정적인 키. 카드 id 와 겹치지 않게 둔다. */
+private const val LOAD_MORE_KEY = "load-more"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -346,7 +408,7 @@ private fun ListHeader(uiState: CalendarUiState, modifier: Modifier = Modifier) 
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = uiState.listedRaces.size.toString(),
+            text = uiState.headerRaceCount.toString(),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,

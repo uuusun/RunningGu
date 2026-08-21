@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.9
+# 런닝구 백엔드 API 명세서 v2.10
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -389,27 +389,62 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 
 | 파라미터 | 설명 |
 |---|---|
-| `category` | `TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING` (부록 B 매핑) |
-| `lat` `lng` | 기준점 (숙소 선택 전 = 대회장, 이후 = 숙소·현재 블록) |
-| `radius` | 기본 8000m 🔧 · **3건 미만이면 20km 재검색** 🔒(§8.1) · 최대 20000(KTO 제약) |
+| `category` | 필수. `TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING` (부록 B 매핑) |
+| `lat` `lng` | 필수 WGS84 기준점. `lat=-90~90`, `lng=-180~180` (숙소 선택 전 = 대회장, 이후 = 숙소·현재 블록) |
+| `radius` | 기본 8000m 🔧 · 양의 정수, 최대 20000(KTO 제약) · **3건 미만이면 같은 원천을 20km에서 재검색** 🔒(§8.1) |
 | `query` | *(선택)* 키워드 검색 — W3 숙소 검색창. 공백 제거 후 2자 이상, 미만이면 `400 VALIDATION_FAILED` |
-| `size` | 기본 8 🔒(노출 8건) |
+| `size` | 기본 8 🔒(노출 8건) · 허용 범위 `1~20` |
 
 ```json
 {
   "source": "LIVE",
   "items": [
     {
-      "name": "호텔 세종 가온", "category": "LODGING",
+      "name": "호텔 세종 가온", "category": "LODGING", "provider": "KAKAO",
       "lat": 36.4912, "lng": 127.2714, "distanceM": 1200,
       "description": "어진동 · 대회장 1.2km",
-      "address": "세종특별자치시 어진동 123", "url": "http://place.map.kakao.com/...",
+      "address": "세종특별자치시 어진동 123", "url": "https://place.map.kakao.com/...",
       "imageUrl": null
     }
   ]
 }
 ```
-- **숙소(LODGING) = 카카오 로컬 AD5 1순위, KTO 32 폴백** 🔒(회의 결정 7·검증리포트 D2 — TourAPI 단독이면 실측상 4건뿐).
+
+항목은 정확히 `{name, category, provider, lat, lng, distanceM, description, address, url, imageUrl}`다.
+`provider`는 실제 항목을 제공한 원천 `KAKAO | KTO`이며 필수다. `name`, `category`, `provider`,
+`lat`, `lng`, `distanceM`, `description`, `address`, `url`은 non-null이고, 원천에 문자열 값이 없으면
+빈 문자열을 반환한다. `imageUrl`만 nullable이다. `distanceM`은 요청 기준점부터의 0 이상 정수 미터다.
+
+P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 저장하므로 안정적 `placeId`를 응답에
+두지 않는다. `fetchedAt`·`cachedAt`도 서버 캐시·운영 정보이므로 응답에서 제외한다. 앱의 Room
+`cachedAt`과는 별개다.
+
+| category | 1순위 | 폴백 |
+|---|---|---|
+| `TOUR` · `HISTORY` | KTO KorService2 `locationBasedList2` 12 | 카카오 AT4/키워드 |
+| `FOOD` | 카카오 FD6 | KTO KorService2 39 |
+| `CAFE` | 카카오 CE7 | 없음 |
+| `LODGING` | 카카오 AD5 | KTO KorService2 32 |
+| `WELLNESS` | KTO WellnessTursmService | 카카오 키워드 |
+| `NATURE` | 카카오 자연 키워드 + AP-23 두루누비 번들 | KTO KorService2 12 |
+
+조회·폴백 규칙은 다음과 같다.
+
+1. 1순위 원천을 요청 반경에서 조회한다.
+2. 결과가 3건 미만이고 요청 반경이 20km 미만이면 같은 원천을 20km에서 다시 조회한다.
+3. 그래도 `size`보다 적으면 폴백 원천에서 부족한 개수를 채운다. 폴백이 없는 카테고리는 적은
+   결과를 그대로 반환한다. AP-23 두루누비 어댑터 장애는 NATURE의 카카오·KTO 결과를 막지 않는다.
+4. 정규화한 이름과 좌표가 같은 항목을 중복 제거하고 `distanceM` 오름차순으로 최대 `size`건을
+   반환한다. 최종 응답 `items`에서는 JSON 응답값 기준 `(name, lat, lng)` 조합의 유일성을
+   보장한다. 좌표는 숫자값으로 비교하므로 소수점 뒤 0만 다른 값은 같다. 앱은 이 조합을 목록
+   `key`로 사용할 수 있다.
+5. 성공 결과만 요청 파라미터 기준으로 5분 캐시하고 오류 응답은 캐시하지 않는다.
+
+모든 원천이 정상 응답했지만 결과가 없으면 `200 {"source":"LIVE","items":[]}`다. 일부 원천이
+실패해도 다른 원천에서 한 건 이상 만들면 `200`으로 성공한다. 표시 항목이 없는데 하나 이상의
+원천이 실패했다면 모든 실패가 timeout일 때 `504 EXTERNAL_API_TIMEOUT`, 그 외에는
+`502 EXTERNAL_API_ERROR`다. 외부 장애를 빈 배열이나 SAMPLE/SYNTH로 낮추지 않는다.
+
 - Android는 최초 진입 시 query 없이 주변 8건을 조회하고, 검색어가 2자 이상일 때 500ms debounce 후 query를 보낸다. debounce는 앱 내부 정책이다.
 - 운영 응답의 `source`는 항상 `LIVE`다. `SAMPLE/SYNTH`는 목업·데모 빌드 전용이며, 운영에서 502/504를 샘플 데이터로 숨기지 않는다(NFR-2).
 

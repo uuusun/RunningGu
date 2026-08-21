@@ -12,7 +12,20 @@ class CacheConfigTest {
     @Test
     void 지오코드_캐시는_최대_500건을_5분간_보관한다() {
         var cacheManager = new CacheConfig().cacheManager();
-        var springCache = (CaffeineCache) cacheManager.getCache(CacheConfig.GEOCODE_CACHE);
+        assertCachePolicy(cacheManager.getCache(CacheConfig.GEOCODE_CACHE), 500, 5);
+    }
+
+    @Test
+    void POI_캐시는_최대_2000건을_5분간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        assertCachePolicy(cacheManager.getCache(CacheConfig.POI_CACHE), 2_000, 5);
+    }
+
+    private void assertCachePolicy(
+            org.springframework.cache.Cache cache,
+            long maximumSize,
+            long minutes) {
+        var springCache = (CaffeineCache) cache;
         @SuppressWarnings("unchecked")
         Cache<Object, Object> nativeCache = (Cache<Object, Object>) springCache.getNativeCache();
 
@@ -20,12 +33,12 @@ class CacheConfigTest {
                         .eviction()
                         .orElseThrow()
                         .getMaximum())
-                .isEqualTo(500);
+                .isEqualTo(maximumSize);
         assertThat(nativeCache.policy()
                         .expireAfterWrite()
                         .orElseThrow()
                         .getExpiresAfter(TimeUnit.MINUTES))
-                .isEqualTo(5);
+                .isEqualTo(minutes);
     }
 
     @Test

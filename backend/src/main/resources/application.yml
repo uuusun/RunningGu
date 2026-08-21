@@ -74,3 +74,9 @@ runninggu:
       service-key: ${KTO_SERVICE_KEY:}
       connect-timeout: 1s
       read-timeout: 2500ms
+    kto-poi:
+      base-url: https://apis.data.go.kr/B551011/KorService2
+      wellness-base-url: https://apis.data.go.kr/B551011/WellnessTursmService
+      service-key: ${KTO_SERVICE_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
