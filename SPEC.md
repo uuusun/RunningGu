@@ -505,7 +505,7 @@ Contest { id, name, region, venue, roadAddress?, date('YYYY-MM-DD'), startTime?(
 ContestSource { contestId, sourceType, externalId, rawPayload, fetchedAt, sourceUrl }
 ```
 
-- 원천 snake_case(`race_id`·`event_date`·`latitude`…) → camelCase 정규화 (원본: normalize.js).
+- 원천 snake_case(`race_id`·`event_date`·`latitude`…) → camelCase 정규화. **Python 파이프라인이 수행한다**(결정-39) — 원본 `normalize.js` 의 자리이며 앱·백엔드가 다시 구현하지 않는다.
 - 필터용 **regionCode 17종**(서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주)을 `sido`에서 파생, 비표준 값('충청' 등)은 주소로 보정 🔧정책.
 - `imageUrl`은 P0부터 nullable로 제공하고 없으면 앱 placeholder를 사용한다. 현재 원천 271건과 canonical 153건의 좌표 누락은 0건이지만 전송 DTO의 `lat/lng`는 nullable로 방어한다. 좌표 없는 항목은 동선 생성에 사용할 수 없다.
 - `startTime`은 원천에 출발 시각이 없거나 형식이 올바르지 않으면 nullable이다. PostgreSQL `CONTEST`는 `start_time`·`road_address`·`detail_url`을 nullable로 저장해 서버용 snapshot의 canonical 필드를 손실 없이 보존한다(결정-47).
@@ -716,8 +716,9 @@ app/src/main/java/com/runninggu/app/
 ├── ui/          # Compose 화면 + 화면별 ViewModel(StateFlow<UiState>)
 │   ├── auth/ home/ calendar/ course/ my/ wizard/
 │   └── (공통: 지도 래퍼 §3-8 · 스낵바 · 배지 · 카드)
-├── domain/      # 앱에서 실행하는 §5 순수 Kotlin: CourseBuilder · RaceNormalizer ·
-│                #   Recovery/Cats/Patterns 상수 · 저장 전 편집 연산 (동선 생성 엔진은 서버 §5.6)
+├── domain/      # 앱에서 실행하는 §5 순수 Kotlin: CourseBuilder ·
+│                #   Recovery/Cats/Patterns 상수 · 저장 전 편집 연산 (동선 생성 엔진은 서버 §5.6,
+│                #   크롤 레코드 정규화는 Python 파이프라인 — 결정-39)
 ├── data/
 │   ├── remote/  # Retrofit: RunningguApi(자체 백엔드 단일 창구 — 인증·마이
 │   │            #   ·동선 생성/POI/축제/지오코딩/이동시간 조회) · DTO→도메인 매퍼(좌표 변환은 여기서만)
@@ -815,7 +816,12 @@ app/src/main/java/com/runninggu/app/
 > 📌 **08-17 교체** — 이건모와 김민지가 앱 UI ↔ 앱 코어를 맞바꿨다. 백엔드(유선경)는 그대로다.
 > 교체 시점에 앱 코어는 AP-01 · AP-24(앱)이 완료, AP-04는 §5.1~5.4 · §5.6 · §5.7 포팅 완료이고
 > `RaceNormalizer`(§5.5 접수 상태는 `domain/RegistrationStatus.kt` 로 이동 완료, 정규화는 남음) ·
-> AP-05 · 14 · 03 · 12 · 22가 남아 있다.
+> AP-05 · 14 · 03 · 12 · 22가 남아 있었다.
+>
+> **AP-04 는 완료로 닫는다**(2026-08-21). 남아 있던 `RaceNormalizer` 정규화는 **포팅하지 않기로
+> 했다** — 결정-39 가 정규화·중복 병합의 주인을 Python 파이프라인으로 못 박았고, 앱은 크롤
+> 레코드를 볼 일이 없다(서버 API·번들 둘 다 이미 정규화된 것이다). 근거는
+> `docs/android-porting-plan.md` 2.1.
 > 앱 UI는 4탭 골격과 S1 홈 · S2 캘린더 · S3 대회 상세 · S4 일정 선택이 완료(샘플 데이터 기준)이고
 > S5~S7 위저드 · S8 러닝코스 화면 · 인증 A1~A3 · S10 마이가 남아 있다.
 
@@ -828,7 +834,7 @@ app/src/main/java/com/runninggu/app/
 | AP-01 | Android Studio 프로젝트 생성 — 패키지 `com.runninggu.app`, JDK 21, BuildConfig 키 주입(local.properties), **minSdk 26** 🔒확정(결정-17) | README·§9.4 |
 | AP-02 | 카카오 콘솔 Android 플랫폼 등록 (패키지명+디버그/릴리스 키 해시) + 네이티브 앱 키 발급 | §7.4-10 (구 G-06 대체) |
 | AP-03 | 카카오맵 SDK 연동 — §3-8 지도 계약 구현 (번호 핀·폴리라인·bounds·활성 이동·실패 격리) | §3-8 |
-| AP-04 | **앱 domain 포팅** — normalize·events·dates(KST)·RECOVERY/CATS/PATTERNS·regStatusOf·저장 전 편집 연산·코스 빌더·걷기 스팟 필터 (원본: reference-web, 부록 D) + 단위 테스트. PR #22 앱 `ItineraryEngine`은 서버 이식의 참고 구현·테스트 기준이며 운영 UI에 연결하지 않는다(결정-41) | §5 |
+| AP-04 | **앱 domain 포팅** — events·dates(KST)·RECOVERY/CATS/PATTERNS·regStatusOf·저장 전 편집 연산·코스 빌더·걷기 스팟 필터 (원본: reference-web, 부록 D) + 단위 테스트. **크롤 레코드 정규화(`normalize.js`)는 포팅하지 않는다** — 주인이 Python 파이프라인이다(결정-39 · §5.4). PR #22 앱 `ItineraryEngine`은 서버 이식의 참고 구현·테스트 기준이며 운영 UI에 연결하지 않는다(결정-41) | §5 |
 | AP-05 | 데이터 폴백·로더 — 대회 초기본·GPX 축약본·kotlinx.serialization 파서·Room 읽기 캐시 | §6.1 |
 | AP-06 | **4탭** 내비게이션(홈·캘린더·러닝코스·마이) + wizard 그래프 + back 규칙 | §2 |
 | AP-07 | **백엔드 구축 — Spring Boot + PostgreSQL** 🔒확정: USER+LOGIN_IDENTITY 인증·canonical 대회·**§5.6 동선 생성 엔진**·P0 마이/찜·외부 API 프록시·두루누비 동기화 + springdoc (GPS 기록은 AP-22 P1) | §9.2·9.3 |
@@ -1010,7 +1016,8 @@ app/src/main/java/com/runninggu/app/
 | `screens/*.jsx` (9개 화면) | `ui/<feature>/*Screen` Composable + ViewModel | 화면 매핑: §2.2 route |
 | `map/MapView.jsx` (카카오 JS SDK + SVG 폴백) | 카카오맵 **Android SDK** 래퍼 | SVG 폴백 폐기 — 실패 격리로 대체 (§3-8) |
 | `lib/runninggu/constants.js` (RECOVERY·CATS·PATTERNS) | `domain/` 상수 | 값 변경 금지 (§5.1~5.3) |
-| `lib/runninggu/events.js` · `dates.js` · `normalize.js` | `domain/` 표준화·날짜(KST)·정규화 | §5.4~5.5 · §6.6 |
+| `lib/runninggu/events.js` · `dates.js` | `domain/` 표준화·날짜(KST) | §5.4~5.5 · §6.6 |
+| `lib/runninggu/normalize.js` | **앱에 만들지 않는다** — `scripts/` Python 파이프라인이 주인 | 결정-39 · §5.4 |
 | `lib/runninggu/engine.js` `buildItinerary` | 백엔드 `ItineraryGenerationService` | `POST /itineraries/generate`의 서버 규칙 엔진. **walk 블록 제거 반영** (§5.6). PR #22 앱 `ItineraryEngine`은 이식 참고·테스트 기준이며 운영 UI에 연결하지 않음(결정-41) |
 | `lib/runninggu/edits.js` | `domain/` 편집 연산 (불변) | §5.7 |
 | `lib/runninggu/courses.js` (빌더) | 서버 큐레이션 course API + 앱 오프라인 CourseBuilder | §5.8 큐레이션 규칙 |

@@ -1,3 +1,22 @@
+import java.util.Properties
+
+/**
+ * 카카오 **네이티브** 앱 키. (SPEC §7.4-10 · AGENTS 8장)
+ *
+ * `local.properties` 는 gitignore 대상이라 저장소에 키가 남지 않는다. 각자 자기 파일에
+ * `KAKAO_NATIVE_APP_KEY=...` 한 줄을 넣는다.
+ *
+ * **없어도 빌드는 된다.** CI 에는 키가 없고 단위 테스트는 지도를 띄우지 않기 때문이다 —
+ * 여기서 빌드를 깨면 키 없는 사람이 테스트조차 못 돌린다. 대신 비어 있으면 지도 초기화에서
+ * 알아채고 화면이 오류로 떨어진다(AP-03).
+ *
+ * REST 키는 여기 두지 않는다. 서버에만 있다(AGENTS 8장).
+ */
+val kakaoNativeAppKey: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("KAKAO_NATIVE_APP_KEY").orEmpty()
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -20,6 +39,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoNativeAppKey\"")
+        // 카카오 로그인이 돌아올 때 쓰는 `kakao{네이티브키}://oauth` 스킴. (AP-08 · §4.1)
+        manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey
     }
 
     buildTypes {
@@ -55,6 +78,7 @@ android {
 
 dependencies {
     implementation(libs.play.services.location)
+    implementation(libs.kakao.maps)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

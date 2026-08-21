@@ -1,6 +1,9 @@
 package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.Contest
+import com.runninggu.app.data.model.NearbyFestival
+import com.runninggu.app.data.remote.ApiException
+import java.io.IOException
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.domain.dDay
 import com.runninggu.app.domain.regStatusOf
@@ -60,6 +63,15 @@ class BundleContestRepository(
      */
     override suspend fun detail(id: Long): Contest =
         throw NoSuchElementException("번들에는 canonical id 가 없다: $id")
+
+    /**
+     * 번들에는 축제 데이터가 없다. (§3-5)
+     *
+     * **빈 목록을 주지 않는다** — 그러면 화면이 "대회 기간에 열리는 인근 축제가 없어요" 를
+     * 그려서, 실제로는 못 불러온 것을 없다고 말하게 된다. 실패로 올려 재시도를 띄운다.
+     */
+    override suspend fun festivals(id: Long): List<NearbyFestival> =
+        throw ApiException.Network(IOException("오프라인이라 인근 축제를 부를 수 없다"))
 
     /** 오프라인 표시용 — 화면 키(번들 id)로 찾는다. **서버 상세와 다른 경로다.** */
     suspend fun findByKey(key: String): Contest? = source().firstOrNull { it.id == key }

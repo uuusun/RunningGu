@@ -170,6 +170,14 @@ public class Contest {
         return roadAddress;
     }
 
+    public BigDecimal getLat() {
+        return lat;
+    }
+
+    public BigDecimal getLng() {
+        return lng;
+    }
+
     public LocalDate getContestDate() {
         return contestDate;
     }
@@ -188,6 +196,14 @@ public class Contest {
 
     public LocalDate getApplyEnd() {
         return applyEnd;
+    }
+
+    public String getOrganizer() {
+        return organizer;
+    }
+
+    public String getOfficialUrl() {
+        return officialUrl;
     }
 
     public String getDetailUrl() {
