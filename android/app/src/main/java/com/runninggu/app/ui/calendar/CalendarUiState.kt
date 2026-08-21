@@ -6,6 +6,22 @@ import com.runninggu.app.ui.model.registrationStatus
 import java.time.LocalDate
 import java.time.YearMonth
 
+/**
+ * 월간 건수 조회 상태. (API 명세 §3-2)
+ *
+ * 달력의 점은 목록과 별도로 조회한다. 실패해도 목록은 볼 수 있으므로 화면 전체를 오류로
+ * 덮지 않고 여기서만 구분한다(AGENTS 2장-5 영역 단위 부분 실패).
+ */
+sealed interface DailyCountsState {
+    data object Loading : DailyCountsState
+    data class Content(val counts: Map<LocalDate, Int>) : DailyCountsState
+    data object Error : DailyCountsState
+}
+
+/** 화면이 점을 찍을 때 쓰는 값. 로딩·실패는 점이 없다. */
+val DailyCountsState.countsOrEmpty: Map<LocalDate, Int>
+    get() = (this as? DailyCountsState.Content)?.counts.orEmpty()
+
 /** 리스트 / 캘린더 뷰 토글. 기본은 리스트. (SPEC §4.5) */
 enum class CalendarViewMode { LIST, CALENDAR }
 
@@ -60,10 +76,14 @@ data class CalendarUiState(
     /**
      * 월간 뷰 날짜별 대회 수. (API 명세 §3-2)
      *
-     * [racesByDate] 와 달리 **받아온 페이지에 없는 대회도 센다.** 목록은 커서로 나눠 오지만
-     * 달력의 점은 그 달 전체를 알아야 맞기 때문이다.
+     * 목록([allRaces])과 달리 **받아온 페이지에 없는 대회도 센다.** 목록은 커서로 나눠
+     * 오지만 달력의 점은 그 달 전체를 알아야 맞기 때문이다 — 첫 장에 없는 대회의 날짜에
+     * 점이 안 찍히면 "이 달엔 대회가 없구나" 로 읽힌다(#85 리뷰).
+     *
+     * **못 불러온 것과 없는 것을 가른다.** 빈 맵으로 뭉뚱그리면 조회가 실패했을 때
+     * 대회 없는 달과 구분이 안 된다.
      */
-    val dailyCounts: Map<LocalDate, Int> = emptyMap(),
+    val dailyCounts: DailyCountsState = DailyCountsState.Loading,
 ) {
     enum class Phase { LOADING, ERROR, LOADED }
 
@@ -84,10 +104,6 @@ data class CalendarUiState(
                     .any { it.contains(query, ignoreCase = true) }
             }
             .sortedBy { it.date }
-
-    /** 캘린더 뷰에서 날짜별 점을 찍기 위한 묶음. */
-    val racesByDate: Map<LocalDate, List<RaceSummary>>
-        get() = filteredRaces.groupBy { it.date }
 
     /**
      * 화면 하단에 실제로 나열할 목록.

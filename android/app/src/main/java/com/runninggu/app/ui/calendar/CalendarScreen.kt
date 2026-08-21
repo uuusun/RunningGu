@@ -207,11 +207,21 @@ private fun RaceList(
             item {
                 MonthCalendar(
                     month = uiState.currentMonth,
-                    racesByDate = uiState.racesByDate,
+                    dailyCounts = uiState.dailyCounts.countsOrEmpty,
                     selectedDate = uiState.selectedDate,
                     onMonthChange = onMonthChange,
                     onDateSelect = onDateSelect,
                 )
+            }
+            // 점이 하나도 없는 게 "대회 없는 달" 로 읽히면 안 된다 (#85 리뷰)
+            if (uiState.dailyCounts is DailyCountsState.Error) {
+                item {
+                    Text(
+                        text = "이 달의 대회 수를 불러오지 못했어요. 아래 목록은 그대로 볼 수 있어요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 

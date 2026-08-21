@@ -108,7 +108,8 @@ class CalendarViewModel(
                             ?: state.currentMonth,
                     )
                 }
-                loadDailyCounts()
+                // 리스트 뷰에서는 달력이 안 보인다 — 안 쓰는 값을 받으려고 왕복하지 않는다
+                if (_uiState.value.viewMode == CalendarViewMode.CALENDAR) loadDailyCounts()
             } catch (e: ApiException) {
                 _uiState.update {
                     it.copy(
@@ -164,26 +165,32 @@ class CalendarViewModel(
      * 목록과 **같은 조건**을 넘겨야 한다 — 조건을 안 넘기면 걸러진 대회까지 점이 찍혀서
      * 눌렀는데 아무것도 없는 날이 생긴다.
      *
-     * 실패는 조용히 넘긴다. 점이 안 찍혀도 목록은 볼 수 있어서 화면 전체를 오류로 덮을
-     * 이유가 없다(AGENTS 2장-5 영역별 부분 실패).
+     * 실패해도 화면 전체를 오류로 덮지 않는다. 점이 안 찍혀도 목록은 볼 수 있기 때문이다
+     * (AGENTS 2장-5 영역별 부분 실패). 다만 **빈 맵으로 뭉뚱그리지 않는다** — 그러면
+     * 대회 없는 달과 구분이 안 돼서 "이 달엔 대회가 없구나" 로 읽힌다(#85 리뷰).
      */
     private fun loadDailyCounts() {
         val state = _uiState.value
         val month = state.currentMonth
         countsJob?.cancel()
         countsJob = viewModelScope.launch {
-            val counts = try {
-                repository.dailyCounts(
-                    year = month.year,
-                    month = month.monthValue,
-                    filter = state.toContestFilter(includeDate = false),
+            _uiState.update {
+                if (it.currentMonth == month) it.copy(dailyCounts = DailyCountsState.Loading) else it
+            }
+            val result = try {
+                DailyCountsState.Content(
+                    repository.dailyCounts(
+                        year = month.year,
+                        month = month.monthValue,
+                        filter = state.toContestFilter(includeDate = false),
+                    ),
                 )
             } catch (e: ApiException) {
-                emptyMap()
+                DailyCountsState.Error
             }
             _uiState.update {
                 // 늦게 온 응답이 그 사이 바뀐 달을 덮지 않게 한다
-                if (it.currentMonth == month) it.copy(dailyCounts = counts) else it
+                if (it.currentMonth == month) it.copy(dailyCounts = result) else it
             }
         }
     }
