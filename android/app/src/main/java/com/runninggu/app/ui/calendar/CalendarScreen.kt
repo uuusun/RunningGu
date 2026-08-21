@@ -2,6 +2,8 @@ package com.runninggu.app.ui.calendar
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -107,6 +109,7 @@ fun CalendarScreen(
             onFilterApply = viewModel::onFilterApply,
             onFilterChipRemove = viewModel::onFilterChipRemove,
             onResetAll = viewModel::onResetAll,
+            onLoadMore = viewModel::loadMore,
             onMonthChange = viewModel::onMonthChange,
             onDateSelect = viewModel::onDateSelect,
             onFavoriteToggle = viewModel::onFavoriteToggle,
@@ -130,6 +133,7 @@ private fun CalendarContent(
     onFavoriteToggle: (String) -> Unit,
     onRetry: () -> Unit,
     onRaceClick: (String) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var filterSheetVisible by remember { mutableStateOf(false) }
@@ -171,6 +175,7 @@ private fun CalendarContent(
                 onRaceClick = onRaceClick,
                 onFavoriteToggle = onFavoriteToggle,
                 onResetAll = onResetAll,
+                onLoadMore = onLoadMore,
             )
         }
     }
@@ -195,6 +200,7 @@ private fun RaceList(
     onRaceClick: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     onResetAll: () -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val races = uiState.listedRaces
@@ -241,9 +247,29 @@ private fun RaceList(
                     onFavoriteToggle = { onFavoriteToggle(race.id) },
                 )
             }
+
+            // 목록이 커서로 나뉘어 온다 — 끝에 닿으면 다음 장을 잇는다 (API 명세 §3-1)
+            if (uiState.hasNext) {
+                item(key = LOAD_MORE_KEY) {
+                    // 이 항목이 화면에 들어오는 순간이 곧 "끝까지 스크롤했다" 는 신호다
+                    LaunchedEffect(uiState.nextCursor) { onLoadMore() }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
         }
     }
 }
+
+/** 더 받기 항목의 안정적인 키. 카드 id 와 겹치지 않게 둔다. */
+private const val LOAD_MORE_KEY = "load-more"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

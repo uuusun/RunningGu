@@ -57,6 +57,14 @@ class CalendarViewModel(
     private var countsJob: Job? = null
     private var searchJob: Job? = null
 
+    /**
+     * 달을 한 번이라도 정했는가.
+     *
+     * 첫 조회는 결과가 있는 달을 열어 주는 게 맞지만, 그 뒤로는 **사용자가 보고 있는 달**이
+     * 기준이다. 조회할 때마다 옮기면 날짜 선택을 해제하는 것만으로 달이 바뀐다(#85 리뷰).
+     */
+    private var monthDecided = false
+
     init {
         load()
         // 찜은 S3 상세·S10 마이와 같은 값을 봐야 하므로 공용 보관소를 구독한다. (SPEC §4.5)
@@ -67,13 +75,20 @@ class CalendarViewModel(
         }
     }
 
-    /** 홈에서 넘어온 검색어를 최초 1회만 적용한다. (SPEC §4.5) */
+    /**
+     * 홈에서 넘어온 검색어를 최초 1회만 적용한다. (SPEC §4.5 · §4.4-1)
+     *
+     * **검색어를 넣은 뒤 다시 조회한다.** 거르는 일을 서버가 하는데(§3-1 `q`), `init` 의
+     * 첫 조회는 검색어 없이 나가 있다. 그 결과만 놓고 앱에서 다시 걸러 봐야 **검색 대상이
+     * 첫 장 밖에 있으면 안 보인다** — 조건에 맞는 대회가 있는데도 빈 화면이 된다(#85 리뷰).
+     */
     fun applyInitialQuery(query: String) {
         if (initialQueryApplied) return
         initialQueryApplied = true
-        if (query.isNotBlank()) {
-            _uiState.update { it.copy(query = query) }
-        }
+        if (query.isBlank()) return
+
+        _uiState.update { it.copy(query = query) }
+        load()
     }
 
     /** 첫 장부터 다시. 진입·조건 변경·오류 재시도가 모두 여기로 온다. */
@@ -103,11 +118,19 @@ class CalendarViewModel(
                         allRaces = upcoming,
                         nextCursor = page.nextCursor,
                         hasNext = page.hasNext,
-                        currentMonth = upcoming.minByOrNull { race -> race.date }
-                            ?.let { race -> YearMonth.from(race.date) }
-                            ?: state.currentMonth,
+                        // **보고 있던 달을 유지한다.** 매번 첫 결과의 달로 옮기면, 10월 날짜를
+                        // 눌렀다 재탭으로 해제했을 때 8월로 튄다 — 해제는 달을 바꾸는 동작이
+                        // 아니다(SPEC §4.5 · #85 리뷰). 첫 조회에서만 옮긴다
+                        currentMonth = if (monthDecided) {
+                            state.currentMonth
+                        } else {
+                            upcoming.minByOrNull { race -> race.date }
+                                ?.let { race -> YearMonth.from(race.date) }
+                                ?: state.currentMonth
+                        },
                     )
                 }
+                monthDecided = true
                 // 리스트 뷰에서는 달력이 안 보인다 — 안 쓰는 값을 받으려고 왕복하지 않는다
                 if (_uiState.value.viewMode == CalendarViewMode.CALENDAR) loadDailyCounts()
             } catch (e: ApiException) {
