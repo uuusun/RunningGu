@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(OPENAPI_PATHS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/contests/*/festivals").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/geocode").permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(exception -> exception
