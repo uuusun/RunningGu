@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/contests/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests/*/festivals").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/geocode").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/pois").permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, cause) ->
