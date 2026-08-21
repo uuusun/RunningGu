@@ -1,7 +1,9 @@
-package com.runninggu.app.ui.auth
+package com.runninggu.app.data.repository
 
-import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.local.AuthTokens
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import kotlinx.coroutines.delay
 
@@ -12,14 +14,28 @@ import kotlinx.coroutines.delay
  * (#43 규약) Retrofit 구현으로 바꿔도 화면 분기가 그대로 산다. 화면은 `ApiException.Http.code`
  * 로 사유를 갈라 문구를 고른다(예: `CODE_EXPIRED` 는 재발송을 유도해야 한다).
  *
- * TODO(AP-14): `data/remote` 의 Retrofit 구현으로 교체한다. 그때
- *  - `Result` 대신 `apiCall {}` 이 예외를 던지는 형태가 되므로 호출부가 `try/catch` 로 바뀐다
- *  - 발급된 [AuthTokens] 를 `ApiClient.TokenProvider` 에 물려야 인증 API 가 게스트로 나가지 않는다
+ * 구현이 둘이다 — [RemoteAuthRepository](Retrofit)와 [FakeAuthRepository](서버 전 데모용).
+ * 화면은 인터페이스만 보므로 [com.runninggu.app.data.ServiceLocator] 에서 갈아끼운다.
+ *
+ * **실패를 `Result` 로 주는 것은 여기뿐이다.** `data/` 의 다른 저장소들은 `ApiException` 을
+ * 던진다. 규칙이 섞여 있는 게 맞고, 맞추려면 화면 세 곳의 분기를 다시 써야 해서 이 PR 에서
+ * 하지 않았다 — 별도로 정리한다(#97 · 앱 UI 담당과 함께).
  */
 interface AuthRepository {
 
+    /**
+     * `GET /auth/email/exists`. 가입 2단계 인라인 검증용. (§1-1 · 이슈 #97 선택지 A)
+     *
+     * 실패해도 다음 단계를 막지 않는다 — 확인 API 가 죽었다고 가입 자체를 못 하면
+     * 사용자가 할 수 있는 게 없다. `send-code` 의 `409` 가 최종 방어다.
+     */
+    suspend fun emailExists(email: String): Result<Boolean>
+
+    /** `GET /auth/nickname/exists`. 대소문자 무시 판정은 서버가 한다. (§1-2 · 이슈 #97) */
+    suspend fun nicknameExists(nickname: String): Result<Boolean>
+
     /** `POST /auth/login`. 실패 사유는 구분하지 않는다 — 계정 존재를 노출하지 않는다(§4.1). */
-    suspend fun login(email: String, password: String): Result<AuthTokens>
+    suspend fun login(email: String, password: String): Result<AuthSession>
 
     /** `POST /auth/email/send-code`. 쿨다운 위반은 `429 SEND_COOLDOWN`. */
     suspend fun sendSignupCode(email: String): Result<Unit>
@@ -32,17 +48,26 @@ interface AuthRepository {
      */
     suspend fun verifySignupCode(email: String, code: String): Result<Unit>
 
-    /** `POST /auth/signup`. `201` 이 곧 로그인 응답이다(§1-5) — 토큰을 함께 준다. */
+    /** `POST /auth/signup`. `201` 이 곧 로그인 응답이다(§1-5) — 토큰과 사용자를 함께 준다. */
     suspend fun signup(
         email: String,
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
-    ): Result<AuthTokens>
+    ): Result<AuthSession>
 
     /** `POST /auth/password/reset-request`. 가입 여부와 무관하게 `202`(§4.3 계정 존재 비노출). */
     suspend fun requestPasswordReset(email: String): Result<Unit>
 }
+
+/**
+ * 로그인·가입 성공 결과. (API 명세 §1-5 · §1-6)
+ *
+ * **토큰만 주지 않고 사용자도 함께 준다.** 예전에는 토큰만 돌려줘서 화면이 닉네임을
+ * 이메일 앞부분에서 파생했는데(`runner@test.com` → "runner"), 그건 서버가 아는 진짜
+ * 닉네임이 아니다. 마이 화면과 카드에 다른 이름이 보이게 된다.
+ */
+data class AuthSession(val tokens: AuthTokens, val profile: SessionProfile)
 
 /**
  * 백엔드 인증 API가 붙기 전까지 쓰는 스텁.
@@ -58,19 +83,37 @@ object FakeAuthRepository : AuthRepository {
     /** 명세 §1-4 예시 코드. 데모에서 이 값을 입력하면 통과한다. */
     const val SAMPLE_CODE = "483920"
 
+    /** 데모에서 "이미 가입된 이메일" 화면을 볼 수 있게 정해 둔 값. */
+    const val TAKEN_EMAIL = "taken@test.com"
+
+    /** 데모에서 "이미 사용 중인 닉네임" 화면을 볼 수 있게 정해 둔 값. */
+    const val TAKEN_NICKNAME = "김러너"
+
     /** NFR-10 🔒 — 5회 실패하면 재발송부터 다시 해야 한다. */
     const val MAX_VERIFY_ATTEMPTS = 5
 
     /** 이메일별 코드 오입력 횟수. 재발송하면 0으로 돌아간다. */
     private val attempts = mutableMapOf<String, Int>()
 
-    override suspend fun login(email: String, password: String): Result<AuthTokens> {
+    override suspend fun emailExists(email: String): Result<Boolean> {
         delay(NETWORK_DELAY_MS)
-        offlineOrNull<AuthTokens>(email)?.let { return it }
+        offlineOrNull<Boolean>(email)?.let { return it }
+        // 데모에서 중복 화면을 볼 수 있게 한 값을 정해 둔다
+        return Result.success(email.trim().equals(TAKEN_EMAIL, ignoreCase = true))
+    }
+
+    override suspend fun nicknameExists(nickname: String): Result<Boolean> {
+        delay(NETWORK_DELAY_MS)
+        return Result.success(nickname.trim().equals(TAKEN_NICKNAME, ignoreCase = true))
+    }
+
+    override suspend fun login(email: String, password: String): Result<AuthSession> {
+        delay(NETWORK_DELAY_MS)
+        offlineOrNull<AuthSession>(email)?.let { return it }
         return if (password.startsWith("wrong")) {
             failure(401, ApiErrorCode.LOGIN_FAILED)
         } else {
-            Result.success(fakeTokens())
+            Result.success(fakeSession(email, nickname = email.substringBefore('@')))
         }
     }
 
@@ -107,10 +150,10 @@ object FakeAuthRepository : AuthRepository {
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
-    ): Result<AuthTokens> {
+    ): Result<AuthSession> {
         delay(NETWORK_DELAY_MS)
-        offlineOrNull<AuthTokens>(email)?.let { return it }
-        return Result.success(fakeTokens())
+        offlineOrNull<AuthSession>(email)?.let { return it }
+        return Result.success(fakeSession(email, nickname, marketingAgreed))
     }
 
     override suspend fun requestPasswordReset(email: String): Result<Unit> {
@@ -130,9 +173,21 @@ object FakeAuthRepository : AuthRepository {
     private fun <T> failure(status: Int, code: ApiErrorCode): Result<T> =
         Result.failure(ApiException.Http(status = status, code = code, problem = null))
 
-    private fun fakeTokens() = AuthTokens(
-        accessToken = "fake-access-token",
-        refreshToken = "fake-refresh-token",
+    private fun fakeSession(
+        email: String,
+        nickname: String,
+        marketingAgreed: Boolean = false,
+    ) = AuthSession(
+        tokens = AuthTokens(
+            accessToken = "fake-access-token",
+            refreshToken = "fake-refresh-token",
+        ),
+        profile = SessionProfile(
+            nickname = nickname.trim(),
+            email = email.trim(),
+            loginProvider = LoginProvider.EMAIL,
+            marketingAgreed = marketingAgreed,
+        ),
     )
 
     private const val NETWORK_DELAY_MS = 400L

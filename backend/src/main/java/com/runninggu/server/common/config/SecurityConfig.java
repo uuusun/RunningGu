@@ -2,17 +2,21 @@ package com.runninggu.server.common.config;
 
 import com.runninggu.server.common.error.ApiProblemWriter;
 import com.runninggu.server.common.error.ErrorCode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /** 모바일 API는 무상태로 동작하며 공개·인증 경로는 기능 구현 시 명시적으로 연다. (SPEC §9.2~9.3) */
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfig {
 
     private static final String[] OPENAPI_PATHS = {
@@ -24,7 +28,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            ApiProblemWriter problemWriter) throws Exception {
+            ApiProblemWriter problemWriter,
+            @Qualifier("accessJwtDecoder") JwtDecoder accessJwtDecoder) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -37,8 +42,36 @@ public class SecurityConfig {
                         .requestMatchers(OPENAPI_PATHS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/contests/*/festivals").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/festivals").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/geocode").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/pois").permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/email/exists",
+                                "/api/auth/nickname/exists")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/email/send-code",
+                                "/api/auth/email/verify",
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/logout")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/itineraries/generate")
+                        .permitAll()
+                        .requestMatchers(
+                                "/api/me/**",
+                                "/api/itineraries/**",
+                                "/api/runs/**")
+                        .authenticated()
                         .anyRequest().denyAll())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.decoder(accessJwtDecoder))
+                        .authenticationEntryPoint((request, response, cause) ->
+                                problemWriter.write(request, response, ErrorCode.UNAUTHORIZED)))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, cause) ->
                                 problemWriter.write(request, response, ErrorCode.UNAUTHORIZED))

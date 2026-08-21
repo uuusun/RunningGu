@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.9
+# 런닝구 백엔드 API 명세서 v3.0
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -23,7 +23,7 @@
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
-- 인증 방식: `Authorization: Bearer {accessToken}`. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 서명 키는 서버 환경변수로만 관리한다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 회전(rotate) + 서버 저장(SHA-256 해시) — 비밀번호 변경·재설정·탈퇴 시 전체 무효화한다(NFR-11). 🔒
+- 인증 방식: Spring Security Resource Server의 `BearerTokenAuthenticationFilter`가 `Authorization: Bearer {accessToken}`을 검증한다. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 claim은 `sub=String(userId)`, `iss=runninggu`, `aud=runninggu-api`, `type=ACCESS|REFRESH`, `jti=UUID`, `iat`, `exp`로 고정한다. `JWT_SECRET`은 Base64로 디코딩한 32바이트 이상 키이며 누락·형식 오류·길이 미달이면 서버 기동을 실패시킨다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 family 회전 + 서버 저장(SHA-256 lowercase hex) + 재사용 탐지를 적용한다(NFR-11). 🔒
 - 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
@@ -105,7 +105,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 1-7 | POST | `/auth/kakao` | 카카오 로그인 (SDK 토큰 검증) | 공개 |
 | 1-8 | POST | `/auth/kakao/signup` | 카카오 신규 가입 (동의 포함) | 공개 |
 | 1-9 | POST | `/auth/refresh` | 액세스 토큰 재발급 | 공개(리프레시 필요) |
-| 1-10 | POST | `/auth/logout` | 로그아웃 (리프레시 무효화) | 인증 |
+| 1-10 | POST | `/auth/logout` | 로그아웃 (리프레시 family 무효화) | 공개(리프레시 필요) |
 | 1-11 | POST | `/auth/password/reset-request` | 재설정 링크 메일 발송 | 공개 |
 | 1-12 | POST | `/auth/password/reset` | 새 비밀번호 설정 | 공개(토큰 필요) |
 
@@ -114,15 +114,23 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ### 1-1 · 1-2 중복 확인
 
 `GET /api/auth/email/exists?email=` · `GET /api/auth/nickname/exists?nickname=` → `200 {"exists": true}`
-닉네임 규칙: 2~12자 🔒. (가입 2단계 인라인 검증용 — 정리본 "숨은 값: 이메일 중복 여부")
+이메일은 앞뒤 Unicode 공백 제거 후 전체 소문자화하며 최대 320자, `^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$` 형식이다. Gmail 점·`+tag` 같은 공급자별 변환은 하지 않는다. KAKAO의 `email_snapshot`은 EMAIL 중복으로 세지 않는다.
+닉네임은 앞뒤 공백 제거 후 Unicode 코드포인트 2~12자이고 내부 공백·Unicode를 허용한다. 표시 문자열은 보존하되 중복 키는 ASCII 영문 대소문자를 무시하며 NFC/NFKC 변환은 하지 않는다. (가입 2단계 인라인 검증용 — 이슈 #97)
+
+두 API는 공개 이메일 존재 조회라는 의도된 비대칭을 가진다. IP 합산 30회/분, 정규화 이메일·닉네임별 5회/분을 단일 서버 Caffeine에서 제한하고 초과 시 `429 RATE_LIMITED`를 반환한다. P0 응답에는 `Retry-After` 헤더나 남은 시간을 넣지 않으며 앱은 카운트다운 없이 일반 재시도 안내를 표시한다. 조회 실패·제한은 앱의 `DuplicateCheck.Error`이며 가입 진행을 막지 않고, 발송·가입의 유니크 오류가 최종 방어다.
+
+IP는 Spring 전달 헤더 처리 후 `request.getRemoteAddr()`를 사용한다. 로컬·직접 연결은 `FORWARD_HEADERS_STRATEGY=none`, 신뢰 가능한 프록시 뒤 운영은 `framework`로 설정한다. 프록시는 외부 전달 헤더를 제거·재설정하고 원본 서버 직접 접근을 차단해야 한다. 프록시 배포에서 `none`이면 모든 사용자가 프록시 IP 버킷을 공유하고, 신뢰 경계 없이 `framework`를 켜면 헤더 위조로 제한을 우회할 수 있다.
 
 ### 1-3 `POST /auth/email/send-code`
 
 ```json
 { "email": "runner@test.com" }
 ```
-`204` — 6자리 코드 메일 발송. **유효 10분 · 재발송 쿨다운 60초 · 5회 실패 시 재발송 요구** 🔒(NFR-10).
-오류: `409 EMAIL_DUPLICATED`(이미 가입) · `429 SEND_COOLDOWN`
+`204` — 6자리 코드 메일 발송. **유효 10분 · 재발송 쿨다운 60초 · 5번째 오입력부터 재발송 요구** 🔒(NFR-10).
+코드는 BCrypt strength 10 해시만 저장한다. 재발송은 이전 코드·검증 상태를 무효화하고 실패 횟수를 0으로 초기화한다. 인증 메일은 UTF-8 일반 텍스트이며 코드를 공백·하이픈 없이 표시한다.
+오류: `409 EMAIL_DUPLICATED`(이미 가입) · `429 SEND_COOLDOWN` · `502 EXTERNAL_API_ERROR`(SMTP 실패, 코드·쿨다운 미반영)
+
+SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수로 하며 connect/read/write timeout은 각 5초, 애플리케이션 재시도는 하지 않는다. `MAIL_ENABLED` 기본값은 `false`이고 운영은 `true`로 설정하며 `SMTP_HOST`, `SMTP_PORT`(기본 587), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME`(기본 런닝구)을 환경변수로 받는다. outbox를 두지 않는 P0 계약상 SMTP 성공 뒤 DB commit이 실패하면 먼저 도착한 코드는 검증할 수 없고 사용자가 즉시 재발송해야 하는 잔여 위험을 허용한다.
 
 ### 1-4 `POST /auth/email/verify`
 
@@ -130,7 +138,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 { "email": "runner@test.com", "code": "483920" }
 ```
 `200 {"verified": true}` — 서버가 해당 이메일을 '인증 완료(30분 내 가입 유효 🔧)'로 마킹.
-오류: `400 INVALID_CODE` · `400 CODE_EXPIRED` · `429 TOO_MANY_ATTEMPTS`(5회 초과 → 재발송부터)
+6자리 숫자 형식 자체가 아니면 `400 VALIDATION_FAILED`이며 횟수를 올리지 않는다. 발송 이력이 없거나 인증 완료 후 30분이 지나면 `400 CODE_EXPIRED`다. 형식은 맞지만 코드가 다르면 1~4번째는 `400 INVALID_CODE`, 5번째부터는 시도 횟수를 5로 보존하고 `429 TOO_MANY_ATTEMPTS`다. 성공한 같은 코드는 인증 완료 후 30분 동안 멱등 `200`이고, 성공 후 다른 코드는 인증 상태·횟수를 바꾸지 않고 `INVALID_CODE`다. 재발송 후 이전 코드는 `INVALID_CODE`다.
 
 ### 1-5 `POST /auth/signup`
 
@@ -143,7 +151,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 }
 ```
 `201` — 응답은 1-6 로그인과 동일(가입 완료 → "시작하기 → 홈" 목업 플로우에 맞춰 **자동 로그인** 🔧).
-검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt 단방향 해시(NFR-9). 서버가 활성 약관 버전을 결정하고 항목별 `{type, version, agreed, changedAt}` 이력을 append-only로 저장한다(NFR-12).
+검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt strength 10 단방향 해시(NFR-9). 서버 활성 버전 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`으로 선택 동의를 포함한 세 행을 같은 `changedAt`에 append-only 저장하며 앱은 버전을 보내지 않는다(NFR-12, 결정-52, 이슈 #111).
 
 ### 1-6 `POST /auth/login`
 
@@ -192,8 +200,9 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 1-9 ~ 1-10 토큰 관리
 
-`POST /auth/refresh` `{"refreshToken": "..."}` → `200` 새 액세스 + **회전된 리프레시**. 오류 `401 INVALID_REFRESH_TOKEN`(만료·revoked) → 앱은 재로그인 유도.
-`POST /auth/logout` `{"refreshToken": "..."}` → `204` — 해당 리프레시 revoke.
+`POST /auth/refresh` `{"refreshToken": "..."}` → `200 {"accessToken":"...","refreshToken":"..."}`. 새 기기 로그인은 새 `familyId`를 만들고, 재발급은 기존 토큰을 revoke한 뒤 같은 family의 새 토큰으로 **회전**한다. 만료·서명/claim 오류·알 수 없는 토큰은 `401 INVALID_REFRESH_TOKEN`이다. 이미 회전·revoke된 과거 토큰이 다시 제시되면 같은 family의 활성 토큰을 모두 revoke하고 `401`을 반환하되 다른 기기 family는 유지한다. DB에는 원문 대신 SHA-256 lowercase hex만 저장한다.
+
+`POST /auth/logout` `{"refreshToken": "..."}` → `204`. Access 토큰 없이 호출하는 공개 경로이고, 알려진 refresh token이면 같은 family의 활성 토큰을 revoke한다. 활성·이미 revoked·만료·알 수 없는 non-blank 토큰 모두 멱등 `204`이며 빈 값은 `400 VALIDATION_FAILED`다. Access blacklist는 두지 않아 기존 Access는 최대 30분까지 유효할 수 있다. 앱은 Authenticator가 붙지 않는 클라이언트로 호출해 refresh 재시도 루프를 만들지 않는다(결정-51).
 
 ### 1-11 `POST /auth/password/reset-request`
 
@@ -367,11 +376,13 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 파라미터 | 설명 |
 |---|---|
-| `yearMonth` | `2026-08` 🔧 기본 = 이번 달 (정리본 "조회 월 기준") |
-| `size` | 기본 6 🔧 |
+| `yearMonth` | `YYYY-MM`(예: `2026-08`) 🔧 기본 = KST 이번 달. 형식이 다르면 `400 VALIDATION_FAILED` |
+| `size` | 기본 6 🔧 · 허용 범위 `1~20`. 범위를 벗어나면 `400 VALIDATION_FAILED` |
 
-응답 항목: `{contentId, name, startDate, endDate, region, imageUrl, inProgress}` — `inProgress` = start ≤ 오늘 ≤ end (진행중 배지).
+응답은 `{"items": [...]}`이고 항목은 정확히 `{contentId, name, startDate, endDate, region, imageUrl, inProgress}`다. `inProgress` = start ≤ KST 오늘 ≤ end (진행중 배지).
 조회 월과 겹치는 전국 축제를 진행 중 우선, 시작일 오름차순으로 반환한다. 홈에서는 위치 권한과 사용자 좌표를 사용하지 않는다. 서버가 KTO `searchFestival2`를 호출·캐시하며 앱은 우리 서버만 호출한다.
+
+`region`은 KTO `addr1`의 첫 토큰을 17개 시도 단축명(서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주)으로 정규화한 값이다. `addr1`이 없거나 17개 시도로 판별할 수 없으면 항목을 제외하지 않고 `region: ""`으로 유지한다. 좌표·주소·상세 이동 키·`fetchedAt/cachedAt/source` 같은 추적 메타데이터는 응답에 추가하지 않는다.
 
 **P0에서 홈 축제 카드는 표시 전용이다** — 축제 상세로 이동하는 동작도, 그 화면으로 가는 route도 없다(결정 D-05). 그래서 응답에 상세 조회용 키를 더 넣지 않는다.
 
@@ -381,27 +392,62 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 | 파라미터 | 설명 |
 |---|---|
-| `category` | `TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING` (부록 B 매핑) |
-| `lat` `lng` | 기준점 (숙소 선택 전 = 대회장, 이후 = 숙소·현재 블록) |
-| `radius` | 기본 8000m 🔧 · **3건 미만이면 20km 재검색** 🔒(§8.1) · 최대 20000(KTO 제약) |
+| `category` | 필수. `TOUR / FOOD / CAFE / WELLNESS / NATURE / HISTORY / LODGING` (부록 B 매핑) |
+| `lat` `lng` | 필수 WGS84 기준점. `lat=-90~90`, `lng=-180~180` (숙소 선택 전 = 대회장, 이후 = 숙소·현재 블록) |
+| `radius` | 기본 8000m 🔧 · 양의 정수, 최대 20000(KTO 제약) · **3건 미만이면 같은 원천을 20km에서 재검색** 🔒(§8.1) |
 | `query` | *(선택)* 키워드 검색 — W3 숙소 검색창. 공백 제거 후 2자 이상, 미만이면 `400 VALIDATION_FAILED` |
-| `size` | 기본 8 🔒(노출 8건) |
+| `size` | 기본 8 🔒(노출 8건) · 허용 범위 `1~20` |
 
 ```json
 {
   "source": "LIVE",
   "items": [
     {
-      "name": "호텔 세종 가온", "category": "LODGING",
+      "name": "호텔 세종 가온", "category": "LODGING", "provider": "KAKAO",
       "lat": 36.4912, "lng": 127.2714, "distanceM": 1200,
       "description": "어진동 · 대회장 1.2km",
-      "address": "세종특별자치시 어진동 123", "url": "http://place.map.kakao.com/...",
+      "address": "세종특별자치시 어진동 123", "url": "https://place.map.kakao.com/...",
       "imageUrl": null
     }
   ]
 }
 ```
-- **숙소(LODGING) = 카카오 로컬 AD5 1순위, KTO 32 폴백** 🔒(회의 결정 7·검증리포트 D2 — TourAPI 단독이면 실측상 4건뿐).
+
+항목은 정확히 `{name, category, provider, lat, lng, distanceM, description, address, url, imageUrl}`다.
+`provider`는 실제 항목을 제공한 원천 `KAKAO | KTO`이며 필수다. `name`, `category`, `provider`,
+`lat`, `lng`, `distanceM`, `description`, `address`, `url`은 non-null이고, 원천에 문자열 값이 없으면
+빈 문자열을 반환한다. `imageUrl`만 nullable이다. `distanceM`은 요청 기준점부터의 0 이상 정수 미터다.
+
+P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 저장하므로 안정적 `placeId`를 응답에
+두지 않는다. `fetchedAt`·`cachedAt`도 서버 캐시·운영 정보이므로 응답에서 제외한다. 앱의 Room
+`cachedAt`과는 별개다.
+
+| category | 1순위 | 폴백 |
+|---|---|---|
+| `TOUR` · `HISTORY` | KTO KorService2 `locationBasedList2` 12 | 카카오 AT4/키워드 |
+| `FOOD` | 카카오 FD6 | KTO KorService2 39 |
+| `CAFE` | 카카오 CE7 | 없음 |
+| `LODGING` | 카카오 AD5 | KTO KorService2 32 |
+| `WELLNESS` | KTO WellnessTursmService | 카카오 키워드 |
+| `NATURE` | 카카오 자연 키워드 + AP-23 두루누비 번들 | KTO KorService2 12 |
+
+조회·폴백 규칙은 다음과 같다.
+
+1. 1순위 원천을 요청 반경에서 조회한다.
+2. 결과가 3건 미만이고 요청 반경이 20km 미만이면 같은 원천을 20km에서 다시 조회한다.
+3. 그래도 `size`보다 적으면 폴백 원천에서 부족한 개수를 채운다. 폴백이 없는 카테고리는 적은
+   결과를 그대로 반환한다. AP-23 두루누비 어댑터 장애는 NATURE의 카카오·KTO 결과를 막지 않는다.
+4. 정규화한 이름과 좌표가 같은 항목을 중복 제거하고 `distanceM` 오름차순으로 최대 `size`건을
+   반환한다. 최종 응답 `items`에서는 JSON 응답값 기준 `(name, lat, lng)` 조합의 유일성을
+   보장한다. 좌표는 숫자값으로 비교하므로 소수점 뒤 0만 다른 값은 같다. 앱은 이 조합을 목록
+   `key`로 사용할 수 있다.
+5. 성공 결과만 요청 파라미터 기준으로 5분 캐시하고 오류 응답은 캐시하지 않는다.
+
+모든 원천이 정상 응답했지만 결과가 없으면 `200 {"source":"LIVE","items":[]}`다. 일부 원천이
+실패해도 다른 원천에서 한 건 이상 만들면 `200`으로 성공한다. 표시 항목이 없는데 하나 이상의
+원천이 실패했다면 모든 실패가 timeout일 때 `504 EXTERNAL_API_TIMEOUT`, 그 외에는
+`502 EXTERNAL_API_ERROR`다. 외부 장애를 빈 배열이나 SAMPLE/SYNTH로 낮추지 않는다.
+
 - Android는 최초 진입 시 query 없이 주변 8건을 조회하고, 검색어가 2자 이상일 때 500ms debounce 후 query를 보낸다. debounce는 앱 내부 정책이다.
 - 운영 응답의 `source`는 항상 `LIVE`다. `SAMPLE/SYNTH`는 목업·데모 빌드 전용이며, 운영에서 502/504를 샘플 데이터로 숨기지 않는다(NFR-2).
 
@@ -513,6 +559,10 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ## 6. 러닝코스 API `/api/courses` (공개)
 
 > 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+>
+> 두루누비 번들 파일·시작 후/24시간 동기화·`courseId` 결합·원자적 fail-open의 내부 계약은
+> [`docs/course-bundle-contract.md`](../course-bundle-contract.md)가 기준이다. 이 catalog는
+> PostgreSQL에 복제하지 않고 검증된 번들에서 시작한 불변 메모리 snapshot으로 제공한다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
@@ -573,13 +623,15 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=0&size=20` → 큐레이션 코스만 거리 오름차순으로 반환한다 🔒(§4.11-b). `OSM_GENERATED`는 포함하지 않는다.
+`?region=부산&page=0&size=20` → 큐레이션 코스만 `distanceKm ASC, courseId ASC`로
+안정 정렬해 반환한다 🔒(§4.11-b). `region`은 앞뒤 공백 제거 후 `sido`와 정확히 일치시키며
+`OSM_GENERATED`는 포함하지 않는다.
 
 ```json
 {
   "content": [
     {
-      "courseId": "durunubi-001",
+      "courseId": "T_CRS_MNG0000005117",
       "courseName": "해파랑길 1코스",
       "sido": "부산",
       "sigun": "남구",
@@ -602,9 +654,17 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 ```
 
 - `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
+- `courseId`는 번들·KTO 결합에 사용하는 안정적 유일키다. `dataSource`는 지역별 응답에서
+  `API_GPX|GPX_ONLY`만 가능하다.
+- `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
+  `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
 
-### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
+### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
+
+같은 catalog snapshot의 서비스 대상 코스를 `sido`별로 세고 `count DESC, region ASC`로
+정렬한다. 0건인 시도는 만들지 않으며, `count` 합은 필터 없는 6-2의 `totalElements`와 같다.
+KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두 지역 API를 계속 제공한다.
 
 ---
 
@@ -779,6 +839,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
+| `RATE_LIMITED` | 429 | 공개 중복 확인 IP 30회/분 또는 정규화 입력 5회/분 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
 | `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |

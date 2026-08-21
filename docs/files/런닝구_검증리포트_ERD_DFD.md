@@ -1,8 +1,8 @@
-# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.4
+# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.5
 
-> **검증일**: 2026-08-20
-> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-44·45·46·47 포함) · API 명세 v2.8 · 화면–API 매핑표 v1.8 · 논리 ERD v4.3 · 수정 DFD
-> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08 계약은 정렬됐다. 남은 `TBD-DB-01`과 `TBD-P1-01`은 해당 물리 컬럼·P1 계약 전에 닫는다.
+> **검증일**: 2026-08-21
+> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-44~51 포함) · API 명세 v3.0 · 화면–API 매핑표 v1.9 · 논리 ERD v4.4 · 수정 DFD
+> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08·09·10 계약은 정렬됐다. 남은 `TBD-DB-01`과 `TBD-P1-01`은 해당 물리 컬럼·P1 계약 전에 닫는다.
 
 ---
 
@@ -27,8 +27,8 @@
 - `UNIQUE(user_id)`와 `UNIQUE(provider, provider_subject)`를 적용하고 P0 연결·추가·해제·전환을 제공하지 않는다.
 - 대표 이메일은 EMAIL의 `provider_subject`, KAKAO의 nullable `email_snapshot`에서 파생한다. `GET /me.email`은 항상 포함하는 `string|null`이며, KAKAO가 이메일을 제공하지 않으면 앱이 이메일 행을 숨긴다.
 - EMAIL은 `password_hash`·`email_verified_at`이 필수이고 KAKAO는 둘 다 null이며, nullable `last_login_at`을 유지한다.
-- 약관은 `USER_AGREEMENT`에 append-only 이력으로 저장한다.
-- 인증 코드·재설정 토큰과 refresh token은 원문이 아니라 hash만 저장한다.
+- 약관은 `USER_AGREEMENT`에 append-only 이력으로 저장하고 가입 시 활성 `TOS/PRIVACY/MARKETING=1.0` 세 행을 같은 시각에 기록한다.
+- 인증 코드·재설정 토큰과 refresh token은 원문이 아니라 hash만 저장한다. refresh는 `family_id UUID`로 기기 세션을 구분하고 family별 활성 행을 하나로 제한하며 과거 토큰 재사용 시 같은 family만 전부 revoke한다.
 - 이메일 인증 목적은 `SIGNUP/PASSWORD_RESET`으로 통일한다.
 
 ### 2.2 대회·찜
@@ -137,6 +137,7 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - `DB-06`: `externalId`, `PASSWORD_RESET`, `fetchedAt`, `organizer` 명칭 통일
 - `DB-07`: 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum CHECK, 좌표 `NUMERIC(10,7)`, 거리 `NUMERIC(8,3)`, 문자열 용도별 길이·nullable·주요 조회 인덱스 명시
 - `DB-08`: 대회 출발 시각·도로명 주소·상세 URL nullable 저장, snapshot 파일 바이트 해시를 사용한 성공 적용 이력의 원자 기록과 동일/과거 snapshot 차단
+- `DB-09`: 물리 회원 테이블은 예약어를 피한 `app_user`, 표시 닉네임과 ASCII 대소문자 무시 `nickname_key`를 분리해 UNIQUE, 인증 상태는 `UNIQUE(email,purpose)` 한 행을 재발송 때 갱신
 
 ---
 
@@ -144,6 +145,8 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 - 같은 `user_id`에 두 번째 LOGIN_IDENTITY 삽입 → UNIQUE 위반.
 - EMAIL/KAKAO별 필수·null 필드 조합 위반 → CHECK 위반.
+- ASCII 대소문자만 다른 닉네임 키 삽입 → UNIQUE 위반, Unicode 코드포인트 2~12자 검증은 서버 정책으로 동일 적용.
+- 같은 정규화 이메일·목적의 두 번째 EMAIL_VERIFICATION 삽입 → UNIQUE 위반, 재발송은 기존 행 갱신.
 - 가입 방식과 다른 provider로 탈퇴 재인증 → `409 REAUTH_PROVIDER_MISMATCH`.
 - RACE 블록 PATCH/DELETE/이동 → `409 SYSTEM_BLOCK_IMMUTABLE`.
 - canonical 이름만 변경 → 저장 동선 `needsRegeneration=false`; 날짜·시간·장소·지역·좌표 변경 → true이며 기존 RACE snapshot 유지.

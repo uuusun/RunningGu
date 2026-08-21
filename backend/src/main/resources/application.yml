@@ -23,9 +23,25 @@ spring:
       enabled: true
   cache:
     type: caffeine
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
   error:
     include-message: never
     include-binding-errors: never
@@ -43,9 +59,35 @@ logging:
     level: "%5p [traceId=%X{traceId:-}]"
 
 runninggu:
+  auth:
+    jwt:
+      secret: ${JWT_SECRET}
+      issuer: runninggu
+      audience: runninggu-api
+      access-ttl: 30m
+      refresh-ttl: 14d
+    agreements:
+      tos-version: "1.0"
+      privacy-version: "1.0"
+      marketing-version: "1.0"
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from-address: ${SMTP_FROM_ADDRESS:}
+    from-name: ${SMTP_FROM_NAME:런닝구}
   external:
     kakao-local:
       base-url: https://dapi.kakao.com
       rest-key: ${KAKAO_REST_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
+    kto-festival:
+      base-url: https://apis.data.go.kr/B551011/KorService2
+      service-key: ${KTO_SERVICE_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
+    kto-poi:
+      base-url: https://apis.data.go.kr/B551011/KorService2
+      wellness-base-url: https://apis.data.go.kr/B551011/WellnessTursmService
+      service-key: ${KTO_SERVICE_KEY:}
       connect-timeout: 1s
       read-timeout: 2500ms

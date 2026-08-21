@@ -7,6 +7,9 @@ import org.testcontainers.utility.DockerImageName;
 
 abstract class PostgreSqlContainerSupport {
 
+    private static final String TEST_JWT_SECRET =
+            "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+
     private static final PostgreSQLContainer<?> POSTGRESQL =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:17.10"));
 
@@ -19,5 +22,6 @@ abstract class PostgreSqlContainerSupport {
         registry.add("spring.datasource.url", POSTGRESQL::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRESQL::getUsername);
         registry.add("spring.datasource.password", POSTGRESQL::getPassword);
+        registry.add("runninggu.auth.jwt.secret", () -> TEST_JWT_SECRET);
     }
 }

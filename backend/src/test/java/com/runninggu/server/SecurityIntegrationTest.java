@@ -1,6 +1,7 @@
 package com.runninggu.server;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,5 +28,30 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.traceId").isString())
                 .andExpect(jsonPath("$.instance").value("/api/not-yet-implemented"));
+    }
+
+    @Test
+    void 인증_API는_공개하고_잘못된_가입_요청은_검증오류다() throws Exception {
+        mockMvc.perform(get("/api/auth/email/exists")
+                        .param("email", "runner@example.com"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void 게스트_생성과_회원_경로를_분리한다() throws Exception {
+        mockMvc.perform(post("/api/itineraries/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 }

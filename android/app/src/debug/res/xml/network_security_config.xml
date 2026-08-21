@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    평문 HTTP 를 로컬 백엔드 주소에만 연다. 전체 허용(usesCleartextTraffic="true")으로 두면
+    디버그 빌드가 아무 평문 호스트로나 나갈 수 있어서, 주소를 못 박는다.
+
+    10.0.2.2 는 에뮬레이터에서 본 개발 PC 다. 실기기로 붙일 때는 PC 의 사설 IP 를 여기 더한다.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

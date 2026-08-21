@@ -53,6 +53,9 @@ enum class ApiErrorCode {
     SEND_COOLDOWN,
     TOO_MANY_ATTEMPTS,
 
+    /** 중복 확인 호출이 너무 잦다. 서버가 IP·값 단위로 막는다 (#114). */
+    RATE_LIMITED,
+
     // 500 · 502 · 503 · 504
     INTERNAL_SERVER_ERROR,
     EXTERNAL_API_ERROR,

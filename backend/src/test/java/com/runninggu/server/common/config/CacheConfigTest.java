@@ -12,7 +12,40 @@ class CacheConfigTest {
     @Test
     void 지오코드_캐시는_최대_500건을_5분간_보관한다() {
         var cacheManager = new CacheConfig().cacheManager();
-        var springCache = (CaffeineCache) cacheManager.getCache(CacheConfig.GEOCODE_CACHE);
+        assertCachePolicy(cacheManager.getCache(CacheConfig.GEOCODE_CACHE), 500, 5);
+    }
+
+    @Test
+    void POI_캐시는_최대_2000건을_5분간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        assertCachePolicy(cacheManager.getCache(CacheConfig.POI_CACHE), 2_000, 5);
+    }
+
+    private void assertCachePolicy(
+            org.springframework.cache.Cache cache,
+            long maximumSize,
+            long minutes) {
+        var springCache = (CaffeineCache) cache;
+        @SuppressWarnings("unchecked")
+        Cache<Object, Object> nativeCache = (Cache<Object, Object>) springCache.getNativeCache();
+
+        assertThat(nativeCache.policy()
+                        .eviction()
+                        .orElseThrow()
+                        .getMaximum())
+                .isEqualTo(maximumSize);
+        assertThat(nativeCache.policy()
+                        .expireAfterWrite()
+                        .orElseThrow()
+                        .getExpiresAfter(TimeUnit.MINUTES))
+                .isEqualTo(minutes);
+    }
+
+    @Test
+    void 홈_축제_캐시는_월별_결과를_5분간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        var springCache =
+                (CaffeineCache) cacheManager.getCache(CacheConfig.HOME_FESTIVALS_CACHE);
         @SuppressWarnings("unchecked")
         Cache<Object, Object> nativeCache = (Cache<Object, Object>) springCache.getNativeCache();
 
@@ -26,5 +59,25 @@ class CacheConfigTest {
                         .orElseThrow()
                         .getExpiresAfter(TimeUnit.MINUTES))
                 .isEqualTo(5);
+    }
+
+    @Test
+    void 인근_축제_캐시는_대회별_최대_500건을_하루간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        var springCache =
+                (CaffeineCache) cacheManager.getCache(CacheConfig.NEARBY_FESTIVALS_CACHE);
+        @SuppressWarnings("unchecked")
+        Cache<Object, Object> nativeCache = (Cache<Object, Object>) springCache.getNativeCache();
+
+        assertThat(nativeCache.policy()
+                        .eviction()
+                        .orElseThrow()
+                        .getMaximum())
+                .isEqualTo(500);
+        assertThat(nativeCache.policy()
+                        .expireAfterWrite()
+                        .orElseThrow()
+                        .getExpiresAfter(TimeUnit.HOURS))
+                .isEqualTo(24);
     }
 }

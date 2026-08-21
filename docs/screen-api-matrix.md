@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.8
+# 런닝구 화면–API 매핑표 v1.10
 
-> 갱신일: 2026-08-20
+> 갱신일: 2026-08-21
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v2.8(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v3.0(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -51,7 +51,7 @@ Compose 화면
 | `SERVER_DB` | 우리 서버의 canonical·사용자 데이터 | PostgreSQL에 저장 |
 | `KTO_LIVE` | 한국관광공사 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
 | `KAKAO_LIVE` | 카카오 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
-| `KTO_SYNC_GPX` | 두루누비 최신 메타 동기화 + GPX 경로 결합 | 마지막 성공 메타·GPX 기준 데이터 보관 |
+| `KTO_SYNC_GPX` | 두루누비 최신 메타 동기화 + GPX 경로 결합 | 버전 번들에서 시작한 서버 메모리 불변 snapshot. 성공한 전체 동기화만 원자 교체, PostgreSQL 복제 없음 |
 | `OSM_GRAPH` | 서버 내부 GraphHopper가 OSM+SRTM으로 순환 경로 생성 | 원천 그래프는 영속 캐시, 응답은 임시 DTO·사용자 저장 시 snapshot만 보관 |
 | `LOCAL_STATE` | 화면·ViewModel 메모리 상태 | 저장하지 않음 |
 | `LOCAL_CACHE` | Room·DataStore·임시 GPS | 제한적 로컬 보관 |
@@ -96,7 +96,7 @@ Compose 화면
 | S7 새 동선 | recovery, days, blocks | 생성 DTO | 서버 규칙 엔진 + KTO/카카오 POI | 저장 전 없음 | Result ViewModel 임시 DTO |
 | S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | Room 읽기 캐시 |
 | S8 내 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 GraphHopper 그래프 캐시, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
-| S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 최신 메타·경로 기준 데이터 | Room 읽기 캐시 |
+| S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 버전 번들에서 시작해 최신 전체 KTO 메타를 결합한 서버 메모리 snapshot | Room 읽기 캐시 |
 | R1 GPS 기록 | timestamp, lat, lng, distance | 위치 point stream | `ANDROID_SDK` | 저장 전 없음 | 전송 전 임시 기록 |
 | R2 러닝 요약 | 거리·시간·평균 페이스·경로 | local summary / run DTO | `LOCAL_STATE` + `SERVER_DB` | RUN·RUN_TRACK | 저장 전 임시 기록 |
 | S10 보관함 | 동선·저장 코스·러닝 기록·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | Room 읽기 캐시 |
@@ -165,7 +165,7 @@ Compose 화면
 |---|---|---|---|---|---|
 | 세션 읽기 | DataStore | token, guest | 세션 분기 | token 없음→로그인 | 기기 |
 | 세션 검증 | `GET /api/me` | Bearer token | user profile | 401→refresh | 서버 DB 조회 |
-| 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 회전된 token pair | 실패→세션 삭제·로그인 | 서버 hash + DataStore |
+| 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 같은 기기 family에서 회전된 token pair | 실패→세션 삭제·로그인, 과거 토큰 재사용이면 해당 family 폐기 | 서버 SHA-256 hash + DataStore |
 | 게스트 저장·찜 차단 | Android guard | 원래 route와 동작 종류 | 로그인 모달 | 로그인 후 원래 화면 복귀, **자동 실행하지 않음** | route 임시 상태 |
 | 공통 API 오류 | Problem Details parser | status, code | 화면별 Error | Empty로 강등 금지 | 저장 없음 |
 | 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 | 쓰기 비활성 | 기기 캐시 |
@@ -184,9 +184,9 @@ Compose 화면
 
 | 단계/행동 | 처리/API | 입력 | 응답·다음 상태 | 저장 |
 |---|---|---|---|---|
-| 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화 | 가입 완료 전 로컬 |
+| 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화. 활성 카피 버전 `TOS/PRIVACY/MARKETING=1.0` | 가입 완료 전 로컬, 가입 시 서버가 버전 포함 3행 저장 |
 | 정보 입력·검증 | 로컬 + 중복 API | email, password, confirm, nickname | exists/validation | 가입 완료 전 로컬 |
-| 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | exists | 없음 |
+| 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | `Unchecked/Checking/Available/Duplicate/Error`; 입력 변경 시 이전 응답 무효화 | 없음 |
 | 코드 발송 | `POST /api/auth/email/send-code` | email | 204, 60초 타이머 | 서버 검증 상태 |
 | 코드 확인 | `POST /api/auth/email/verify` | email, code | verified | 서버 검증 상태 |
 | 이메일 가입 | `POST /api/auth/signup` | email, password, nickname, agreements | token pair + user | PostgreSQL |
@@ -215,7 +215,7 @@ Compose 화면
 | 달력·러닝코스·관광 아이콘 | Navigation/scroll | 없음 | 없음 | LOCAL_STATE | 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
-| 홈 축제 | `GET /api/festivals` | yearMonth, size | contentId, name, 기간, region, imageUrl, inProgress | KTO_LIVE/TTL cache | 전국 월간, 위치 권한 없음, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
 
@@ -271,10 +271,13 @@ Compose 화면
 
 | 행동 | API/로컬 | 요청 | 응답·원천 | 상태 |
 |---|---|---|---|---|
-| 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items, 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
-| 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | POI items | Android 500ms debounce, 2자 미만은 호출 안 함 |
+| 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items(`provider=KAKAO|KTO`, `(name,lat,lng)` 조합 유일), 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
+| 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | 같은 POI item 계약 | Android 500ms debounce, 2자 미만은 호출 안 함 |
 | 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
 | 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 비활성은 생성 차단(status/code는 #56 추가 리뷰 대기). 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
+
+S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `(name, lat, lng)` 조합을 사용한다.
+주소는 원천에 없으면 빈 문자열일 수 있으므로 `key`에 사용하지 않는다.
 
 `generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다. 앱은 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않으며, 서버 응답 표시와 저장 전 USER 블록 편집만 담당한다(SPEC 결정-41).
 
@@ -283,7 +286,7 @@ Compose 화면
 | 행동 | API/로컬 | 요청/응답 | 저장 | 상태 |
 |---|---|---|---|---|
 | 새 결과 표시 | 로컬 | generate DTO | 저장 전 없음 | 날짜 탭, 지도 핀, 회복 배지 |
-| POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | 영구 저장 없음 | 시트 Loading/Empty/Error |
+| POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | `provider` 포함 장소 snapshot 후보, `placeId/fetchedAt/cachedAt` 없음 | 시트 Loading/Empty/Error |
 | 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서 | ResultUiState | RACE 편집 UI 미노출 |
 | 새 동선 저장 | `POST /api/itineraries` | 편집된 전체 DTO→201 id 또는 200 replaced | PostgreSQL | 게스트 modal, 성공→보관함 |
 | 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | Room cache | RACE는 저장 당시 값 유지. 변경 시 안내/재생성 CTA, 403/404/Error |
@@ -314,8 +317,8 @@ Compose 화면
 | OSM 품질 상한 | 서버 내부 | seed 0~15 | 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km | 하나라도 초과하면 후보 제외, 상한 완화 금지; AP-25 전 차도 거리 가중 PoC 재검증 |
 | 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | 호출 실패만 Content+비차단 안내; 품질 상한 통과 후보 0건은 정상 결과 |
 | 전체 Empty/Error | 같은 near 응답 | 없음 | 모든 원천 정상+items=[] / 원천 실패+표시 항목 없음 | 전자는 Empty, 후자는 `503 COURSE_SOURCES_UNAVAILABLE` Error |
-| 지역 칩 | `GET /api/courses/regions` | 없음 | region,count | 실패 시 Error |
-| 지역 목록 | `GET /api/courses` | region?,page,size | 큐레이션 course page + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty, 출처는 완성 문구를 `" · "`로 연결 |
+| 지역 칩 | `GET /api/courses/regions` | 없음 | `count DESC, region ASC`의 region,count | KTO 동기화 실패는 번들/마지막 정상 snapshot으로 200 유지. catalog 자체가 없을 때만 Error |
+| 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved/Ran` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 
@@ -371,7 +374,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 마케팅 동의 | `PATCH /api/me/agreements` | marketing | 응답 계약 보완 필요 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
-| 로그아웃 | `POST /api/auth/logout` | refreshToken | 세션 삭제→로그인 |
+| 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
 | 탈퇴 재인증 | `POST /api/me/reauth` | EMAIL password 또는 KAKAO SDK token | 5분 reauthToken |
 | 회원 탈퇴 | 확인 modal→`DELETE /api/me` | `X-Reauth-Token` | 204→모든 세션·사용자 캐시 삭제→로그인 |
 
@@ -432,7 +435,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 대회 상세 인근 축제 | `GET /api/contests/{id}/festivals` | `searchFestival2` 후 날짜 겹침·40km 필터 | 대회별 1일 캐시 | Loading/Empty/Error 포함 독립 영역 |
 | 동선 관광·역사 POI | `GET /api/pois?category=TOUR/HISTORY` | `locationBasedList2` | 5분 캐시 | 결과·POI 추가/교체 시트 |
 | 동선 웰니스 POI | `GET /api/pois?category=WELLNESS` | WellnessTursmService | 5분 캐시 | 위저드 취향→동선 결과 |
-| 러닝코스 큐레이션 | `GET /api/courses/**` | Durunubi `courseList` | 시작 시+하루 1회 동기화, GPX 결합 | 지역 목록·near 우선 경로·한국관광공사 출처. OSM fallback은 KTO 증빙을 대체하지 않음 |
+| 러닝코스 큐레이션 | `GET /api/courses/**` | Durunubi `courseList` | 버전 번들 즉시 로드→준비 후 1회+완료 기준 24시간 동기화, 전체 성공 snapshot만 원자 교체 | 실패 시 261 GPX 번들/마지막 정상본 유지. 지역 목록·near 우선 경로·한국관광공사 출처. OSM fallback은 KTO 증빙을 대체하지 않음 |
 
 숙소는 카카오 AD5가 1순위이고 KTO 32는 폴백이므로 숙소 화면 하나만으로 KTO 사용을 증명하지 않는다. 공모전 실시간 API 증빙의 주 기능은 **S3 인근 축제**, 보조 기능은 홈 축제와 TOUR/HISTORY/WELLNESS POI로 삼는다.
 
@@ -481,6 +484,9 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
+| D-30 / SPEC 결정-50 | 이메일·닉네임 중복 확인은 모두 P0에서 호출한다. `Checking` 동안 인증 메일 발송을 막고 `Available`에서 허용하며, `Duplicate`만 확정 차단한다. `Unchecked`·네트워크/`RATE_LIMITED` `Error`는 발송·가입의 서버 유니크 방어를 믿고 진행을 막지 않는다. 입력 변경 시 결과를 즉시 무효화하고 늦은 응답은 버린다 |
+| D-31 / SPEC 결정-51 | Access 30분·Refresh 14일, 기기별 refresh family 회전·재사용 탐지를 적용한다. 로그아웃은 Access 없이 Authenticator가 붙지 않는 클라이언트로 호출하고 non-blank refresh 결과와 무관하게 204를 받으면 로컬 세션을 삭제한다 |
+| D-32 / SPEC 결정-52 | 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 계약 PR에서 함께 확인한다(이슈 #111) |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |
 | DB-05 / SPEC 결정-46 | 승인된 full snapshot에서 source 2회 연속 누락 시 비활성. 실패·부분 snapshot은 미반영, 재등장은 즉시 복구, canonical은 활성 source가 없을 때만 비활성. 공개 탐색 제외·참조 상세 유지 |
@@ -511,9 +517,11 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 - `POST /api/me/courses`의 fingerprint 멱등 저장
 - `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·구간 기준 표시 난이도·서버 생성 이름·정상 0건/부분 실패·동적 출처 계약
 - `GET /api/courses`의 Page 최상위 `attributions[]`와 저장 코스 상세의 attribution snapshot 계약
+- `GET /api/courses`·`/regions`의 안정 정렬·nullable `syncedAt`·번들/마지막 정상 snapshot fail-open 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 - `GET /api/me`의 단일 `loginProvider`와 로그인 수단 연결·해제 API 제거
+- `GET /api/pois`의 항목별 `provider(KAKAO|KTO)`, `placeId`·추적 timestamp 제외, 8→20km 확대·원천 보충·부분 실패·5분 캐시 계약
 
 ### 남은 springdoc 상세화 항목
 
@@ -521,7 +529,6 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 
 | API | 보완할 계약 |
 |---|---|
-| `GET /api/pois` | 항목별 provider(KTO/KAKAO), fetchedAt/cachedAt, 안정적 placeId 필요 여부 |
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
 | `PATCH /api/me` | 성공 status와 응답 body |
 | `PATCH /api/me/agreements` | 성공 status와 응답 body |

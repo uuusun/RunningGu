@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        디버그 빌드는 로컬 백엔드(http://10.0.2.2:8080)를 본다. targetSdk 28 부터 평문 HTTP 가
+        기본 차단이라 이 설정이 없으면 디버그 빌드가 자기 서버에 붙지 못한다.
+
+        릴리스는 https 라 이 파일이 필요 없고, debug 소스셋에만 두어 절대 섞이지 않게 한다.
+    -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
+</manifest>

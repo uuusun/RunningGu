@@ -19,6 +19,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // 카카오맵 SDK 는 mavenCentral 에 없다. (SPEC §3-8)
+        maven("https://devrepo.kakao.com/nexus/content/groups/public/")
     }
 }
 
