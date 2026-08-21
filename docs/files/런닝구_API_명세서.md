@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.10
+# 런닝구 백엔드 API 명세서 v2.11
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -548,6 +548,10 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 ## 6. 러닝코스 API `/api/courses` (공개)
 
 > 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+>
+> 두루누비 번들 파일·시작 후/24시간 동기화·`courseId` 결합·원자적 fail-open의 내부 계약은
+> [`docs/course-bundle-contract.md`](../course-bundle-contract.md)가 기준이다. 이 catalog는
+> PostgreSQL에 복제하지 않고 검증된 번들에서 시작한 불변 메모리 snapshot으로 제공한다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
@@ -608,13 +612,15 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=0&size=20` → 큐레이션 코스만 거리 오름차순으로 반환한다 🔒(§4.11-b). `OSM_GENERATED`는 포함하지 않는다.
+`?region=부산&page=0&size=20` → 큐레이션 코스만 `distanceKm ASC, courseId ASC`로
+안정 정렬해 반환한다 🔒(§4.11-b). `region`은 앞뒤 공백 제거 후 `sido`와 정확히 일치시키며
+`OSM_GENERATED`는 포함하지 않는다.
 
 ```json
 {
   "content": [
     {
-      "courseId": "durunubi-001",
+      "courseId": "T_CRS_MNG0000005117",
       "courseName": "해파랑길 1코스",
       "sido": "부산",
       "sigun": "남구",
@@ -637,9 +643,17 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 ```
 
 - `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
+- `courseId`는 번들·KTO 결합에 사용하는 안정적 유일키다. `dataSource`는 지역별 응답에서
+  `API_GPX|GPX_ONLY`만 가능하다.
+- `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
+  `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
 
-### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
+### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
+
+같은 catalog snapshot의 서비스 대상 코스를 `sido`별로 세고 `count DESC, region ASC`로
+정렬한다. 0건인 시도는 만들지 않으며, `count` 합은 필터 없는 6-2의 `totalElements`와 같다.
+KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두 지역 API를 계속 제공한다.
 
 ---
 
