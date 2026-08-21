@@ -98,7 +98,7 @@ class MyViewModel(
                 }
                 // 서버 SSOT 를 다시 읽는다. 게스트면 캐시를 비운다 (SPEC §4.13 · AP-21).
                 FavoriteStore.refresh()
-                if (profile != null) loadCourses()
+                loadCourses() // 게스트면 스스로 빠진다
             }
         }
         viewModelScope.launch {
@@ -112,6 +112,20 @@ class MyViewModel(
         }
     }
 
+    /**
+     * 화면이 다시 앞으로 나왔다. 상세에서 코스를 지우고 돌아온 경우가 이 자리다.
+     *
+     * 첫 번째는 건너뛴다 — [init] 의 세션 수집이 이미 목록을 불렀고, 진입할 때마다 같은 GET 을
+     * 두 번 쏘게 된다. 이 플래그가 ViewModel 에 있어야 하는 이유는, 상세로 나가면 마이의
+     * 컴포지션이 걷혀 화면 쪽 `remember` 는 지워지기 때문이다.
+     */
+    fun onResume() {
+        if (resumedOnce) loadCourses()
+        resumedOnce = true
+    }
+
+    private var resumedOnce = false
+
     fun onSegmentSelect(segment: MySegment) {
         _uiState.update { it.copy(segment = segment) }
     }
@@ -123,8 +137,10 @@ class MyViewModel(
      * 못 본다(§3-5 영역 단위 부분 실패). 다시 들어오면 재조회된다.
      *
      * 상세에서 삭제하고 돌아왔을 때도 이걸 다시 부른다 — 목록에서 빠진 것을 보여야 한다.
+     * 게스트 차단은 여기서 한다. 화면 복귀 등 부르는 자리가 여럿이라 각자 막으면 하나는 샌다.
      */
     fun loadCourses() {
+        if (_uiState.value.profile == null) return
         viewModelScope.launch {
             val courses = try {
                 savedCourseRepository.list().courses

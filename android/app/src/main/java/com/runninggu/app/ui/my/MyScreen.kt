@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
@@ -66,6 +68,12 @@ fun MyScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val profile = state.profile
+
+    // 상세에서 코스를 지우고 돌아오면 목록이 달라져 있다. 화면이 다시 앞으로 나올 때
+    // 재조회한다 — 마이는 back stack 에 남아 ViewModel 이 그대로라 스스로는 안 바뀐다.
+    // "처음인가" 판단은 ViewModel 이 한다. 여기서 remember 로 세면 상세로 나갈 때
+    // 컴포지션이 걷히면서 같이 지워져, 돌아와도 첫 진입으로 보인다.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
 
     // 찜 해제 실패 등을 알린다. 하트는 롤백돼 되돌아오는데 이유가 없으면 오작동으로 보인다.
     LaunchedEffect(message) {

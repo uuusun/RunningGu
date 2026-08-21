@@ -3,6 +3,7 @@ package com.runninggu.app.ui.common
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -27,7 +28,8 @@ import kotlin.math.sin
  * 코스 고도 API가 아직 없으므로 [seed]로 결정적인 능선을 만든다 — 같은 대회는 항상 같은
  * 모양이라 목록을 다시 그려도 흔들리지 않는다.
  *
- * TODO(AP-12): 두루누비 GPX 고도 배열이 붙으면 [profile]로 실제 값을 넘긴다.
+ * @param profile **0..1 로 정규화한** 높이. 미터 원값을 그대로 넘기면 안 된다 — `1f - v` 가
+ *  음수가 되어 캔버스 밖에 그려진다. 실제 고도 배열을 쓰는 쪽에서 최소·최대로 나눠 넘긴다.
  */
 @Composable
 fun ElevationLine(
@@ -39,7 +41,9 @@ fun ElevationLine(
     val lineColor = if (closed) ClosedLine else Blue
     val areaColor = if (closed) ClosedArea else BlueSoft.copy(alpha = 0.9f)
 
-    Canvas(modifier = modifier) {
+    // 범위를 벗어난 값이 와도 **레이아웃을 망가뜨리지는 않게** 자른다. 안 자르면 캔버스
+    // 밖까지 칠해져서 아래 텍스트를 통째로 덮는다(실제로 겪었다 — 이슈 #100).
+    Canvas(modifier = modifier.clipToBounds()) {
         val points = profile ?: generateProfile(seed, SAMPLE_COUNT)
         if (points.size < 2) return@Canvas
 
