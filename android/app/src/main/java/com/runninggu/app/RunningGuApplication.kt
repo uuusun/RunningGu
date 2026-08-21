@@ -43,7 +43,11 @@ class RunningGuApplication : Application() {
         }
         try {
             KakaoMapSdk.init(this, appKey)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // **Exception 이 아니라 Throwable 로 받는다.** SDK 가 네이티브 라이브러리를 여는데,
+            // 실패하면 UnsatisfiedLinkError — Exception 이 아닌 Error 라 catch(Exception) 을 빠져나가
+            // 앱이 통째로 죽었다. x86_64 에뮬레이터에는 카카오맵이 그 ABI 용 .so 를 주지 않아
+            // 항상 이 경로로 온다(arm64-v8a · armeabi-v7a 만 있다).
             Log.w(TAG, "카카오맵 SDK 초기화 실패 — 지도만 비활성화됩니다", e)
         }
     }
