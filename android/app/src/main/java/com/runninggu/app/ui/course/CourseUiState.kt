@@ -37,6 +37,21 @@ data class CourseUiState(
      */
     val locationMessage: String? = null,
 ) {
+    /**
+     * 지도에 그릴 경로. (SPEC §4.11-4 · §3-8)
+     *
+     * **고르기 전에는 첫 코스를 그린다.** 조회 직후 [selectedRouteId] 는 null 인데
+     * (`CourseViewModel` 이 새 조회마다 지운다) 그때 지도를 비워 두면 목록을 한 번
+     * 탭하기 전까지 빈 회색 판이 놓인다. 서버가 거리순으로 준 첫 코스가 기본이다.
+     */
+    val mappedRoute: NearbyItem.Route?
+        get() {
+            val routes = (nearby as? NearbyState.Content)
+                ?.items
+                ?.filterIsInstance<NearbyItem.Route>()
+                ?: return null
+            return routes.firstOrNull { it.routeId == selectedRouteId } ?: routes.firstOrNull()
+        }
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
         BY_REGION("지역별"),

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,9 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.NumberRail
+import com.runninggu.app.ui.map.MIN_ROUTE_POINTS
+import com.runninggu.app.ui.map.MapScene
+import com.runninggu.app.ui.map.RunningGuMap
 
 /**
  * S8 러닝코스. (SPEC §4.11 · AP-12)
@@ -103,7 +107,7 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
     LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item { OriginRow(state, viewModel) }
         item { TargetSlider(state, viewModel) }
-        item { MapPlaceholder() }
+        item { CourseMap(state) }
 
         when (val near = state.nearby) {
             NearbyState.Idle -> item {
@@ -311,26 +315,42 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
     }
 }
 
-/** TODO(AP-03): 카카오맵 SDK 가 붙으면 폴리라인·번호 핀을 그린다. (SPEC §4.11-4) */
+/**
+ * S8 지도. **핀 없이 경로선만 그린다.** (SPEC §3-8 · §4.11-4)
+ *
+ * 동선(S7)과 달리 방문 순서라는 개념이 없어 번호 핀을 세우지 않는다. 카메라는
+ * [MapScene] 안의 규칙이 정한다 — 경로가 바뀌면 전체 맞춤이다.
+ *
+ * **그릴 경로가 없으면 지도를 띄우지 않는다.** 빈 회색 판보다 왜 비었는지 적는 편이 낫고,
+ * 지도를 붙드는 것 자체가 비용이다(SDK 뷰 · 렌더링).
+ */
 @Composable
-private fun MapPlaceholder() {
+private fun CourseMap(state: CourseUiState) {
+    val route = state.mappedRoute?.path.orEmpty()
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .height(140.dp),
+            .height(180.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("지도", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = "AP-03 카카오맵 연동 예정",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (route.size < MIN_ROUTE_POINTS) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("따라갈 경로가 없어요", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = "걷기 스팟은 아래 목록에서 볼 수 있어요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            RunningGuMap(
+                scene = MapScene(route = route),
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
