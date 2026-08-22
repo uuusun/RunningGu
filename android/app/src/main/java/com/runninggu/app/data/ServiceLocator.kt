@@ -17,6 +17,8 @@ import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.FestivalApi
+import com.runninggu.app.data.remote.GeocodeApi
+import com.runninggu.app.data.remote.PoiApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
 import com.runninggu.app.data.remote.TokenApi
@@ -27,6 +29,10 @@ import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.data.repository.RemoteFestivalRepository
+import com.runninggu.app.data.repository.GeocodeRepository
+import com.runninggu.app.data.repository.PoiRepository
+import com.runninggu.app.data.repository.RemoteGeocodeRepository
+import com.runninggu.app.data.repository.RemotePoiRepository
 import com.runninggu.app.data.repository.FakeSavedCourseRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
@@ -194,4 +200,20 @@ object ServiceLocator {
      * 않고 그대로 던지고, 홈이 영역 상태로 받는다(AGENTS 2장-5).
      */
     val festivalRepository: FestivalRepository by lazy { RemoteFestivalRepository(festivalApi) }
+
+    // ── 서버에 선 나머지 ────────────────────────────────────────
+
+    val poiApi: PoiApi by lazy { retrofit.create() }
+    val geocodeApi: GeocodeApi by lazy { retrofit.create() }
+
+    /**
+     * 위저드 숙소·슬롯 후보. (API 명세 4-2 · `GET /api/pois`)
+     *
+     * 서버 `PoiController` 가 `category`·`lat`·`lng`·`radius`·`query`·`size` 를 받는다 —
+     * 앱 [PoiApi] 와 같다.
+     */
+    val poiRepository: PoiRepository by lazy { RemotePoiRepository(poiApi) }
+
+    /** S8 출발지 검색. (`GET /api/geocode`) 서버 `GeocodeController` 가 `query` 하나를 받는다. */
+    val geocodeRepository: GeocodeRepository by lazy { RemoteGeocodeRepository(geocodeApi) }
 }

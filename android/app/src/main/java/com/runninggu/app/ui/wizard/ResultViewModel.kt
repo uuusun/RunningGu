@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
-import com.runninggu.app.data.repository.FakePoiRepository
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
 
 /**
@@ -29,12 +29,20 @@ import com.runninggu.app.data.repository.PoiRepository
  * 서버에 맡기고(결정-41), 받은 응답을 화면 상태로 들고 있는다. 저장 전 USER 블록 편집만
  * 앱 몫이다(§5.7).
  *
- * 서버가 서면 [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다 —
- * 화면은 그대로다(AGENTS 4장).
+ * **동선 저장소는 아직 가짜다** — 서버에 `/api/itineraries` 가 없다(AP-07). 서면
+ * [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다. 교체·추가
+ * 시트가 쓰는 POI 는 `GET /api/pois` 가 서 있어 먼저 옮겼다. 화면은 그대로다(AGENTS 4장).
  */
 class ResultViewModel(
+    /**
+     * **아직 가짜다.** 서버에 `/api/itineraries` 가 없다(AP-07 · SPEC 결정-41).
+     *
+     * 동선 생성은 서버 단일 주체라 앱 엔진을 대신 붙일 수도 없다 — 서면 이 한 줄을
+     * `ServiceLocator` 것으로 바꾼다.
+     */
     private val repository: ItineraryRepository = FakeItineraryRepository,
-    private val poiRepository: PoiRepository = FakePoiRepository,
+    /** 교체·추가 시트의 후보. 이쪽은 서버에 `GET /api/pois` 가 있어 옮겼다. */
+    private val poiRepository: PoiRepository = ServiceLocator.poiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ResultUiState())
