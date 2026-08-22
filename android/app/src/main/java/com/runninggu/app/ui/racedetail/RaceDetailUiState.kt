@@ -15,7 +15,7 @@ data class RaceDetailUiState(
     val phase: Phase = Phase.LOADING,
     val race: RaceSummary? = null,
     val errorMessage: String? = null,
-    val festivalPhase: Phase = Phase.LOADING,
+    val festivalPhase: FestivalPhase = FestivalPhase.LOADING,
     val festivals: List<NearbyFestival> = emptyList(),
     val isFavorite: Boolean = false,
 ) {
@@ -24,6 +24,29 @@ data class RaceDetailUiState(
      * 재시도해도 소용없으므로 [ERROR]와 달리 [다시 시도]를 주지 않는다.
      */
     enum class Phase { LOADING, LOADED, ERROR, NOT_FOUND }
+
+    /**
+     * 인근 축제 섹션의 상태. **본문 [Phase] 와 값이 다르다.** (API 명세 §3-5)
+     *
+     * 축제에만 있는 `409 CONTEST_LOCATION_UNAVAILABLE` 때문에 갈랐다. 본문에 없는
+     * 값을 [Phase] 에 넣으면 본문을 그리는 `when` 이 못 쓰는 분기를 들고 다닌다.
+     */
+    enum class FestivalPhase {
+        LOADING,
+        LOADED,
+
+        /** 네트워크·`502` 등. [다시 시도]를 준다. */
+        ERROR,
+
+        /**
+         * 대회에 좌표가 없어 서버가 반경을 못 잰다(`409`).
+         *
+         * [ERROR] 와 갈라 두는 이유는 **[다시 시도]를 붙이면 안 되기 때문**이다 —
+         * 좌표는 다시 눌러도 생기지 않아 헛돈다. 그렇다고 빈 상태로 적으면
+         * "축제가 없다" 가 되어 사실과 다르다. 문구는 명세가 고정한다.
+         */
+        LOCATION_UNAVAILABLE,
+    }
 
     /**
      * 축제 섹션을 그릴 수 있는가 — 대회 좌표가 있어야 서버가 반경 계산을 한다.

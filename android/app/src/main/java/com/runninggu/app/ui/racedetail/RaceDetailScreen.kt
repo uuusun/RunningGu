@@ -54,6 +54,7 @@ import com.runninggu.app.ui.common.SectionHeader
 import com.runninggu.app.ui.theme.Ink5
 import com.runninggu.app.ui.theme.Orange
 import com.runninggu.app.ui.model.NearbyFestival
+import com.runninggu.app.ui.model.nearbyFestivalPeriod
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.dDayLabel
@@ -190,7 +191,7 @@ fun RaceDetailScreen(
 @Composable
 private fun RaceDetailContent(
     race: RaceSummary,
-    festivalPhase: RaceDetailUiState.Phase,
+    festivalPhase: RaceDetailUiState.FestivalPhase,
     festivals: List<NearbyFestival>,
     showFestivals: Boolean,
     onRetryFestivals: () -> Unit,
@@ -400,18 +401,23 @@ private fun InfoRow(label: String, value: String) {
  */
 @Composable
 private fun NearbyFestivalSection(
-    phase: RaceDetailUiState.Phase,
+    phase: RaceDetailUiState.FestivalPhase,
     festivals: List<NearbyFestival>,
     onRetry: () -> Unit,
 ) {
     Column {
         SectionHeader(title = "대회 인근 축제", trailing = "한국관광공사")
         when {
-            phase == RaceDetailUiState.Phase.LOADING ->
+            phase == RaceDetailUiState.FestivalPhase.LOADING ->
                 LoadingState("축제를 찾는 중…")
 
-            phase == RaceDetailUiState.Phase.ERROR ->
+            phase == RaceDetailUiState.FestivalPhase.ERROR ->
                 ErrorState(message = "축제를 못 불러왔어요.", onRetry = onRetry)
+
+            // 좌표가 없어 서버가 반경을 못 잰다. **[다시 시도]를 붙이지 않는다** —
+            // 다시 눌러도 좌표는 생기지 않는다. 문구는 명세가 고정한다 (§3-5).
+            phase == RaceDetailUiState.FestivalPhase.LOCATION_UNAVAILABLE ->
+                EmptyState(title = "인근 축제를 확인할 수 없어요.")
 
             festivals.isEmpty() ->
                 EmptyState(
@@ -447,7 +453,7 @@ private fun FestivalRow(festival: NearbyFestival) {
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "${festival.startDate.format(MONTH_DAY)}~${festival.endDate.format(MONTH_DAY)}" +
+                text = nearbyFestivalPeriod(festival.startDate, festival.endDate) +
                     " · 대회장 ${"%.1f".format(festival.distanceKm)}km",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
