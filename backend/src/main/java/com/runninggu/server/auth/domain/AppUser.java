@@ -30,7 +30,23 @@ public class AppUser {
 
     protected AppUser() {}
 
+    public static AppUser create(
+            String nickname,
+            String nicknameKey,
+            Instant createdAt) {
+        AppUser user = new AppUser();
+        user.nickname = nickname;
+        user.nicknameKey = nicknameKey;
+        user.createdAt = createdAt;
+        user.updatedAt = createdAt;
+        return user;
+    }
+
     public Long getId() {
         return id;
+    }
+
+    public String getNickname() {
+        return nickname;
     }
 }

@@ -1,4 +1,4 @@
-%% 런닝구 논리 ERD v4.3 — SPEC v4 · API 명세 v2.8 기준 (2026-08-20)
+%% 런닝구 논리 ERD v4.4 — SPEC v4 · API 명세 v3.0 기준 (2026-08-21)
 %% P0: USER~SAVED_COURSE + CONTEST_SNAPSHOT_IMPORT 14개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
 %% 이 문서는 논리 계약이다. 아래 남은 TBD-DB-01을 확정하기 전에는 관련 컬럼을 Flyway 물리 스키마로 옮기지 않는다.
 %% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
@@ -11,6 +11,7 @@
 %% 확정-DB-07 사용자·aggregate 자식 CASCADE, 대회 참조 RESTRICT, Enum VARCHAR+CHECK, 좌표 NUMERIC(10,7), nullable 명시
 %% 확정-DB-08 CONTEST start_time·road_address·detail_url nullable, 적용 snapshot 이력은 CONTEST_SNAPSHOT_IMPORT에 원자 기록
 %% 확정-DB-09 물리 USER 테이블명 app_user, nickname_key=trim 후 ASCII lowercase UNIQUE, EMAIL_VERIFICATION(email,purpose) UNIQUE
+%% 확정-DB-10 REFRESH_TOKEN family_id UUID, family별 revoked_at IS NULL 부분 UNIQUE, 과거 토큰 재사용 시 같은 family 활성 토큰 revoke
 %% DB-07 타입 규약: nickname VARCHAR(12), email VARCHAR(320), Enum VARCHAR(32), key/name/title/place VARCHAR(255), URL VARCHAR(2048), token hash VARCHAR(64), password/code hash VARCHAR(255), 거리 NUMERIC(8,3), 자유문 TEXT
 %% DB-07 null 규약: "nullable" 표기가 없는 저장 컬럼은 NOT NULL, derived는 DB 컬럼이 아님
 %% DB-07 CHECK: LOGIN_IDENTITY는 EMAIL(password_hash·email_verified_at 필수, email_snapshot null) 또는 KAKAO(password_hash·email_verified_at null)
@@ -83,6 +84,7 @@ erDiagram
     REFRESH_TOKEN {
         bigint id PK
         bigint user_id FK "ON DELETE CASCADE"
+        uuid family_id "기기 로그인 세션 family"
         varchar token_hash UK "원문 저장 금지"
         timestamptz expires_at
         timestamptz revoked_at "nullable"

@@ -3,6 +3,7 @@ package com.runninggu.server.common.error;
 import com.runninggu.server.common.error.ProblemDetailFactory.FieldViolation;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -54,6 +56,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 detail,
                 request);
         return problemResponse(problem, ErrorCode.VALIDATION_FAILED);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        String constraintName = constraintName(exception);
+        ErrorCode errorCode = switch (constraintName == null ? "" : constraintName) {
+            case "uk_login_identity_provider_subject" -> ErrorCode.EMAIL_DUPLICATED;
+            case "uk_app_user_nickname_key" -> ErrorCode.NICKNAME_DUPLICATED;
+            default -> null;
+        };
+        if (errorCode == null) {
+            return handleUnexpectedException(exception, request);
+        }
+        ProblemDetail problem = problemDetailFactory.create(
+                errorCode,
+                errorCode.title(),
+                request);
+        return problemResponse(problem, errorCode);
     }
 
     @ExceptionHandler(Exception.class)
@@ -113,6 +135,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ? "올바르지 않은 값입니다."
                 : error.getDefaultMessage();
         return new FieldViolation(error.getField(), reason);
+    }
+
+    private String constraintName(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private ResponseEntity<ProblemDetail> problemResponse(

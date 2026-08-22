@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -37,12 +38,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.domain.today
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
+import com.runninggu.app.ui.common.ErrorState
+import com.runninggu.app.ui.common.LoadingState
 
 /**
  * S10 마이(보관함). (SPEC §4.13 · AP-13)
@@ -55,6 +60,7 @@ fun MyScreen(
     onLoginRequest: () -> Unit,
     onOpenAccount: () -> Unit,
     onRaceClick: (String) -> Unit,
+    onCourseClick: (Long) -> Unit,
     onBrowseRaces: () -> Unit,
     onBrowseCourses: () -> Unit,
     modifier: Modifier = Modifier,
@@ -64,6 +70,12 @@ fun MyScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val profile = state.profile
+
+    // 상세에서 코스를 지우고 돌아오면 목록이 달라져 있다. 화면이 다시 앞으로 나올 때
+    // 재조회한다 — 마이는 back stack 에 남아 ViewModel 이 그대로라 스스로는 안 바뀐다.
+    // "처음인가" 판단은 ViewModel 이 한다. 여기서 remember 로 세면 상세로 나갈 때
+    // 컴포지션이 걷히면서 같이 지워져, 돌아와도 첫 진입으로 보인다.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
 
     // 찜 해제 실패 등을 알린다. 하트는 롤백돼 되돌아오는데 이유가 없으면 오작동으로 보인다.
     LaunchedEffect(message) {
@@ -108,8 +120,11 @@ fun MyScreen(
             )
 
             MySegment.COURSE -> CourseList(
-                items = state.courses,
+                state = state.courses,
+                onCourseClick = onCourseClick,
                 onBrowseCourses = onBrowseCourses,
+                onRetry = viewModel::loadCourses,
+                onLoadMore = viewModel::loadMoreCourses,
             )
 
             MySegment.FAVORITE -> FavoriteList(
@@ -268,18 +283,39 @@ private fun ItineraryList(
 
 @Composable
 private fun CourseList(
-    items: List<SavedCourse>,
+    state: SavedCoursesState,
+    onCourseClick: (Long) -> Unit,
     onBrowseCourses: () -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
-    if (items.isEmpty()) {
-        EmptyState("저장한 코스가 없어요.")
-        BrowseButton("러닝코스 둘러보기", onBrowseCourses)
-        return
+    // 로딩·빈·오류를 구분한다 — 뭉뚱그리면 "없는 것" 과 "못 불러온 것" 이 같아 보인다
+    // (SPEC §3-5 · #107 리뷰).
+    when (state) {
+        SavedCoursesState.Loading -> {
+            LoadingState("저장한 코스를 불러오는 중…")
+            return
+        }
+
+        SavedCoursesState.Empty -> {
+            EmptyState("저장한 코스가 없어요.")
+            BrowseButton("러닝코스 둘러보기", onBrowseCourses)
+            return
+        }
+
+        is SavedCoursesState.Error -> {
+            ErrorState(message = state.message, onRetry = onRetry)
+            return
+        }
+
+        is SavedCoursesState.Content -> Unit
     }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { course ->
+        state.courses.forEach { course ->
             Surface(
-                // TODO(AP-12/14): 탭 → 경로 지도 상세 (D-20 sealed CourseDetailKey).
+                // 탭 → 저장 코스 상세. 경로·고도·출처는 거기서만 본다 (matrix S8-D · D-20).
+                onClick = { onCourseClick(course.id) },
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 1.dp,
@@ -287,18 +323,46 @@ private fun CourseList(
             ) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
-                        text = course.name,
+                        text = course.courseName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
+                        // 출처(attributions)는 카드에 안 낸다 — 상세 응답에만 온다(결정-44).
                         text = "왕복 ${course.distanceKm}km · 상승 ${course.gainM}m",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+        }
+
+        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4).
+        if (state.hasNext) {
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(
+                onClick = onLoadMore,
+                enabled = state.canLoadMore,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (state.loadingMore) {
+                        "불러오는 중…"
+                    } else {
+                        "더 보기 (${state.courses.size}/${state.totalElements})"
+                    },
+                )
+            }
+        }
+
+        // 다음 장을 못 받았다. 위 목록은 그대로 두고 이 줄만 붙인다.
+        state.moreMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

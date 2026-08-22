@@ -59,6 +59,17 @@ logging:
     level: "%5p [traceId=%X{traceId:-}]"
 
 runninggu:
+  auth:
+    jwt:
+      secret: ${JWT_SECRET}
+      issuer: runninggu
+      audience: runninggu-api
+      access-ttl: 30m
+      refresh-ttl: 14d
+    agreements:
+      tos-version: "1.0"
+      privacy-version: "1.0"
+      marketing-version: "1.0"
   mail:
     enabled: ${MAIL_ENABLED:false}
     from-address: ${SMTP_FROM_ADDRESS:}
