@@ -12,6 +12,8 @@ import com.runninggu.app.ui.auth.LoginScreen
 import com.runninggu.app.ui.auth.ResetScreen
 import com.runninggu.app.ui.auth.SignupScreen
 import com.runninggu.app.ui.calendar.CalendarScreen
+import com.runninggu.app.ui.course.CourseDetailScreen
+import com.runninggu.app.ui.course.CourseDetailViewModel
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
@@ -93,8 +95,25 @@ fun RunningGuNavHost(
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.MY)) },
                 onOpenAccount = { navController.navigate(Routes.ACCOUNT) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
+                onCourseClick = { id -> navController.navigate(Routes.courseDetailSaved(id)) },
                 onBrowseRaces = { navController.navigate(Routes.CALENDAR) },
                 onBrowseCourses = { navController.navigate(Routes.COURSES) },
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
+
+        // S8-D 저장 코스 상세 — 마이 [러닝코스] 에서만 들어온다 (matrix D-20).
+        // near·ran 변형은 각각 AP-12 · P1 이라 route 를 두지 않는다.
+        composable(
+            route = Routes.COURSE_DETAIL_SAVED_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_SAVED_COURSE_ID) { type = NavType.LongType },
+            ),
+        ) { entry ->
+            val savedCourseId = entry.arguments?.getLong(Routes.ARG_SAVED_COURSE_ID) ?: 0L
+            CourseDetailScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = viewModel(factory = CourseDetailViewModel.factory(savedCourseId)),
                 modifier = Modifier.statusBarsPadding(),
             )
         }
