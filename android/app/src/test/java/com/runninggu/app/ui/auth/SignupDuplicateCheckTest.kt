@@ -19,7 +19,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * A2 이메일·닉네임 중복 확인. (화면-API 매핑표 D-30 · SPEC 결정-49 · 이슈 #97)
+ * A2 이메일·닉네임 중복 확인. (화면-API 매핑표 D-30 · SPEC 결정-50 · 이슈 #97)
  *
  * 세 가지가 어긋나기 쉬운 자리다.
  *
@@ -195,6 +195,66 @@ class SignupDuplicateCheckTest {
 
         // 앞 값의 "중복" 이 새 값에 앉으면 안 된다
         assertEquals(DuplicateCheck.Unchecked, viewModel.uiState.value.nicknameCheck)
+    }
+
+    @Test
+    fun `값이 그대로면 포커스가 다시 빠져도 안 부른다`() = runTest(dispatcher) {
+        // A2 는 네 칸이 한 화면에 있어 오가는 게 자연스럽다. 그때마다 부르면 값별 5회/분
+        // 제한에 걸려 `Available` 이던 자리가 `Error` 로 퇴행한다 (#132 리뷰).
+        val repository = StubAuthRepository()
+        val viewModel = viewModelAtInfoStep(repository)
+
+        viewModel.onEmailFocusLost()
+        advanceUntilIdle()
+        assertEquals(1, repository.emailCalls)
+
+        // 값을 안 바꾸고 포커스만 다시 오갔다
+        viewModel.onEmailFocusLost()
+        viewModel.onEmailFocusLost()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.emailCalls)
+        assertEquals(DuplicateCheck.Available, viewModel.uiState.value.emailCheck)
+    }
+
+    @Test
+    fun `값이 바뀌면 다시 부른다`() = runTest(dispatcher) {
+        val repository = StubAuthRepository()
+        val viewModel = viewModelAtInfoStep(repository)
+
+        viewModel.onEmailFocusLost()
+        advanceUntilIdle()
+        assertEquals(1, repository.emailCalls)
+
+        viewModel.onEmailChange("other@test.com")
+        viewModel.onEmailFocusLost()
+        advanceUntilIdle()
+
+        assertEquals(2, repository.emailCalls)
+    }
+
+    @Test
+    fun `못 물어봤으면 다시 시도한다`() = runTest(dispatcher) {
+        // Error 는 답을 모르는 상태다. 값이 그대로여도 재시도할 값어치가 있다.
+        var fail = true
+        val repository = object : StubAuthRepository() {
+            override suspend fun nicknameExists(nickname: String): Result<Boolean> {
+                super.nicknameExists(nickname)
+                return if (fail) httpFailure() else Result.success(false)
+            }
+        }
+        val viewModel = viewModelAtInfoStep(repository)
+
+        viewModel.onNicknameFocusLost()
+        advanceUntilIdle()
+        assertEquals(DuplicateCheck.Error, viewModel.uiState.value.nicknameCheck)
+
+        fail = false
+        viewModel.onNicknameFocusLost()
+        advanceUntilIdle()
+
+        assertEquals(2, repository.nicknameCalls)
+        assertEquals(DuplicateCheck.Available, viewModel.uiState.value.nicknameCheck)
     }
 
     @Test

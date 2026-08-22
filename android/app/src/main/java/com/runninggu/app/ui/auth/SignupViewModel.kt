@@ -24,7 +24,7 @@ import com.runninggu.app.data.local.SessionStore
 enum class SignupStep { AGREE, INFO, VERIFY, DONE }
 
 /**
- * 이메일·닉네임 중복 확인 상태. (화면-API 매핑표 D-30 · SPEC 결정-49 · 이슈 #97)
+ * 이메일·닉네임 중복 확인 상태. (화면-API 매핑표 D-30 · SPEC 결정-50 · 이슈 #97)
  *
  * **[Error] 는 진행을 막지 않는다.** 조회가 안 된다고 가입 자체를 못 하게 하면 사용자가
  * 할 수 있는 게 없다 — `send-code` 의 `EMAIL_DUPLICATED` 와 `signup` 의
@@ -186,6 +186,11 @@ class SignupViewModel(
     fun onEmailFocusLost() {
         val email = _uiState.value.email.trim()
         if (!AuthValidation.isEmailValid(email)) return
+        // 값이 그대로면 다시 묻지 않는다. A2 는 네 칸이 한 화면에 있어 오가는 게 자연스러운데,
+        // 그때마다 부르면 **값별 5회/분 제한**에 걸려 `Available` 이던 자리가 `Error` 로
+        // 퇴행한다(#132 리뷰). `onEmailChange` 가 값이 바뀔 때 `Unchecked` 로 되돌리므로
+        // 이 조건은 "바뀐 뒤 첫 이탈" 만 통과시킨다. `Error` 는 재시도할 여지를 남긴다.
+        if (_uiState.value.emailCheck !in RECHECKABLE) return
         emailCheckJob?.cancel()
         emailCheckJob = viewModelScope.launch {
             _uiState.update { it.copy(emailCheck = DuplicateCheck.Checking) }
@@ -203,6 +208,7 @@ class SignupViewModel(
     fun onNicknameFocusLost() {
         val nickname = _uiState.value.nickname.trim()
         if (!AuthValidation.isNicknameValid(nickname)) return
+        if (_uiState.value.nicknameCheck !in RECHECKABLE) return
         nicknameCheckJob?.cancel()
         nicknameCheckJob = viewModelScope.launch {
             _uiState.update { it.copy(nicknameCheck = DuplicateCheck.Checking) }
@@ -362,6 +368,15 @@ class SignupViewModel(
     }
 
     private companion object {
+        /**
+         * 포커스가 빠질 때 **다시 물어도 되는** 상태. (#132 리뷰)
+         *
+         * `Unchecked` 는 아직 안 물었거나 값이 바뀐 것이고, `Error` 는 못 물어본 것이라
+         * 재시도할 값어치가 있다. `Available`·`Duplicate` 는 이미 답을 아는 값이고,
+         * `Checking` 은 묻는 중이다.
+         */
+        val RECHECKABLE = setOf(DuplicateCheck.Unchecked, DuplicateCheck.Error)
+
         /** SPEC §4.2-3 — 재발송 쿨다운 60초. */
         const val RESEND_COOLDOWN_SEC = 60
 
