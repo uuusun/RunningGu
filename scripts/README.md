@@ -12,7 +12,7 @@
 | `build_contest_snapshot.py` | `data/races_sample.csv` → 서버용 대회 스냅샷 `data/contest_snapshot.json` (계약: `docs/contest-snapshot-contract.md`) |
 | `test_races_pipeline.py` | 종목 정규식·NFC 병합 키 회귀 테스트 (`python -m unittest test_races_pipeline`) |
 | `geocode.py` | 장소명→좌표 단건 조회 (카카오, `geocode_cache.json` 캐시) |
-| `build_courses.py` | 러닝코스 소스(두루누비 API+GPX · 로컬 GPX 폴더) → 정규화 `data/courses.json`. 어댑터는 `courses/sources/` |
+| `build_courses.py` | 러닝코스 소스(두루누비 API+GPX · 로컬 GPX 폴더) → 정규화 `data/courses.json`. 파일 계약은 [`docs/course-bundle-contract.md`](../docs/course-bundle-contract.md), 어댑터는 `courses/sources/` |
 
 ## 사용법
 
@@ -41,13 +41,20 @@ python build_races_json.py --out ../android/app/src/main/assets/races.json
 - Python은 `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT` 운영 핵심 테이블에 직접 쓰지 않는다. 향후 자동화 방식은 계약 문서 §6.
 
 - 입력 경로는 저장소 루트 `data/races_sample.csv`다. 모든 입출력과 콘솔은 UTF-8로 처리한다.
-- `durunubi_courses.json`은 두루누비 GPX 파싱본 261코스다. 서버 경로 리소스의 원천으로 보존하고, 앱에는 축약본을 생성해 번들한다. 최신 이름·난이도 등 메타데이터는 서버가 두루누비 API에서 시작 시+하루 1회 동기화한다.
+- `durunubi_courses.json`은 두루누비 GPX 파싱본 261코스다. 서버용 생산물은
+  [`docs/course-bundle-contract.md`](../docs/course-bundle-contract.md)의 버전 스키마로
+  `data/courses.json`에 만들고, 앱에는 별도 축약본을 생성해 번들한다. 최신 이름·난이도 등
+  메타데이터는 서버가 두루누비 API에서 준비 완료 후 1회+직전 완료 기준 24시간마다 동기화한다.
 - CI는 `PYTHONUTF8=1`에서 두 번 생성한 결과가 동일한지, JSON UTF-8 디코딩, 153건, 이미지 133건을 검증한다.
 
 ## 러닝코스 데이터 (`build_courses.py`)
 
 소스를 어댑터로 붙이는 구조다. 새 소스는 `courses/sources/` 에 파일 하나를 추가하고
 `@register` 를 붙이면 되며 `build_courses.py` 는 고치지 않는다.
+
+`data/courses.json`의 경로·필드·유일키·원천 우선순위·결정성 검증은
+[`docs/course-bundle-contract.md`](../docs/course-bundle-contract.md)가 SSOT다. 생산자는 이
+파일을 쓰기 전에 전체 검증하고, 백엔드는 검증된 파일만 classpath 리소스로 포함한다.
 
 ```bash
 set -a; source scripts/.env; set +a          # KTO_SERVICE_KEY · KAKAO_REST_KEY

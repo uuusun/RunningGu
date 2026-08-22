@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
+import androidx.compose.foundation.lazy.LazyListScope
+import com.runninggu.app.ui.common.SectionState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
 import com.runninggu.app.ui.model.FestivalSummary
@@ -95,7 +98,8 @@ fun HomeScreen(
         query = query,
         onQueryChange = viewModel::onSearchQueryChange,
         onSearch = { onSearch(query) },
-        onRetry = viewModel::load,
+        onRetryClosingSoon = viewModel::loadClosingSoon,
+        onRetryFestivals = viewModel::loadFestivals,
         onRaceClick = onRaceClick,
         onStartWizard = onStartWizard,
         onOpenCalendar = onOpenCalendar,
@@ -110,7 +114,8 @@ private fun HomeContent(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onRetry: () -> Unit,
+    onRetryClosingSoon: () -> Unit,
+    onRetryFestivals: () -> Unit,
     onRaceClick: (String) -> Unit,
     onStartWizard: (String) -> Unit,
     onOpenCalendar: () -> Unit,
@@ -129,83 +134,99 @@ private fun HomeContent(
         // 히어로(로고·검색·대표 대회)는 다크 몰입 레지스터 한 덩어리다 (목업 .hero).
         item {
             HomeHero(
-                race = (uiState as? HomeUiState.Content)?.featured,
+                race = uiState.featured,
                 query = query,
                 onQueryChange = onQueryChange,
                 onSearch = onSearch,
-                onRaceClick = {
-                    (uiState as? HomeUiState.Content)?.featured?.let { onRaceClick(it.id) }
-                },
-                onStartWizard = {
-                    (uiState as? HomeUiState.Content)?.featured?.let { onStartWizard(it.id) }
-                },
+                onRaceClick = { uiState.featured?.let { onRaceClick(it.id) } },
+                onStartWizard = { uiState.featured?.let { onStartWizard(it.id) } },
             )
         }
 
-        when (uiState) {
-            HomeUiState.Loading -> item { LoadingState(message = "불러오는 중…") }
-
-            is HomeUiState.Error -> item {
-                ErrorState(message = uiState.message, onRetry = onRetry)
-            }
-
-            is HomeUiState.Content -> {
-                if (uiState.isEmpty) {
-                    item {
-                        EmptyState(
-                            title = "보여드릴 대회가 없어요.",
-                            description = "잠시 후 다시 확인해 주세요.",
-                        )
-                    }
-                } else {
-                    // 퀵바는 흰 카드로 히어로 하단에 26dp 겹친다 (목업 .quickbar margin-top:-26px).
-                    item {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(QUICKBAR_HEIGHT - QUICKBAR_OVERLAP)
-                                // unbounded — 카드가 이 칸보다 커도 잘리지 않고 위로 넘치게 둔다.
-                                .wrapContentHeight(align = Alignment.Top, unbounded = true),
-                        ) {
-                            QuickActionRow(
-                                onCalendar = onOpenCalendar,
-                                onMap = onOpenCourses,
-                                onCourse = onOpenCourses,
-                                // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
-                                onTour = {
-                                    scope.launch {
-                                        listState.animateScrollToItem(uiState.festivalSectionIndex)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .offset(y = -QUICKBAR_OVERLAP)
-                                    .padding(horizontal = 22.dp),
-                            )
+        // 퀵바는 흰 카드로 히어로 하단에 26dp 겹친다 (목업 .quickbar margin-top:-26px).
+        // 조회 결과와 무관한 이동 수단이라 영역 상태를 안 본다.
+        item {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(QUICKBAR_HEIGHT - QUICKBAR_OVERLAP)
+                    // unbounded — 카드가 이 칸보다 커도 잘리지 않고 위로 넘치게 둔다.
+                    .wrapContentHeight(align = Alignment.Top, unbounded = true),
+            ) {
+                QuickActionRow(
+                    onCalendar = onOpenCalendar,
+                    onMap = onOpenCourses,
+                    onCourse = onOpenCourses,
+                    // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
+                    onTour = {
+                        scope.launch {
+                            // 축제는 언제나 마지막 항목이다 — 마감 임박이 접혀도 맞는다
+                            val last = listState.layoutInfo.totalItemsCount - 1
+                            if (last >= 0) listState.animateScrollToItem(last)
                         }
-                    }
-
-                    item {
-                        ClosingSoonSection(
-                            races = uiState.closingSoon,
-                            onRaceClick = onRaceClick,
-                        )
-                    }
-
-                    item {
-                        FestivalSection(festivals = uiState.festivals)
-                    }
-                }
+                    },
+                    modifier = Modifier
+                        .offset(y = -QUICKBAR_OVERLAP)
+                        .padding(horizontal = 22.dp),
+                )
             }
+        }
+
+        // 두 영역은 서로를 가리지 않는다. 축제가 502 여도 마감 임박은 그대로 보인다
+        // (AGENTS 2장-5). 빈 결과는 섹션을 통째로 접는다 — 홈은 탐색 시작점이라
+        // "없음" 이 자리를 차지할 이유가 없다(#49 합의).
+        section(
+            state = uiState.closingSoon,
+            errorMessage = "마감 임박 대회를 불러오지 못했어요",
+            onRetry = onRetryClosingSoon,
+        ) { races ->
+            ClosingSoonSection(races = races, onRaceClick = onRaceClick)
+        }
+
+        section(
+            state = uiState.festivals,
+            errorMessage = "축제 정보를 불러오지 못했어요",
+            onRetry = onRetryFestivals,
+            // 퀵바 [관광]이 이 섹션으로 스크롤한다 — 비어도 자리를 남겨야 겨냥할 곳이 있다
+            empty = { FestivalSectionFrame { EmptyState(title = "추천할 축제가 없어요.") } },
+        ) { festivals ->
+            FestivalSection(festivals = festivals)
         }
     }
 }
 
 /**
- * 축제 섹션의 LazyColumn 내 위치 — 헤더·검색·(히어로)·퀵바·마감임박 다음.
- * 히어로는 featured가 없으면 빠지므로 그만큼 당겨진다. 섹션을 추가하면 같이 조정한다.
+ * 영역 하나를 그린다. (AGENTS 2장-5 · #49 합의)
+ *
+ * - **[SectionState.Empty] 는 아무것도 안 그린다** — 섹션 헤더까지 접는다. 홈은 탐색
+ *   시작점이라 "없음" 을 자리 잡아 보여줄 이유가 없고, SPEC §4.4 에 홈 섹션 빈 문구
+ *   규정도 없다
+ * - **[SectionState.Error] 는 그 자리에만** 안내와 재시도를 둔다. 화면 전체를 덮지 않는다
  */
-private val HomeUiState.Content.festivalSectionIndex: Int
-    get() = if (featured != null) 5 else 4
+private fun <T> LazyListScope.section(
+    state: SectionState<T>,
+    errorMessage: String,
+    onRetry: () -> Unit,
+    /**
+     * 비었을 때 자리를 남길 것인가. 기본은 접는다.
+     *
+     * **퀵액션이 겨냥하는 섹션만 넘긴다**(#102 리뷰). 접히면 스크롤할 자리가 사라져서
+     * 버튼이 죽거나 엉뚱한 섹션으로 간다.
+     */
+    empty: (@Composable () -> Unit)? = null,
+    content: @Composable (T) -> Unit,
+) {
+    when (state) {
+        SectionState.Loading -> item { LoadingState(message = "불러오는 중…") }
+        SectionState.Empty -> empty?.let { item { it() } } ?: Unit
+        is SectionState.Error -> item {
+            // 서버가 준 문구가 있으면 그걸 쓴다. 없을 때만 영역 기본 문구다 (§0-3)
+            ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)
+        }
+
+        is SectionState.Content -> item { content(state.value) }
+    }
+}
 
 @Composable
 private fun HomeHeader(modifier: Modifier = Modifier) {
@@ -403,16 +424,12 @@ private fun ClosingSoonSection(
             modifier = Modifier.padding(horizontal = ScreenPadding),
         )
         Spacer(Modifier.height(12.dp))
-        if (races.isEmpty()) {
-            EmptyState(title = "마감이 임박한 대회가 없어요.")
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(races, key = { it.id }) { race ->
-                    ClosingSoonCard(race = race, onClick = { onRaceClick(race.id) })
-                }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(races, key = { it.id }) { race ->
+                ClosingSoonCard(race = race, onClick = { onRaceClick(race.id) })
             }
         }
     }
@@ -475,10 +492,15 @@ private fun ClosingSoonCard(
     }
 }
 
+/**
+ * 축제 섹션의 제목까지. 내용과 빈 자리가 **같은 머리를 쓰도록** 갈라 두었다 (#102 리뷰).
+ *
+ * 비었을 때도 제목이 남아야 퀵바 [관광]이 데려다 놓은 자리가 무엇인지 알 수 있다.
+ */
 @Composable
-private fun FestivalSection(
-    festivals: List<FestivalSummary>,
+private fun FestivalSectionFrame(
     modifier: Modifier = Modifier,
+    body: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = modifier) {
         SectionHeader(
@@ -486,26 +508,32 @@ private fun FestivalSection(
             modifier = Modifier.padding(horizontal = ScreenPadding),
         )
         Spacer(Modifier.height(12.dp))
-        if (festivals.isEmpty()) {
-            EmptyState(title = "추천할 축제가 없어요.")
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(festivals, key = { it.id }) { festival ->
-                    FestivalCard(festival = festival)
-                }
+        body()
+    }
+}
+
+@Composable
+private fun FestivalSection(
+    festivals: List<FestivalSummary>,
+    modifier: Modifier = Modifier,
+) {
+    FestivalSectionFrame(modifier = modifier) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(festivals, key = { it.id }) { festival ->
+                FestivalCard(festival = festival)
             }
-            Spacer(Modifier.height(10.dp))
-            // 출처 표기는 한국관광공사 고정. (NFR-7)
-            Text(
-                text = "출처 · 한국관광공사",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = ScreenPadding),
-            )
         }
+        Spacer(Modifier.height(10.dp))
+        // 출처 표기는 한국관광공사 고정. (NFR-7)
+        Text(
+            text = "출처 · 한국관광공사",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = ScreenPadding),
+        )
     }
 }
 

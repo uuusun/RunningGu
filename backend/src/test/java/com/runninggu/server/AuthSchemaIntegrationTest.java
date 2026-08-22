@@ -81,6 +81,45 @@ class AuthSchemaIntegrationTest extends PostgreSqlContainerSupport {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void 리프레시는_family당_활성_한개만_허용하고_회전_이력은_보존한다() {
+        long userId = insertUser("세션러너", "세션러너");
+        String familyId = "11111111-1111-1111-1111-111111111111";
+        insertRefresh(userId, familyId, "a".repeat(64));
+
+        assertThatThrownBy(() -> insertRefresh(userId, familyId, "b".repeat(64)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        jdbcTemplate.update(
+                "UPDATE refresh_token SET revoked_at = CURRENT_TIMESTAMP WHERE token_hash = ?",
+                "a".repeat(64));
+        insertRefresh(userId, familyId, "c".repeat(64));
+    }
+
+    @Test
+    void 사용자_삭제는_약관과_리프레시를_함께_삭제한다() {
+        long userId = insertUser("삭제러너", "삭제러너");
+        jdbcTemplate.update(
+                """
+                INSERT INTO user_agreement(user_id, agreement_type, version, agreed, changed_at)
+                VALUES (?, 'TOS', '1.0', true, CURRENT_TIMESTAMP)
+                """,
+                userId);
+        insertRefresh(
+                userId,
+                "22222222-2222-2222-2222-222222222222",
+                "d".repeat(64));
+
+        jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", userId);
+
+        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_agreement",
+                Integer.class)).isZero();
+        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM refresh_token",
+                Integer.class)).isZero();
+    }
+
     private long insertUser(String nickname, String nicknameKey) {
         return jdbcTemplate.queryForObject(
                 """
@@ -125,5 +164,18 @@ class AuthSchemaIntegrationTest extends PostgreSqlContainerSupport {
                 """,
                 email,
                 attempts);
+    }
+
+    private void insertRefresh(long userId, String familyId, String tokenHash) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO refresh_token(
+                    user_id, family_id, token_hash, expires_at, created_at)
+                VALUES (?, CAST(? AS UUID), ?, CURRENT_TIMESTAMP + INTERVAL '14 days',
+                    CURRENT_TIMESTAMP)
+                """,
+                userId,
+                familyId,
+                tokenHash);
     }
 }

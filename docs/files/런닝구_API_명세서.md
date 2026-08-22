@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v2.10
+# 런닝구 백엔드 API 명세서 v3.0
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -23,7 +23,7 @@
 
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
-- 인증 방식: `Authorization: Bearer {accessToken}`. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 서명 키는 서버 환경변수로만 관리한다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 회전(rotate) + 서버 저장(SHA-256 해시) — 비밀번호 변경·재설정·탈퇴 시 전체 무효화한다(NFR-11). 🔒
+- 인증 방식: Spring Security Resource Server의 `BearerTokenAuthenticationFilter`가 `Authorization: Bearer {accessToken}`을 검증한다. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 claim은 `sub=String(userId)`, `iss=runninggu`, `aud=runninggu-api`, `type=ACCESS|REFRESH`, `jti=UUID`, `iat`, `exp`로 고정한다. `JWT_SECRET`은 Base64로 디코딩한 32바이트 이상 키이며 누락·형식 오류·길이 미달이면 서버 기동을 실패시킨다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 family 회전 + 서버 저장(SHA-256 lowercase hex) + 재사용 탐지를 적용한다(NFR-11). 🔒
 - 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
@@ -105,7 +105,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 1-7 | POST | `/auth/kakao` | 카카오 로그인 (SDK 토큰 검증) | 공개 |
 | 1-8 | POST | `/auth/kakao/signup` | 카카오 신규 가입 (동의 포함) | 공개 |
 | 1-9 | POST | `/auth/refresh` | 액세스 토큰 재발급 | 공개(리프레시 필요) |
-| 1-10 | POST | `/auth/logout` | 로그아웃 (리프레시 무효화) | 인증 |
+| 1-10 | POST | `/auth/logout` | 로그아웃 (리프레시 family 무효화) | 공개(리프레시 필요) |
 | 1-11 | POST | `/auth/password/reset-request` | 재설정 링크 메일 발송 | 공개 |
 | 1-12 | POST | `/auth/password/reset` | 새 비밀번호 설정 | 공개(토큰 필요) |
 
@@ -151,7 +151,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 }
 ```
 `201` — 응답은 1-6 로그인과 동일(가입 완료 → "시작하기 → 홈" 목업 플로우에 맞춰 **자동 로그인** 🔧).
-검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt 단방향 해시(NFR-9). 서버가 활성 약관 버전을 결정하고 항목별 `{type, version, agreed, changedAt}` 이력을 append-only로 저장한다(NFR-12).
+검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt strength 10 단방향 해시(NFR-9). 서버 활성 버전 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`으로 선택 동의를 포함한 세 행을 같은 `changedAt`에 append-only 저장하며 앱은 버전을 보내지 않는다(NFR-12, 결정-52, 이슈 #111).
 
 ### 1-6 `POST /auth/login`
 
@@ -200,8 +200,9 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 
 ### 1-9 ~ 1-10 토큰 관리
 
-`POST /auth/refresh` `{"refreshToken": "..."}` → `200` 새 액세스 + **회전된 리프레시**. 오류 `401 INVALID_REFRESH_TOKEN`(만료·revoked) → 앱은 재로그인 유도.
-`POST /auth/logout` `{"refreshToken": "..."}` → `204` — 해당 리프레시 revoke.
+`POST /auth/refresh` `{"refreshToken": "..."}` → `200 {"accessToken":"...","refreshToken":"..."}`. 새 기기 로그인은 새 `familyId`를 만들고, 재발급은 기존 토큰을 revoke한 뒤 같은 family의 새 토큰으로 **회전**한다. 만료·서명/claim 오류·알 수 없는 토큰은 `401 INVALID_REFRESH_TOKEN`이다. 이미 회전·revoke된 과거 토큰이 다시 제시되면 같은 family의 활성 토큰을 모두 revoke하고 `401`을 반환하되 다른 기기 family는 유지한다. DB에는 원문 대신 SHA-256 lowercase hex만 저장한다.
+
+`POST /auth/logout` `{"refreshToken": "..."}` → `204`. Access 토큰 없이 호출하는 공개 경로이고, 알려진 refresh token이면 같은 family의 활성 토큰을 revoke한다. 활성·이미 revoked·만료·알 수 없는 non-blank 토큰 모두 멱등 `204`이며 빈 값은 `400 VALIDATION_FAILED`다. Access blacklist는 두지 않아 기존 Access는 최대 30분까지 유효할 수 있다. 앱은 Authenticator가 붙지 않는 클라이언트로 호출해 refresh 재시도 루프를 만들지 않는다(결정-51).
 
 ### 1-11 `POST /auth/password/reset-request`
 
@@ -558,6 +559,10 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 ## 6. 러닝코스 API `/api/courses` (공개)
 
 > 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+>
+> 두루누비 번들 파일·시작 후/24시간 동기화·`courseId` 결합·원자적 fail-open의 내부 계약은
+> [`docs/course-bundle-contract.md`](../course-bundle-contract.md)가 기준이다. 이 catalog는
+> PostgreSQL에 복제하지 않고 검증된 번들에서 시작한 불변 메모리 snapshot으로 제공한다.
 
 ### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
 
@@ -618,13 +623,15 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 
 ### 6-2 `GET /api/courses` — 지역별 (Pageable)
 
-`?region=부산&page=0&size=20` → 큐레이션 코스만 거리 오름차순으로 반환한다 🔒(§4.11-b). `OSM_GENERATED`는 포함하지 않는다.
+`?region=부산&page=0&size=20` → 큐레이션 코스만 `distanceKm ASC, courseId ASC`로
+안정 정렬해 반환한다 🔒(§4.11-b). `region`은 앞뒤 공백 제거 후 `sido`와 정확히 일치시키며
+`OSM_GENERATED`는 포함하지 않는다.
 
 ```json
 {
   "content": [
     {
-      "courseId": "durunubi-001",
+      "courseId": "T_CRS_MNG0000005117",
       "courseName": "해파랑길 1코스",
       "sido": "부산",
       "sigun": "남구",
@@ -647,9 +654,17 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 ```
 
 - `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
+- `courseId`는 번들·KTO 결합에 사용하는 안정적 유일키다. `dataSource`는 지역별 응답에서
+  `API_GPX|GPX_ONLY`만 가능하다.
+- `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
+  `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
 
-### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}` — 코스 수 내림차순(지역 칩).
+### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
+
+같은 catalog snapshot의 서비스 대상 코스를 `sido`별로 세고 `count DESC, region ASC`로
+정렬한다. 0건인 시도는 만들지 않으며, `count` 합은 필터 없는 6-2의 `totalElements`와 같다.
+KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두 지역 API를 계속 제공한다.
 
 ---
 

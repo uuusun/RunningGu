@@ -56,7 +56,45 @@ public class LoginIdentity {
 
     protected LoginIdentity() {}
 
+    public static LoginIdentity email(
+            AppUser user,
+            String email,
+            String passwordHash,
+            Instant verifiedAt,
+            Instant createdAt) {
+        LoginIdentity identity = new LoginIdentity();
+        identity.user = user;
+        identity.provider = LoginProvider.EMAIL;
+        identity.providerSubject = email;
+        identity.emailSnapshot = null;
+        identity.passwordHash = passwordHash;
+        identity.emailVerifiedAt = verifiedAt;
+        identity.createdAt = createdAt;
+        identity.lastLoginAt = createdAt;
+        return identity;
+    }
+
+    public void markLoggedIn(Instant now) {
+        lastLoginAt = now;
+    }
+
     public Long getId() {
         return id;
+    }
+
+    public AppUser getUser() {
+        return user;
+    }
+
+    public LoginProvider getProvider() {
+        return provider;
+    }
+
+    public String getProviderSubject() {
+        return providerSubject;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
     }
 }

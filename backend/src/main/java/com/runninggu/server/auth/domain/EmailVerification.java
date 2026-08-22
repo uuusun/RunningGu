@@ -107,6 +107,11 @@ public class EmailVerification {
         this.verifiedAt = verifiedAt;
     }
 
+    /** 가입 트랜잭션 안에서 인증 자격을 한 번만 소비한다. (SPEC §4.2) */
+    public void markConsumed(Instant consumedAt) {
+        this.consumedAt = consumedAt;
+    }
+
     public Long getId() {
         return id;
     }
