@@ -168,7 +168,7 @@ object ServiceLocator {
      * 카카오(`auth/kakao`·`auth/kakao/signup`)도 서버에 없는데, 부르는 화면이
      * 아직 없어 지금은 드러나지 않는다.
      */
-    val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi) }
+    val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi, tokenApi) }
 
     /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
