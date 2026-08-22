@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.runninggu.app.domain.today
 import java.time.DayOfWeek
@@ -153,6 +154,15 @@ private fun DayGrid(
     }
 }
 
+/** 날짜 동그라미 지름. */
+private val DAY_CIRCLE = 28.dp
+
+/** 동그라미와 건수 줄 사이. */
+private val DAY_GAP = 3.dp
+
+/** 칸 위아래 여백 합. */
+private val DAY_PADDING = 7.dp
+
 @Composable
 private fun DayCell(
     date: LocalDate,
@@ -163,10 +173,17 @@ private fun DayCell(
     modifier: Modifier = Modifier,
 ) {
     val hasRace = raceCount > 0
+    // 건수 줄의 높이를 **타이포그래피에서 끌어온다.** `dp` 상수로 박으면 두 가지가 샌다 —
+    // 글꼴 크기를 키운 기기에서 `sp` 가 커져 다시 잘리고, `Type.kt` 의 `labelSmall` 을
+    // 고쳐도 여기가 안 따라온다(#128 리뷰).
+    val countLineHeight = with(LocalDensity.current) {
+        MaterialTheme.typography.labelSmall.lineHeight.toDp()
+    }
     Column(
         modifier = modifier
-            // 원(28) + 사이(3) + 점·건수 줄(16) = 47. 나머지는 상하 여백이다.
-            .height(54.dp)
+            // 원(28) + 사이(3) + 건수 줄 + 상하 여백(7). 모든 칸이 같은 값을 쓰므로
+            // 글꼴이 커져도 날짜 숫자는 가로로 나란히 선다.
+            .height(DAY_CIRCLE + DAY_GAP + countLineHeight + DAY_PADDING)
             // 대회가 없는 날은 선택할 수 없다.
             .clickable(enabled = hasRace, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -199,12 +216,12 @@ private fun DayCell(
                 },
             )
         }
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(DAY_GAP))
         Row(
-            // 점만 있을 때 기준(6dp)으로 잡았더니 건수 숫자가 아래로 잘렸다 — `labelSmall` 은
-            // 줄높이가 16sp 라 6dp 상자를 넘는다. **모든 칸이 같은 높이여야** 날짜 숫자가
-            // 가로로 나란히 서므로, 늘리되 고정으로 둔다 (#85 리뷰).
-            modifier = Modifier.height(16.dp),
+            // 점 크기(5dp) 기준인 6dp 로 잡았더니 건수 숫자가 아래로 잘렸다 — `labelSmall`
+            // 줄높이가 그 상자를 넘는다. **칸마다 높이가 달라지면** 세로 가운데 정렬 때문에
+            // 날짜 숫자가 들쭉날쭉해지므로, `heightIn` 이 아니라 모든 칸이 같은 값을 쓴다.
+            modifier = Modifier.height(countLineHeight),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
