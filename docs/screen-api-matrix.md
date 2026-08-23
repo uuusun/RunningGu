@@ -176,7 +176,7 @@ Compose 화면
 |---|---|---|---|---|---|
 | 이메일 로그인 | `POST /api/auth/login` | email, password | token pair + user | pending route가 있으면 복귀, 없으면 홈 | `LOGIN_FAILED` 인라인 오류 |
 | 카카오 시작 | Kakao Android SDK | 없음 | kakaoAccessToken | 다음 API 호출 | SDK 취소/오류 |
-| 카카오 계정 확인 | `POST /api/auth/kakao` | kakaoAccessToken | 기존 token+user / 신규 `isNewUser=true`+nullable nickname/email profile | 기존 로그인 / 신규 회원가입 | `INVALID_KAKAO_TOKEN`, 외부 502/504 |
+| 카카오 계정 확인 | `POST /api/auth/kakao` | kakaoAccessToken | 서버가 토큰 `app_id=KAKAO_APP_ID` 검증 후 기존 token+user / 신규 `isNewUser=true`+nullable nickname/email profile | 기존 로그인 / 신규 회원가입 | 다른 앱 토큰·무효 토큰은 `INVALID_KAKAO_TOKEN`, 외부 502/504 |
 | 게스트 둘러보기 | 로컬 | guest=true | 없음 | 홈 | 없음 |
 | 회원가입·비밀번호 찾기 | Navigation | 없음 | 없음 | A2/A3 | 없음 |
 

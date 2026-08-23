@@ -72,7 +72,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 정책 | 값 |
 |---|---|
 | 타임아웃 | 연결 1초 · 응답 2.5초 🔧 → 초과 시 504 |
-| 카카오 429 | 1회 재시도 후 실패 처리 (NFR-5) |
+| 카카오 로컬 REST 429 | 1회 재시도 후 실패 처리 (NFR-5) |
+| 카카오 로그인 검증 429 | 재시도 없이 `502 EXTERNAL_API_ERROR` 반환 (NFR-5) |
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
 | 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
 | 캐시 구현 | 단일 서버 MVP는 Spring Cache + Caffeine 인메모리 캐시. Redis는 MVP에서 사용하지 않음 🔒 |
@@ -177,7 +178,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 ```json
 { "kakaoAccessToken": "카카오 SDK가 발급한 액세스 토큰" }
 ```
-서버가 카카오 API(`/v2/user/me`)로 토큰 검증 → `(provider=KAKAO, providerSubject=카카오 회원번호)`로 `LOGIN_IDENTITY`를 조회한다.
+서버가 카카오 API `/v1/user/access_token_info`로 토큰의 유효성과 발급 앱을 확인한다. 응답 `app_id`가 서버 환경변수 `KAKAO_APP_ID`와 다르면 `401 INVALID_KAKAO_TOKEN`으로 거부하고 `/v2/user/me`를 호출하지 않는다. 일치할 때만 `/v2/user/me`로 회원번호와 동의된 프로필을 조회하며, 두 응답의 회원번호가 다르면 `502 EXTERNAL_API_ERROR`로 처리한다. 검증된 회원번호로 `(provider=KAKAO, providerSubject=카카오 회원번호)` `LOGIN_IDENTITY`를 조회한다.
 - 기존 KAKAO 가입 계정: `200` — 1-6과 동일 응답. `user.email`은 가입 때 이메일이 제공되지 않았다면 null이다.
 - 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명 또는 null", "email": null}}` → 앱은 약관 동의 화면으로 → 1-8 호출. 이 판별 호출에서는 DB에 사용자 데이터를 저장하지 않는다.
 

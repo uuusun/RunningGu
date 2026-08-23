@@ -14,16 +14,18 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
-/** 앱이 받은 액세스 토큰으로 카카오 회원번호와 동의된 프로필만 조회한다. (SPEC §4.1) */
+/** 앱이 받은 액세스 토큰의 발급 앱을 검증하고 카카오 회원번호와 동의된 프로필만 조회한다. (SPEC §4.1) */
 public class KakaoUserInfoClient implements KakaoUserInfoProvider {
 
+    private static final String ACCESS_TOKEN_INFO_PATH = "/v1/user/access_token_info";
     private static final String USER_INFO_PATH = "/v2/user/me";
-    private static final int MAX_ATTEMPTS = 2;
 
     private final RestClient restClient;
+    private final long expectedAppId;
 
-    public KakaoUserInfoClient(RestClient restClient) {
+    public KakaoUserInfoClient(RestClient restClient, long expectedAppId) {
         this.restClient = restClient;
+        this.expectedAppId = expectedAppId;
     }
 
     @Override
@@ -32,8 +34,21 @@ public class KakaoUserInfoClient implements KakaoUserInfoProvider {
             throw new KakaoUserInfoException(Reason.INVALID_TOKEN);
         }
 
-        KakaoUserInfoResponse response = executeWithRateLimitRetry(accessToken);
+        KakaoAccessTokenInfoResponse tokenInfo = execute(
+                ACCESS_TOKEN_INFO_PATH, accessToken, KakaoAccessTokenInfoResponse.class);
+        if (tokenInfo == null || tokenInfo.id() == null || tokenInfo.appId() == null) {
+            throw new KakaoUserInfoException(Reason.ERROR);
+        }
+        if (tokenInfo.appId() != expectedAppId) {
+            throw new KakaoUserInfoException(Reason.INVALID_TOKEN);
+        }
+
+        KakaoUserInfoResponse response =
+                execute(USER_INFO_PATH, accessToken, KakaoUserInfoResponse.class);
         if (response == null || response.id() == null) {
+            throw new KakaoUserInfoException(Reason.ERROR);
+        }
+        if (!tokenInfo.id().equals(response.id())) {
             throw new KakaoUserInfoException(Reason.ERROR);
         }
 
@@ -45,31 +60,24 @@ public class KakaoUserInfoClient implements KakaoUserInfoProvider {
         return new KakaoUserProfile(response.id().toString(), nickname, email);
     }
 
-    private KakaoUserInfoResponse executeWithRateLimitRetry(String accessToken) {
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            try {
-                return restClient.get()
-                        .uri(USER_INFO_PATH)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                        .retrieve()
-                        .body(KakaoUserInfoResponse.class);
-            } catch (RestClientResponseException exception) {
-                if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                    throw new KakaoUserInfoException(Reason.INVALID_TOKEN, exception);
-                }
-                if (exception.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS
-                        && attempt < MAX_ATTEMPTS) {
-                    continue;
-                }
-                throw new KakaoUserInfoException(Reason.ERROR, exception);
-            } catch (ResourceAccessException exception) {
-                Reason reason = causedByTimeout(exception) ? Reason.TIMEOUT : Reason.ERROR;
-                throw new KakaoUserInfoException(reason, exception);
-            } catch (RestClientException exception) {
-                throw new KakaoUserInfoException(Reason.ERROR, exception);
+    private <T> T execute(String path, String accessToken, Class<T> responseType) {
+        try {
+            return restClient.get()
+                    .uri(path)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .body(responseType);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                throw new KakaoUserInfoException(Reason.INVALID_TOKEN, exception);
             }
+            throw new KakaoUserInfoException(Reason.ERROR, exception);
+        } catch (ResourceAccessException exception) {
+            Reason reason = causedByTimeout(exception) ? Reason.TIMEOUT : Reason.ERROR;
+            throw new KakaoUserInfoException(reason, exception);
+        } catch (RestClientException exception) {
+            throw new KakaoUserInfoException(Reason.ERROR, exception);
         }
-        throw new KakaoUserInfoException(Reason.ERROR);
     }
 
     private String textOrNull(String value) {

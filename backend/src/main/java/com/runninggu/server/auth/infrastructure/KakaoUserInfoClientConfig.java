@@ -26,7 +26,7 @@ public class KakaoUserInfoClientConfig {
                 .baseUrl(properties.baseUrl().toString())
                 .requestFactory(requestFactory)
                 .build();
-        return new KakaoUserInfoClient(restClient);
+        return new KakaoUserInfoClient(restClient, properties.appId());
     }
 
     private int toMillis(Duration duration) {
