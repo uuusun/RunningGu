@@ -26,8 +26,18 @@ data class CourseUiState(
     /** 지역 칩 선택. null 이면 전국이다. 재탭하면 해제된다. (§4.11-b) */
     val selectedRegion: String? = null,
     val regionCourses: RegionCoursesState = RegionCoursesState.Loading,
-    /** 목록에서 고른 항목. 지도 폴리라인이 이걸 따라간다. (§4.11-4) */
-    val selectedRouteId: String? = null,
+    /**
+     * 목록에서 고른 항목. 지도 폴리라인과 카드 강조가 이걸 따라간다. (§4.11-4)
+     *
+     * **경로 id 하나로 들지 않는다.** 그러면 "아직 아무것도 안 골랐다" 와 "걷기 스팟을
+     * 골랐다" 가 둘 다 null 이 되어 구분되지 않는다. 그 탓에 스팟을 탭하면 관계없는 첫
+     * 코스 선이 그려지고, 조회 직후에는 `null == null` 이 참이라 **모든 스팟 카드가
+     * 강조**됐다(#142 리뷰).
+     *
+     * 같은 항목이 목록에 두 번 오면 둘 다 강조된다. 서버가 거리순으로 섞어 주되 중복은
+     * 주지 않으므로 실제로는 생기지 않는다(§4.11-5).
+     */
+    val selectedItem: NearbyItem? = null,
     /**
      * [내 위치] 가 실패한 이유. (SPEC §4.11-1 ① · NFR-15)
      *
@@ -40,9 +50,13 @@ data class CourseUiState(
     /**
      * 지도에 그릴 경로. (SPEC §4.11-4 · §3-8)
      *
-     * **고르기 전에는 첫 코스를 그린다.** 조회 직후 [selectedRouteId] 는 null 인데
+     * **고르기 전에는 첫 코스를 그린다.** 조회 직후 [selectedItem] 은 null 인데
      * (`CourseViewModel` 이 새 조회마다 지운다) 그때 지도를 비워 두면 목록을 한 번
      * 탭하기 전까지 빈 회색 판이 놓인다. 서버가 거리순으로 준 첫 코스가 기본이다.
+     *
+     * **걷기 스팟을 골랐으면 그릴 것이 없다.** 첫 코스로 되돌리면 방금 탭한 것과 아무
+     * 상관 없는 선이 지도에 남는다. §4.11-4 의 번호 핀이 붙기 전까지는 비어 있는 것이
+     * 맞다.
      */
     val mappedRoute: NearbyItem.Route?
         get() {
@@ -50,8 +64,14 @@ data class CourseUiState(
                 ?.items
                 ?.filterIsInstance<NearbyItem.Route>()
                 ?: return null
-            return routes.firstOrNull { it.routeId == selectedRouteId } ?: routes.firstOrNull()
+            return when (val picked = selectedItem) {
+                is NearbyItem.Place -> null
+                is NearbyItem.Route ->
+                    routes.firstOrNull { it.routeId == picked.routeId } ?: routes.firstOrNull()
+                null -> routes.firstOrNull()
+            }
         }
+
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
         BY_REGION("지역별"),

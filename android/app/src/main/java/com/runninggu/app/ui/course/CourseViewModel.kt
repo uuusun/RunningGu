@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.model.CourseTargetKm
+import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
@@ -204,8 +205,8 @@ class CourseViewModel(
         loadRegionCourses()
     }
 
-    fun onItemSelect(routeId: String?) {
-        _uiState.update { it.copy(selectedRouteId = routeId) }
+    fun onItemSelect(item: NearbyItem?) {
+        _uiState.update { it.copy(selectedItem = item) }
     }
 
     fun refreshNearby() {
@@ -232,7 +233,7 @@ class CourseViewModel(
             } catch (e: ApiException) {
                 NearbyState.Error(e.nearbyMessage())
             }
-            _uiState.update { it.copy(nearby = state, selectedRouteId = null) }
+            _uiState.update { it.copy(nearby = state, selectedItem = null) }
         }
     }
 

@@ -147,8 +147,8 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                         item = item,
                         number = index + 1,
                         targetKm = state.targetKm,
-                        selected = (item as? NearbyItem.Route)?.routeId == state.selectedRouteId,
-                        onClick = { viewModel.onItemSelect((item as? NearbyItem.Route)?.routeId) },
+                        selected = state.selectedItem == item,
+                        onClick = { viewModel.onItemSelect(item) },
                     )
                 }
                 item { ActionRow(hasNoRoute = near.hasNoRoute) }
@@ -345,10 +345,22 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
  *
  * 고치는 방법이 여럿이라(고정 영역으로 빼기 등) **실기기에서 보고 정한다** — #104 확인
  * 항목이다.
+ *
+ * ## 아직 모르는 동안에는 단정하지 않는다
+ *
+ * 이 카드는 [NearbyState] 바깥에 있어 조회 전·조회 중·실패에도 그려진다. 그때 "따라갈
+ * 경로가 없어요" 를 놓으면 아래에서 "이 근처를 찾는 중…" 이 도는 동안 위에서 없다고
+ * 단정하는 꼴이 된다. **결과가 실제로 나온 뒤에만**(Content · Empty) 그 문구를 쓴다.
+ *
+ * 경로가 있는데 [NearbyItem.Route.path] 가 비어 있을 수도 있다 — 매퍼가 폴리라인을
+ * 못 풀면 그렇다(#129). 그때는 목록이 `경로` 태그를 달고 있는데 지도만 비는데, 선이
+ * 안 되는 좌표열을 그리는 것보다 낫다고 보고 그대로 둔다.
  */
 @Composable
 private fun CourseMap(state: CourseUiState) {
     val route = state.mappedRoute?.path.orEmpty()
+    // 결과가 나온 뒤에만 "없다" 고 말할 수 있다
+    val settled = state.nearby is NearbyState.Content || state.nearby is NearbyState.Empty
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -356,23 +368,35 @@ private fun CourseMap(state: CourseUiState) {
             .height(180.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (route.size < MIN_ROUTE_POINTS) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text("따라갈 경로가 없어요", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "걷기 스팟은 아래 목록에서 볼 수 있어요.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            RunningGuMap(
+        when {
+            route.size >= MIN_ROUTE_POINTS -> RunningGuMap(
                 scene = MapScene(route = route),
                 modifier = Modifier.fillMaxSize(),
+            )
+
+            settled -> MapNotice(
+                title = "따라갈 경로가 없어요",
+                detail = "걷기 스팟은 아래 목록에서 볼 수 있어요.",
+            )
+
+            else -> MapNotice(title = "지도", detail = null)
+        }
+    }
+}
+
+@Composable
+private fun MapNotice(title: String, detail: String?) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
+        if (detail != null) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
