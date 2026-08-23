@@ -304,9 +304,14 @@ private class RecordingContestRepository : ContestRepository {
      * 박아 두었다가 08-23 에 `develop` 이 빨간불이 됐다.
      *
      * 이 테스트가 보는 것은 페이징의 이어 붙이기·중복 제거지 특정 날짜가 아니다.
+     *
+     * **오늘 자신을 쓰지 않고 하루 뒤부터 잡는다**(#146 리뷰). 픽스처와 `CalendarViewModel`
+     * 이 `today()` 를 **각각** 부르므로, 오늘을 경계로 쓰면 두 호출 사이에 자정이 지날 때
+     * 갈린다. 확률은 낮지만 경계를 아예 안 밟는 편이 낫다 — 이 테스트가 오늘이라는 날짜를
+     * 검사하는 것도 아니다.
      */
-    private val firstDate: LocalDate = today()
-    private val secondDate: LocalDate = today().plusDays(14)
+    private val firstDate: LocalDate = today().plusDays(1)
+    private val secondDate: LocalDate = today().plusDays(15)
 
     var lastFilter: ContestFilter? = null
         private set
