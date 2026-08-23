@@ -3,11 +3,15 @@ package com.runninggu.server.contest.api;
 import com.runninggu.server.contest.application.ContestQueryService;
 import com.runninggu.server.contest.application.ContestSearchCondition;
 import com.runninggu.server.contest.domain.ContestEventType;
+import com.runninggu.server.common.error.ApiException;
+import com.runninggu.server.common.error.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +39,8 @@ public class ContestController {
                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                     LocalDate date,
             @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal Jwt jwt) {
         ContestSearchCondition condition = new ContestSearchCondition(
                 query,
                 events == null ? Set.of() : Set.copyOf(events),
@@ -43,7 +48,8 @@ public class ContestController {
                 regions == null ? Set.of() : Set.copyOf(regions),
                 date);
         int pageSize = size == null ? ContestQueryService.DEFAULT_PAGE_SIZE : size;
-        return ContestListResponse.from(queryService.findContests(condition, cursor, pageSize));
+        return ContestListResponse.from(
+                queryService.findContests(condition, cursor, pageSize, userId(jwt)));
     }
 
     @Operation(summary = "대회 월간 일별 건수 조회")
@@ -68,16 +74,31 @@ public class ContestController {
     @Operation(summary = "접수 마감 임박 대회 조회")
     @GetMapping("/closing-soon")
     public ContestClosingSoonResponse closingSoon(
-            @RequestParam(required = false) Integer limit) {
+            @RequestParam(required = false) Integer limit,
+            @AuthenticationPrincipal Jwt jwt) {
         int requestedLimit = limit == null
                 ? ContestQueryService.DEFAULT_CLOSING_SOON_LIMIT
                 : limit;
-        return ContestClosingSoonResponse.from(queryService.findClosingSoon(requestedLimit));
+        return ContestClosingSoonResponse.from(
+                queryService.findClosingSoon(requestedLimit, userId(jwt)));
     }
 
     @Operation(summary = "대회 상세 조회")
     @GetMapping("/{id}")
-    public ContestDetailResponse detail(@PathVariable long id) {
-        return ContestDetailResponse.from(queryService.findContest(id));
+    public ContestDetailResponse detail(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ContestDetailResponse.from(queryService.findContest(id, userId(jwt)));
+    }
+
+    private Long userId(Jwt jwt) {
+        if (jwt == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(jwt.getSubject());
+        } catch (NumberFormatException | NullPointerException exception) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "사용자 세션을 확인할 수 없습니다.");
+        }
     }
 }
