@@ -54,4 +54,12 @@ public class UserAgreement {
         agreement.changedAt = changedAt;
         return agreement;
     }
+
+    public AgreementType getType() {
+        return type;
+    }
+
+    public boolean isAgreed() {
+        return agreed;
+    }
 }
