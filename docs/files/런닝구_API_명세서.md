@@ -232,6 +232,27 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 | POST | `/me/reauth` | 탈퇴용 재인증 토큰 발급 |
 | DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스·기록 연쇄 삭제, `204` |
 
+`GET /api/me`, `PATCH /api/me`, `PATCH /api/me/agreements`는 모두 성공 시 현재 프로필을
+같은 형태로 `200` 반환한다. `agreements`는 각 약관의 최신 이력 기준이며, `createdAt`은 UTC `Z`다.
+
+```json
+{
+  "id": 1,
+  "email": "runner@test.com",
+  "nickname": "김러너",
+  "loginProvider": "EMAIL",
+  "agreements": {
+    "tos": true,
+    "privacy": true,
+    "marketing": false
+  },
+  "createdAt": "2026-08-23T05:00:00Z"
+}
+```
+
+`PATCH /api/me/agreements`는 같은 `marketing` 값을 다시 보내도 멱등 `200`이며 약관 이력을
+중복 추가하지 않는다. 값이 바뀐 경우에만 활성 `MARKETING` 버전으로 append-only 이력을 추가한다.
+
 가입 수단 정책:
 
 - 한 `USER`는 EMAIL 또는 KAKAO 중 정확히 하나만 보유한다.

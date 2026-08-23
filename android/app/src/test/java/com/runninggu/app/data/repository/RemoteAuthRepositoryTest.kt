@@ -3,6 +3,9 @@ package com.runninggu.app.data.repository
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.AuthApi
+import com.runninggu.app.data.remote.RefreshResponseDto
+import com.runninggu.app.data.remote.RefreshRequestDto
+import com.runninggu.app.data.remote.TokenApi
 import com.runninggu.app.data.remote.dto.AuthTokenResponseDto
 import com.runninggu.app.data.remote.dto.ExistsResponseDto
 import com.runninggu.app.data.remote.dto.KakaoLoginRequestDto
@@ -45,9 +48,19 @@ class RemoteAuthRepositoryTest {
         override suspend fun signup(body: SignupRequestDto): AuthTokenResponseDto = TODO()
         override suspend fun kakaoLogin(body: KakaoLoginRequestDto): KakaoLoginResponseDto = TODO()
         override suspend fun kakaoSignup(body: KakaoSignupRequestDto): AuthTokenResponseDto = TODO()
-        override suspend fun logout(body: LogoutRequestDto) = TODO()
         override suspend fun requestPasswordReset(body: ResetRequestDto) = TODO()
         override suspend fun resetPassword(body: ResetPasswordRequestDto) = TODO()
+    }
+
+    /** 로그아웃은 **인증자 없는 클라이언트**를 타므로 API 가 갈려 있다 (이슈 #113). */
+    private class ThrowingTokenApi(private val error: Throwable) : TokenApi {
+        override suspend fun refresh(body: RefreshRequestDto): RefreshResponseDto = throw error
+        override suspend fun logout(body: LogoutRequestDto) = throw error
+    }
+
+    private object UnusedTokenApi : TokenApi {
+        override suspend fun refresh(body: RefreshRequestDto): RefreshResponseDto = TODO()
+        override suspend fun logout(body: LogoutRequestDto) = TODO()
     }
 
     private fun httpError(code: Int, body: String) = HttpException(
@@ -61,7 +74,7 @@ class RemoteAuthRepositoryTest {
             httpError(401, """{"code":"LOGIN_FAILED","userMessage":"이메일 또는 비밀번호가 올바르지 않아요."}"""),
         )
 
-        val result = RemoteAuthRepository(api).login("runner@test.com", "wrong")
+        val result = RemoteAuthRepository(api, UnusedTokenApi).login("runner@test.com", "wrong")
 
         assertTrue("실패로 담기지 않았다", result.isFailure)
         val error = result.exceptionOrNull()
@@ -73,7 +86,7 @@ class RemoteAuthRepositoryTest {
     fun `통신이 끊겨도 앱이 죽지 않고 실패로 담긴다`() = runBlocking {
         val api = ThrowingApi(IOException("네트워크 없음"))
 
-        val result = RemoteAuthRepository(api).login("runner@test.com", "pw")
+        val result = RemoteAuthRepository(api, UnusedTokenApi).login("runner@test.com", "pw")
 
         assertTrue("실패로 담기지 않았다", result.isFailure)
         assertTrue(
@@ -81,4 +94,20 @@ class RemoteAuthRepositoryTest {
             result.exceptionOrNull() is ApiException.Network,
         )
     }
+
+    @Test
+    fun `로그아웃도 통신이 끊기면 실패로 담긴다`() = runBlocking {
+        // 여기서 예외가 새면 로그아웃 버튼이 앱을 죽인다. 화면은 실패를 보고
+        // **기기 토큰을 남긴 채** 재시도를 안내해야 한다 (이슈 #113).
+        val repository = RemoteAuthRepository(ThrowingApi(IOException("없음")), ThrowingTokenApi(IOException("네트워크 없음")))
+
+        val result = repository.logout("refresh-1")
+
+        assertTrue("실패로 담기지 않았다", result.isFailure)
+        assertTrue(
+            "Network 로 안 바뀌었다: ${result.exceptionOrNull()}",
+            result.exceptionOrNull() is ApiException.Network,
+        )
+    }
+
 }

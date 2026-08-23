@@ -1,4 +1,6 @@
-package com.runninggu.app.domain
+package com.runninggu.app.data.remote.mapper
+
+import com.runninggu.app.domain.LatLng
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -11,7 +13,7 @@ import org.junit.Test
  * 뭉친다. 눈으로는 "지도가 이상하다" 로만 보여서 원인을 찾기 어렵다. 그래서 표준 벡터로
  * 고정한다.
  */
-class PolylineTest {
+class PolylineMapperTest {
 
     private fun assertPoint(expectedLat: Double, expectedLng: Double, actual: LatLng) {
         assertEquals(expectedLat, actual.lat, 1e-5)
@@ -77,8 +79,25 @@ class PolylineTest {
     }
 
     @Test
-    fun `폴리라인이 아닌 문자열은 빈 목록이다`() {
-        // 인코딩 문자는 63 이상이다. 그보다 작은 문자가 오면 형식이 아니다.
+    fun `범위보다 작은 문자는 빈 목록이다`() {
+        // 유효 문자는 63..126 이다.
         assertTrue(Polyline.decode("!!!").isEmpty())
+    }
+
+    @Test
+    fun `범위보다 큰 문자도 빈 목록이다`() {
+        // #129 — 상한을 안 막았을 때 이 입력이 LatLng(0, 0) 으로 통과했다.
+        // 값이 0 이라 지도에서는 **아프리카 앞바다에 점 하나**로 보인다. 못 알아챈다.
+        val overRange = "??"
+
+        assertTrue(Polyline.decode(overRange).isEmpty())
+    }
+
+    @Test
+    fun `유효 문자 경계는 그대로 받는다`() {
+        // 63(`?`)과 126(`~`)은 유효하다. **상한을 125 로 잘못 막으면 여기서 걸린다.**
+        // `~` 는 이어짐 비트가 켜진 문자라 종료 문자(`?`)가 뒤따라야 한 성분이 된다.
+        assertEquals(1, Polyline.decode("??").size)
+        assertEquals(1, Polyline.decode("~?~?").size)
     }
 }

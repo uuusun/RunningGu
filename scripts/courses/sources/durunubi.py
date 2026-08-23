@@ -34,6 +34,7 @@ from pathlib import Path
 
 import requests
 
+from ..geo import cum_dist, haversine_m
 from ..model import RawCourse
 from .base import CourseSource, register
 
@@ -56,6 +57,7 @@ _TRK = re.compile(r"<trk>(.*?)</trk>", re.S)
 _TRKPT = re.compile(r'<trkpt\s+lat="([-\d.]+)"\s+lon="([-\d.]+)"\s*>(.*?)</trkpt>', re.S)
 _ELE = re.compile(r"<ele>([-\d.]+)</ele>")
 _TAG = re.compile(r"<[^>]+>")
+JUMP_THRESHOLD_M = 500.0
 
 
 def _points_of(fragment: str) -> list[tuple[float, float, float]]:
@@ -68,18 +70,40 @@ def _points_of(fragment: str) -> list[tuple[float, float, float]]:
     return out
 
 
-def _parse_gpx(xml: str) -> list[tuple[float, float, float]]:
+def _split_at_jumps(points: list[tuple[float, float, float]]) -> list[list[tuple[float, float, float]]]:
+    """같은 trk 안에 잘못 이어진 500m 초과 순간이동을 서로 다른 경로로 분리한다."""
+    if not points:
+        return []
+    segments = [[points[0]]]
+    for point in points[1:]:
+        if haversine_m(segments[-1][-1], point) > JUMP_THRESHOLD_M:
+            segments.append([point])
+        else:
+            segments[-1].append(point)
+    return [segment for segment in segments if len(segment) >= 2]
+
+
+def _distance_km(points: list[tuple[float, float, float]]) -> float:
+    return cum_dist(points)[-1] / 1000
+
+
+def _parse_gpx(xml: str, declared_km: float | None = None) -> list[tuple[float, float, float]]:
     """GPX → [(lat, lng, ele)].
 
-    **`<trk>` 를 이어붙이지 않는다.** 두루누비 GPX 263개 중 16개가 같은 경로를 `<trk>` 두 벌로
-    담고 있다(좌표 자릿수만 다르고 시작·끝이 동일). 이어붙이면 트랙 사이 점프가 거리에 더해져
-    해파랑길 18코스가 18km → 50km 로 부풀었다. 가장 긴 트랙 하나만 쓴다.
+    **`<trk>` 를 이어붙이지 않고, 같은 `<trk>` 안의 500m 초과 점프도 끊는다.** 두루누비
+    원본에는 중복 트랙뿐 아니라 떨어진 두 조각을 한 트랙으로 넣은 코스도 있다(#130).
+    후보가 여러 개면 원천 표기 거리는 올바른 트랙을 고르는 데만 쓰고, 최종 거리는 선택한
+    GPX 좌표로 다시 잰다. 표기값으로 실측값을 덮어쓰지 않는다(SPEC §8.4).
     """
-    tracks = [_points_of(t) for t in _TRK.findall(xml)]
-    tracks = [t for t in tracks if len(t) >= 2]
-    if tracks:
-        return max(tracks, key=len)
-    return _points_of(xml)  # <trk> 없이 trkpt 만 있는 변형 대비
+    tracks = [_points_of(track) for track in _TRK.findall(xml)]
+    if not tracks:
+        tracks = [_points_of(xml)]  # <trk> 없이 trkpt 만 있는 변형 대비
+    candidates = [segment for track in tracks for segment in _split_at_jumps(track)]
+    if not candidates:
+        return []
+    if declared_km is not None and declared_km > 0:
+        return min(candidates, key=lambda candidate: (abs(_distance_km(candidate) - declared_km), -len(candidate)))
+    return max(candidates, key=lambda candidate: (_distance_km(candidate), len(candidate)))
 
 
 @register
@@ -90,8 +114,11 @@ class Durunubi(CourseSource):
     derivable = True
 
     def __init__(self, service_key: str | None = None, use_cache: bool = True):
-        self.service_key = service_key or os.environ.get("KTO_SERVICE_KEY", "")
-        if not self.service_key:
+        # `durunubi:seed`는 승인된 261개 시드와 공개 GPX만으로 장애 대응 번들을 만든다.
+        # 이때 메타는 런타임 전체 동기화 전 상태이므로 전부 GPX_ONLY가 맞다.
+        self.seed_only = service_key == "seed"
+        self.service_key = "" if self.seed_only else (service_key or os.environ.get("KTO_SERVICE_KEY", ""))
+        if not self.seed_only and not self.service_key:
             raise SystemExit(
                 "환경변수 KTO_SERVICE_KEY 가 없다. scripts/.env 를 만들고 넣어라.\n"
                 "  cp scripts/.env.example scripts/.env\n"
@@ -170,7 +197,7 @@ class Durunubi(CourseSource):
 
     def fetch(self) -> Iterator[RawCourse]:
         seed = self._seed()
-        api = self._api_meta()
+        api = {} if self.seed_only else self._api_meta()
 
         ids = list(seed) + [i for i in api if i not in seed]
         log.info(
@@ -183,8 +210,14 @@ class Durunubi(CourseSource):
             row = api.get(crs_id) or {}
             s = seed.get(crs_id) or {}
 
+            declared_km = (
+                float(row["crsDstnc"])
+                if row.get("crsDstnc")
+                else s.get("distKm")
+            )
+
             xml = self._gpx(crs_id, (row.get("gpxpath") or "").strip() or None)
-            points = _parse_gpx(xml) if xml else []
+            points = _parse_gpx(xml, declared_km) if xml else []
 
             if len(points) < 2:
                 # GPX 를 못 얻었으면 시드의 좌표라도 쓴다. 고도가 없어 난이도는 못 매기지만
@@ -211,6 +244,6 @@ class Durunubi(CourseSource):
                 level=int(level_raw) if str(level_raw or "").isdigit() else None,
                 cycle=(row.get("crsCycle") or s.get("cycle") or "").strip(),
                 summary=_TAG.sub(" ", summary).strip(),
-                declared_km=float(row["crsDstnc"]) if row.get("crsDstnc") else s.get("distKm"),
+                declared_km=declared_km,
                 data_source="API_GPX" if crs_id in api else "GPX_ONLY",
             )

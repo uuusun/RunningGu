@@ -370,8 +370,8 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 | 행동 | API/SDK | 요청 | 성공·실패 |
 |---|---|---|---|
-| 닉네임 변경 | `PATCH /api/me` | nickname | 응답 계약 보완 필요, duplicated 처리 |
-| 마케팅 동의 | `PATCH /api/me/agreements` | marketing | 응답 계약 보완 필요 |
+| 닉네임 변경 | `PATCH /api/me` | nickname | `200` 현재 프로필 전체, duplicated 처리 |
+| 마케팅 동의 | `PATCH /api/me/agreements` | marketing | `200` 현재 프로필 전체. 같은 값은 이력 추가 없는 멱등 성공 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
 | 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
@@ -532,8 +532,9 @@ P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01�
 | API | 보완할 계약 |
 |---|---|
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
-| `PATCH /api/me` | 성공 status와 응답 body |
-| `PATCH /api/me/agreements` | 성공 status와 응답 body |
+
+현재 P0 API의 springdoc 상세화 미정 항목은 없다. GPS 기록 P1 착수 시 `GET /api/runs` 계약을
+확정하고 이 표를 다시 연다.
 
 ---
 

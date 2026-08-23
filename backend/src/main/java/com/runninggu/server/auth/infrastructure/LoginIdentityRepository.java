@@ -13,4 +13,7 @@ public interface LoginIdentityRepository extends JpaRepository<LoginIdentity, Lo
     Optional<LoginIdentity> findByProviderAndProviderSubject(
             LoginProvider provider,
             String providerSubject);
+
+    @EntityGraph(attributePaths = "user")
+    Optional<LoginIdentity> findByUser_Id(Long userId);
 }

@@ -40,6 +40,8 @@ private fun NearItemDto.toModel(): NearbyItem = when (this) {
         elevationProfileM = elevationProfileM,
         shortfall = shortfall,
         pathPolyline = pathPolyline,
+        // 와이어 형식을 푸는 것은 매퍼의 일이다 (AGENTS 2장-4 · #129).
+        path = pathPolyline?.let { Polyline.decode(it) }.orEmpty(),
         sourceCourseId = sourceCourseId,
         sido = sido,
         sigun = sigun,

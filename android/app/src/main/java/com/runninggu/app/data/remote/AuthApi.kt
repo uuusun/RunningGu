@@ -80,10 +80,6 @@ interface AuthApi {
     @POST("auth/kakao/signup")
     suspend fun kakaoSignup(@Body body: KakaoSignupRequestDto): AuthTokenResponseDto
 
-    /** 로그아웃 — 해당 리프레시 revoke. `204`. (§1-10) */
-    @POST("auth/logout")
-    suspend fun logout(@Body body: LogoutRequestDto)
-
     /**
      * 비밀번호 재설정 메일 요청. (§1-11)
      *

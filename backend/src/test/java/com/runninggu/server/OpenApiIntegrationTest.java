@@ -61,6 +61,9 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/me/courses']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/me/courses/{id}']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/me/courses/{id}']['delete']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me']['patch']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me/agreements']['patch']").exists())
                 .andExpect(jsonPath(
                                 "$['paths']['/api/contests/daily-counts']['get']['parameters']"
                                         + "[?(@.name == 'year' && @.required == true)]")
@@ -85,6 +88,11 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.components.schemas.SaveSavedCourseRequest").exists())
                 .andExpect(jsonPath("$.components.schemas.SavedCourseListResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.SavedCourseDetailResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.MemberProfileResponse").exists())
+                .andExpect(jsonPath(
+                                "$.components.schemas.MemberProfileResponse.properties.email.type"
+                                        + "[?(@ == 'null')]")
+                        .isNotEmpty())
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type")
                         .value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")

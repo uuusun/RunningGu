@@ -30,6 +30,8 @@ object SampleData {
         organizer: String = "$region 육상연맹",
         active: Boolean = true,
         serverId: Long? = null,
+        lat: Double? = null,
+        lng: Double? = null,
     ) = RaceSummary(
         id = id,
         serverId = serverId,
@@ -46,6 +48,10 @@ object SampleData {
         checked = today.minusDays(1),
         organizer = organizer,
         officialUrl = "https://example.com/$id",
+        // 대회장의 실제 좌표다. S6 숙소 조회가 이 값을 기준으로 부르므로 지어내면
+        // 엉뚱한 동네 숙소가 나온다 (#136 리뷰 · SPEC §4.9)
+        lat = lat,
+        lng = lng,
     )
 
     /**
@@ -67,26 +73,26 @@ object SampleData {
      * 두 경로를 다 확인할 수 있다.
      */
     private val archivedRaces: List<RaceSummary> = listOf(
-        race("chungbuk-past", "충북 청남대 벚꽃마라톤", "충북", "청남대", -12, "09:00", -40, listOf("하프", "10K")),
-        race("jeonbuk-ended", "전북 새만금 바람길런", "전북", "새만금 방조제", 34, "08:30", 20, listOf("풀", "하프"), active = false),
+        race("chungbuk-past", "충북 청남대 벚꽃마라톤", "충북", "청남대", -12, "09:00", -40, listOf("하프", "10K"), lat = 36.47, lng = 127.48),
+        race("jeonbuk-ended", "전북 새만금 바람길런", "전북", "새만금 방조제", 34, "08:30", 20, listOf("풀", "하프"), active = false, lat = 35.8, lng = 126.53),
     )
 
     /** 공개 목록 + 보관된 것. 상세(S3)와 찜 목록(S10)이 본다. */
     val allRaces: List<RaceSummary> = races + archivedRaces
 
     private fun publicRaces(): List<RaceSummary> = listOf(
-        race("seoul-hangang", "서울 한강 러닝 페스티벌", "서울", "여의도한강공원", 18, "09:00", 4, listOf("10K", "5K")),
-        race("sejong-lake", "세종 호수공원 마라톤", "세종", "세종 호수공원", 21, "08:00", 9, listOf("하프", "10K", "5K")),
-        race("incheon-bridge", "인천 송도 브릿지런", "인천", "송도 센트럴파크", 26, "08:30", -3, listOf("하프", "10K")),
-        race("busan-sea", "부산 바다마라톤", "부산", "광안리해수욕장", 40, "08:30", 27, listOf("풀", "하프", "10K")),
-        race("daegu-color", "대구 컬러런", "대구", "두류공원", 45, "10:00", 30, listOf("5K")),
-        race("gangwon-trail", "강원 대관령 트레일런", "강원", "대관령 양떼목장", 52, "07:00", 38, listOf("하프", "10K"), source = "로드런"),
-        race("gwangju-flower", "광주 꽃길 마라톤", "광주", "5·18 기념공원", 58, "09:00", 44, listOf("10K", "5K")),
-        race("jeju-olle", "제주 올레 트레일런", "제주", "성산일출봉 일원", 75, "07:30", 62, listOf("하프", "10K"), source = "로드런"),
-        race("gyeonggi-lake", "경기 호수공원 하프", "경기", "일산 호수공원", 82, "08:00", 68, listOf("하프", "10K", "5K")),
-        race("daejeon-science", "대전 사이언스런", "대전", "엑스포시민광장", 90, "09:30", 76, listOf("10K", "5K")),
-        race("ulsan-whale", "울산 고래축제 마라톤", "울산", "태화강국가정원", 96, "08:00", 82, listOf("풀", "하프", "10K")),
-        race("jeonnam-green", "전남 순천만 갈대런", "전남", "순천만습지", 104, "08:30", null, listOf("하프", "10K"), regStartInDays = 20),
+        race("seoul-hangang", "서울 한강 러닝 페스티벌", "서울", "여의도한강공원", 18, "09:00", 4, listOf("10K", "5K"), lat = 37.5285, lng = 126.9326),
+        race("sejong-lake", "세종 호수공원 마라톤", "세종", "세종 호수공원", 21, "08:00", 9, listOf("하프", "10K", "5K"), lat = 36.504, lng = 127.261),
+        race("incheon-bridge", "인천 송도 브릿지런", "인천", "송도 센트럴파크", 26, "08:30", -3, listOf("하프", "10K"), lat = 37.3925, lng = 126.6395),
+        race("busan-sea", "부산 바다마라톤", "부산", "광안리해수욕장", 40, "08:30", 27, listOf("풀", "하프", "10K"), lat = 35.1532, lng = 129.1187),
+        race("daegu-color", "대구 컬러런", "대구", "두류공원", 45, "10:00", 30, listOf("5K"), lat = 35.8478, lng = 128.562),
+        race("gangwon-trail", "강원 대관령 트레일런", "강원", "대관령 양떼목장", 52, "07:00", 38, listOf("하프", "10K"), source = "로드런", lat = 37.687, lng = 128.729),
+        race("gwangju-flower", "광주 꽃길 마라톤", "광주", "5·18 기념공원", 58, "09:00", 44, listOf("10K", "5K"), lat = 35.142, lng = 126.856),
+        race("jeju-olle", "제주 올레 트레일런", "제주", "성산일출봉 일원", 75, "07:30", 62, listOf("하프", "10K"), source = "로드런", lat = 33.458, lng = 126.9425),
+        race("gyeonggi-lake", "경기 호수공원 하프", "경기", "일산 호수공원", 82, "08:00", 68, listOf("하프", "10K", "5K"), lat = 37.658, lng = 126.77),
+        race("daejeon-science", "대전 사이언스런", "대전", "엑스포시민광장", 90, "09:30", 76, listOf("10K", "5K"), lat = 36.375, lng = 127.388),
+        race("ulsan-whale", "울산 고래축제 마라톤", "울산", "태화강국가정원", 96, "08:00", 82, listOf("풀", "하프", "10K"), lat = 35.549, lng = 129.323),
+        race("jeonnam-green", "전남 순천만 갈대런", "전남", "순천만습지", 104, "08:30", null, listOf("하프", "10K"), regStartInDays = 20, lat = 34.885, lng = 127.509),
     )
 
     /**

@@ -42,11 +42,24 @@ public class AppUser {
         return user;
     }
 
+    public void changeNickname(
+            String nickname,
+            String nicknameKey,
+            Instant changedAt) {
+        this.nickname = nickname;
+        this.nicknameKey = nicknameKey;
+        this.updatedAt = changedAt;
+    }
+
     public Long getId() {
         return id;
     }
 
     public String getNickname() {
         return nickname;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 }

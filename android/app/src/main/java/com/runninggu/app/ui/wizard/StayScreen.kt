@@ -61,10 +61,18 @@ fun StayScreen(
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 기준점은 대회장이다. 좌표는 아직 RaceSummary 에 없어 0,0 이 가고 Fake 가 무시한다.
-    // TODO(AP-14): `GET /contests/{id}` 의 lat/lng 를 넘긴다 (API 명세 §3-4).
+    // 기준점은 **대회장**이다 (SPEC §4.9 · screen-api-matrix S6).
+    //
+    // 예전에는 `(0.0, 0.0)` 을 넘겼다. Fake 저장소가 좌표를 무시해서 안 보였을 뿐,
+    // 실제 서버에 붙으면 기니만 앞바다를 조회해 숙소가 비거나 엉뚱하게 나온다(#136 리뷰).
+    //
+    // 좌표가 없는 대회는 S3 CTA 가 이미 막으므로(§4.6) 여기까지 오지 않는다. 그래도
+    // null 이면 **호출하지 않는다** — 0,0 으로 지어내는 것보다 빈 목록이 정직하다.
     LaunchedEffect(wizard.race?.id) {
-        wizard.race?.let { viewModel.start(lat = 0.0, lng = 0.0) }
+        val race = wizard.race ?: return@LaunchedEffect
+        val lat = race.lat ?: return@LaunchedEffect
+        val lng = race.lng ?: return@LaunchedEffect
+        viewModel.start(lat = lat, lng = lng)
     }
 
     Scaffold(

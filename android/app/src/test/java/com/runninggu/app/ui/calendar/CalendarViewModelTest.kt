@@ -10,6 +10,7 @@ import com.runninggu.app.data.repository.ContestPage
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
+import com.runninggu.app.domain.today
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -295,6 +296,18 @@ class CalendarViewModelTest {
 /** 넘겨받은 조건을 기록하는 가짜 저장소. */
 private class RecordingContestRepository : ContestRepository {
 
+    /**
+     * 대회 날짜를 **오늘 기준 상대값**으로 만든다.
+     *
+     * `CalendarViewModel` 이 `today()`(실제 KST 시계)로 지난 대회를 걸러내므로,
+     * 고정 날짜를 두면 **그날이 지나는 순간 테스트가 깨진다.** 실제로 `2026-08-22` 로
+     * 박아 두었다가 08-23 에 `develop` 이 빨간불이 됐다.
+     *
+     * 이 테스트가 보는 것은 페이징의 이어 붙이기·중복 제거지 특정 날짜가 아니다.
+     */
+    private val firstDate: LocalDate = today()
+    private val secondDate: LocalDate = today().plusDays(14)
+
     var lastFilter: ContestFilter? = null
         private set
     var listCalls = 0
@@ -311,7 +324,7 @@ private class RecordingContestRepository : ContestRepository {
         lastFilter = filter
         return if (cursor == null) {
             ContestPage(
-                contests = listOf(contest("1", LocalDate.of(2026, 8, 22))),
+                contests = listOf(contest("1", firstDate)),
                 nextCursor = if (hasSecondPage) "cursor-2" else null,
                 hasNext = hasSecondPage,
             )
@@ -320,8 +333,8 @@ private class RecordingContestRepository : ContestRepository {
             // 첫 장의 1 번이 다시 온다 — 조회 중 원천이 갱신되면 실제로 생기는 일이다
             ContestPage(
                 contests = listOf(
-                    contest("1", LocalDate.of(2026, 8, 22)),
-                    contest("2", LocalDate.of(2026, 9, 5)),
+                    contest("1", firstDate),
+                    contest("2", secondDate),
                 ),
                 nextCursor = null,
                 hasNext = false,
@@ -337,7 +350,7 @@ private class RecordingContestRepository : ContestRepository {
 
     override suspend fun closingSoon(limit: Int): List<ClosingSoon> = emptyList()
 
-    override suspend fun detail(id: Long): Contest = contest(id.toString(), LocalDate.of(2026, 8, 22))
+    override suspend fun detail(id: Long): Contest = contest(id.toString(), firstDate)
 
     /** 캘린더는 인근 축제를 쓰지 않는다. S3 상세 전용이다(§3-5). */
     override suspend fun festivals(id: Long): List<NearbyFestival> = emptyList()
