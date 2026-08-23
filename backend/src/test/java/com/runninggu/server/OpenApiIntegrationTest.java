@@ -37,6 +37,9 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/auth/refresh']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/logout']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/itineraries/generate']['post']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me']['patch']").exists())
+                .andExpect(jsonPath("$['paths']['/api/me/agreements']['patch']").exists())
                 .andExpect(jsonPath(
                                 "$['paths']['/api/contests/daily-counts']['get']['parameters']"
                                         + "[?(@.name == 'year' && @.required == true)]")
@@ -53,6 +56,11 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                         .exists())
                 .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.dDay")
                         .exists())
+                .andExpect(jsonPath("$.components.schemas.MemberProfileResponse").exists())
+                .andExpect(jsonPath(
+                                "$.components.schemas.MemberProfileResponse.properties.email.type"
+                                        + "[?(@ == 'null')]")
+                        .isNotEmpty())
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type")
                         .value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme")

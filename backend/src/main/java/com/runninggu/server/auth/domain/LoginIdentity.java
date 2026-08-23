@@ -97,4 +97,8 @@ public class LoginIdentity {
     public String getPasswordHash() {
         return passwordHash;
     }
+
+    public String getEmailSnapshot() {
+        return emailSnapshot;
+    }
 }
