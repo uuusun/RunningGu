@@ -481,20 +481,20 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `themes`는 1개 이상(§4.8 — 0개면 클라 CTA 비활성) · `event`는 대회 종목에 없어도 선택 가능(§4.8).
 - `startDate/endDate`는 역순을 허용하지 않으며 시작·종료일 포함 최대 7일, 해당 대회일을 반드시 포함한다. 위반 시 `400 INVALID_TRAVEL_PERIOD`.
 - canonical 대회의 `lat/lng`가 없으면 생성하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
-- 비활성 대회는 새 동선을 생성하지 않는다. 정확한 HTTP status와 문제 응답 `code`는 이슈 #56의 추가 리뷰 전까지 미확정이므로 임의의 오류 계약으로 구현하지 않는다.
+- 비활성 대회는 새 동선을 생성하지 않고 `409 CONTEST_INACTIVE`를 반환한다(결정-53).
 
 응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
 
 ```json
 {
-  "title": "세종 2박 3일",
+  "title": "2박 3일",
   "contestId": 153, "event": "HALF", "themes": ["TOUR", "FOOD"],
   "startDate": "2026-08-21", "endDate": "2026-08-23",
   "hotel": { "name": "호텔 세종 가온", "lat": 36.4901, "lng": 127.2688 },
   "recovery": { "label": "D+1 회복 모드", "note": "하프는 완주 다음날 회복이 중요해요..." },
   "days": [
     {
-      "dayIndex": 0, "date": "2026-08-21", "dayLabel": "D-1",
+      "dayIndex": -1, "date": "2026-08-21", "dayLabel": "D-1",
       "recovery": false, "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
       "blocks": [
         { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
@@ -510,6 +510,11 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 }
 ```
 - `recovery`는 하프/풀만, D+ 없으면 `"D-day 회복 모드"` 🔒(§5.6-6). 회복일 day는 `recovery=true`.
+- `title`은 지역을 넣지 않은 `당일치기` 또는 `n박 n+1일`이다. 앱이 canonical 지역과 조합해 표시한다.
+- `dayIndex`는 배열 순번이 아니라 대회일 기준 상대 오프셋이다. `D-1=-1`, `D-day=0`, `D+1=1`로 고정한다.
+- HALF/FULL은 D+ 일자를 `recovery=true`로 표시한다. 일정에 D+가 하나도 없으면 D-day가 `true`다. 5K/10K는 모두 `false`다.
+- RACE 블록은 `placeName=CONTEST.place`, `address=CONTEST.road_address`(nullable), canonical 좌표를 사용한다. `start_time`이 없으면 `08:00`이다.
+- 순수 엔진은 카테고리별 POI 조회 원천을 내부 추적하지만 `sources`는 생성 HTTP 응답에 포함하지 않는다. `LIVE/SAMPLE/SYNTH` 배지는 POI 목록 응답에서 노출한다(결정-53, NFR-2).
 - 외부 POI 실패 시 해당 블록 `placeName/lat/lng=null` 강등, **생성은 실패하지 않음** 🔒(NFR-3).
 - 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (noHard면 WELLNESS, 아니면 CAFE) 🔒(§5.6-2).
 - 정상 처리됐지만 표시 가능한 블록이 없으면 `200`에서 `days: []`를 반환하고 앱은 S7 Empty로 표시한다. 네트워크·timeout·4xx/5xx는 Error이며 Empty로 강등하지 않는다.
@@ -837,6 +842,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
 | `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
+| `CONTEST_INACTIVE` | 409 | 비활성 대회의 신규 동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
 | `RATE_LIMITED` | 429 | 공개 중복 확인 IP 30회/분 또는 정규화 입력 5회/분 초과 |

@@ -175,7 +175,7 @@ erDiagram
     ITINERARY_DAY {
         bigint id PK
         bigint itinerary_id FK "ON DELETE CASCADE"
-        int day_index "0..N, UNIQUE(itinerary_id, day_index)"
+        int day_index "대회일 상대 오프셋(-N..+N), UNIQUE(itinerary_id, day_index)"
         date day_date
         boolean recovery
         text note "nullable"

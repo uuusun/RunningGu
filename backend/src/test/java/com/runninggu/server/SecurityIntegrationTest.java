@@ -48,7 +48,8 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/itineraries/generate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         mockMvc.perform(get("/api/me"))
                 .andExpect(status().isUnauthorized())
