@@ -2,6 +2,7 @@ package com.runninggu.app.ui.racedetail
 
 import com.runninggu.app.ui.model.NearbyFestival
 import com.runninggu.app.ui.model.RaceSummary
+import com.runninggu.app.ui.model.hasLocation
 
 /**
  * S3 대회 상세의 UI 계약. (SPEC §4.6 · §3-5)
@@ -44,11 +45,15 @@ data class RaceDetailUiState(
      * 비활성 대회는 명세가 CTA 를 막으라고 한다 — 원천이 사라진 대회로 여행 동선을
      * 짜 봐야 날짜·장소가 맞는지 알 수 없다.
      *
+     * **좌표가 없는 대회도 막는다** (SPEC §4.6). S6 숙소와 S7 후보가 대회장 좌표로
+     * POI 를 조회하므로, 좌표 없이 위저드에 들어가면 조회할 기준이 없다. 좌표 전용
+     * 안내 UX 는 P1 이라 P0 에서는 CTA 비활성으로 둔다.
+     *
      * canonical id 가 없는 대회(번들·오프라인)도 결국 여기서 막아야 하지만, 지금은
      * 화면이 서버 데이터가 아니라 샘플을 그려서 판단 근거가 없다. AP-14 가 화면을
      * `Contest` 로 옮길 때 `serverId != null` 을 조건에 더한다 (#66 리뷰).
      * 그때까지는 `ResultViewModel` 의 오류 안내가 안전망이다.
      */
     val canStartWizard: Boolean
-        get() = phase == Phase.LOADED && race?.active == true
+        get() = phase == Phase.LOADED && race?.active == true && race.hasLocation
 }

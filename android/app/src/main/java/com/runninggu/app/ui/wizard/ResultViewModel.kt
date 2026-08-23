@@ -61,12 +61,15 @@ class ResultViewModel(
     private var lastRegion: String = ""
 
     /**
-     * 후보 시트의 조회 중심. 숙소 > 대회장 순서다. (SPEC §4.10)
+     * 후보 시트의 조회 중심. **숙소 > 대회장** 순서다. (SPEC §4.10)
      *
-     * TODO(AP-14): 숙소를 안 골랐으면 `GET /contests/{id}` 의 대회장 lat/lng 를 쓴다 (API 명세 §3-4).
-     *  [RaceSummary] 에 좌표가 없어 지금은 원점이 폴백이다 — S6 StayViewModel.start 와 같은 제약.
+     * 숙소는 선택 사항이라(§4.9) 안 고르고 온 경우가 정상이다. 그때 대회장으로 떨어지지
+     * 않고 `(0.0, 0.0)` 으로 가면 기니만 앞바다 후보가 나온다(#136 리뷰).
+     *
+     * 둘 다 없으면 **null 이다** — 조회를 아예 하지 않는다. 좌표 없는 대회는 S3 CTA 가
+     * 막으므로(§4.6) 실제로는 여기 닿지 않는다.
      */
-    private var sheetCenter: Pair<Double, Double> = 0.0 to 0.0
+    private var sheetCenter: Pair<Double, Double>? = null
 
     /** 위저드 상태로 생성을 요청한다. 같은 조건이면 다시 부르지 않는다. */
     fun generate(wizard: WizardUiState) {
@@ -77,8 +80,13 @@ class ResultViewModel(
             _uiState.update { it.copy(phase = ResultUiState.Phase.ERROR, errorMessage = wizard.blockedReason()) }
             return
         }
-        // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다.
-        sheetCenter = wizard.stay?.let { it.lat to it.lng } ?: (0.0 to 0.0)
+        // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다. 숙소 > 대회장 순이다(§4.10).
+        sheetCenter = wizard.stay?.let { it.lat to it.lng }
+            ?: wizard.race?.let { race ->
+                val lat = race.lat
+                val lng = race.lng
+                if (lat != null && lng != null) lat to lng else null
+            }
         // LOADING 중 LaunchedEffect 재발화(회전·재진입)로 같은 요청이 두 번 나가는 것도 막는다.
         // EMPTY·ERROR 는 재진입 시 다시 시도한다 — 기존 동작 유지.
         if (request == lastRequest &&
@@ -214,7 +222,11 @@ class ResultViewModel(
         _uiState.update {
             it.copy(sheet = sheet.copy(phase = CandidateSheetState.Phase.LOADING))
         }
-        val (lat, lng) = sheetCenter
+        // 기준 좌표가 없으면 후보를 부를 수 없다. 빈 시트를 여는 대신 조회를 건너뛴다.
+        val (lat, lng) = sheetCenter ?: run {
+            _uiState.update { it.copy(sheet = sheet.copy(phase = CandidateSheetState.Phase.EMPTY)) }
+            return
+        }
         viewModelScope.launch {
             val outcome = runCatching { poiRepository.search(sheet.category, lat, lng) }
             _uiState.update { state ->
