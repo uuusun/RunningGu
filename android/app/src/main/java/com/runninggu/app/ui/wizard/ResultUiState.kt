@@ -32,6 +32,14 @@ data class ResultUiState(
     /** 후보 시트. null 이면 닫힌 상태다. (SPEC §4.10) */
     val sheet: CandidateSheetState? = null,
     val errorMessage: String? = null,
+    /**
+     * 오류에서 [다시 시도] 를 줄 것인가. (SPEC §4.10 · §3-5)
+     *
+     * **다시 눌러도 소용없는 오류가 있다** — `409 CONTEST_INACTIVE` 는 원천에서 사라진
+     * 대회라 재시도로 살아나지 않는다. 버튼을 주면 헛돌고, 사용자는 뭘 더 해야 하는지
+     * 모른 채 계속 누른다.
+     */
+    val canRetry: Boolean = true,
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 

@@ -49,6 +49,14 @@ enum class ApiErrorCode {
     CONTEST_LOCATION_UNAVAILABLE,
     SYSTEM_BLOCK_IMMUTABLE,
 
+    /**
+     * 정보 제공이 끝난 대회로 새 동선을 만들려 했다. (§5-1 · SPEC 결정-53)
+     *
+     * **재시도해도 소용없다** — 원천에서 사라진 대회라 다시 눌러도 살아나지 않는다.
+     * 화면은 [다시 시도] 를 주지 않는다.
+     */
+    CONTEST_INACTIVE,
+
     // 429
     SEND_COOLDOWN,
     TOO_MANY_ATTEMPTS,

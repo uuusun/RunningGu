@@ -140,7 +140,8 @@ fun ResultScreen(
 
                 ResultUiState.Phase.ERROR -> ErrorState(
                     message = state.errorMessage.orEmpty(),
-                    onRetry = viewModel::retry,
+                    // 재시도가 소용없는 오류는 버튼을 주지 않는다 (#144 · SPEC §3-5).
+                    onRetry = if (state.canRetry) viewModel::retry else null,
                 )
 
                 ResultUiState.Phase.CONTENT -> Content(
