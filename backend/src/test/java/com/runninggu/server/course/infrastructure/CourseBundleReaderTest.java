@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.DefaultResourceLoader;
 
@@ -30,6 +31,25 @@ class CourseBundleReaderTest {
         assertThatThrownBy(reader::read)
                 .isInstanceOf(CourseBundleValidationException.class)
                 .hasMessageContaining("하한");
+    }
+
+    @Test
+    void 저장소의_운영_번들_261코스를_같은_소비자_검증으로_읽는다() {
+        String productionBundle = Path.of("..", "data", "courses.json")
+                .toAbsolutePath()
+                .normalize()
+                .toUri()
+                .toString();
+        CourseBundleReader reader = new CourseBundleReader(
+                new ObjectMapper(),
+                new DefaultResourceLoader(),
+                new CourseCatalogProperties(productionBundle, 261));
+
+        var snapshot = reader.read();
+
+        assertThat(snapshot.courses()).hasSize(261);
+        assertThat(snapshot.courses())
+                .allSatisfy(course -> assertThat(course.syncedAt()).isNull());
     }
 
     @Test

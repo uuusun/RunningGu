@@ -11,6 +11,7 @@ import com.runninggu.server.course.domain.CourseDifficulty;
 import com.runninggu.server.course.domain.CoursePoint;
 import com.runninggu.server.course.domain.CourseSource;
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,8 @@ class CourseCatalogTest {
 
     @Test
     void 지역을_정규화하고_거리와_ID로_정렬하며_현재_페이지_출처만_반환한다() {
-        CoursePage result = catalog.find("  서울  ", 0, 1);
+        String nfdRegion = Normalizer.normalize("서울", Normalizer.Form.NFD);
+        CoursePage result = catalog.find("  " + nfdRegion + "  ", 0, 1);
 
         assertThat(result.content()).extracting(Course::courseId).containsExactly("C1");
         assertThat(result.totalElements()).isEqualTo(2);

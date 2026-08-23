@@ -49,8 +49,15 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+val courseBundleFile = rootProject.projectDir.parentFile.resolve("data/courses.json")
+
 tasks.processResources {
-    from(rootProject.projectDir.parentFile.resolve("data/courses.json")) {
+    doFirst {
+        require(courseBundleFile.isFile) {
+            "서버 코스 번들이 없습니다: ${courseBundleFile.absolutePath}"
+        }
+    }
+    from(courseBundleFile) {
         into("data")
     }
 }

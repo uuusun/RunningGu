@@ -2,6 +2,7 @@ package com.runninggu.server.course.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,12 +10,14 @@ import com.runninggu.server.course.application.CourseMetadataBatch;
 import com.runninggu.server.course.application.CourseMetadataSyncException;
 import com.runninggu.server.course.application.CourseMetadataSyncException.Reason;
 import com.runninggu.server.course.domain.CourseDifficulty;
+import java.net.SocketTimeoutException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -121,6 +124,57 @@ class KtoCourseClientTest {
                 .isInstanceOfSatisfying(
                         CourseMetadataSyncException.class,
                         exception -> assertThat(exception.reason()).isEqualTo(Reason.MISSING_KEY));
+    }
+
+    @Test
+    void HTTP_오류와_timeout을_구분해_전체_동기화를_실패시킨다() {
+        server.expect(request -> {}).andRespond(withServerError());
+        assertReason(Reason.HTTP_ERROR);
+        server.verify();
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer timeoutServer = MockRestServiceServer.bindTo(builder).build();
+        KtoCourseClient timeoutClient = new KtoCourseClient(
+                builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
+                new ObjectMapper(),
+                "key");
+        timeoutServer.expect(request -> {}).andRespond(request -> {
+            throw new ResourceAccessException("timeout", new SocketTimeoutException());
+        });
+
+        assertThatThrownBy(timeoutClient::fetchAll)
+                .isInstanceOfSatisfying(
+                        CourseMetadataSyncException.class,
+                        exception -> assertThat(exception.reason()).isEqualTo(Reason.TIMEOUT));
+        timeoutServer.verify();
+    }
+
+    @Test
+    void KTO_오류코드와_전체건수_변경은_부분_snapshot으로_받지_않는다() {
+        server.expect(request -> {}).andRespond(withSuccess(
+                """
+                {"response":{"header":{"resultCode":"30","resultMsg":"SERVICE KEY ERROR"}}}
+                """,
+                MediaType.APPLICATION_JSON));
+        assertReason(Reason.INVALID_RESPONSE);
+        server.verify();
+
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer changingTotalServer = MockRestServiceServer.bindTo(builder).build();
+        KtoCourseClient changingTotalClient = new KtoCourseClient(
+                builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
+                new ObjectMapper(),
+                "key");
+        changingTotalServer.expect(request -> {})
+                .andRespond(withSuccess(successBody(2, rawItem("C1")), MediaType.APPLICATION_JSON));
+        changingTotalServer.expect(request -> {})
+                .andRespond(withSuccess(successBody(3, rawItem("C2")), MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(changingTotalClient::fetchAll)
+                .isInstanceOfSatisfying(
+                        CourseMetadataSyncException.class,
+                        exception -> assertThat(exception.reason()).isEqualTo(Reason.INVALID_RESPONSE));
+        changingTotalServer.verify();
     }
 
     private void assertReason(Reason expected) {
