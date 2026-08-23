@@ -8,6 +8,7 @@ import com.runninggu.server.contest.domain.ContestRegistrationStatusPolicy;
 import com.runninggu.server.contest.domain.ContestSourceType;
 import com.runninggu.server.contest.infrastructure.ContestQueryRepository;
 import com.runninggu.server.contest.infrastructure.ContestRepository;
+import com.runninggu.server.favorite.infrastructure.FavoriteRepository;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,16 +31,19 @@ public class ContestQueryService {
 
     private final ContestQueryRepository queryRepository;
     private final ContestRepository contestRepository;
+    private final FavoriteRepository favoriteRepository;
     private final ContestCursorCodec cursorCodec;
     private final Clock businessClock;
 
     public ContestQueryService(
             ContestQueryRepository queryRepository,
             ContestRepository contestRepository,
+            FavoriteRepository favoriteRepository,
             ContestCursorCodec cursorCodec,
             Clock businessClock) {
         this.queryRepository = queryRepository;
         this.contestRepository = contestRepository;
+        this.favoriteRepository = favoriteRepository;
         this.cursorCodec = cursorCodec;
         this.businessClock = businessClock;
     }
@@ -48,6 +53,14 @@ public class ContestQueryService {
             ContestSearchCondition condition,
             String encodedCursor,
             int size) {
+        return findContests(condition, encodedCursor, size, null);
+    }
+
+    public ContestListResult findContests(
+            ContestSearchCondition condition,
+            String encodedCursor,
+            int size,
+            Long userId) {
         validateSize(size);
         LocalDate today = LocalDate.now(businessClock);
         ContestCursor cursor = cursorCodec.decode(encodedCursor);
@@ -55,7 +68,7 @@ public class ContestQueryService {
         boolean hasNext = fetched.size() > size;
         List<Contest> contests = hasNext ? fetched.subList(0, size) : fetched;
 
-        List<ContestListItem> items = toItems(contests, today);
+        List<ContestListItem> items = toItems(contests, today, userId);
 
         String nextCursor = hasNext
                 ? cursorCodec.encode(cursorOf(contests.getLast()))
@@ -75,9 +88,13 @@ public class ContestQueryService {
 
     /** 홈에 노출할 접수 마감 임박 대회를 최대 네 건 반환한다. (SPEC §4.4, API 명세 §3-3) */
     public List<ContestClosingSoonItem> findClosingSoon(int limit) {
+        return findClosingSoon(limit, null);
+    }
+
+    public List<ContestClosingSoonItem> findClosingSoon(int limit, Long userId) {
         validateClosingSoonLimit(limit);
         LocalDate today = LocalDate.now(businessClock);
-        return toItems(queryRepository.findClosingSoon(limit, today), today).stream()
+        return toItems(queryRepository.findClosingSoon(limit, today), today, userId).stream()
                 .map(item -> new ContestClosingSoonItem(
                         item,
                         Math.toIntExact(ChronoUnit.DAYS.between(today, item.applyEnd()))))
@@ -86,12 +103,16 @@ public class ContestQueryService {
 
     /** 비활성·과거 대회도 참조 보존을 위해 ID 상세로 반환한다. (SPEC 결정-46, API 명세 §3-4) */
     public ContestDetailItem findContest(long id) {
+        return findContest(id, null);
+    }
+
+    public ContestDetailItem findContest(long id, Long userId) {
         Contest contest = contestRepository.findById(id)
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.CONTEST_NOT_FOUND,
                         "대회 ID " + id + "를 찾을 수 없습니다."));
         LocalDate today = LocalDate.now(businessClock);
-        ContestListItem item = toItems(List.of(contest), today).getFirst();
+        ContestListItem item = toItems(List.of(contest), today, userId).getFirst();
         int dDay = Math.toIntExact(ChronoUnit.DAYS.between(today, contest.getContestDate()));
         return new ContestDetailItem(
                 item,
@@ -102,7 +123,27 @@ public class ContestQueryService {
                 dDay);
     }
 
-    private List<ContestListItem> toItems(List<Contest> contests, LocalDate today) {
+    /** 찜 목록에서도 공개 대회 카드와 같은 파생·원천 필드를 사용한다. (API 명세 §7-C) */
+    public List<ContestListItem> describeFavoriteContests(List<Contest> contests) {
+        Set<Long> favoriteIds = contests.stream()
+                .map(Contest::getId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return toItems(contests, LocalDate.now(businessClock), favoriteIds);
+    }
+
+    private List<ContestListItem> toItems(
+            List<Contest> contests,
+            LocalDate today,
+            Long userId) {
+        List<Long> contestIds = contests.stream().map(Contest::getId).toList();
+        Set<Long> favoriteIds = favoriteIds(userId, contestIds);
+        return toItems(contests, today, favoriteIds);
+    }
+
+    private List<ContestListItem> toItems(
+            List<Contest> contests,
+            LocalDate today,
+            Set<Long> favoriteIds) {
         List<Long> contestIds = contests.stream().map(Contest::getId).toList();
         Map<Long, List<ContestEventType>> events =
                 queryRepository.findEventsByContestIds(contestIds);
@@ -113,15 +154,24 @@ public class ContestQueryService {
                         contest,
                         events.getOrDefault(contest.getId(), List.of()),
                         sources.getOrDefault(contest.getId(), List.of()),
-                        today))
+                        today,
+                        favoriteIds.contains(contest.getId())))
                 .toList();
+    }
+
+    private Set<Long> favoriteIds(Long userId, List<Long> contestIds) {
+        if (userId == null || contestIds.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(favoriteRepository.findContestIds(userId, contestIds));
     }
 
     private ContestListItem toItem(
             Contest contest,
             List<ContestEventType> events,
             List<ContestSourceType> sources,
-            LocalDate today) {
+            LocalDate today,
+            boolean favorite) {
         return new ContestListItem(
                 contest.getId(),
                 contest.isActive(),
@@ -141,8 +191,7 @@ public class ContestQueryService {
                 contest.getImageUrl(),
                 sources,
                 contest.getCheckedAt(),
-                // 인증·찜 SSOT 연결 전 공개 게스트 응답 계약이다. (API 명세 §3-1)
-                false);
+                favorite);
     }
 
     private ContestCursor cursorOf(Contest contest) {

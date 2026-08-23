@@ -1,6 +1,6 @@
 # 런닝구(區) — 최종 통합 명세서 (SPEC v4 · 안드로이드)
 
-> **기준일 2026-08-21** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
+> **기준일 2026-08-23** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
 > v3의 안드로이드 전환안에 서버 중심 데이터·단일 가입 수단·대회/코스 관리 정책을 확정 반영한 판이다. 내용이 충돌하면 **번호가 빠른 쪽이 우선**한다.
 >
 > | 우선 | 원천 | 처리 |
@@ -426,7 +426,10 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 **P0 운영 실행 주체는 백엔드 하나뿐이다** 🔒확정(결정-41). 앱은 대회·숙소·종목·취향·기간을 `POST /api/itineraries/generate`로 보내고, 서버가 KTO·카카오 POI 조회·캐시·폴백과 아래 조립 규칙을 한 요청에서 수행한다. 앱은 응답 DTO를 표시하고 저장 전 USER 블록만 로컬 편집하며, 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않는다.
 
-입력 `{race, stay, event, themes, start, end}` → `{days, sources, recovery}`. 서버 구현은 HTTP·DB·외부 API 어댑터와 분리된 **순수 규칙 모듈**로 두고 단위 테스트한다.
+입력 `{race, stay, event, themes, start, end}` → 내부 생성 결과 `{days, sources, recovery}`. `sources`는
+카테고리별 POI 조회 성공·실패를 추적하는 서버 내부 값이며 `POST /itineraries/generate` HTTP 응답에는
+포함하지 않는다. 운영 `LIVE` 배지는 숙소·교체·추가 후보처럼 POI 목록을 직접 보여 주는 응답에서
+노출한다. 서버 구현은 HTTP·DB·외부 API 어댑터와 분리된 **순수 규칙 모듈**로 두고 단위 테스트한다.
 
 1. 회복 룰 결정(§5.1).
 2. 카테고리 풀: `{food, tour} ∪ themes` — **noHard면 wellness, 아니면 cafe 추가.**
@@ -444,6 +447,10 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 5. **테마 우선 선택**: `[...themes, tour, nature, cafe, history]` 순 미사용 POI가 있는 첫 카테고리.
 6. **회복 배지**: noHard 아니면 null. D+ 존재 시 "D+n 회복 모드", 없으면 "D-day 회복 모드" + rule 문구.
 7. 결과 `days[]`에서 일반 장소는 `blockType=USER`, 대회는 `blockType=RACE · systemManaged=true`다. 서버 저장 시 canonical 대회 정보로 RACE 블록을 재구성한다.
+8. **생성 DTO 고정** 🔒확정(결정-53): `title`은 지역을 제외한 `당일치기|n박 n+1일`이고 앱이
+   canonical 지역과 조합한다. `dayIndex`는 대회일 기준 상대 오프셋(`D-1=-1`, `D-day=0`,
+   `D+1=1`)이다. HALF/FULL은 D+ 일자를 `recovery=true`로 표시하고 D+가 전혀 없는 일정에서는
+   D-day를 회복일로 표시한다. RACE 블록은 canonical `place`·nullable `roadAddress`·좌표를 사용한다.
 
 ### 5.7 편집 연산
 
@@ -554,7 +561,8 @@ favoriteContest { userId, contestId, savedAt }                               // 
 - `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
 - `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
 - **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)와 GPS 전송 전 임시 기록만 둔다. 서버 ID·버전·`cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
-- 저장 코스는 서버가 `pathPolyline`을 좌표열로 복원한 뒤 동일 정밀도로 정규화하고 연속 중복 좌표만 제거해 진행 순서를 유지한 canonical geometry를 만든다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 개정). 좌표 정밀도는 GraphHopper 실제 polyline 정밀도 확인 후 고정한다.
+- 저장 코스의 `pathPolyline`은 **고도를 제외한 2D Google Encoded Polyline precision 5(E5)** 다. 서버는 이를 위도·경도 순서의 E5 좌표열로 복원하고, 연속 중복 좌표만 제거해 진행 순서를 유지한다. canonical geometry는 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
+- 저장 코스 `elevationProfileM`은 정수 미터 배열이며 순서를 보존하고 최대 100개, 미보유 시 `[]`다. PostgreSQL `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`로 저장하고 DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증한다. 검색·정렬에는 사용하지 않고 `routeFingerprint`에서도 제외한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 서버는 저장 시 실제 경로 원천의 검증 완료 attribution 완성 문구를 `attributions` snapshot으로 확정한다. PostgreSQL은 `JSONB NOT NULL DEFAULT '[]'`로 보존하며, 상세 API만 `List<String>`으로 반환한다. 클라이언트 입력과 이후 라이선스 문구 변경은 기존 값에 반영하지 않고, attribution은 geometry 기반 `routeFingerprint` 계산에서도 제외한다 🔒확정(결정-44).
 
 ### 6.5 회원 계약 🆕회의 (**Spring Boot + PostgreSQL** 🔒확정 — 구현 시 테이블 상세화)
@@ -923,7 +931,7 @@ app/src/main/java/com/runninggu/app/
 |---|---|---|---|
 | 결정-27 | S8 앱은 **`GET /courses/near` 한 번만 호출**하고, 서버가 경로(큐레이션 우선·OSM fallback)와 카카오 걷기 스팟을 거리순 통합 반환한다. 독립 `/walk-spots` 앱 API는 두지 않는다 | 여러 원천의 완료 시점에 따른 목록 순서 변경을 막고 통합·정렬 규칙을 서버 한 곳에 둔다(이슈 #19, 결정-42로 원천 확장) | §4.11 · §9.3 |
 
-### 12.4 확정 — 2026-08-17~21 화면·API 계약
+### 12.4 확정 — 2026-08-17~23 화면·API 계약
 
 | # | 결정 | 이유 | 반영 위치 |
 |---|---|---|---|
@@ -932,7 +940,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-30 | D-13을 개정해 동선 생성의 **Empty와 Error를 분리**하고 Empty는 조건 수정, Error는 재시도 | 정상 0건과 장애를 같은 실패 화면으로 숨기지 않는다 | §3.5 · §4.9 · §4.10 |
 | 결정-31 | canonical 좌표 누락 0건을 배치 게이트로 검증하고 앱 DTO는 nullable로 방어 | 현재 데이터에는 별도 좌표 없음 UX가 불필요하지만 재수집 회귀를 막아야 한다 | §4.6 · §6.2 · §8.2 |
 | 결정-32 | 숙소 검색은 2자 이상·500ms debounce로 서버 `query`를 호출 | 외부 API 쿼터와 입력 UX를 함께 보호한다 | §4.9 |
-| 결정-33(08-19 개정) | 저장 코스는 geometry 좌표열만 정규화해 서버가 `v1:` + SHA-256 lowercase hex `routeFingerprint`를 만들고 사용자별 멱등 저장한다. 진행 반대 경로는 별개이며 연속 중복 좌표는 제거한다 | 코스 메타데이터 변경이 동일 경로 판정을 흔들지 않게 하고 클라이언트별 계산 차이를 막는다. 좌표 정밀도만 실제 GraphHopper 응답 확인 후 고정한다 | §6.4 |
+| 결정-33(08-23 재개정) | 저장 코스 `pathPolyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5)로 고정한다. 서버는 E5 좌표열의 연속 중복점을 제거하고 소수점 5자리 `lat,lng`를 `;`로 연결한 UTF-8 canonical geometry로 `v1:` + SHA-256 lowercase hex `routeFingerprint`를 만들어 사용자별 멱등 저장한다. 진행 반대 경로는 별개다. `elevationProfileM`은 최대 100개 정수 미터 배열·미보유 시 `[]`이며 PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장하고 fingerprint에서는 제외한다 | GraphHopper·GPX 경로의 와이어 정밀도와 중복 판정을 하나로 고정하고 앱 디코더와 서버 해시가 어긋나지 않게 한다. 고도 배열은 조회 조건이 아닌 순서 있는 표시 snapshot이므로 HTTP `List<Int>`·빈 배열 의미를 그대로 보존한다(이슈 #62) | §6.4 · §9.3 |
 | 결정-34 | 탈퇴는 짧게 유효한 재인증 토큰을 요구 | 탈취된 Access Token만으로 계정을 삭제하지 못하게 한다 | §4.13 |
 | 결정-35 | 대회 `imageUrl`은 P0부터 nullable, 미보유 시 placeholder | 이미지가 없는 대회도 목록·상세에서 유지한다 | §4.6 · §6.2 |
 | 결정-36 | GPS 기록·`ran` 목록과 saved/ran 통합 계약은 **P1** | P0에는 저장 코스만 있어 통합 정렬·페이징을 미리 추측하지 않는다 | §4.11 · §4.13 · AP-22 |
@@ -952,10 +960,11 @@ app/src/main/java/com/runninggu/app/
 | 결정-50 | EMAIL은 서버가 `strip + lowercase(Locale.ROOT)`로 정규화하고 공급자별 별칭 변환은 하지 않는다. 닉네임은 trim 후 Unicode 코드포인트 2~12자이며 ASCII 영문 대소문자를 무시해 중복 판정한다. 이메일·닉네임 중복 확인은 모두 P0 공개 API로 유지하되 IP 30회/분·정규화 입력 5회/분 제한을 적용한다. 인증 코드는 BCrypt strength 10 해시만 저장하고 5번째 오입력부터 잠그며, 성공 후 30분 동안 같은 코드 검증은 멱등 성공한다 | 앱·서버의 입력 판정 차이와 늦은 중복 응답을 막고, 가입 전 확인 UX를 유지하면서 공개 이메일 존재 조회의 대량 열거 비용을 높인다(이슈 #97) | §4.2 · §6.5 · §9.3 · NFR-9~10 |
 | 결정-51 | JWT는 HS256과 `sub/iss/aud/type/jti/iat/exp` claim 계약을 사용하고 Access 30분·Refresh 14일로 발급한다. Refresh 원문은 SHA-256 lowercase hex로만 저장하며 기기별 family 회전과 과거 토큰 재사용 탐지 시 해당 family 전체 revoke를 적용한다. 로그아웃은 Refresh만 받는 공개·멱등 `204`이고 Access blacklist는 두지 않는다 | 앱 재발급 계약과 서버 인증 필터의 책임을 고정하고 탈취된 회전 전 토큰 재사용을 같은 기기 세션 안에서 차단한다 | §6.5 · §9.2~9.3 · NFR-11 |
 | 결정-52 | 활성 가입 약관 버전은 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`이며 가입 시 선택 동의를 포함한 세 항목을 같은 시각으로 append-only 저장한다. 앱은 버전을 보내지 않고 동의 boolean만 전송한다 | 앱 카피와 서버 이력 버전이 독립적으로 어긋나지 않게 하며, 이후 버전 변경은 앱·서버 계약 변경으로 함께 리뷰한다(이슈 #111) | §4.2 · §6.5 · NFR-12 |
+| 결정-53 | 비활성 대회의 신규 동선 생성은 `409 CONTEST_INACTIVE`로 차단한다. 생성 응답 `title`은 지역 없는 기간 라벨, `dayIndex`는 대회일 상대 오프셋이다. HALF/FULL의 회복일은 D+이며 D+가 없으면 D-day다. 생성 엔진의 카테고리별 `sources`는 내부 추적값이고 HTTP 응답에는 넣지 않는다 | API 예시·논리 ERD·Android 소비 방식의 충돌을 제거하고, 비활성 대회를 404로 숨기지 않으면서 재시도로 해결되지 않는 상태를 안정적인 code로 전달한다 | §4.10 · §5.6 · §9.3 · 이슈 #56 |
 
 ### 12.5 남은 미결
 
-**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로, 대회 snapshot 물리 저장·적용 이력·승계 충돌은 결정-47·48로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성은 차단하되 정확한 HTTP status·오류 `code`는 이슈 #56의 추가 리뷰 후 API 계약에 확정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
+**P0 화면·기능과 물리 DB 계약은 모두 닫혔다.** 저장 코스 좌표 정밀도·canonical 직렬화·고도 배열 타입은 결정-33의 08-23 재개정으로 확정됐다. D-21(saved/ran 통합 정렬·페이징)만 결정-36에 따라 GPS P1 착수 시 결정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
 
 > 구 미결 1~13번은 전부 12.1의 결정으로 해소되었다 (번호는 문서 내 참조 보존을 위해 재사용하지 않음).
 

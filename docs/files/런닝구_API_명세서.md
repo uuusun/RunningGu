@@ -1,6 +1,6 @@
-# 런닝구 백엔드 API 명세서 v3.0
+# 런닝구 백엔드 API 명세서 v3.1
 
-> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.5·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
@@ -231,6 +231,27 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 | PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경. 성공 시 기존 refresh token 전부 revoke 후 현재 기기용 token pair 재발급 |
 | POST | `/me/reauth` | 탈퇴용 재인증 토큰 발급 |
 | DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스·기록 연쇄 삭제, `204` |
+
+`GET /api/me`, `PATCH /api/me`, `PATCH /api/me/agreements`는 모두 성공 시 현재 프로필을
+같은 형태로 `200` 반환한다. `agreements`는 각 약관의 최신 이력 기준이며, `createdAt`은 UTC `Z`다.
+
+```json
+{
+  "id": 1,
+  "email": "runner@test.com",
+  "nickname": "김러너",
+  "loginProvider": "EMAIL",
+  "agreements": {
+    "tos": true,
+    "privacy": true,
+    "marketing": false
+  },
+  "createdAt": "2026-08-23T05:00:00Z"
+}
+```
+
+`PATCH /api/me/agreements`는 같은 `marketing` 값을 다시 보내도 멱등 `200`이며 약관 이력을
+중복 추가하지 않는다. 값이 바뀐 경우에만 활성 `MARKETING` 버전으로 append-only 이력을 추가한다.
 
 가입 수단 정책:
 
@@ -481,20 +502,20 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `themes`는 1개 이상(§4.8 — 0개면 클라 CTA 비활성) · `event`는 대회 종목에 없어도 선택 가능(§4.8).
 - `startDate/endDate`는 역순을 허용하지 않으며 시작·종료일 포함 최대 7일, 해당 대회일을 반드시 포함한다. 위반 시 `400 INVALID_TRAVEL_PERIOD`.
 - canonical 대회의 `lat/lng`가 없으면 생성하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
-- 비활성 대회는 새 동선을 생성하지 않는다. 정확한 HTTP status와 문제 응답 `code`는 이슈 #56의 추가 리뷰 전까지 미확정이므로 임의의 오류 계약으로 구현하지 않는다.
+- 비활성 대회는 새 동선을 생성하지 않고 `409 CONTEST_INACTIVE`를 반환한다(결정-53).
 
 응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
 
 ```json
 {
-  "title": "세종 2박 3일",
+  "title": "2박 3일",
   "contestId": 153, "event": "HALF", "themes": ["TOUR", "FOOD"],
   "startDate": "2026-08-21", "endDate": "2026-08-23",
   "hotel": { "name": "호텔 세종 가온", "lat": 36.4901, "lng": 127.2688 },
   "recovery": { "label": "D+1 회복 모드", "note": "하프는 완주 다음날 회복이 중요해요..." },
   "days": [
     {
-      "dayIndex": 0, "date": "2026-08-21", "dayLabel": "D-1",
+      "dayIndex": -1, "date": "2026-08-21", "dayLabel": "D-1",
       "recovery": false, "note": "내일 완주 · 가볍게 먹고 푹 쉬기",
       "blocks": [
         { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
@@ -510,6 +531,11 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 }
 ```
 - `recovery`는 하프/풀만, D+ 없으면 `"D-day 회복 모드"` 🔒(§5.6-6). 회복일 day는 `recovery=true`.
+- `title`은 지역을 넣지 않은 `당일치기` 또는 `n박 n+1일`이다. 앱이 canonical 지역과 조합해 표시한다.
+- `dayIndex`는 배열 순번이 아니라 대회일 기준 상대 오프셋이다. `D-1=-1`, `D-day=0`, `D+1=1`로 고정한다.
+- HALF/FULL은 D+ 일자를 `recovery=true`로 표시한다. 일정에 D+가 하나도 없으면 D-day가 `true`다. 5K/10K는 모두 `false`다.
+- RACE 블록은 `placeName=CONTEST.place`, `address=CONTEST.road_address`(nullable), canonical 좌표를 사용한다. `start_time`이 없으면 `08:00`이다.
+- 순수 엔진은 카테고리별 POI 조회 원천을 내부 추적하지만 `sources`는 생성 HTTP 응답에 포함하지 않는다. `LIVE/SAMPLE/SYNTH` 배지는 POI 목록 응답에서 노출한다(결정-53, NFR-2).
 - 외부 POI 실패 시 해당 블록 `placeName/lat/lng=null` 강등, **생성은 실패하지 않음** 🔒(NFR-3).
 - 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (noHard면 WELLNESS, 아니면 CAFE) 🔒(§5.6-2).
 - 정상 처리됐지만 표시 가능한 블록이 없으면 `200`에서 `days: []`를 반환하고 앱은 S7 Empty로 표시한다. 네트워크·timeout·4xx/5xx는 Error이며 Empty로 강등하지 않는다.
@@ -605,7 +631,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 }
 ```
 - 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 입력 출발지에서 실제 경로 시작점 또는 장소까지의 거리다.
-- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
+- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `pathPolyline`은 고도를 제외한 **2D Google Encoded Polyline precision 5(E5)** 다. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
 - `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다.
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
@@ -710,9 +736,11 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 | `region` | ✗ | 큐레이션만. `OSM_GENERATED`는 `null` |
 | `pathPolyline` · `elevationProfileM` · `attributions` | — | **목록에는 없다**(LOB 제외 프로젝션 🔧). 목록 카드는 지도를 그리지 않는다 |
 
-**상세 응답** `GET /me/courses/{id}` — 목록 필드 + `elevationProfileM`(최대 100, 없으면 `[]`) · `pathPolyline`(경로가 없으면 `null`) · `attributions[]`(없으면 `[]`).
+**상세 응답** `GET /me/courses/{id}` — 목록 필드 + `elevationProfileM`(최대 100, 없으면 `[]`) · 필수 `pathPolyline` · `attributions[]`(없으면 `[]`). 저장 요청에서 유효한 경로를 반드시 받고 `SAVED_COURSE.path_polyline`도 `NOT NULL`이므로 저장 상세의 경로는 `null`이 아니다. 없는 id는 `404 SAVED_COURSE_NOT_FOUND`, 다른 사용자 소유 id는 `403 FORBIDDEN`이다.
 
-`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 `pathPolyline`의 geometry만 사용해 `routeFingerprint`를 계산한다. 좌표를 확정 정밀도로 정규화하고 연속 중복 좌표만 제거하되 진행 순서는 유지하며, 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. 좌표 정밀도는 GraphHopper 실제 응답 확인 후 고정한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다.
+`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 2D Google Encoded Polyline precision 5인 `pathPolyline`을 E5 위도·경도 좌표열로 복원하고 연속 중복 좌표만 제거하되 진행 순서를 유지한다. 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트가 canonical geometry다. 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 fingerprint 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 기존 snapshot도 갱신하지 않는다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다(결정-33 08-23 재개정, 이슈 #62).
+
+`elevationProfileM`은 순서를 보존하는 정수 미터 배열이며 최대 100개, 고도가 없으면 `[]`이다. `SAVED_COURSE.elevation_profile_m`은 PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장한다. DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증하며 검색·정렬과 `routeFingerprint`에는 사용하지 않는다(결정-33 08-23 재개정, 이슈 #62).
 
 저장 시 서버는 `sourceCourseId`와 원천 메타데이터 또는 서버가 생성한 OSM 원천 정보를 기준으로 attribution 완성 문구를 확정한다. 요청에 attribution을 받지 않으며 클라이언트가 보내더라도 무시한다. `SAVED_COURSE.attributions`는 PostgreSQL `JSONB NOT NULL DEFAULT '[]'` snapshot이고, 외부 라이선스 문구가 바뀌어도 기존 값을 소급 변경하지 않는다. 상세 응답의 `attributions`는 `List<String>`이며 출처가 없으면 `[]`이다. 목록 응답에는 이 필드를 포함하지 않고, 상세에서 앱이 배열 순서대로 `" · "`로 연결한다. attribution은 `routeFingerprint` 입력에서 제외한다(결정-44, 이슈 #54).
 
@@ -837,6 +865,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
 | `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
+| `CONTEST_INACTIVE` | 409 | 비활성 대회의 신규 동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
 | `RATE_LIMITED` | 429 | 공개 중복 확인 IP 30회/분 또는 정규화 입력 5회/분 초과 |
