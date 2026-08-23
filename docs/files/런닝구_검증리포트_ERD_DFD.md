@@ -1,8 +1,8 @@
-# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.5
+# 런닝구 — ERD·DFD·API 교차 검증 리포트 v4.6
 
-> **검증일**: 2026-08-21
-> **검증 기준**: SPEC v4(결정-22·33 개정, 결정-44~51 포함) · API 명세 v3.0 · 화면–API 매핑표 v1.9 · 논리 ERD v4.4 · 수정 DFD
-> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08·09·10 계약은 정렬됐다. 남은 `TBD-DB-01`과 `TBD-P1-01`은 해당 물리 컬럼·P1 계약 전에 닫는다.
+> **검증일**: 2026-08-23
+> **검증 기준**: SPEC v4(결정-33 08-23 재개정, 결정-44~53 포함) · API 명세 v3.1 · 화면–API 매핑표 v1.11 · 논리 ERD v4.5 · 수정 DFD
+> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08·09·10 계약은 정렬됐다. P0 물리 DB 계약은 모두 닫혔고 `TBD-P1-01`만 P1 착수 전에 결정한다.
 
 ---
 
@@ -62,7 +62,8 @@
 - OSM 저장 코스에는 `source_course_id`, `region`이 없을 수 있다.
 - `(user_id, route_fingerprint)`는 복합 UNIQUE이며 중복 저장은 기존 id를 반환한다.
 - fingerprint는 백엔드가 geometry만 정규화해 `v1:` + SHA-256 lowercase hex로 생성하고 `VARCHAR(67)`에 저장한다. 진행 순서를 유지하고 연속 중복 좌표만 제거하며, 메타데이터는 입력에서 제외한다.
-- fingerprint 좌표 정밀도와 고도 배열 저장 타입은 `TBD-DB-01`이다.
+- `path_polyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5)다. fingerprint는 연속 중복점을 제거한 소수점 5자리 `lat,lng` 좌표를 `;`로 연결한 UTF-8 canonical geometry로 계산한다.
+- `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`, 최대 100개 정수 미터 배열이며 미보유 시 `[]`다(확정-DB-01, SPEC 결정-33 08-23 재개정, 이슈 #62).
 - `attributions`는 서버가 원천 메타데이터에서 만든 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'`로 snapshot 저장한다. 클라이언트 입력은 신뢰하지 않고 저장 코스 상세에만 반환하며, 문구 변경을 소급하지 않고 fingerprint에서도 제외한다(확정-DB-02, 이슈 #54).
 - P1은 `RUN_RECORD 1:1 RUN_TRACK`으로 목록 요약과 큰 경로 데이터를 분리한다. 정확한 목록 projection과 saved/ran 통합 페이징은 `TBD-P1-01`이다.
 
@@ -123,13 +124,13 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 | ID | 결정할 내용 |
 |---|---|
-| `TBD-DB-01` | fingerprint 좌표 정규화 정밀도, 고도 배열 PostgreSQL 타입 |
 | `TBD-P1-01` | saved/ran 통합 정렬·페이징과 RUN projection |
 
-비활성 대회의 새 동선 생성 차단 원칙은 확정됐지만 정확한 HTTP status·오류 `code`는 이슈 #56 추가 리뷰 후 API 명세에 보완한다. 그 값이 정해지기 전에는 임의의 오류 계약으로 구현하지 않는다.
+비활성 대회의 새 동선 생성 차단은 SPEC 결정-53의 `409 CONTEST_INACTIVE`로 확정됐다.
 
 확정되어 위 표에서 제거한 항목은 다음과 같다.
 
+- `DB-01`: 2D Google Encoded Polyline precision 5(E5), 고정 5자리 `lat,lng` canonical geometry fingerprint, `elevation_profile_m JSONB NOT NULL DEFAULT '[]'`·최대 100개 정수
 - `DB-03`: USER와 LOGIN_IDENTITY 1:1, 대표 이메일 파생, P0 연결·전환 없음
 - `DB-02`: 저장 코스 attribution을 서버 생성 완성 문구 배열로 snapshot 저장하고 상세에만 반환. `JSONB NOT NULL DEFAULT '[]'`, fingerprint 제외, 소급 변경 없음. 지역별 코스 응답도 실제 사용 원천의 `attributions[]` 포함
 - `DB-04`: 동선 region·recovery·트리/RACE snapshot, 대회명·현재 메타 파생, 변경 감지와 사용자 확정 재생성 교체
@@ -157,6 +158,9 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - 같은 snapshot 재적재 → 성공 no-op·이력 1행 유지, 과거 snapshot 또는 동일 `checked_at_max`의 다른 `snapshot_sha256` → 적재 거부, 적재 실패 → 이력 미생성.
 - canonical의 source 중 하나만 active여도 canonical active 유지; 모두 inactive일 때만 공개 탐색 제외하고 id 상세는 유지.
 - 같은 경로 snapshot을 반복 저장하면 `SAVED_COURSE` 1행과 기존 id 유지.
+- 같은 E5 좌표열·소수점 5자리 미만 표현 차이는 같은 fingerprint, E5 한 단위 차이는 다른 fingerprint이며 정규화 후 생긴 연속 중복점은 fingerprint에 한 번만 반영.
+- 같은 좌표열의 진행 순서를 뒤집으면 다른 fingerprint이며, 고도 배열 변경만으로는 fingerprint가 바뀌지 않음.
+- `elevation_profile_m`의 객체·문자열·101개 배열은 거부하고 빈 배열과 100개 정수 배열은 저장.
 - 같은 geometry의 attribution 문구가 달라져도 fingerprint는 같고, 기존 저장 행의 attribution snapshot은 소급 변경하지 않음.
 - OSM 생성 경로는 저장 전 PostgreSQL에 남지 않고 지역별 코스 목록에도 나타나지 않음.
 - P1 RUN_RECORD 생성·삭제 시 RUN_TRACK이 반드시 함께 생성·삭제됨.
@@ -167,5 +171,5 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 - 논리 ERD: **P0+P1 범위 정렬 완료**
 - DFD: **현재 SPEC/API 흐름과 정렬 완료**
-- 물리 ERD·Flyway: **DB-02·04·05·08 계약 반영 가능, TBD-DB-01 관련 컬럼은 결정 전 확정 금지**
+- 물리 ERD·Flyway: **P0 DB-01~10 계약 반영 가능. 저장 코스 좌표 정밀도·고도 JSONB 타입까지 확정 완료**
 - API: **핵심 계약 정렬, 화면–API 매핑표 §11 상세화 항목 유지**

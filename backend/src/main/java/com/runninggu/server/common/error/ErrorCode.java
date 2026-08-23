@@ -20,6 +20,7 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     CONTEST_NOT_FOUND(HttpStatus.NOT_FOUND, "대회를 찾을 수 없습니다."),
     ITINERARY_NOT_FOUND(HttpStatus.NOT_FOUND, "동선을 찾을 수 없습니다."),
+    SAVED_COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "저장 코스를 찾을 수 없습니다."),
     DAY_NOT_FOUND(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다."),
     BLOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "블록을 찾을 수 없습니다."),
     NO_RESULT(HttpStatus.NOT_FOUND, "검색 결과를 찾을 수 없습니다."),

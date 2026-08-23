@@ -1,6 +1,6 @@
-# 런닝구 백엔드 API 명세서 v3.0
+# 런닝구 백엔드 API 명세서 v3.1
 
-> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.3·수정 DFD
+> **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.5·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
 > **테스트**: JUnit 5 · Testcontainers(PostgreSQL 통합 테스트)
 > **지위**: springdoc-openapi(결정-18) 구현의 **시드 문서** — 컨트롤러 확정 후 Swagger UI가 최종 계약이 된다. SPEC §9.3 초안을 대체·상세화한 판.
@@ -610,7 +610,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 }
 ```
 - 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 입력 출발지에서 실제 경로 시작점 또는 장소까지의 거리다.
-- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
+- `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `pathPolyline`은 고도를 제외한 **2D Google Encoded Polyline precision 5(E5)** 다. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
 - `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다.
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
@@ -715,9 +715,11 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 | `region` | ✗ | 큐레이션만. `OSM_GENERATED`는 `null` |
 | `pathPolyline` · `elevationProfileM` · `attributions` | — | **목록에는 없다**(LOB 제외 프로젝션 🔧). 목록 카드는 지도를 그리지 않는다 |
 
-**상세 응답** `GET /me/courses/{id}` — 목록 필드 + `elevationProfileM`(최대 100, 없으면 `[]`) · `pathPolyline`(경로가 없으면 `null`) · `attributions[]`(없으면 `[]`).
+**상세 응답** `GET /me/courses/{id}` — 목록 필드 + `elevationProfileM`(최대 100, 없으면 `[]`) · 필수 `pathPolyline` · `attributions[]`(없으면 `[]`). 저장 요청에서 유효한 경로를 반드시 받고 `SAVED_COURSE.path_polyline`도 `NOT NULL`이므로 저장 상세의 경로는 `null`이 아니다. 없는 id는 `404 SAVED_COURSE_NOT_FOUND`, 다른 사용자 소유 id는 `403 FORBIDDEN`이다.
 
-`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 `pathPolyline`의 geometry만 사용해 `routeFingerprint`를 계산한다. 좌표를 확정 정밀도로 정규화하고 연속 중복 좌표만 제거하되 진행 순서는 유지하며, 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. 좌표 정밀도는 GraphHopper 실제 응답 확인 후 고정한다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다.
+`sourceCourseId`와 `region`은 큐레이션 경로에만 있고 `OSM_GENERATED`에서는 생략한다. OSM 경로는 `/courses/near`에서 서버가 생성한 `name`을 `courseName`으로 그대로 저장한다. 서버는 2D Google Encoded Polyline precision 5인 `pathPolyline`을 E5 위도·경도 좌표열로 복원하고 연속 중복 좌표만 제거하되 진행 순서를 유지한다. 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트가 canonical geometry다. 반대 방향은 다른 경로다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 fingerprint 입력에서 제외한다. 저장 형식은 `v1:<SHA-256 lowercase hex 64자>`이고 DB 타입은 `VARCHAR(67)`이다. `(userId, routeFingerprint)`가 같으면 새 행을 만들지 않고 기존 id를 반환하며 기존 snapshot도 갱신하지 않는다. 클라이언트가 fingerprint를 보내더라도 신뢰하지 않는다(결정-33 08-23 재개정, 이슈 #62).
+
+`elevationProfileM`은 순서를 보존하는 정수 미터 배열이며 최대 100개, 고도가 없으면 `[]`이다. `SAVED_COURSE.elevation_profile_m`은 PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장한다. DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증하며 검색·정렬과 `routeFingerprint`에는 사용하지 않는다(결정-33 08-23 재개정, 이슈 #62).
 
 저장 시 서버는 `sourceCourseId`와 원천 메타데이터 또는 서버가 생성한 OSM 원천 정보를 기준으로 attribution 완성 문구를 확정한다. 요청에 attribution을 받지 않으며 클라이언트가 보내더라도 무시한다. `SAVED_COURSE.attributions`는 PostgreSQL `JSONB NOT NULL DEFAULT '[]'` snapshot이고, 외부 라이선스 문구가 바뀌어도 기존 값을 소급 변경하지 않는다. 상세 응답의 `attributions`는 `List<String>`이며 출처가 없으면 `[]`이다. 목록 응답에는 이 필드를 포함하지 않고, 상세에서 앱이 배열 순서대로 `" · "`로 연결한다. attribution은 `routeFingerprint` 입력에서 제외한다(결정-44, 이슈 #54).
 

@@ -1,8 +1,7 @@
-%% 런닝구 논리 ERD v4.4 — SPEC v4 · API 명세 v3.0 기준 (2026-08-21)
+%% 런닝구 논리 ERD v4.5 — SPEC v4 · API 명세 v3.1 기준 (2026-08-23)
 %% P0: USER~SAVED_COURSE + CONTEST_SNAPSHOT_IMPORT 14개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
-%% 이 문서는 논리 계약이다. 아래 남은 TBD-DB-01을 확정하기 전에는 관련 컬럼을 Flyway 물리 스키마로 옮기지 않는다.
-%% 확정-DB-01 route_fingerprint=v1: + SHA-256 lowercase hex, 백엔드 생성, geometry만 입력, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67)
-%% TBD-DB-01 route_fingerprint 좌표 정규화 정밀도와 elevation_profile_m PostgreSQL 저장 타입
+%% 이 문서는 논리 계약이다. P0 물리 DB 계약은 모두 확정됐고 TBD-P1-01만 P1 착수 시 결정한다.
+%% 확정-DB-01 path_polyline=2D Google Encoded Polyline precision 5(E5), route_fingerprint=v1: + SHA-256 lowercase hex, 고정 5자리 lat,lng canonical geometry, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67), elevation_profile_m=JSONB NOT NULL DEFAULT '[]'·최대 100개 정수
 %% 확정-DB-02 SAVED_COURSE.attributions=JSONB NOT NULL DEFAULT '[]', 서버 생성 완성 문구 snapshot, 상세만 반환, fingerprint 제외
 %% 확정-DB-03 USER:LOGIN_IDENTITY=1:1, 가입 시 EMAIL/KAKAO 중 하나, P0 연결·추가·전환 미지원
 %% 확정-DB-04 ITINERARY region·recovery·트리/RACE는 snapshot, contestName·현재 대회 메타는 CONTEST 파생, needs_regeneration은 비교 파생
@@ -210,7 +209,7 @@ erDiagram
         int duration_min
         varchar difficulty "CHECK EASY / NORMAL / HARD"
         int gain_m
-        int_array elevation_profile_m "최대 100개 논리 배열, DB 타입 TBD"
+        jsonb elevation_profile_m "NOT NULL DEFAULT '[]', 최대 100개 정수 미터 배열"
         jsonb attributions "NOT NULL DEFAULT '[]', 서버 생성 완성 문구 snapshot"
         numeric entry_lat "NUMERIC(10,7)"
         numeric entry_lng "NUMERIC(10,7)"
