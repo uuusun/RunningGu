@@ -33,6 +33,10 @@ class CourseBundleReaderTest {
                 .hasMessageContaining("하한");
     }
 
+    /**
+     * 운영 번들의 261코스 하한을 직접 읽어 검증하는 유일한 회귀 테스트다.
+     * 테스트용 4건 픽스처와 별개로 운영 번들 축소를 막으므로 삭제하거나 비활성화하지 않는다.
+     */
     @Test
     void 저장소의_운영_번들_261코스를_같은_소비자_검증으로_읽는다() {
         String productionBundle = Path.of("..", "data", "courses.json")
