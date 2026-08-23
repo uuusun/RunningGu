@@ -23,6 +23,7 @@ def nfc(s: str) -> str:
 
 # 두루누비 crsLevel 과 같은 척도. 1 하 · 2 중 · 3 상.
 LEVEL_LABEL = {1: "쉬움", 2: "보통", 3: "어려움"}
+LEVEL_DIFFICULTY = {1: "EASY", 2: "NORMAL", 3: "HARD"}
 
 REGIONS = [
     "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
@@ -71,16 +72,15 @@ class Course:
 
     def to_json(self) -> dict:
         return {
-            "id": self.id,
+            "courseId": self.id,
             "source": self.source,
             "dataSource": self.data_source,
-            "name": self.name,
+            "courseName": self.name,
             "sido": self.sido,
             "sigun": self.sigun,
-            "distKm": self.dist_km,
+            "distanceKm": self.dist_km,
             "gainM": self.gain_m,
-            "level": self.level,
-            "levelLabel": self.level_label,
+            "difficulty": LEVEL_DIFFICULTY.get(self.level, "NORMAL"),
             "cycle": self.cycle,
             "summary": self.summary,
             "points": self.points,

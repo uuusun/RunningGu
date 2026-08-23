@@ -37,6 +37,16 @@ data class ResetUiState(
 
 /** A3 비밀번호 찾기. (SPEC §4.3 · AP-08) */
 class ResetViewModel(
+    /**
+     * **A1·A2 와 달리 아직 가짜 저장소다.** (AP-07 · AP-14)
+     *
+     * A3 은 `POST auth/password/reset-request` 를 부르는데 **서버에 그 엔드포인트가
+     * 없다** — 백엔드 `auth/api` 에 있는 것은 `signup`·`login`·`refresh`·`logout` 과
+     * `email/exists`·`email/send-code`·`email/verify`·`nickname/exists` 뿐이다.
+     * 여기를 서버 저장소로 바꾸면 A3 은 지금 되는 데모조차 못 하고 404 로 떨어진다.
+     *
+     * **서버에 서면 이 한 줄만 [ServiceLocator.authRepository] 로 바꾸면 된다.**
+     */
     private val repository: AuthRepository = FakeAuthRepository,
 ) : ViewModel() {
 

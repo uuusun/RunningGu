@@ -30,6 +30,10 @@ fun Contest.toRaceSummary(): RaceSummary = RaceSummary(
     regStatusFallback = regStatusFallback,
     organizer = organizer,
     officialUrl = officialUrl,
+    // S6 숙소·S7 후보가 대회장 기준으로 POI 를 조회한다. 여기서 떨구면 화면이
+    // (0.0, 0.0) 으로 폴백해 기니만 인근을 조회한다 (#136 리뷰 · SPEC §4.9)
+    lat = lat,
+    lng = lng,
     active = active,
 )
 

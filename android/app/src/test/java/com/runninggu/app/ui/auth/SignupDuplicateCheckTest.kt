@@ -38,7 +38,7 @@ class SignupDuplicateCheckTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    /** 필요한 두 개만 구현한다. 다른 경로가 조용히 섞이면 테스트가 뭘 본 건지 알 수 없다. */
+    /** 중복 확인 두 경로만 실제 동작시키고, 이 테스트와 무관한 로그아웃은 성공으로 고정한다. */
     private open class StubAuthRepository(
         private val emailTaken: Result<Boolean> = Result.success(false),
         private val nicknameTaken: Result<Boolean> = Result.success(false),
@@ -68,6 +68,7 @@ class SignupDuplicateCheckTest {
             marketingAgreed: Boolean,
         ): Result<AuthSession> = TODO()
         override suspend fun requestPasswordReset(email: String): Result<Unit> = TODO()
+        override suspend fun logout(refreshToken: String): Result<Unit> = Result.success(Unit)
     }
 
     private fun httpFailure() = Result.failure<Boolean>(

@@ -54,6 +54,60 @@ class CourseMapperTest {
         }
     """.trimIndent()
 
+    /** 여의도 3점을 precision 5 로 인코딩한 값. */
+    private val realPolyline = "{b`dFgeueW{DgG{DiG"
+
+    private fun routeJson(polyline: String) = """
+        {
+          "items": [
+            {
+              "kind": "ROUTE",
+              "routeId": "osm:1",
+              "name": "테스트 경로",
+              "distanceM": 10,
+              "lat": 37.5, "lng": 126.9,
+              "routeKm": 5.0, "durationMin": 45, "gainM": 30,
+              "shortfall": false,
+              "pathPolyline": "$polyline"
+            }
+          ]
+        }
+    """.trimIndent()
+
+    @Test
+    fun `경로 문자열을 풀어 좌표를 함께 준다`() {
+        // 와이어 형식을 푸는 것은 매퍼의 일이다 (AGENTS 2장-4 · #129).
+        val near = ApiJson.decodeFromString(CoursesNearDto.serializer(), routeJson(realPolyline))
+            .toNearbyCourses()
+        val route = near.items.first() as NearbyItem.Route
+
+        assertEquals(3, route.path.size)
+        assertEquals(37.52510, route.path[0].lat, 1e-5)
+        assertEquals(126.92580, route.path[0].lng, 1e-5)
+    }
+
+    @Test
+    fun `저장에 다시 쓸 원문을 그대로 보관한다`() {
+        // 풀었다 다시 묶으면 서버 routeFingerprint 가 달라져 같은 코스가 중복 저장된다.
+        val near = ApiJson.decodeFromString(CoursesNearDto.serializer(), routeJson(realPolyline))
+            .toNearbyCourses()
+        val route = near.items.first() as NearbyItem.Route
+
+        assertEquals(realPolyline, route.pathPolyline)
+    }
+
+    @Test
+    fun `못 푸는 경로여도 항목을 버리지 않는다`() {
+        // 명세 예시의 자리표시자("인코딩된 왕복 경로")처럼 폴리라인이 아닌 값이 올 수 있다.
+        // 경로만 못 그리면 되고, 카드까지 사라지면 안 된다.
+        val near = ApiJson.decodeFromString(CoursesNearDto.serializer(), routeJson("폴리라인 아님"))
+            .toNearbyCourses()
+        val route = near.items.first() as NearbyItem.Route
+
+        assertTrue(route.path.isEmpty())
+        assertEquals("폴리라인 아님", route.pathPolyline)
+    }
+
     @Test
     fun `경로와 장소가 섞인 목록을 종류대로 읽는다`() {
         val near = ApiJson.decodeFromString(CoursesNearDto.serializer(), nearJson).toNearbyCourses()

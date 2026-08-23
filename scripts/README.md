@@ -61,6 +61,8 @@ set -a; source scripts/.env; set +a          # KTO_SERVICE_KEY · KAKAO_REST_KEY
 
 python scripts/build_courses.py --sources durunubi --regeocode
 python scripts/build_courses.py --sources "durunubi,gpx:100대명산" --regeocode
+# KTO 키 없이 승인된 261개 시드+공개 GPX로 초기 fail-open 번들 재생성
+python scripts/build_courses.py --sources durunubi:seed
 ```
 
 | 어댑터 | 소스 | 구간 잘라내기 |
@@ -81,10 +83,17 @@ python scripts/build_courses.py --sources "durunubi,gpx:100대명산" --regeocod
 - **두루누비는 API 만 보고 수집하지 않는다.** API 가 주는 코스는 144개뿐이고 시드
   `durunubi_courses.json` 에는 261개가 있다. 시드를 기준으로 두고 API 메타로 보강하며,
   `dataSource` 를 `API_GPX` / `GPX_ONLY` 로 남긴다 (SPEC §8.4 · `domain-logic-audit.md` §C4).
+- `durunubi:seed`는 KTO 메타 키가 없는 환경에서 승인된 261개 시드 ID의 공개 GPX를 다시
+  내려받아 초기 번들을 만든다. 런타임 전체 동기화 전 fallback 상태이므로 이 산출물의
+  `dataSource`는 모두 `GPX_ONLY`이고, 서버가 성공한 전체 `courseList`와 결합한 항목만
+  `API_GPX`와 `syncedAt`을 갖는다.
 - **난이도는 상승고도(m/km)로 매긴다.** 원본 `level` 은 코스 **전체** 등급이라 조각 추천에
   그대로 쓰면 안 된다 — 해파랑길 1코스(level=2)를 2.5km 로 쪼개면 조각별 상승고도가
   36m~309m 로 9배 차이났다.
 - 원본 GPX 배포본(`data/100대명산/` 등)과 `.cache/` 는 커밋하지 않는다. 합쳐서 200MB 가 넘는다.
+- 생산자는 쓰기 전에 v1 필드·정렬·유일키·17개 시도·좌표·누적 상승고도·261개 하한과
+  `GPX_ONLY > 0`을 검증한다. `python -m unittest test_courses_pipeline`으로 계약 회귀를 확인하고,
+  동일 명령을 두 번 실행해 출력 SHA-256이 같은지 확인한 뒤 산출물을 승격한다.
 
 ## 대회 재수집 안전 게이트
 
