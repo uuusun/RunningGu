@@ -223,9 +223,8 @@ class ItineraryEditsTest {
 
     @Test
     fun `사용자 블록은 대회 블록을 넘어갈 수 없다`() {
-        // 서버 `PUT .../blocks/order` 가 USER 를 원래 USER 순번 안에서만 재배치하므로
-        // (#148) 대회 앞으로 넘긴 순서는 **오류도 없이 다른 순서로 저장된다.**
-        // 화면과 저장 결과가 갈리므로 여기서 막는다.
+        // 계약이 대회 블록의 고정 위치를 넘는 요청을 `409 SYSTEM_BLOCK_IMMUTABLE` 로
+        // 거부한다(API 명세 §5-10). 화면이 애초에 그 상태를 못 만들게 여기서 막는다.
         val days = itinerary()
         val i = days.ddayIndex()
         val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }

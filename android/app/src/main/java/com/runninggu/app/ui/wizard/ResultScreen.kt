@@ -573,8 +573,8 @@ internal fun EditList(
                                 Spacer(Modifier.width(4.dp))
                                 DragGrip(
                                     label = block.title,
-                                    // 이웃이 대회 블록이면 막는다 — 서버가 대회 블록의 순번을
-                                    // 고정해서 넘긴 순서는 저장되지 않는다 (API 명세 §5-10 · #148).
+                                    // 이웃이 대회 블록이면 막는다 — 계약이 대회 블록의 고정
+                                    // 위치를 넘는 요청을 `409` 로 거부한다 (API 명세 §5-10).
                                     canMoveUp = canMoveTo(blocks, index - 1),
                                     canMoveDown = canMoveTo(blocks, index + 1),
                                     onMoveUp = { onMove(index, index - 1) },
@@ -601,8 +601,8 @@ internal fun EditList(
                                                 // 이웃 행의 절반을 넘으면 실제로 한 칸 옮긴다. 옮긴 만큼
                                                 // 시각 오프셋을 되돌려 행이 손가락 밑에 그대로 남는다.
                                                 //
-                                                // **이웃이 대회 블록이면 그 문턱에서 멈춘다.** 옮겨 봐야
-                                                // `ItineraryEdits` 가 거부하는데(§5-10), 오프셋만 되돌리면
+                                                // **이웃이 대회 블록이면 그 문턱에서 멈춘다.** 계약이 그
+                                                // 요청을 `409` 로 거부하므로(§5-10) 오프셋만 되돌리면
                                                 // 행이 손가락과 어긋난 채 남는다. 더 끌어도 안 넘어가는
                                                 // 것이 "여기까지" 를 손으로 알려 준다.
                                                 val below = blocks.getOrNull(from + 1)?.let { rowHeights[it.id] }
