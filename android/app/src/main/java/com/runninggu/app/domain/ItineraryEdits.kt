@@ -95,20 +95,37 @@ object ItineraryEdits {
     }
 
     /**
-     * 순서 변경. **같은 일자 안에서만** 옮긴다. (SPEC §5.7)
+     * 순서 변경. **같은 일자 안에서만** 옮긴다. (SPEC §5.7 · API 명세 §5-10)
      *
-     * 대회 블록 자체는 옮길 수 없다. 다른 블록이 그 앞뒤로 이동해 대회 블록의 자리가
-     * 밀리는 것은 막지 않는다 — 블록을 바꾸는 게 아니라 이웃이 움직이는 것이다.
+     * 대회 블록 자체를 옮길 수 없고, **다른 블록이 대회 블록을 넘어갈 수도 없다.**
+     *
+     * 예전에는 "블록을 바꾸는 게 아니라 이웃이 움직이는 것" 이라며 넘는 것을 허용했다.
+     * 저장 계약이 서기 전이라 검증할 대상이 없었는데, `PUT .../blocks/order` 가
+     * **USER 블록을 원래 USER 가 있던 순번 안에서만 재배치**한다(#148). USER id 만으로는
+     * "대회 앞" 을 표현할 수 없어서, 넘긴 순서로 저장하면 **오류도 없이 다른 순서로
+     * 저장된다** — 화면과 저장 결과가 갈린다.
+     *
      * 범위를 벗어난 인덱스는 조용히 무시한다(원본과 같다).
      */
     fun moveBlock(days: List<ItineraryDay>, dayIndex: Int, from: Int, to: Int): List<ItineraryDay> =
         mapDay(days, dayIndex) { day ->
             if (from !in day.blocks.indices || to !in day.blocks.indices) return@mapDay day
             if (!canEdit(day.blocks[from])) return@mapDay day
+            if (crossesFixedBlock(day.blocks, from, to)) return@mapDay day
             val blocks = day.blocks.toMutableList()
             blocks.add(to, blocks.removeAt(from))
             day.copy(blocks = blocks)
         }
+
+    /**
+     * [from] 에서 [to] 로 가는 길에 옮길 수 없는 블록이 있는가. (API 명세 §5-10)
+     *
+     * 서버가 대회 블록의 순번을 고정하므로, 그 사이를 지나는 이동은 저장할 수 없다.
+     */
+    private fun crossesFixedBlock(blocks: List<ItineraryBlock>, from: Int, to: Int): Boolean {
+        val range = if (from < to) (from + 1)..to else to until from
+        return range.any { !canEdit(blocks[it]) }
+    }
 
     /**
      * 하루치 지도 핀. 좌표가 있는 블록만 **순서대로 번호를 붙인다.** (SPEC §5.7 · §3-8)

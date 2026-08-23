@@ -222,6 +222,49 @@ class ItineraryEditsTest {
     }
 
     @Test
+    fun `사용자 블록은 대회 블록을 넘어갈 수 없다`() {
+        // 서버 `PUT .../blocks/order` 가 USER 를 원래 USER 순번 안에서만 재배치하므로
+        // (#148) 대회 앞으로 넘긴 순서는 **오류도 없이 다른 순서로 저장된다.**
+        // 화면과 저장 결과가 갈리므로 여기서 막는다.
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        // 대회 블록 뒤에 있는 USER 블록을 맨 앞(대회 앞)으로 끌어 본다
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 1, raceIndex)
+
+        assertEquals(before, after[i].blocks.map { it.id })
+    }
+
+    @Test
+    fun `대회 블록을 지나 여러 칸 옮기는 것도 막는다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        // 대회 블록이 0번이면 2번을 0번으로 — 사이에 대회가 있다
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 2, raceIndex)
+
+        assertEquals(before, after[i].blocks.map { it.id })
+    }
+
+    @Test
+    fun `대회 블록을 지나지 않으면 그대로 옮긴다`() {
+        // 막는 것은 "넘는 것" 뿐이다. 같은 쪽에서 자리를 바꾸는 것은 계약상 문제없다.
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 1, raceIndex + 2)
+
+        assertEquals(before[raceIndex + 2], after[i].blocks[raceIndex + 1].id)
+        assertEquals(before[raceIndex + 1], after[i].blocks[raceIndex + 2].id)
+    }
+
+    @Test
     fun `범위를 벗어난 인덱스는 무시한다`() {
         val days = itinerary()
         val i = days.ddayIndex()
