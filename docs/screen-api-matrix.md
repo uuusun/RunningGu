@@ -274,7 +274,7 @@ Compose 화면
 | 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items(`provider=KAKAO|KTO`, `(name,lat,lng)` 조합 유일), 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
 | 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | 같은 POI item 계약 | Android 500ms debounce, 2자 미만은 호출 안 함 |
 | 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
-| 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 비활성은 생성 차단(status/code는 #56 추가 리뷰 대기). 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
+| 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | 지역 없는 기간 `title`, recovery, days[](dayIndex=대회일 상대 오프셋), blocks[] | 비활성은 `409 CONTEST_INACTIVE`. HALF/FULL 회복일은 D+, D+가 없으면 D-day. 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
 
 S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `(name, lat, lng)` 조합을 사용한다.
 주소는 원천에 없으면 빈 문자열일 수 있으므로 `key`에 사용하지 않는다.
@@ -493,6 +493,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | SPEC 결정-48 | 다중 원천은 정상 수용. 최대 source 겹침 동률 또는 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 Importer가 snapshot 전체를 거부하고 기존 참조·누락 상태·적용 이력을 유지 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
+| SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
 
 ### P1 착수 시 재논의
 
@@ -500,7 +501,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 |---|---|---|---|
 | D-21 | saved/ran 통합 정렬·페이징 | 보관함 목록 계약 | 앱+백엔드 |
 
-P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45·46으로, 대회 snapshot 승계 충돌은 결정-48로 확정됐다. 남은 `TBD-DB-01`은 fingerprint 좌표 정밀도와 고도 배열 저장 타입이며, D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다. 비활성 대회 생성 차단의 정확한 HTTP status·오류 `code`만 이슈 #56 추가 리뷰 후 API 명세에 보완한다.
+P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45·46으로, 대회 snapshot 승계 충돌은 결정-48로 확정됐다. 남은 `TBD-DB-01`은 fingerprint 좌표 정밀도와 고도 배열 저장 타입이며, D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다. 비활성 대회 생성 차단은 결정-53의 `409 CONTEST_INACTIVE`로 확정했다.
 
 ---
 

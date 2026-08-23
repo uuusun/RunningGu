@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호 형식이 올바르지 않습니다."),
+    INVALID_TRAVEL_PERIOD(HttpStatus.BAD_REQUEST, "여행 기간이 올바르지 않습니다."),
     AGREEMENT_REQUIRED(HttpStatus.BAD_REQUEST, "필수 약관 동의가 필요합니다."),
     INVALID_CODE(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."),
     CODE_EXPIRED(HttpStatus.BAD_REQUEST, "인증 코드가 만료됐습니다."),
@@ -20,6 +21,7 @@ public enum ErrorCode {
     NO_RESULT(HttpStatus.NOT_FOUND, "검색 결과를 찾을 수 없습니다."),
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
     CONTEST_LOCATION_UNAVAILABLE(HttpStatus.CONFLICT, "대회장 위치를 확인할 수 없습니다."),
+    CONTEST_INACTIVE(HttpStatus.CONFLICT, "정보 제공이 종료된 대회입니다."),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
     SEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "인증 메일 재발송 대기 중입니다."),
     TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "인증 시도 횟수를 초과했습니다."),

@@ -426,7 +426,10 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 
 **P0 운영 실행 주체는 백엔드 하나뿐이다** 🔒확정(결정-41). 앱은 대회·숙소·종목·취향·기간을 `POST /api/itineraries/generate`로 보내고, 서버가 KTO·카카오 POI 조회·캐시·폴백과 아래 조립 규칙을 한 요청에서 수행한다. 앱은 응답 DTO를 표시하고 저장 전 USER 블록만 로컬 편집하며, 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않는다.
 
-입력 `{race, stay, event, themes, start, end}` → `{days, sources, recovery}`. 서버 구현은 HTTP·DB·외부 API 어댑터와 분리된 **순수 규칙 모듈**로 두고 단위 테스트한다.
+입력 `{race, stay, event, themes, start, end}` → 내부 생성 결과 `{days, sources, recovery}`. `sources`는
+카테고리별 POI 조회 성공·실패를 추적하는 서버 내부 값이며 `POST /itineraries/generate` HTTP 응답에는
+포함하지 않는다. 운영 `LIVE` 배지는 숙소·교체·추가 후보처럼 POI 목록을 직접 보여 주는 응답에서
+노출한다. 서버 구현은 HTTP·DB·외부 API 어댑터와 분리된 **순수 규칙 모듈**로 두고 단위 테스트한다.
 
 1. 회복 룰 결정(§5.1).
 2. 카테고리 풀: `{food, tour} ∪ themes` — **noHard면 wellness, 아니면 cafe 추가.**
@@ -444,6 +447,10 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 5. **테마 우선 선택**: `[...themes, tour, nature, cafe, history]` 순 미사용 POI가 있는 첫 카테고리.
 6. **회복 배지**: noHard 아니면 null. D+ 존재 시 "D+n 회복 모드", 없으면 "D-day 회복 모드" + rule 문구.
 7. 결과 `days[]`에서 일반 장소는 `blockType=USER`, 대회는 `blockType=RACE · systemManaged=true`다. 서버 저장 시 canonical 대회 정보로 RACE 블록을 재구성한다.
+8. **생성 DTO 고정** 🔒확정(결정-53): `title`은 지역을 제외한 `당일치기|n박 n+1일`이고 앱이
+   canonical 지역과 조합한다. `dayIndex`는 대회일 기준 상대 오프셋(`D-1=-1`, `D-day=0`,
+   `D+1=1`)이다. HALF/FULL은 D+ 일자를 `recovery=true`로 표시하고 D+가 전혀 없는 일정에서는
+   D-day를 회복일로 표시한다. RACE 블록은 canonical `place`·nullable `roadAddress`·좌표를 사용한다.
 
 ### 5.7 편집 연산
 
@@ -952,10 +959,11 @@ app/src/main/java/com/runninggu/app/
 | 결정-50 | EMAIL은 서버가 `strip + lowercase(Locale.ROOT)`로 정규화하고 공급자별 별칭 변환은 하지 않는다. 닉네임은 trim 후 Unicode 코드포인트 2~12자이며 ASCII 영문 대소문자를 무시해 중복 판정한다. 이메일·닉네임 중복 확인은 모두 P0 공개 API로 유지하되 IP 30회/분·정규화 입력 5회/분 제한을 적용한다. 인증 코드는 BCrypt strength 10 해시만 저장하고 5번째 오입력부터 잠그며, 성공 후 30분 동안 같은 코드 검증은 멱등 성공한다 | 앱·서버의 입력 판정 차이와 늦은 중복 응답을 막고, 가입 전 확인 UX를 유지하면서 공개 이메일 존재 조회의 대량 열거 비용을 높인다(이슈 #97) | §4.2 · §6.5 · §9.3 · NFR-9~10 |
 | 결정-51 | JWT는 HS256과 `sub/iss/aud/type/jti/iat/exp` claim 계약을 사용하고 Access 30분·Refresh 14일로 발급한다. Refresh 원문은 SHA-256 lowercase hex로만 저장하며 기기별 family 회전과 과거 토큰 재사용 탐지 시 해당 family 전체 revoke를 적용한다. 로그아웃은 Refresh만 받는 공개·멱등 `204`이고 Access blacklist는 두지 않는다 | 앱 재발급 계약과 서버 인증 필터의 책임을 고정하고 탈취된 회전 전 토큰 재사용을 같은 기기 세션 안에서 차단한다 | §6.5 · §9.2~9.3 · NFR-11 |
 | 결정-52 | 활성 가입 약관 버전은 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`이며 가입 시 선택 동의를 포함한 세 항목을 같은 시각으로 append-only 저장한다. 앱은 버전을 보내지 않고 동의 boolean만 전송한다 | 앱 카피와 서버 이력 버전이 독립적으로 어긋나지 않게 하며, 이후 버전 변경은 앱·서버 계약 변경으로 함께 리뷰한다(이슈 #111) | §4.2 · §6.5 · NFR-12 |
+| 결정-53 | 비활성 대회의 신규 동선 생성은 `409 CONTEST_INACTIVE`로 차단한다. 생성 응답 `title`은 지역 없는 기간 라벨, `dayIndex`는 대회일 상대 오프셋이다. HALF/FULL의 회복일은 D+이며 D+가 없으면 D-day다. 생성 엔진의 카테고리별 `sources`는 내부 추적값이고 HTTP 응답에는 넣지 않는다 | API 예시·논리 ERD·Android 소비 방식의 충돌을 제거하고, 비활성 대회를 404로 숨기지 않으면서 재시도로 해결되지 않는 상태를 안정적인 code로 전달한다 | §4.10 · §5.6 · §9.3 · 이슈 #56 |
 
 ### 12.5 남은 미결
 
-**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로, 대회 snapshot 물리 저장·적용 이력·승계 충돌은 결정-47·48로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성은 차단하되 정확한 HTTP status·오류 `code`는 이슈 #56의 추가 리뷰 후 API 계약에 확정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
+**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로, 대회 snapshot 물리 저장·적용 이력·승계 충돌은 결정-47·48로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성 오류는 결정-53으로 확정했다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
 
 > 구 미결 1~13번은 전부 12.1의 결정으로 해소되었다 (번호는 문서 내 참조 보존을 위해 재사용하지 않음).
 
