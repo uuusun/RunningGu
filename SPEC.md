@@ -1,6 +1,6 @@
 # 런닝구(區) — 최종 통합 명세서 (SPEC v4 · 안드로이드)
 
-> **기준일 2026-08-21** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
+> **기준일 2026-08-23** · 이 문서가 프로젝트의 **단일 기준 명세(SSOT)** 다.
 > v3의 안드로이드 전환안에 서버 중심 데이터·단일 가입 수단·대회/코스 관리 정책을 확정 반영한 판이다. 내용이 충돌하면 **번호가 빠른 쪽이 우선**한다.
 >
 > | 우선 | 원천 | 처리 |
@@ -561,7 +561,8 @@ favoriteContest { userId, contestId, savedAt }                               // 
 - `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
 - `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
 - **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)와 GPS 전송 전 임시 기록만 둔다. 서버 ID·버전·`cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
-- 저장 코스는 서버가 `pathPolyline`을 좌표열로 복원한 뒤 동일 정밀도로 정규화하고 연속 중복 좌표만 제거해 진행 순서를 유지한 canonical geometry를 만든다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 개정). 좌표 정밀도는 GraphHopper 실제 polyline 정밀도 확인 후 고정한다.
+- 저장 코스의 `pathPolyline`은 **고도를 제외한 2D Google Encoded Polyline precision 5(E5)** 다. 서버는 이를 위도·경도 순서의 E5 좌표열로 복원하고, 연속 중복 좌표만 제거해 진행 순서를 유지한다. canonical geometry는 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
+- 저장 코스 `elevationProfileM`은 정수 미터 배열이며 순서를 보존하고 최대 100개, 미보유 시 `[]`다. PostgreSQL `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`로 저장하고 DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증한다. 검색·정렬에는 사용하지 않고 `routeFingerprint`에서도 제외한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 서버는 저장 시 실제 경로 원천의 검증 완료 attribution 완성 문구를 `attributions` snapshot으로 확정한다. PostgreSQL은 `JSONB NOT NULL DEFAULT '[]'`로 보존하며, 상세 API만 `List<String>`으로 반환한다. 클라이언트 입력과 이후 라이선스 문구 변경은 기존 값에 반영하지 않고, attribution은 geometry 기반 `routeFingerprint` 계산에서도 제외한다 🔒확정(결정-44).
 
 ### 6.5 회원 계약 🆕회의 (**Spring Boot + PostgreSQL** 🔒확정 — 구현 시 테이블 상세화)
@@ -930,7 +931,7 @@ app/src/main/java/com/runninggu/app/
 |---|---|---|---|
 | 결정-27 | S8 앱은 **`GET /courses/near` 한 번만 호출**하고, 서버가 경로(큐레이션 우선·OSM fallback)와 카카오 걷기 스팟을 거리순 통합 반환한다. 독립 `/walk-spots` 앱 API는 두지 않는다 | 여러 원천의 완료 시점에 따른 목록 순서 변경을 막고 통합·정렬 규칙을 서버 한 곳에 둔다(이슈 #19, 결정-42로 원천 확장) | §4.11 · §9.3 |
 
-### 12.4 확정 — 2026-08-17~21 화면·API 계약
+### 12.4 확정 — 2026-08-17~23 화면·API 계약
 
 | # | 결정 | 이유 | 반영 위치 |
 |---|---|---|---|
@@ -939,7 +940,7 @@ app/src/main/java/com/runninggu/app/
 | 결정-30 | D-13을 개정해 동선 생성의 **Empty와 Error를 분리**하고 Empty는 조건 수정, Error는 재시도 | 정상 0건과 장애를 같은 실패 화면으로 숨기지 않는다 | §3.5 · §4.9 · §4.10 |
 | 결정-31 | canonical 좌표 누락 0건을 배치 게이트로 검증하고 앱 DTO는 nullable로 방어 | 현재 데이터에는 별도 좌표 없음 UX가 불필요하지만 재수집 회귀를 막아야 한다 | §4.6 · §6.2 · §8.2 |
 | 결정-32 | 숙소 검색은 2자 이상·500ms debounce로 서버 `query`를 호출 | 외부 API 쿼터와 입력 UX를 함께 보호한다 | §4.9 |
-| 결정-33(08-19 개정) | 저장 코스는 geometry 좌표열만 정규화해 서버가 `v1:` + SHA-256 lowercase hex `routeFingerprint`를 만들고 사용자별 멱등 저장한다. 진행 반대 경로는 별개이며 연속 중복 좌표는 제거한다 | 코스 메타데이터 변경이 동일 경로 판정을 흔들지 않게 하고 클라이언트별 계산 차이를 막는다. 좌표 정밀도만 실제 GraphHopper 응답 확인 후 고정한다 | §6.4 |
+| 결정-33(08-23 재개정) | 저장 코스 `pathPolyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5)로 고정한다. 서버는 E5 좌표열의 연속 중복점을 제거하고 소수점 5자리 `lat,lng`를 `;`로 연결한 UTF-8 canonical geometry로 `v1:` + SHA-256 lowercase hex `routeFingerprint`를 만들어 사용자별 멱등 저장한다. 진행 반대 경로는 별개다. `elevationProfileM`은 최대 100개 정수 미터 배열·미보유 시 `[]`이며 PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장하고 fingerprint에서는 제외한다 | GraphHopper·GPX 경로의 와이어 정밀도와 중복 판정을 하나로 고정하고 앱 디코더와 서버 해시가 어긋나지 않게 한다. 고도 배열은 조회 조건이 아닌 순서 있는 표시 snapshot이므로 HTTP `List<Int>`·빈 배열 의미를 그대로 보존한다(이슈 #62) | §6.4 · §9.3 |
 | 결정-34 | 탈퇴는 짧게 유효한 재인증 토큰을 요구 | 탈취된 Access Token만으로 계정을 삭제하지 못하게 한다 | §4.13 |
 | 결정-35 | 대회 `imageUrl`은 P0부터 nullable, 미보유 시 placeholder | 이미지가 없는 대회도 목록·상세에서 유지한다 | §4.6 · §6.2 |
 | 결정-36 | GPS 기록·`ran` 목록과 saved/ran 통합 계약은 **P1** | P0에는 저장 코스만 있어 통합 정렬·페이징을 미리 추측하지 않는다 | §4.11 · §4.13 · AP-22 |
@@ -963,7 +964,7 @@ app/src/main/java/com/runninggu/app/
 
 ### 12.5 남은 미결
 
-**P0 화면·기능의 제품 결정은 모두 닫혔다.** `DB-04`와 `DB-05`는 각각 결정-45·46으로, 대회 snapshot 물리 저장·적용 이력·승계 충돌은 결정-47·48로 확정됐다. `TBD-DB-01`은 좌표 정밀도와 고도 배열 PostgreSQL 타입만 남았고, D-21(saved/ran 통합 정렬·페이징)은 결정-36에 따라 GPS P1 착수 시 결정한다. 비활성 대회의 신규 동선 생성 오류는 결정-53으로 확정했다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
+**P0 화면·기능과 물리 DB 계약은 모두 닫혔다.** 저장 코스 좌표 정밀도·canonical 직렬화·고도 배열 타입은 결정-33의 08-23 재개정으로 확정됐다. D-21(saved/ran 통합 정렬·페이징)만 결정-36에 따라 GPS P1 착수 시 결정한다. 구현 중 새 결정이 필요하면 PR 본문에서 논의하고, 확정 시 §12에 추가한다.
 
 > 구 미결 1~13번은 전부 12.1의 결정으로 해소되었다 (번호는 문서 내 참조 보존을 위해 재사용하지 않음).
 
