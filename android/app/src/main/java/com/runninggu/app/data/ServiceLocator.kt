@@ -16,6 +16,9 @@ import com.runninggu.app.data.remote.AuthApi
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
+import com.runninggu.app.data.remote.FestivalApi
+import com.runninggu.app.data.remote.GeocodeApi
+import com.runninggu.app.data.remote.PoiApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
 import com.runninggu.app.data.remote.TokenApi
@@ -24,6 +27,12 @@ import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
+import com.runninggu.app.data.repository.FestivalRepository
+import com.runninggu.app.data.repository.RemoteFestivalRepository
+import com.runninggu.app.data.repository.GeocodeRepository
+import com.runninggu.app.data.repository.PoiRepository
+import com.runninggu.app.data.repository.RemoteGeocodeRepository
+import com.runninggu.app.data.repository.RemotePoiRepository
 import com.runninggu.app.data.repository.FakeSavedCourseRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
@@ -156,10 +165,19 @@ object ServiceLocator {
     /**
      * 인증. (API 명세 §1)
      *
-     * **서버에 §1 엔드포인트가 아직 없다.** 화면은 아직 `FakeAuthRepository` 를 기본값으로
-     * 쓰고, 서면 화면의 기본값만 이걸로 바꾼다 — 계약이 맞는지는 DTO 테스트가 지킨다.
+     * **A1 로그인·A2 가입이 이걸 쓴다**(2026-08-22). 서버 `auth/api` 에 `signup`·`login`·
+     * `refresh`·`logout` 과 `email/exists`·`email/send-code`·`email/verify`·
+     * `nickname/exists` 가 서면서 화면 기본값을 옮겼다 — 그전까지는 셋 다
+     * `FakeAuthRepository` 를 보고 있었다.
+     *
+     * **A3 비밀번호 재설정만 아직 가짜다.** `auth/password/reset-request` ·
+     * `auth/password/reset` 이 서버에 없다(AP-07). 서면 `ResetViewModel` 의
+     * 기본값 한 줄만 바꾸면 된다.
+     *
+     * 카카오(`auth/kakao`·`auth/kakao/signup`)도 서버에 없는데, 부르는 화면이
+     * 아직 없어 지금은 드러나지 않는다.
      */
-    val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi) }
+    val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi, tokenApi) }
 
     /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
@@ -172,4 +190,30 @@ object ServiceLocator {
      * 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을 확인할 수 없기 때문이다.
      */
     val savedCourseRepository: SavedCourseRepository by lazy { FakeSavedCourseRepository }
+
+    val festivalApi: FestivalApi by lazy { retrofit.create() }
+
+    /**
+     * 홈 축제. (API 명세 4-1 · `GET /api/festivals`)
+     *
+     * **KTO 프록시라 `502`·`504` 가 실제로 난다.** 그래서 이 저장소는 실패를 삼키지
+     * 않고 그대로 던지고, 홈이 영역 상태로 받는다(AGENTS 2장-5).
+     */
+    val festivalRepository: FestivalRepository by lazy { RemoteFestivalRepository(festivalApi) }
+
+    // ── 서버에 선 나머지 ────────────────────────────────────────
+
+    val poiApi: PoiApi by lazy { retrofit.create() }
+    val geocodeApi: GeocodeApi by lazy { retrofit.create() }
+
+    /**
+     * 위저드 숙소·슬롯 후보. (API 명세 4-2 · `GET /api/pois`)
+     *
+     * 서버 `PoiController` 가 `category`·`lat`·`lng`·`radius`·`query`·`size` 를 받는다 —
+     * 앱 [PoiApi] 와 같다.
+     */
+    val poiRepository: PoiRepository by lazy { RemotePoiRepository(poiApi) }
+
+    /** S8 출발지 검색. (`GET /api/geocode`) 서버 `GeocodeController` 가 `query` 하나를 받는다. */
+    val geocodeRepository: GeocodeRepository by lazy { RemoteGeocodeRepository(geocodeApi) }
 }

@@ -21,18 +21,21 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
+import math
 import os
 import sys
 import time
+from decimal import Decimal
 from pathlib import Path
 
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from courses.model import REGIONS, Course, normalize  # noqa: E402
+from courses.model import REGIONS, Course, nfc, normalize  # noqa: E402
 from courses.sources import REGISTRY  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -40,6 +43,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = ROOT / "data" / "courses.json"
+SCHEMA_VERSION = 1
+MINIMUM_COURSE_COUNT = 261
+COURSE_DATA_SOURCES = {"API_GPX", "GPX_ONLY"}
+DIFFICULTIES = {"EASY", "NORMAL", "HARD"}
 
 log = logging.getLogger("build_courses")
 
@@ -75,6 +82,125 @@ def build_source(spec: str):
     if cls is None:
         raise SystemExit(f"모르는 소스 '{key}'. 가능한 값: {', '.join(sorted(REGISTRY))}")
     return cls(arg) if arg else cls()
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _validate_text(value: object, path: str, *, empty_allowed: bool = False) -> None:
+    _require(isinstance(value, str), f"{path}는 문자열이어야 한다")
+    if empty_allowed and value == "":
+        return
+    _require(bool(value.strip()), f"{path}가 비었다")
+    _require(value == value.strip(), f"{path}에 앞뒤 공백이 있다")
+    _require(value == nfc(value), f"{path}가 NFC 문자열이 아니다")
+
+
+def validate_payload(payload: dict, minimum_course_count: int = MINIMUM_COURSE_COUNT) -> None:
+    """생산자 경계에서 v1 번들 전체를 검증한다. (SPEC §5.8·§8.4)"""
+    _require(set(payload) == {"schemaVersion", "sources", "courses"}, "최상위 필드가 v1 계약과 다르다")
+    _require(payload["schemaVersion"] == SCHEMA_VERSION, "schemaVersion은 1이어야 한다")
+
+    sources = payload["sources"]
+    _require(isinstance(sources, list) and sources, "sources가 비었다")
+    source_keys: set[str] = set()
+    previous_source = None
+    for index, source in enumerate(sources):
+        path = f"sources[{index}]"
+        _require(isinstance(source, dict), f"{path}는 객체여야 한다")
+        _require(
+            set(source) == {"key", "attribution", "license", "derivable"},
+            f"{path} 필드가 v1 계약과 다르다",
+        )
+        _validate_text(source["key"], f"{path}.key")
+        _validate_text(source["attribution"], f"{path}.attribution")
+        _validate_text(source["license"], f"{path}.license")
+        _require(source["derivable"] is True, f"{path}는 파생 허용 원천이어야 한다")
+        _require(source["key"] not in source_keys, f"source key가 중복됐다: {source['key']}")
+        _require(previous_source is None or previous_source < source["key"], "sources가 key 오름차순이 아니다")
+        source_keys.add(source["key"])
+        previous_source = source["key"]
+
+    courses = payload["courses"]
+    _require(isinstance(courses, list), "courses는 배열이어야 한다")
+    _require(len(courses) >= minimum_course_count, f"코스가 승인 하한 {minimum_course_count}개보다 적다")
+    course_ids: set[str] = set()
+    previous_course = None
+    gpx_only_count = 0
+    required_course_fields = {
+        "courseId", "source", "dataSource", "courseName", "sido", "sigun",
+        "distanceKm", "gainM", "difficulty", "cycle", "summary", "points",
+    }
+    for index, course in enumerate(courses):
+        path = f"courses[{index}]"
+        _require(isinstance(course, dict), f"{path}는 객체여야 한다")
+        _require(set(course) == required_course_fields, f"{path} 필드가 v1 계약과 다르다")
+        _validate_text(course["courseId"], f"{path}.courseId")
+        _validate_text(course["source"], f"{path}.source")
+        _require(course["source"] in source_keys, f"{path}가 알 수 없는 source를 참조한다")
+        _require(course["courseId"] not in course_ids, f"courseId가 중복됐다: {course['courseId']}")
+        _require(previous_course is None or previous_course < course["courseId"], "courses가 courseId 오름차순이 아니다")
+        course_ids.add(course["courseId"])
+        previous_course = course["courseId"]
+
+        _require(course["dataSource"] in COURSE_DATA_SOURCES, f"{path}.dataSource가 잘못됐다")
+        gpx_only_count += int(course["dataSource"] == "GPX_ONLY")
+        _validate_text(course["courseName"], f"{path}.courseName")
+        _validate_text(course["sido"], f"{path}.sido")
+        _require(course["sido"] in REGIONS, f"{path}.sido가 17개 시도 단축명이 아니다")
+        _validate_text(course["sigun"], f"{path}.sigun")
+        distance = course["distanceKm"]
+        _require(_is_number(distance) and distance > 0, f"{path}.distanceKm는 양수여야 한다")
+        _require(Decimal(str(distance)).as_tuple().exponent >= -1, f"{path}.distanceKm는 소수점 한 자리까지여야 한다")
+        _require(isinstance(course["gainM"], int) and not isinstance(course["gainM"], bool) and course["gainM"] >= 0,
+                 f"{path}.gainM은 0 이상 정수여야 한다")
+        _require(course["difficulty"] in DIFFICULTIES, f"{path}.difficulty가 잘못됐다")
+        _validate_text(course["cycle"], f"{path}.cycle", empty_allowed=True)
+        _validate_text(course["summary"], f"{path}.summary", empty_allowed=True)
+
+        points = course["points"]
+        _require(isinstance(points, list) and len(points) >= 2, f"{path}.points는 점이 2개 이상이어야 한다")
+        previous_gain = None
+        for point_index, point in enumerate(points):
+            point_path = f"{path}.points[{point_index}]"
+            _require(isinstance(point, list) and len(point) == 4, f"{point_path}는 숫자 4개여야 한다")
+            _require(all(_is_number(value) for value in point), f"{point_path}에 유효하지 않은 숫자가 있다")
+            lat, lng, _, cumulative_gain = point
+            _require(-90 <= lat <= 90, f"{point_path} 위도가 범위를 벗어났다")
+            _require(-180 <= lng <= 180, f"{point_path} 경도가 범위를 벗어났다")
+            _require(cumulative_gain >= 0, f"{point_path} 누적 상승고도가 음수다")
+            _require(previous_gain is None or previous_gain <= cumulative_gain,
+                     f"{path}.points 누적 상승고도가 감소한다")
+            previous_gain = cumulative_gain
+    _require(gpx_only_count > 0, "GPX_ONLY가 0건이라 시드 누락 가능성이 있다")
+
+
+def build_payload(courses: list[Course], sources: list, minimum_course_count: int = MINIMUM_COURSE_COUNT) -> dict:
+    """결정적으로 정렬한 v1 번들을 만들고 파일 쓰기 전에 검증한다."""
+    payload = {
+        "schemaVersion": SCHEMA_VERSION,
+        "sources": sorted(
+            [
+                {
+                    "key": source.key,
+                    "attribution": nfc(source.attribution).strip(),
+                    "license": nfc(source.license).strip(),
+                    "derivable": source.derivable,
+                }
+                for source in sources
+            ],
+            key=lambda source: source["key"],
+        ),
+        "courses": [course.to_json() for course in sorted(courses, key=lambda course: course.id)],
+    }
+    validate_payload(payload, minimum_course_count)
+    return payload
 
 
 def regeocode(courses: list[Course], rest_key: str, delay: float = 0.1) -> int:
@@ -167,7 +293,7 @@ def main() -> int:
 
     courses: list[Course] = []
     declared: dict[str, float | None] = {}
-    attributions: list[str] = []
+    selected_sources = []
 
     for spec in [s.strip() for s in args.sources.split(",") if s.strip()]:
         src = build_source(spec)
@@ -175,6 +301,8 @@ def main() -> int:
             print(f"건너뜀: {spec} — 라이선스상 구간 잘라내기 불가 ({src.license})")
             print("        지역별 탭 전용으로 포함하려면 --include-nonderivable")
             continue
+
+        selected_sources.append(src)
 
         print(f"수집 중: {spec} ...")
         n = 0
@@ -188,8 +316,6 @@ def main() -> int:
             declared[c.id] = raw.declared_km
             n += 1
         print(f"  → {n}코스")
-        if src.attribution:
-            attributions.append(src.attribution)
 
     if not courses:
         print("수집된 코스가 없다.")
@@ -203,19 +329,19 @@ def main() -> int:
             print("지역 재계산 중 ...")
             print(f"  → {regeocode(courses, rest_key)}건 정정")
 
-    courses.sort(key=lambda c: (c.sido, c.name))
-    payload = {
-        "attribution": attributions,
-        "courses": [c.to_json() for c in courses],
-    }
+    try:
+        payload = build_payload(courses, selected_sources)
+    except ValueError as error:
+        print(f"번들 검증 실패: {error}")
+        return 1
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
-    )
+    args.out.write_bytes(encoded)
 
     report(courses, declared)
     print(f"\n저장: {args.out} ({args.out.stat().st_size / 1024:.0f} KB)")
-    print(f"출처 표기: {' · '.join(attributions)}")
+    print(f"SHA-256: {hashlib.sha256(encoded).hexdigest()}")
+    print(f"출처 표기: {' · '.join(source.attribution for source in selected_sources)}")
     return 0
 
 

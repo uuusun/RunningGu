@@ -5,10 +5,12 @@ import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.AuthApi
+import com.runninggu.app.data.remote.TokenApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.dto.AgreementsRequestDto
 import com.runninggu.app.data.remote.dto.AuthTokenResponseDto
 import com.runninggu.app.data.remote.dto.LoginRequestDto
+import com.runninggu.app.data.remote.dto.LogoutRequestDto
 import com.runninggu.app.data.remote.dto.ResetRequestDto
 import com.runninggu.app.data.remote.dto.SendCodeRequestDto
 import com.runninggu.app.data.remote.dto.SignupRequestDto
@@ -23,7 +25,16 @@ import com.runninggu.app.data.remote.dto.VerifyCodeRequestDto
  *
  * **소문자 정규화는 하지 않는다.** 그건 서버 몫이다 — 규칙이 두 벌이면 갈라진다.
  */
-class RemoteAuthRepository(private val api: AuthApi) : AuthRepository {
+class RemoteAuthRepository(
+    private val api: AuthApi,
+    /**
+     * 로그아웃 전용. **인증자 없는 클라이언트**라 [api] 와 갈라 받는다 (이슈 #113).
+     *
+     * 저장소 하나가 API 둘을 보는 게 어색해 보이지만, 갈리는 기준은 "무슨 기능이냐" 가
+     * 아니라 **"인증자를 타도 되느냐"** 다. 화면은 그 차이를 알 필요가 없어 여기서 숨긴다.
+     */
+    private val tokenApi: TokenApi,
+) : AuthRepository {
 
     override suspend fun emailExists(email: String): Result<Boolean> = call {
         api.emailExists(email.normalized()).exists
@@ -70,6 +81,10 @@ class RemoteAuthRepository(private val api: AuthApi) : AuthRepository {
 
     override suspend fun requestPasswordReset(email: String): Result<Unit> = call {
         api.requestPasswordReset(ResetRequestDto(email.normalized()))
+    }
+
+    override suspend fun logout(refreshToken: String): Result<Unit> = call {
+        tokenApi.logout(LogoutRequestDto(refreshToken))
     }
 
     /**

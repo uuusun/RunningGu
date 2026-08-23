@@ -58,6 +58,16 @@ interface AuthRepository {
 
     /** `POST /auth/password/reset-request`. 가입 여부와 무관하게 `202`(§4.3 계정 존재 비노출). */
     suspend fun requestPasswordReset(email: String): Result<Unit>
+
+    /**
+     * `POST /auth/logout` — 그 리프레시를 revoke 한다. (§1-10 · 이슈 #113)
+     *
+     * **인증자 없는 클라이언트로 나간다**([TokenApi]). 이유는 그쪽 KDoc 에 있다.
+     *
+     * 실패를 삼키지 않는다 — **서버가 지웠는지 모르는 채로 로컬만 지우면** 사용자는
+     * 로그아웃했다고 믿는데 서버 세션이 남는다. 화면이 결과를 보고 정한다.
+     */
+    suspend fun logout(refreshToken: String): Result<Unit>
 }
 
 /**
@@ -159,6 +169,12 @@ object FakeAuthRepository : AuthRepository {
     override suspend fun requestPasswordReset(email: String): Result<Unit> {
         delay(NETWORK_DELAY_MS)
         offlineOrNull<Unit>(email)?.let { return it }
+        return Result.success(Unit)
+    }
+
+    /** 스텁은 언제나 성공한다. 서버가 없으니 revoke 할 것도 없다. */
+    override suspend fun logout(refreshToken: String): Result<Unit> {
+        delay(NETWORK_DELAY_MS)
         return Result.success(Unit)
     }
 

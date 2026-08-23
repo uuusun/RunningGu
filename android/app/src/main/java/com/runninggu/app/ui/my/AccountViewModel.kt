@@ -7,6 +7,8 @@ import com.runninggu.app.ui.auth.AuthValidation
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
 import kotlinx.coroutines.delay
@@ -42,11 +44,14 @@ data class AccountUiState(
 /**
  * 계정 관리. (SPEC §4.13 · AP-13)
  *
- * 전부 Fake 처리다 — TODO(AP-14): `PATCH /me`(닉네임) · `PATCH /me/agreements` ·
- * `PUT /me/password`(EMAIL만, 토큰 쌍 재발급 D-28) · `POST /auth/logout` ·
+ * **로그아웃만 서버를 본다**(이슈 #113). 나머지는 아직 Fake 다 —
+ * TODO(AP-14): `PATCH /me`(닉네임) · `PATCH /me/agreements` ·
+ * `PUT /me/password`(EMAIL만, 토큰 쌍 재발급 D-28) ·
  * `POST /me/reauth` + `DELETE /me`(탈퇴 재인증 D-23) 로 교체한다.
  */
-class AccountViewModel : ViewModel() {
+class AccountViewModel(
+    private val repository: AuthRepository = ServiceLocator.authRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AccountUiState())
     val uiState: StateFlow<AccountUiState> = _uiState.asStateFlow()
@@ -132,13 +137,28 @@ class AccountViewModel : ViewModel() {
     }
 
     /**
-     * 로그아웃. **디스크에서 토큰이 지워진 뒤에** 화면을 넘긴다. (#89 리뷰)
+     * 로그아웃. **서버에서 revoke 한 뒤 기기에서 지운다.** (§1-10 · 이슈 #113)
      *
-     * 예약만 하고 넘기면, 로그인 화면으로 이동한 직후 프로세스가 죽었을 때 **다음 실행에
-     * 이전 리프레시 토큰이 되살아난다.** 남의 기기에 계정이 남는 쪽이라 여기서는 기다린다.
+     * 순서가 중요하다. 로컬을 먼저 지우면 리프레시 토큰이 사라져 **revoke 할 자격을
+     * 잃는다** — 서버에는 쓸 수 있는 세션이 남고 사용자는 로그아웃했다고 믿는다.
+     *
+     * **서버 실패에는 로그인 상태를 유지한다.** 네트워크·5xx 는 "지워졌는지 모르는"
+     * 상태라, 그때 기기만 비우면 위와 같은 결과가 된다. 다시 시도하게 한다.
+     *
+     * 그 뒤에도 **디스크에서 토큰이 지워진 것을 확인하고** 화면을 넘긴다(#89 리뷰) —
+     * 예약만 하고 넘기면 직후 프로세스가 죽었을 때 다음 실행에 이전 세션이 되살아난다.
      */
     fun onLogout() {
         viewModelScope.launch {
+            val refreshToken = SessionStore.tokens?.refreshToken
+            // 지울 토큰이 없으면 서버에 물을 것도 없다. 게스트이거나 이미 정리된 상태다.
+            if (!refreshToken.isNullOrBlank()) {
+                val revoked = repository.logout(refreshToken)
+                if (revoked.isFailure) {
+                    _uiState.update { it.copy(message = LOGOUT_REVOKE_FAILED_MESSAGE) }
+                    return@launch
+                }
+            }
             // **지워진 것을 확인하기 전에는 완료로 넘기지 않는다** (#89 리뷰).
             // 못 지웠는데 로그인 화면으로 보내면, 다음 실행에 이전 계정이 되살아난다
             if (!SessionStore.signOutAndAwait()) {
@@ -172,6 +192,13 @@ class AccountViewModel : ViewModel() {
     private companion object {
         /** 기기에서 못 지웠다. 로그인 상태를 유지한 채 다시 시도하게 한다 (#89 리뷰). */
         const val LOGOUT_FAILED_MESSAGE = "기기에서 로그아웃 정보를 지우지 못했어요. 다시 시도해 주세요."
+
+        /**
+         * 서버에 못 닿았다. **기기 토큰을 남긴 채** 다시 시도하게 한다 (이슈 #113).
+         *
+         * 여기서 기기만 비우면 서버 세션이 살아남는다 — 사용자는 로그아웃했다고 믿는다.
+         */
+        const val LOGOUT_REVOKE_FAILED_MESSAGE = "로그아웃하지 못했어요. 연결을 확인하고 다시 시도해 주세요."
 
         const val FAKE_DELAY_MS = 300L
     }
