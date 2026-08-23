@@ -2,12 +2,15 @@ package com.runninggu.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runninggu.app.domain.RegistrationStatus
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.ContestRepository
+import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.ui.common.SectionState
-import com.runninggu.app.ui.model.registrationStatus
-import com.runninggu.app.ui.sample.SampleData
+import com.runninggu.app.ui.model.toFestivalSummary
+import com.runninggu.app.ui.model.toRaceSummary
+import com.runninggu.app.ui.userMessageOrDefault
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,11 +24,12 @@ import kotlinx.coroutines.launch
  * 그대로 보여야 한다(AGENTS 2장-5). 재시도도 영역별이다 — KTO 가 죽었다고 우리 DB 에서
  * 오는 대회 목록까지 다시 부를 이유가 없다.
  *
- * TODO(AP-14): 임시 데이터를 `ServiceLocator.contestRepository.closingSoon()` 과
- *  축제 저장소로 교체한다. **영역 구조는 그대로 두고 안쪽만 바뀐다** — 서버가
- *  `GET /api/contests/closing-soon` 을 이미 내주고 있어서 마감 임박이 먼저 붙는다.
+ * 두 영역 모두 **서버를 본다**(AP-14). 마감 임박은 우리 DB(canonical), 축제는 KTO 프록시다.
  */
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+    private val contestRepository: ContestRepository = ServiceLocator.contestRepository,
+    private val festivalRepository: FestivalRepository = ServiceLocator.festivalRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -46,36 +50,50 @@ class HomeViewModel : ViewModel() {
         _searchQuery.value = query
     }
 
-    /** 마감 임박만 다시 조회한다. (SPEC §4.4-3) */
+    /**
+     * 마감 임박만 다시 조회한다. (SPEC §4.4-3 · API 명세 §3-3)
+     *
+     * **거르고 자르는 일은 서버가 한다.** 접수중 판정도 `limit` 도 계약이라(§3-3),
+     * 앱이 한 번 더 거르면 서버가 4건을 줬는데 화면에 3건이 뜨는 일이 생긴다.
+     */
     fun loadClosingSoon() {
         closingSoonJob?.cancel()
         closingSoonJob = viewModelScope.launch {
             _uiState.update { it.copy(closingSoon = SectionState.Loading) }
-            delay(LOADING_DELAY_MS) // 임시 — 실제 조회로 교체하면 제거한다.
-
-            // 접수중 ∧ regEnd 임박순 상위 4건. (SPEC §4.4-3 · 결정-28)
-            val races = SampleData.races
-                .filter { it.registrationStatus() == RegistrationStatus.OPEN && it.regEnd != null }
-                .sortedBy { it.regEnd }
-                .take(CLOSING_SOON_LIMIT)
-
-            _uiState.update { it.copy(closingSoon = races.toSectionState()) }
+            val next = try {
+                contestRepository.closingSoon(CLOSING_SOON_LIMIT)
+                    .map { it.contest.toRaceSummary() }
+                    .toSectionState()
+            } catch (e: ApiException) {
+                SectionState.Error(e.userMessageOrDefault())
+            }
+            _uiState.update { it.copy(closingSoon = next) }
         }
     }
 
-    /** 축제만 다시 조회한다. (SPEC §4.4-4) */
+    /**
+     * 축제만 다시 조회한다. (SPEC §4.4-4 · API 명세 §4-1)
+     *
+     * **위치를 쓰지 않는다.** 홈은 전국 월간 목록이다(D-04 · 결정-28) — 홈에 들어왔다는
+     * 이유로 위치 권한을 묻지 않기로 했다.
+     *
+     * 여기가 KTO 프록시라 `502`·`504` 가 실제로 난다. 실패해도 [loadClosingSoon] 결과는
+     * 그대로 남는다(AGENTS 2장-5).
+     */
     fun loadFestivals() {
         festivalsJob?.cancel()
         festivalsJob = viewModelScope.launch {
             _uiState.update { it.copy(festivals = SectionState.Loading) }
-            delay(LOADING_DELAY_MS) // 임시 — 실제 조회로 교체하면 제거한다.
-
-            _uiState.update { it.copy(festivals = SampleData.festivals.toSectionState()) }
+            val next = try {
+                festivalRepository.list().map { it.toFestivalSummary() }.toSectionState()
+            } catch (e: ApiException) {
+                SectionState.Error(e.userMessageOrDefault())
+            }
+            _uiState.update { it.copy(festivals = next) }
         }
     }
 
     private companion object {
-        const val LOADING_DELAY_MS = 400L
         /**
          * 홈 마감 임박 노출 건수. (SPEC §4.4-3 🔒 · 결정-28)
          *

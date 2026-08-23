@@ -16,6 +16,7 @@ import com.runninggu.app.data.remote.AuthApi
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
+import com.runninggu.app.data.remote.FestivalApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
 import com.runninggu.app.data.remote.TokenApi
@@ -24,6 +25,8 @@ import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
+import com.runninggu.app.data.repository.FestivalRepository
+import com.runninggu.app.data.repository.RemoteFestivalRepository
 import com.runninggu.app.data.repository.FakeSavedCourseRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
@@ -181,4 +184,14 @@ object ServiceLocator {
      * 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을 확인할 수 없기 때문이다.
      */
     val savedCourseRepository: SavedCourseRepository by lazy { FakeSavedCourseRepository }
+
+    val festivalApi: FestivalApi by lazy { retrofit.create() }
+
+    /**
+     * 홈 축제. (API 명세 4-1 · `GET /api/festivals`)
+     *
+     * **KTO 프록시라 `502`·`504` 가 실제로 난다.** 그래서 이 저장소는 실패를 삼키지
+     * 않고 그대로 던지고, 홈이 영역 상태로 받는다(AGENTS 2장-5).
+     */
+    val festivalRepository: FestivalRepository by lazy { RemoteFestivalRepository(festivalApi) }
 }
