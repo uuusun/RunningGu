@@ -415,9 +415,11 @@ private fun NearbyFestivalSection(
                 ErrorState(message = "축제를 못 불러왔어요.", onRetry = onRetry)
 
             // 좌표가 없어 서버가 반경을 못 잰다. **[다시 시도]를 붙이지 않는다** —
-            // 다시 눌러도 좌표는 생기지 않는다. 문구는 명세가 고정한다 (§3-5).
+            // 다시 눌러도 좌표는 생기지 않는다. 다만 **빈 상태로 그리지도 않는다** —
+            // 명세가 "빈 상태가 아니라 재시도 버튼이 없는 별도 오류 상태" 로 못 박는다
+            // (§3-5). 아래 빈 상태와 같아 보이면 "축제가 없는 대회" 와 구분이 안 된다.
             phase == RaceDetailUiState.FestivalPhase.LOCATION_UNAVAILABLE ->
-                EmptyState(title = "인근 축제를 확인할 수 없어요.")
+                ErrorState(message = "인근 축제를 확인할 수 없어요.")
 
             festivals.isEmpty() ->
                 EmptyState(
