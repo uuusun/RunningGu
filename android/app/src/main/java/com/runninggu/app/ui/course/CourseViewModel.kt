@@ -13,7 +13,6 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.LocationProvider
 import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.repository.FakeCourseRepository
-import com.runninggu.app.data.repository.FakeGeocodeRepository
 import com.runninggu.app.data.repository.GeocodeRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -258,9 +257,16 @@ class CourseViewModel(
         /** 좌표를 그대로 보여줄 수는 없다. 목업도 "내 위치" 로 적는다. */
         private const val MY_LOCATION_LABEL = "내 위치"
 
+        /**
+         * 출발지 검색만 서버로 옮겼다. (AP-14)
+         *
+         * 코스 자체는 아직 가짜다 — 서버에 `/api/courses`·`/api/courses/near` 가 없다
+         * (AP-07 · AP-25). 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을
+         * 확인할 수 없다. 서면 [ServiceLocator.courseRepository] 로 바꾼다.
+         */
         fun factory(
             repository: CourseRepository = FakeCourseRepository,
-            geocodeRepository: GeocodeRepository = FakeGeocodeRepository,
+            geocodeRepository: GeocodeRepository = ServiceLocator.geocodeRepository,
             locationProvider: LocationProvider = ServiceLocator.locationProvider,
         ) = viewModelFactory {
             initializer { CourseViewModel(repository, geocodeRepository, locationProvider) }

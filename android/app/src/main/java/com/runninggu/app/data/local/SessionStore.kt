@@ -317,7 +317,12 @@ object SessionStore {
 
     /**
      * 세션을 비운다. **디스크는 예약만 된다** — 지워진 것을 확인해야 하면
-     * [signOutAndAwait] 를 쓴다. 서버 revoke 연결은 이슈 #99 · #106 에서 붙는다.
+     * [signOutAndAwait] 를 쓴다.
+     *
+     * **여기서 서버를 부르지 않는다.** 토큰을 지우고 나면 revoke 할 자격이 사라지므로,
+     * 순서는 `POST /auth/logout` → 이 함수다. 화면(`AccountViewModel.onLogout`)이
+     * 그 순서를 지킨다(이슈 #113). 이 함수는 세션 만료·계정 전환처럼 **서버에 물을
+     * 것이 없는 정리**에도 쓰이므로 서버 호출을 안에 넣으면 안 된다.
      */
     @Synchronized
     fun signOut() {
