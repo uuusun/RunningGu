@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.10
+# 런닝구 화면–API 매핑표 v1.11
 
-> 갱신일: 2026-08-21
+> 갱신일: 2026-08-23
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v3.0(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v3.1(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -274,7 +274,7 @@ Compose 화면
 | 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items(`provider=KAKAO|KTO`, `(name,lat,lng)` 조합 유일), 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
 | 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | 같은 POI item 계약 | Android 500ms debounce, 2자 미만은 호출 안 함 |
 | 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
-| 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | recovery, days[], blocks[] | 비활성은 생성 차단(status/code는 #56 추가 리뷰 대기). 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
+| 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | 지역 없는 기간 `title`, recovery, days[](dayIndex=대회일 상대 오프셋), blocks[] | 비활성은 `409 CONTEST_INACTIVE`. HALF/FULL 회복일은 D+, D+가 없으면 D-day. 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
 
 S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `(name, lat, lng)` 조합을 사용한다.
 주소는 원천에 없으면 빈 문자열일 수 있으므로 `key`에 사용하지 않는다.
@@ -370,8 +370,8 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 | 행동 | API/SDK | 요청 | 성공·실패 |
 |---|---|---|---|
-| 닉네임 변경 | `PATCH /api/me` | nickname | 응답 계약 보완 필요, duplicated 처리 |
-| 마케팅 동의 | `PATCH /api/me/agreements` | marketing | 응답 계약 보완 필요 |
+| 닉네임 변경 | `PATCH /api/me` | nickname | `200` 현재 프로필 전체, duplicated 처리 |
+| 마케팅 동의 | `PATCH /api/me/agreements` | marketing | `200` 현재 프로필 전체. 같은 값은 이력 추가 없는 멱등 성공 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
 | 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
@@ -475,7 +475,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-14 | block PATCH는 갱신 block 전체, order PUT은 해당 일자 blocks 전체를 `200`으로 반환 |
 | D-15(개정) | S7→S8은 출발지·`min(RECOVERY.walk,5)` 목표거리만 `CourseLaunchContext`로 전달. 종목·난이도는 전달하지 않고 좌표를 route 문자열에 넣지 않음 |
 | D-16 | Empty는 입력 유지 후 위저드 복귀·조건 수정, Error는 같은 요청 재시도 |
-| D-18(개정) | 서버가 geometry 좌표열만 정규화해 `v1:`+SHA-256 `routeFingerprint`를 계산하고 사용자별 멱등 저장. 진행 반대는 별개, 연속 중복점 제거, 신규 201·중복 200 기존 id. 좌표 정밀도는 TBD |
+| D-18(08-23 개정) | `pathPolyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5). 서버가 연속 중복점을 제거하고 소수점 5자리 `lat,lng`를 `;`로 연결한 UTF-8 canonical geometry로 `v1:`+SHA-256 `routeFingerprint`를 계산해 사용자별 멱등 저장. 진행 반대는 별개, 신규 201·중복 200 기존 id |
 | D-20 | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved/ran 분리 route |
 | D-22 | 내 정보·계정 관리는 보관함 설정에서 여는 별도 화면 |
 | D-23 | 탈퇴 전 EMAIL/KAKAO 재인증으로 5분 token 발급, DELETE 성공 후 모든 세션·캐시 삭제 |
@@ -488,11 +488,13 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-31 / SPEC 결정-51 | Access 30분·Refresh 14일, 기기별 refresh family 회전·재사용 탐지를 적용한다. 로그아웃은 Access 없이 Authenticator가 붙지 않는 클라이언트로 호출하고 non-blank refresh 결과와 무관하게 204를 받으면 로컬 세션을 삭제한다 |
 | D-32 / SPEC 결정-52 | 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 계약 PR에서 함께 확인한다(이슈 #111) |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
+| DB-01 / SPEC 결정-33(08-23 재개정) | 저장 코스 polyline은 2D Google Encoded Polyline precision 5(E5). 고정 `lat,lng` canonical geometry로 fingerprint를 계산하고, `elevationProfileM`은 최대 100개 정수·미보유 `[]`·PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |
 | DB-05 / SPEC 결정-46 | 승인된 full snapshot에서 source 2회 연속 누락 시 비활성. 실패·부분 snapshot은 미반영, 재등장은 즉시 복구, canonical은 활성 source가 없을 때만 비활성. 공개 탐색 제외·참조 상세 유지 |
 | SPEC 결정-48 | 다중 원천은 정상 수용. 최대 source 겹침 동률 또는 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 Importer가 snapshot 전체를 거부하고 기존 참조·누락 상태·적용 이력을 유지 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
+| SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
 
 ### P1 착수 시 재논의
 
@@ -500,7 +502,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 |---|---|---|---|
 | D-21 | saved/ran 통합 정렬·페이징 | 보관함 목록 계약 | 앱+백엔드 |
 
-P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45·46으로, 대회 snapshot 승계 충돌은 결정-48로 확정됐다. 남은 `TBD-DB-01`은 fingerprint 좌표 정밀도와 고도 배열 저장 타입이며, D-21은 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다. 비활성 대회 생성 차단의 정확한 HTTP status·오류 `code`만 이슈 #56 추가 리뷰 후 API 명세에 보완한다.
+P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01은 결정-33의 08-23 재개정으로 확정됐고, D-21만 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
 
 ---
 
@@ -530,8 +532,9 @@ P0 화면·기능의 제품 결정은 모두 닫혔다. `DB-04·05`는 결정-45
 | API | 보완할 계약 |
 |---|---|
 | `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
-| `PATCH /api/me` | 성공 status와 응답 body |
-| `PATCH /api/me/agreements` | 성공 status와 응답 body |
+
+현재 P0 API의 springdoc 상세화 미정 항목은 없다. GPS 기록 P1 착수 시 `GET /api/runs` 계약을
+확정하고 이 표를 다시 연다.
 
 ---
 

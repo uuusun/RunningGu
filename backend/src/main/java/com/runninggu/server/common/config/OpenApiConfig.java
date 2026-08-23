@@ -16,7 +16,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("런닝구 API")
-                        .version("v3.0")
+                        .version("v3.1")
                         .description("런닝구 Android 앱용 백엔드 API"))
                 .components(new Components().addSecuritySchemes(
                         "bearerAuth",
