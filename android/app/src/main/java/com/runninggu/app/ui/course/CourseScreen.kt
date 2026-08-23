@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +57,7 @@ import com.runninggu.app.ui.common.ElevationLine
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.NumberRail
 
 /**
  * S8 러닝코스. (SPEC §4.11 · AP-12)
@@ -362,80 +362,56 @@ private fun NearbyRow(
             NumberRail(number)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (item is NearbyItem.Route) {
-                    // 원천 이름 대신 "따라갈 경로가 있는가" 만 표시한다 (§4.11-5)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (item is NearbyItem.Route) {
+                        // 원천 이름 대신 "따라갈 경로가 있는가" 만 표시한다 (§4.11-5)
+                        Text(
+                            text = "경로",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
                     Text(
-                        text = "경로",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        text = item.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
                     )
-                    Spacer(Modifier.width(6.dp))
                 }
+
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    text = nearbySubtitle(item),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
 
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = nearbySubtitle(item),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (item is NearbyItem.Route) {
-                if (item.elevationProfileM.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    ElevationLine(
-                        seed = item.routeId.hashCode(),
-                        closed = false,
-                        profile = item.elevationProfileM.map { it.toFloat() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(28.dp),
-                    )
+                if (item is NearbyItem.Route) {
+                    if (item.elevationProfileM.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        ElevationLine(
+                            seed = item.routeId.hashCode(),
+                            closed = false,
+                            profile = item.elevationProfileM.map { it.toFloat() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp),
+                        )
+                    }
+                    if (item.shortfall) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "이 근처 경로가 짧아 목표(${formatKm(targetKm)}km)보다 짧게 짜였어요.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
-                if (item.shortfall) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "이 근처 경로가 짧아 목표(${formatKm(targetKm)}km)보다 짧게 짜였어요.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
             }
         }
-    }
-}
-
-/**
- * 목록 순번. **지도 번호 핀과 같은 값이다.** (SPEC §4.11-4 "리스트 번호 일치")
- *
- * S7 타임라인의 번호 레일과 같은 모양으로 둔다 — 두 화면이 같은 뜻(순번)에 다른 모양을
- * 쓰면 사용자가 새로 배워야 한다.
- */
-@Composable
-private fun NumberRail(number: Int) {
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "$number",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
     }
 }
 
