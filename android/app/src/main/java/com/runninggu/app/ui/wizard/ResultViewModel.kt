@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
-import com.runninggu.app.data.repository.FakePoiRepository
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
 
 /**
@@ -29,12 +29,20 @@ import com.runninggu.app.data.repository.PoiRepository
  * 서버에 맡기고(결정-41), 받은 응답을 화면 상태로 들고 있는다. 저장 전 USER 블록 편집만
  * 앱 몫이다(§5.7).
  *
- * 서버가 서면 [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다 —
- * 화면은 그대로다(AGENTS 4장).
+ * **동선 저장소는 아직 가짜다** — 서버에 `/api/itineraries` 가 없다(AP-07). 서면
+ * [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다. 교체·추가
+ * 시트가 쓰는 POI 는 `GET /api/pois` 가 서 있어 먼저 옮겼다. 화면은 그대로다(AGENTS 4장).
  */
 class ResultViewModel(
+    /**
+     * **아직 가짜다.** 서버에 `/api/itineraries` 가 없다(AP-07 · SPEC 결정-41).
+     *
+     * 동선 생성은 서버 단일 주체라 앱 엔진을 대신 붙일 수도 없다 — 서면 이 한 줄을
+     * `ServiceLocator` 것으로 바꾼다.
+     */
     private val repository: ItineraryRepository = FakeItineraryRepository,
-    private val poiRepository: PoiRepository = FakePoiRepository,
+    /** 교체·추가 시트의 후보. 이쪽은 서버에 `GET /api/pois` 가 있어 옮겼다. */
+    private val poiRepository: PoiRepository = ServiceLocator.poiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ResultUiState())
@@ -53,12 +61,15 @@ class ResultViewModel(
     private var lastRegion: String = ""
 
     /**
-     * 후보 시트의 조회 중심. 숙소 > 대회장 순서다. (SPEC §4.10)
+     * 후보 시트의 조회 중심. **숙소 > 대회장** 순서다. (SPEC §4.10)
      *
-     * TODO(AP-14): 숙소를 안 골랐으면 `GET /contests/{id}` 의 대회장 lat/lng 를 쓴다 (API 명세 §3-4).
-     *  [RaceSummary] 에 좌표가 없어 지금은 원점이 폴백이다 — S6 StayViewModel.start 와 같은 제약.
+     * 숙소는 선택 사항이라(§4.9) 안 고르고 온 경우가 정상이다. 그때 대회장으로 떨어지지
+     * 않고 `(0.0, 0.0)` 으로 가면 기니만 앞바다 후보가 나온다(#136 리뷰).
+     *
+     * 둘 다 없으면 **null 이다** — 조회를 아예 하지 않는다. 좌표 없는 대회는 S3 CTA 가
+     * 막으므로(§4.6) 실제로는 여기 닿지 않는다.
      */
-    private var sheetCenter: Pair<Double, Double> = 0.0 to 0.0
+    private var sheetCenter: Pair<Double, Double>? = null
 
     /** 위저드 상태로 생성을 요청한다. 같은 조건이면 다시 부르지 않는다. */
     fun generate(wizard: WizardUiState) {
@@ -69,8 +80,13 @@ class ResultViewModel(
             _uiState.update { it.copy(phase = ResultUiState.Phase.ERROR, errorMessage = wizard.blockedReason()) }
             return
         }
-        // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다.
-        sheetCenter = wizard.stay?.let { it.lat to it.lng } ?: (0.0 to 0.0)
+        // 이전 여정의 숙소 좌표가 남지 않게 매번 다시 정한다. 숙소 > 대회장 순이다(§4.10).
+        sheetCenter = wizard.stay?.let { it.lat to it.lng }
+            ?: wizard.race?.let { race ->
+                val lat = race.lat
+                val lng = race.lng
+                if (lat != null && lng != null) lat to lng else null
+            }
         // LOADING 중 LaunchedEffect 재발화(회전·재진입)로 같은 요청이 두 번 나가는 것도 막는다.
         // EMPTY·ERROR 는 재진입 시 다시 시도한다 — 기존 동작 유지.
         if (request == lastRequest &&
@@ -206,7 +222,11 @@ class ResultViewModel(
         _uiState.update {
             it.copy(sheet = sheet.copy(phase = CandidateSheetState.Phase.LOADING))
         }
-        val (lat, lng) = sheetCenter
+        // 기준 좌표가 없으면 후보를 부를 수 없다. 빈 시트를 여는 대신 조회를 건너뛴다.
+        val (lat, lng) = sheetCenter ?: run {
+            _uiState.update { it.copy(sheet = sheet.copy(phase = CandidateSheetState.Phase.EMPTY)) }
+            return
+        }
         viewModelScope.launch {
             val outcome = runCatching { poiRepository.search(sheet.category, lat, lng) }
             _uiState.update { state ->

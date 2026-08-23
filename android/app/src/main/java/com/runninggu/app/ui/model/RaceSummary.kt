@@ -42,6 +42,16 @@ data class RaceSummary(
     val organizer: String? = null,
     val officialUrl: String? = null,
     /**
+     * 대회장 좌표. **S3 상세에서만 온다.** (API 명세 §3-4 · SPEC §4.6)
+     *
+     * canonical 153건은 좌표 누락 0건이지만 nullable 로 방어한다 — 원천이 늘면 빠질 수
+     * 있고, 없는 좌표를 `(0.0, 0.0)` 으로 지어내면 기니만 앞바다를 조회하게 된다(#136 리뷰).
+     *
+     * S6 숙소 조회와 S7 후보 시트가 이 값을 기준 좌표로 쓴다(§4.9 · §4.10).
+     */
+    val lat: Double? = null,
+    val lng: Double? = null,
+    /**
      * 원천에서 사라진 대회인가. (API 명세 §3-4 · SPEC 결정-46)
      *
      * 공개 목록(S2)에는 `active=true` 만 오므로 **여기서 false 를 보는 곳은 찜 목록과
@@ -62,6 +72,15 @@ data class RaceSummary(
  */
 fun RaceSummary.isDimmed(today: LocalDate = today()): Boolean =
     !active || date.isBefore(today)
+
+/**
+ * 대회장 좌표가 있는가. (SPEC §4.6 · `Contest.hasLocation` 과 같은 판정)
+ *
+ * 좌표가 없으면 S6 숙소·S7 후보를 대회장 기준으로 조회할 수 없다. P0 에서는 동선 만들기
+ * CTA 를 막는 근거로 쓴다 — 좌표 전용 안내 UX 는 P1 이다(§4.6).
+ */
+val RaceSummary.hasLocation: Boolean
+    get() = lat != null && lng != null
 
 /**
  * 대회일까지 남은 일수. 오늘이면 0, 지났으면 음수. (SPEC §4.6 · KST 기준 §6.6)

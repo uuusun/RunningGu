@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
-import com.runninggu.app.data.repository.FakePoiRepository
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
 
 /**
@@ -39,10 +39,15 @@ data class StayUiState(
  * 고른 숙소는 [WizardViewModel] 에 넣는다 — S7 이 `POST /itineraries/generate` 요청에
  * 실어 보내야 하기 때문이다.
  *
- * TODO(AP-14): [FakePoiRepository] 를 Retrofit 구현으로 교체한다.
+ * 저장소는 서버 `GET /api/pois` 를 부른다(AP-14, 2026-08-22 연결).
  */
 class StayViewModel(
-    private val repository: PoiRepository = FakePoiRepository,
+    /**
+     * 기본은 **서버 저장소**다. (AP-14 · `GET /api/pois`)
+     *
+     * 테스트·미리보기에서는 생성자로 가짜 저장소를 바꿔 끼운다 — 화면은 안 건드린다.
+     */
+    private val repository: PoiRepository = ServiceLocator.poiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StayUiState())
