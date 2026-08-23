@@ -2,10 +2,11 @@ package com.runninggu.server.auth.api;
 
 import com.runninggu.server.auth.application.AuthenticatedUser;
 import com.runninggu.server.auth.domain.LoginProvider;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record AuthUserResponse(
         long id,
-        String email,
+        @Schema(nullable = true) String email,
         String nickname,
         LoginProvider loginProvider) {
 

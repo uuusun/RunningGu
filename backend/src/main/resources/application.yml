@@ -76,6 +76,10 @@ runninggu:
     from-address: ${SMTP_FROM_ADDRESS:}
     from-name: ${SMTP_FROM_NAME:런닝구}
   external:
+    kakao-user-info:
+      base-url: https://kapi.kakao.com
+      connect-timeout: 1s
+      read-timeout: 2500ms
     kakao-local:
       base-url: https://dapi.kakao.com
       rest-key: ${KAKAO_REST_KEY:}

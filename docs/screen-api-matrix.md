@@ -176,7 +176,7 @@ Compose 화면
 |---|---|---|---|---|---|
 | 이메일 로그인 | `POST /api/auth/login` | email, password | token pair + user | pending route가 있으면 복귀, 없으면 홈 | `LOGIN_FAILED` 인라인 오류 |
 | 카카오 시작 | Kakao Android SDK | 없음 | kakaoAccessToken | 다음 API 호출 | SDK 취소/오류 |
-| 카카오 계정 확인 | `POST /api/auth/kakao` | kakaoAccessToken | 기존 token+user / 신규 isNewUser+profile | 기존 로그인 / 신규 회원가입 | `INVALID_KAKAO_TOKEN` |
+| 카카오 계정 확인 | `POST /api/auth/kakao` | kakaoAccessToken | 기존 token+user / 신규 `isNewUser=true`+nullable nickname/email profile | 기존 로그인 / 신규 회원가입 | `INVALID_KAKAO_TOKEN`, 외부 502/504 |
 | 게스트 둘러보기 | 로컬 | guest=true | 없음 | 홈 | 없음 |
 | 회원가입·비밀번호 찾기 | Navigation | 없음 | 없음 | A2/A3 | 없음 |
 
@@ -190,7 +190,7 @@ Compose 화면
 | 코드 발송 | `POST /api/auth/email/send-code` | email | 204, 60초 타이머 | 서버 검증 상태 |
 | 코드 확인 | `POST /api/auth/email/verify` | email, code | verified | 서버 검증 상태 |
 | 이메일 가입 | `POST /api/auth/signup` | email, password, nickname, agreements | token pair + user | PostgreSQL |
-| 카카오 신규 가입 | `POST /api/auth/kakao/signup` | kakaoAccessToken, nickname, agreements | token pair + user | PostgreSQL |
+| 카카오 신규 가입 | `POST /api/auth/kakao/signup` | kakaoAccessToken, nickname, agreements | token pair + user. 이미 가입된 카카오 회원번호는 `409 KAKAO_ACCOUNT_DUPLICATED` | PostgreSQL |
 | 가입 완료 | Navigation | 없음 | 홈 | token은 DataStore |
 
 ### A3 비밀번호 찾기·웹 재설정
