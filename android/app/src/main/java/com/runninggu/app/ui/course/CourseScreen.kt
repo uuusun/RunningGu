@@ -10,16 +10,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -132,9 +136,12 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                     )
                 }
                 // 서버가 거리순으로 섞어 준 순서 그대로 그린다 — 앱은 재정렬하지 않는다(결정-27)
-                items(near.items) { item ->
+                // **번호는 지도 핀과 짝이다.** §4.11-4 가 "리스트 번호 일치" 를 요구하므로
+                // 목록 순서 그대로 1부터 매긴다 — 서버가 거리순으로 준 순서다(§4.11-5).
+                itemsIndexed(near.items) { index, item ->
                     NearbyRow(
                         item = item,
+                        number = index + 1,
                         targetKm = state.targetKm,
                         selected = (item as? NearbyItem.Route)?.routeId == state.selectedRouteId,
                         onClick = { viewModel.onItemSelect((item as? NearbyItem.Route)?.routeId) },
@@ -332,6 +339,8 @@ private fun MapPlaceholder() {
 @Composable
 private fun NearbyRow(
     item: NearbyItem,
+    /** 목록 순번. 지도 번호 핀과 같은 값이다. (SPEC §4.11-4) */
+    number: Int,
     targetKm: Double,
     selected: Boolean,
     onClick: () -> Unit,
@@ -349,7 +358,10 @@ private fun NearbyRow(
             },
         ),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            NumberRail(number)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (item is NearbyItem.Route) {
                     // 원천 이름 대신 "따라갈 경로가 있는가" 만 표시한다 (§4.11-5)
@@ -398,7 +410,32 @@ private fun NearbyRow(
                     )
                 }
             }
+            }
         }
+    }
+}
+
+/**
+ * 목록 순번. **지도 번호 핀과 같은 값이다.** (SPEC §4.11-4 "리스트 번호 일치")
+ *
+ * S7 타임라인의 번호 레일과 같은 모양으로 둔다 — 두 화면이 같은 뜻(순번)에 다른 모양을
+ * 쓰면 사용자가 새로 배워야 한다.
+ */
+@Composable
+private fun NumberRail(number: Int) {
+    Box(
+        Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "$number",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
