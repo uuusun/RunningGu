@@ -1,7 +1,7 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
-import com.runninggu.app.data.repository.FakeAuthRepository
 import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
@@ -119,7 +119,13 @@ data class SignupUiState(
 
 /** A2 회원가입. (SPEC §4.2 · AP-08) */
 class SignupViewModel(
-    private val repository: AuthRepository = FakeAuthRepository,
+    /**
+     * 기본은 **서버 저장소**다. (AP-14 · AGENTS 2장-2)
+     *
+     * 테스트·미리보기에서는 생성자로 가짜 저장소를 바꿔 끼운다 — 화면은 안 건드린다.
+     * [AuthRepository] 인터페이스만 보기 때문이다(AGENTS 4장).
+     */
+    private val repository: AuthRepository = ServiceLocator.authRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SignupUiState())

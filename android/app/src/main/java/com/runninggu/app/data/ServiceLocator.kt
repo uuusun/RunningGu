@@ -156,8 +156,17 @@ object ServiceLocator {
     /**
      * 인증. (API 명세 §1)
      *
-     * **서버에 §1 엔드포인트가 아직 없다.** 화면은 아직 `FakeAuthRepository` 를 기본값으로
-     * 쓰고, 서면 화면의 기본값만 이걸로 바꾼다 — 계약이 맞는지는 DTO 테스트가 지킨다.
+     * **A1 로그인·A2 가입이 이걸 쓴다**(2026-08-22). 서버 `auth/api` 에 `signup`·`login`·
+     * `refresh`·`logout` 과 `email/exists`·`email/send-code`·`email/verify`·
+     * `nickname/exists` 가 서면서 화면 기본값을 옮겼다 — 그전까지는 셋 다
+     * `FakeAuthRepository` 를 보고 있었다.
+     *
+     * **A3 비밀번호 재설정만 아직 가짜다.** `auth/password/reset-request` ·
+     * `auth/password/reset` 이 서버에 없다(AP-07). 서면 `ResetViewModel` 의
+     * 기본값 한 줄만 바꾸면 된다.
+     *
+     * 카카오(`auth/kakao`·`auth/kakao/signup`)도 서버에 없는데, 부르는 화면이
+     * 아직 없어 지금은 드러나지 않는다.
      */
     val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi) }
 
