@@ -24,6 +24,34 @@ import com.runninggu.app.data.local.SessionStore
 enum class SignupStep { AGREE, INFO, VERIFY, DONE }
 
 /**
+ * 이메일·닉네임 중복 확인 상태. (화면-API 매핑표 D-30 · SPEC 결정-50 · 이슈 #97)
+ *
+ * **[Error] 는 진행을 막지 않는다.** 조회가 안 된다고 가입 자체를 못 하게 하면 사용자가
+ * 할 수 있는 게 없다 — `send-code` 의 `EMAIL_DUPLICATED` 와 `signup` 의
+ * `NICKNAME_DUPLICATED` 가 최종 방어이고, 그건 동시 가입 대비로 어차피 필요하다.
+ * 확정으로 막는 것은 [Duplicate] 뿐이다.
+ */
+sealed interface DuplicateCheck {
+    /** 아직 확인하지 않았다. 포커스가 안 빠졌거나 입력이 바뀌어 무효가 된 상태다. */
+    data object Unchecked : DuplicateCheck
+
+    data object Checking : DuplicateCheck
+    data object Available : DuplicateCheck
+    data object Duplicate : DuplicateCheck
+
+    /** 조회 실패. 안내만 하고 막지 않는다. */
+    data object Error : DuplicateCheck
+}
+
+/**
+ * 이 상태에서 [인증 메일 발송]을 눌러도 되는가. (D-30)
+ *
+ * 조회 중이면 결과를 기다리게 하고, 확정 중복이면 막는다. 나머지는 통과다.
+ */
+val DuplicateCheck.allowsSubmit: Boolean
+    get() = this != DuplicateCheck.Checking && this != DuplicateCheck.Duplicate
+
+/**
  * A2 회원가입의 UI 계약. (SPEC §4.2)
  *
  * 단계가 넷이라 한 ViewModel 이 상태 기계를 들고 있는다 — 화면은 [step] 만 보고 그린다.
@@ -42,6 +70,10 @@ data class SignupUiState(
     val password: String = "",
     val passwordConfirm: String = "",
     val nickname: String = "",
+    /** 이메일 중복 확인. 포커스가 빠질 때 한 번 부른다. (D-30) */
+    val emailCheck: DuplicateCheck = DuplicateCheck.Unchecked,
+    /** 닉네임 중복 확인. 같은 규칙이다. */
+    val nicknameCheck: DuplicateCheck = DuplicateCheck.Unchecked,
 
     // 3단계 — 이메일 인증
     val code: String = "",
@@ -70,8 +102,16 @@ data class SignupUiState(
     val isPasswordConfirmed: Boolean get() = passwordConfirm.isNotEmpty() && password == passwordConfirm
     val isNicknameValid: Boolean get() = AuthValidation.isNicknameValid(nickname)
 
+    /**
+     * [인증 메일 발송] 활성 조건. (D-30)
+     *
+     * 중복 확인은 **`Checking` 과 `Duplicate` 만 막는다.** `Unchecked`(아직 포커스가 안 빠짐)
+     * 와 `Error`(조회 실패)는 서버 유니크 방어를 믿고 통과시킨다 — 여기서 막으면 확인 API 가
+     * 죽었을 때 아무도 가입할 수 없다.
+     */
     val canProceedInfo: Boolean
-        get() = !isSubmitting && isEmailValid && isPasswordValid && isPasswordConfirmed && isNicknameValid
+        get() = !isSubmitting && isEmailValid && isPasswordValid && isPasswordConfirmed &&
+            isNicknameValid && emailCheck.allowsSubmit && nicknameCheck.allowsSubmit
 
     val canVerify: Boolean
         get() = !isSubmitting && !mustResend && AuthValidation.isCodeValid(code)
@@ -87,6 +127,10 @@ class SignupViewModel(
 
     /** 진행 중인 쿨다운 카운트다운. 새로 시작할 때 이전 것을 끊는다. */
     private var cooldownJob: Job? = null
+
+    /** 진행 중인 중복 확인. 입력이 바뀌거나 다시 부를 때 끊는다. */
+    private var emailCheckJob: Job? = null
+    private var nicknameCheckJob: Job? = null
 
     // ── 1단계 동의 ──────────────────────────────────────────────
 
@@ -109,10 +153,73 @@ class SignupViewModel(
 
     // ── 2단계 정보 입력 ─────────────────────────────────────────
 
-    fun onEmailChange(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
+    /**
+     * 입력이 바뀌면 **확인 결과를 즉시 지운다.** (D-30)
+     *
+     * `Available` 을 띄운 채 다른 주소를 치고 있으면 화면이 거짓말을 한다. 진행 중인
+     * 조회도 끊는다 — 늦게 온 응답이 새 입력의 결과인 것처럼 앉으면 안 된다.
+     */
+    fun onEmailChange(value: String) {
+        emailCheckJob?.cancel()
+        _uiState.update {
+            it.copy(email = value, emailCheck = DuplicateCheck.Unchecked, errorMessage = null)
+        }
+    }
     fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
     fun onPasswordConfirmChange(value: String) = _uiState.update { it.copy(passwordConfirm = value, errorMessage = null) }
-    fun onNicknameChange(value: String) = _uiState.update { it.copy(nickname = value, errorMessage = null) }
+    fun onNicknameChange(value: String) {
+        nicknameCheckJob?.cancel()
+        _uiState.update {
+            it.copy(nickname = value, nicknameCheck = DuplicateCheck.Unchecked, errorMessage = null)
+        }
+    }
+
+    /**
+     * 이메일 칸에서 포커스가 빠졌다 — 중복을 확인한다. (D-30 · 이슈 #97)
+     *
+     * **버튼이 아니라 포커스 이탈로 부른다.** 버튼은 탭이 늘고 안 누르고 넘어가는 사람이
+     * 생겨 게이트가 또 필요해진다. 입력 중 debounce 는 타이핑마다 요청이 나가는데,
+     * 서버 제한이 **값별 5회/분**이라 실제로 걸린다(§1-1).
+     *
+     * 형식이 틀렸으면 부르지 않는다 — 어차피 `400` 이고 인라인 안내가 이미 떠 있다.
+     */
+    fun onEmailFocusLost() {
+        val email = _uiState.value.email.trim()
+        if (!AuthValidation.isEmailValid(email)) return
+        // 값이 그대로면 다시 묻지 않는다. A2 는 네 칸이 한 화면에 있어 오가는 게 자연스러운데,
+        // 그때마다 부르면 **값별 5회/분 제한**에 걸려 `Available` 이던 자리가 `Error` 로
+        // 퇴행한다(#132 리뷰). `onEmailChange` 가 값이 바뀔 때 `Unchecked` 로 되돌리므로
+        // 이 조건은 "바뀐 뒤 첫 이탈" 만 통과시킨다. `Error` 는 재시도할 여지를 남긴다.
+        if (_uiState.value.emailCheck !in RECHECKABLE) return
+        emailCheckJob?.cancel()
+        emailCheckJob = viewModelScope.launch {
+            _uiState.update { it.copy(emailCheck = DuplicateCheck.Checking) }
+            val next = repository.emailExists(email).fold(
+                onSuccess = { if (it) DuplicateCheck.Duplicate else DuplicateCheck.Available },
+                onFailure = { DuplicateCheck.Error },
+            )
+            // 기다리는 사이 입력이 바뀌었으면 버린다 — 이 결과는 이미 남의 것이다.
+            if (_uiState.value.email.trim() != email) return@launch
+            _uiState.update { it.copy(emailCheck = next) }
+        }
+    }
+
+    /** 닉네임 칸 포커스 이탈. 이메일과 같은 규칙이다. (D-30) */
+    fun onNicknameFocusLost() {
+        val nickname = _uiState.value.nickname.trim()
+        if (!AuthValidation.isNicknameValid(nickname)) return
+        if (_uiState.value.nicknameCheck !in RECHECKABLE) return
+        nicknameCheckJob?.cancel()
+        nicknameCheckJob = viewModelScope.launch {
+            _uiState.update { it.copy(nicknameCheck = DuplicateCheck.Checking) }
+            val next = repository.nicknameExists(nickname).fold(
+                onSuccess = { if (it) DuplicateCheck.Duplicate else DuplicateCheck.Available },
+                onFailure = { DuplicateCheck.Error },
+            )
+            if (_uiState.value.nickname.trim() != nickname) return@launch
+            _uiState.update { it.copy(nicknameCheck = next) }
+        }
+    }
 
     /** 정보 입력 완료 → 인증 코드 발송 후 3단계로. (SPEC §4.2-3) */
     fun onInfoNext() {
@@ -261,6 +368,15 @@ class SignupViewModel(
     }
 
     private companion object {
+        /**
+         * 포커스가 빠질 때 **다시 물어도 되는** 상태. (#132 리뷰)
+         *
+         * `Unchecked` 는 아직 안 물었거나 값이 바뀐 것이고, `Error` 는 못 물어본 것이라
+         * 재시도할 값어치가 있다. `Available`·`Duplicate` 는 이미 답을 아는 값이고,
+         * `Checking` 은 묻는 중이다.
+         */
+        val RECHECKABLE = setOf(DuplicateCheck.Unchecked, DuplicateCheck.Error)
+
         /** SPEC §4.2-3 — 재발송 쿨다운 60초. */
         const val RESEND_COOLDOWN_SEC = 60
 
