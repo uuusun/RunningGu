@@ -23,5 +23,7 @@ abstract class PostgreSqlContainerSupport {
         registry.add("spring.datasource.username", POSTGRESQL::getUsername);
         registry.add("spring.datasource.password", POSTGRESQL::getPassword);
         registry.add("runninggu.auth.jwt.secret", () -> TEST_JWT_SECRET);
+        registry.add("runninggu.course.catalog.minimum-course-count", () -> "1");
+        registry.add("runninggu.course.sync.enabled", () -> "false");
     }
 }

@@ -201,6 +201,8 @@ PostgreSQL과 Caffeine은 이 catalog의 SSOT로 사용하지 않는다.
 ### `GET /api/courses`
 
 - 번들·최신 메타가 결합된 큐레이션만 반환하고 `OSM_GENERATED`는 제외한다.
+- `page` 기본값은 `0`, `size` 기본값은 `20`·최대값은 `50`이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`다.
+- 마지막 페이지를 넘은 `page`는 `200`의 빈 `content[]`, `hasNext=false`, 빈 `attributions[]`를 반환한다.
 - `region`이 있으면 NFC·앞뒤 공백 제거 후 `sido`와 정확히 일치하는 코스만 남긴다.
 - 정렬은 `distanceKm ASC, courseId ASC`다.
 - `courseId`는 현재 snapshot 안에서 유일하다.

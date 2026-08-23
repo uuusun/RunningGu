@@ -49,6 +49,12 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+tasks.processResources {
+    from(rootProject.projectDir.parentFile.resolve("data/courses.json")) {
+        into("data")
+    }
+}
+
 tasks.register<JavaExec>("contestImport") {
     group = "application"
     description = "서버용 대회 snapshot을 검증하고 PostgreSQL에 적재한다"

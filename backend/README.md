@@ -39,11 +39,23 @@ $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
 `502 EXTERNAL_API_ERROR`를 반환한다.
 
-`KTO_SERVICE_KEY`는 홈·대회 인근 축제와 POI의 한국관광공사 클라이언트가 함께 사용하며,
+`KTO_SERVICE_KEY`는 홈·대회 인근 축제, POI, 두루누비 코스 메타 동기화의 한국관광공사 클라이언트가 함께 사용하며,
 HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한다. 키가 없으면 홈·대회 인근
 축제 API는 `502 EXTERNAL_API_ERROR`를 반환한다. POI는 KTO 원천을 실패로 처리하고, 다른
 원천에서 한 건 이상 표시할 수 있을 때만 부분 성공 `200`을 반환한다. 다른 공개 API는 계속
-동작한다. 홈 축제는 전국 월간 결과를 5분, 대회 인근 축제는 대회별 결과를 하루 캐시한다.
+동작한다. 두루누비 키가 없거나 전체 페이지 동기화가 실패하면 현재 코스 snapshot을 유지한다.
+홈 축제는 전국 월간 결과를 5분, 대회 인근 축제는 대회별 결과를 하루 캐시한다.
+
+## 두루누비 코스 catalog
+
+빌드 시 저장소 루트의 `data/courses.json`을 JAR의 `data/courses.json`으로 포함한다. 서버는 이
+번들을 동기 로드·검증하고 261개 미만이거나 스키마·좌표·유일키 계약이 깨지면 시작하지 않는다.
+준비 완료 후 KTO `courseList` 전체 페이지를 한 번 읽고, 성공한 전체 결과만 새 불변 snapshot으로
+원자 교체한다. 이후 실행은 직전 완료 시점부터 24시간 뒤다. 외부 실패와 API에서 사라진 코스는
+기존 GPX 번들 조회를 막거나 삭제하지 않는다.
+
+테스트나 외부 호출 없는 로컬 확인에서는 `COURSE_SYNC_ENABLED=false`로 시작 동기화만 끌 수 있다.
+번들 스키마와 결합 정책은 `docs/course-bundle-contract.md`를 따른다.
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html>
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>

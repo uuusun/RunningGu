@@ -65,6 +65,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 - **대회 목록만 불투명 커서 페이징** — 서버 내부 `(contestDate, id)`를 URL-safe Base64 `nextCursor`로 인코딩하고 클라이언트는 해석하지 않는다. 기본 20·최대 50.
 - **개인 목록은 Spring Pageable** — `?page=0&size=20`, `createdAt DESC, id DESC`, 최대 50. 응답은 `content[] + page{number, size, totalElements, hasNext}`.
+- **지역별 코스 목록**은 `?page=0&size=20`, 기본 20·최대 50이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`, 마지막 페이지를 넘으면 `200`의 빈 `content[]`를 반환한다.
 - 집계·Enum·지역 목록은 페이징하지 않는다.
 
 ### 0-5. 외부 API 프록시 방어 정책 🔒(정리본 공통 방어 + SPEC NFR-3~5)
@@ -685,6 +686,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
   `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
+- `page` 기본값은 `0`, `size` 기본값은 `20`이며 `size` 최대값은 `50`이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`다. 마지막 페이지를 넘은 `page`는 오류가 아니라 `200`의 빈 `content[]`, `hasNext=false`, 빈 `attributions[]`로 응답한다.
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
 
