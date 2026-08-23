@@ -56,6 +56,16 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
+        mockMvc.perform(get("/api/itineraries"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/itineraries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
         mockMvc.perform(patch("/api/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"김러너\"}"))

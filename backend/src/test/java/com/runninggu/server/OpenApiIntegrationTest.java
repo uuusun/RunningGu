@@ -37,6 +37,23 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/auth/refresh']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/logout']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/itineraries/generate']['post']").exists())
+                .andExpect(jsonPath("$['paths']['/api/itineraries']['post']").exists())
+                .andExpect(jsonPath("$['paths']['/api/itineraries']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/itineraries/{id}']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/itineraries/{id}']['put']").exists())
+                .andExpect(jsonPath("$['paths']['/api/itineraries/{id}']['delete']").exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/itineraries/{id}/days/{dayId}/blocks']['post']")
+                        .exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/itineraries/{id}/days/{dayId}/blocks/{blockId}']['patch']")
+                        .exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/itineraries/{id}/days/{dayId}/blocks/{blockId}']['delete']")
+                        .exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/itineraries/{id}/days/{dayId}/blocks/order']['put']")
+                        .exists())
                 .andExpect(jsonPath("$['paths']['/api/me']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/me']['patch']").exists())
                 .andExpect(jsonPath("$['paths']['/api/me/agreements']['patch']").exists())
@@ -56,6 +73,10 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                         .exists())
                 .andExpect(jsonPath("$.components.schemas.ContestDetailResponse.properties.dDay")
                         .exists())
+                .andExpect(jsonPath("$.components.schemas.SaveItineraryRequest").exists())
+                .andExpect(jsonPath("$.components.schemas.ItineraryDetailResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ItineraryBlockResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.ItineraryBlockCreatedResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.MemberProfileResponse").exists())
                 .andExpect(jsonPath(
                                 "$.components.schemas.MemberProfileResponse.properties.email.type"
