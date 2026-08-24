@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.ui.auth.AuthValidation
+import com.runninggu.app.ui.auth.PasswordIssue
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.local.SessionProfile
@@ -223,9 +224,23 @@ class AccountViewModel(
             _uiState.update { it.copy(message = "현재 비밀번호를 입력해 주세요") }
             return
         }
-        if (!AuthValidation.isPasswordValid(new)) {
-            _uiState.update { it.copy(message = "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요") }
-            return
+        // A2 와 같은 규칙이다. 너무 길 때는 할 일이 반대라 문구를 가른다(§4.2-2 🔒).
+        when (AuthValidation.passwordIssue(new)) {
+            PasswordIssue.FORMAT -> {
+                _uiState.update {
+                    it.copy(message = "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요")
+                }
+                return
+            }
+
+            PasswordIssue.TOO_LONG -> {
+                _uiState.update {
+                    it.copy(message = "새 비밀번호가 너무 길어요. 영문·숫자는 72자, 한글은 24자까지예요")
+                }
+                return
+            }
+
+            null -> Unit
         }
         if (current == new) {
             _uiState.update { it.copy(message = "지금 쓰는 비밀번호와 달라야 해요") }
