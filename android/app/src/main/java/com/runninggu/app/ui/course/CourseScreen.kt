@@ -320,22 +320,19 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
  * 동선(S7)과 달리 방문 순서라는 개념이 없어 **경로를 이을 핀을 세우지 않는다.** 카메라는
  * [MapScene] 안의 규칙이 정한다 — 경로가 바뀌면 전체 맞춤이다.
  *
- * ## ⚠️ 아직 §4.11-4 의 절반이다
- *
- * 명세는 두 갈래를 요구한다.
+ * ## §4.11-4 의 두 갈래
  *
  * > 선택 항목이 **경로면 왕복 폴리라인**(경로 bounds), **그 외 번호 핀**(잇지 않음,
  * > 리스트 번호 일치) — SPEC §4.11-4
  *
- * 지금은 앞 갈래만 있다. **"경로가 없으면 지도를 안 그린다" 는 최종 동작이 아니다** —
- * 걷기 스팟에는 좌표가 있고([NearbyItem.Place]), 서울 반경 8km 는 코스 0건에 걷기
- * 스팟만 나오는 것이 기본이라(§4.11 📌 · AGENTS 6장) **그대로 두면 수도권에서 지도가
- * 늘 비어 있다.**
+ * 앞 갈래는 #142, 뒤 갈래는 #162 에서 붙었다. 가르는 기준은 **그릴 경로가 있는가**다
+ * ([CourseUiState.mapPins]) — 걷기 스팟을 골랐을 때뿐 아니라 **코스가 아예 0건일 때도**
+ * 핀을 세운다. 서울 반경 8km 는 코스 0건에 스팟만 나오는 것이 기본이라(§4.11 📌 ·
+ * AGENTS 6장) 그러지 않으면 수도권에서 지도가 늘 비어 있다.
  *
- * 뒤 갈래는 `pins = 걷기 스팟` · `connectPins = false` 로 채운다. **목록에 번호가 먼저
- * 있어야** "리스트 번호 일치" 가 성립하는데, 그 번호는 #158 로 들어왔다(`itemsIndexed` 의
- * `index + 1`). 핀은 그 순번을 그대로 쓰면 되고 **#162** 에서 붙인다 — 경로가 섞인 목록이라
- * 핀 번호는 중간이 빈다(2·3·5).
+ * 핀 번호는 목록 순번 그대로여서(#158 `itemsIndexed`) **중간이 빈다** — `1 경로 ·
+ * 2 스팟 · 3 스팟 · 4 경로 · 5 스팟` 이면 지도에는 `2 · 3 · 5` 만 선다. 스팟만 따로
+ * 1·2·3 으로 다시 매기면 "리스트 번호 일치" 가 깨지므로 비는 것이 맞다.
  *
  * ## ⚠️ [LazyColumn] 안이라 스크롤로 벗어나면 다시 만들어진다
  *
@@ -359,6 +356,8 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
 @Composable
 private fun CourseMap(state: CourseUiState) {
     val route = state.mappedRoute?.path.orEmpty()
+    // 그릴 경로가 없을 때 세우는 걷기 스팟 번호 핀 (§4.11-4)
+    val pins = state.mapPins
     // 결과가 나온 뒤에만 "없다" 고 말할 수 있다
     val settled = state.nearby is NearbyState.Content || state.nearby is NearbyState.Empty
     Card(
@@ -371,6 +370,16 @@ private fun CourseMap(state: CourseUiState) {
         when {
             route.size >= MIN_ROUTE_POINTS -> RunningGuMap(
                 scene = MapScene(route = route),
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // **잇지 않는다.** 흩어진 장소라 방문 순서라는 개념이 없다 (§4.11-4)
+            pins.isNotEmpty() -> RunningGuMap(
+                scene = MapScene(
+                    pins = pins,
+                    connectPins = false,
+                    activePinId = state.activePinId,
+                ),
                 modifier = Modifier.fillMaxSize(),
             )
 
