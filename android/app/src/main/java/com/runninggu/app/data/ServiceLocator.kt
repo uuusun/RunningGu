@@ -16,6 +16,7 @@ import com.runninggu.app.data.remote.AuthApi
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.CourseApi
+import com.runninggu.app.data.remote.FavoriteApi
 import com.runninggu.app.data.remote.FestivalApi
 import com.runninggu.app.data.remote.GeocodeApi
 import com.runninggu.app.data.remote.PoiApi
@@ -29,6 +30,8 @@ import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.data.repository.RemoteFestivalRepository
+import com.runninggu.app.data.repository.FavoriteRepository
+import com.runninggu.app.data.repository.RemoteFavoriteRepository
 import com.runninggu.app.data.repository.GeocodeRepository
 import com.runninggu.app.data.repository.PoiRepository
 import com.runninggu.app.data.repository.RemoteGeocodeRepository
@@ -190,6 +193,16 @@ object ServiceLocator {
      * 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을 확인할 수 없기 때문이다.
      */
     val savedCourseRepository: SavedCourseRepository by lazy { FakeSavedCourseRepository }
+
+    val favoriteApi: FavoriteApi by lazy { retrofit.create() }
+
+    /**
+     * 찜. (API 명세 §7-C · AP-21)
+     *
+     * `FavoriteStore` 가 이걸 본다 — 하트는 S2·S3·S10 이 같은 값을 봐야 해서 보관소가
+     * 하나뿐이고, 그 보관소의 뒤가 여기다.
+     */
+    val favoriteRepository: FavoriteRepository by lazy { RemoteFavoriteRepository(favoriteApi) }
 
     val festivalApi: FestivalApi by lazy { retrofit.create() }
 

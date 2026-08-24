@@ -1,6 +1,8 @@
 package com.runninggu.app.ui.favorite
 
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.repository.FavoriteRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,12 +44,24 @@ sealed interface FavoriteToggleResult {
  * 토글은 **낙관적 갱신**이다. 하트를 누르는 즉시 [favoriteIds] 를 바꿔 화면이 반응하고,
  * 서버가 실패하면 되돌린다. 하트는 반응이 즉각적이어야 하는 컨트롤이라 왕복을 기다리지 않는다.
  *
- * TODO(AP-14): [FakeFavoriteRepository] 를 Retrofit 구현으로 교체하고 Room 읽기 캐시를
- *  붙인다. 화면은 [favoriteIds] 와 [toggle] 만 보므로 이 파일 내부만 바뀐다.
+ * 서버 구현을 본다(#163). 화면은 [favoriteIds] 와 [toggle] 만 보므로 교체가 이 파일
+ * 안에서 끝났다.
+ *
+ * TODO(#105): Room 읽기 캐시를 붙여 오프라인에서 마지막 성공 목록을 읽는다 (SPEC §4.13).
  */
 object FavoriteStore {
 
-    private var repository: FavoriteRepository = FakeFavoriteRepository
+    /**
+     * 서버 구현. **`by lazy` 로 미룬다** — 이 객체가 로드되는 것만으로 Retrofit 을 만들면
+     * 단위 테스트가 `FavoriteStore` 를 건드릴 수조차 없다([bind] 를 명시 호출로 둔 것과
+     * 같은 이유다).
+     */
+    private val remote: FavoriteRepository by lazy { ServiceLocator.favoriteRepository }
+
+    /** 테스트가 갈아끼운 것. null 이면 [remote] 를 쓴다. */
+    private var override: FavoriteRepository? = null
+
+    private val repository: FavoriteRepository get() = override ?: remote
 
     private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
@@ -219,7 +233,7 @@ object FavoriteStore {
     internal fun resetForTest(repository: FavoriteRepository) {
         sessionJob?.cancel()
         sessionJob = null
-        this.repository = repository
+        this.override = repository
         sessionEpoch.incrementAndGet()
         _favoriteIds.value = emptySet()
         confirmed.clear()

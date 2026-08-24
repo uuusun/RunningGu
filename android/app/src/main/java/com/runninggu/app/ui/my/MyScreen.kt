@@ -128,10 +128,13 @@ fun MyScreen(
             )
 
             MySegment.FAVORITE -> FavoriteList(
-                races = state.favoriteRaces,
+                state = state.favorites,
+                favoriteIds = state.favoriteIds,
                 onRaceClick = onRaceClick,
                 onFavoriteToggle = viewModel::onFavoriteToggle,
                 onBrowseRaces = onBrowseRaces,
+                onRetry = viewModel::loadFavorites,
+                onLoadMore = viewModel::loadMoreFavorites,
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -371,25 +374,74 @@ private fun CourseList(
 
 @Composable
 private fun FavoriteList(
-    races: List<com.runninggu.app.ui.model.RaceSummary>,
+    state: FavoriteRacesState,
+    favoriteIds: Set<String>,
     onRaceClick: (String) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     onBrowseRaces: () -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
-    if (races.isEmpty()) {
-        EmptyState("찜한 대회가 없어요.")
-        BrowseButton("대회 둘러보기", onBrowseRaces)
-        return
+    // 러닝코스와 같은 규칙이다 — 뭉뚱그리면 "찜한 게 없는 것" 과 "못 불러온 것" 이
+    // 같아 보인다 (SPEC §3-5 · #163).
+    when (state) {
+        FavoriteRacesState.Loading -> {
+            LoadingState("찜한 대회를 불러오는 중…")
+            return
+        }
+
+        FavoriteRacesState.Empty -> {
+            EmptyState("찜한 대회가 없어요.")
+            BrowseButton("대회 둘러보기", onBrowseRaces)
+            return
+        }
+
+        is FavoriteRacesState.Error -> {
+            ErrorState(message = state.message, onRetry = onRetry)
+            return
+        }
+
+        is FavoriteRacesState.Content -> Unit
     }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        races.forEach { race ->
-            // 지난 대회·비활성 대회 흐림은 이제 RaceCard 가 스스로 한다. 여기서 따로
-            // alpha 를 걸면 두 벌이 되어 값이 갈린다 (SPEC §4.13 · API 명세 §7-C 🔒).
+        state.races.forEach { race ->
+            // 지난 대회·비활성 대회 흐림은 RaceCard 가 스스로 한다. 여기서 따로 alpha 를
+            // 걸면 두 벌이 되어 값이 갈린다 (SPEC §4.13 · API 명세 §7-C 🔒).
             RaceCard(
                 race = race,
-                isFavorite = true, // 이 목록에 있다는 것 자체가 찜 상태다
+                // **목록에 있다는 것으로 단정하지 않는다.** 여기서 하트를 끄면 카드는
+                // 남고 하트만 꺼져야 다시 켤 수 있다 (#163).
+                isFavorite = race.id in favoriteIds,
                 onClick = { onRaceClick(race.id) },
                 onFavoriteToggle = { onFavoriteToggle(race.id) },
+            )
+        }
+
+        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4).
+        if (state.hasNext) {
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(
+                onClick = onLoadMore,
+                enabled = state.canLoadMore,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (state.loadingMore) {
+                        "불러오는 중…"
+                    } else {
+                        "더 보기 (${state.races.size}/${state.totalElements})"
+                    },
+                )
+            }
+        }
+
+        // 다음 장을 못 받았다. 위 목록은 그대로 두고 이 줄만 붙인다.
+        state.moreMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
     }

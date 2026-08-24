@@ -1,6 +1,9 @@
 package com.runninggu.app.ui.favorite
 
 import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.repository.FakeFavoriteRepository
+import com.runninggu.app.data.repository.FavoritePage
+import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import kotlinx.coroutines.CompletableDeferred
@@ -231,6 +234,10 @@ private class RecordingFavoriteRepository : FavoriteRepository {
 
     fun appliedSignal(op: String): CompletableDeferred<Unit> =
         CompletableDeferred<Unit>().also { applied[op] = it }
+
+    /** 이 파일은 목록 화면을 보지 않는다 — 하트만 본다. */
+    override suspend fun list(page: Int, size: Int): FavoritePage =
+        FavoritePage(contests = emptyList(), hasNext = false, totalElements = 0)
 
     override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(stored.toSet())
 

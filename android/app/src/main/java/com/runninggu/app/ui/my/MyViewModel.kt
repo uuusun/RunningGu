@@ -8,10 +8,11 @@ import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.model.SavedCourse
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.SavedCourseRepository
+import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.sample.SampleData
+import com.runninggu.app.ui.model.toRaceSummary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,8 +67,48 @@ data class MyUiState(
     val segment: MySegment = MySegment.ITINERARY,
     val itineraries: List<SavedItinerary> = emptyList(),
     val courses: SavedCoursesState = SavedCoursesState.Loading,
-    val favoriteRaces: List<RaceSummary> = emptyList(),
+    val favorites: FavoriteRacesState = FavoriteRacesState.Loading,
+    /**
+     * 지금 찜 상태. **목록과 따로 든다.**
+     *
+     * 목록은 서버가 준 "찜한 대회" 이고 이 집합은 [FavoriteStore] 의 현재 값이다. S10 에서
+     * 하트를 끄면 카드는 남되 하트만 꺼져야 한다 — 카드가 즉시 사라지면 잘못 눌렀을 때
+     * 되돌릴 방법이 없다.
+     */
+    val favoriteIds: Set<String> = emptySet(),
 )
+
+/**
+ * [찜한 대회] 세그먼트의 상태. (API 명세 §7-C · 화면-API 매핑표 S10)
+ *
+ * **[SavedCoursesState] 와 같은 모양이다.** 둘 다 Pageable 목록이고 [더 보기] 동작도 같아서,
+ * 다른 규칙으로 갈라지면 다음 사람이 어느 쪽을 믿을지 모른다(#163).
+ *
+ * TODO(#49): 공용 `SectionState` 가 정해지면(PR #102) 셋을 함께 옮긴다. 지금 일반화하면
+ *  쓰는 곳이 둘뿐이라 모양만 늘어난다.
+ */
+sealed interface FavoriteRacesState {
+    data object Loading : FavoriteRacesState
+
+    data class Content(
+        /** 지금까지 받아온 것을 **이어 붙인** 목록. */
+        val races: List<RaceSummary>,
+        val hasNext: Boolean,
+        /** 찜한 대회 전체 수. `races.size` 가 아니다 — 한 번에 20건씩 온다. */
+        val totalElements: Long,
+        val loadingMore: Boolean = false,
+        /** 다음 장을 못 받았다. **이미 받은 목록은 지우지 않는다.** */
+        val moreMessage: String? = null,
+    ) : FavoriteRacesState {
+        val canLoadMore: Boolean get() = hasNext && !loadingMore
+    }
+
+    /** 정상 조회했는데 0건. "찜한 대회가 없어요." */
+    data object Empty : FavoriteRacesState
+
+    /** 못 불러왔다. 재시도를 준다. */
+    data class Error(val message: String) : FavoriteRacesState
+}
 
 /**
  * [러닝코스] 세그먼트의 상태. (SPEC §3-5 · 화면-API 매핑표 S10)
@@ -108,11 +149,15 @@ sealed interface SavedCoursesState {
 /**
  * S10 마이. (SPEC §4.13 · AP-13)
  *
- * 저장소 SSOT는 서버다 — 동선·코스 목록은 TODO(AP-14) Retrofit + Room 읽기 캐시로
- * 교체한다. 찜은 [FavoriteStore]를 그대로 읽어 S2 카드·S3 상세와 같은 값을 보인다.
+ * 저장소 SSOT는 서버다. **코스·찜 목록은 서버를 본다**(#107 · #163). 동선만 아직
+ * 데모 목록이다 — TODO(AP-14): `GET /api/itineraries` 로 교체한다.
+ *
+ * 찜은 두 갈래로 읽는다. **목록은 `GET /me/favorites`**(비활성도 유지 §7-C), **하트는
+ * [FavoriteStore]** 다 — S2 카드·S3 상세와 같은 값이어야 하기 때문이다.
  */
 class MyViewModel(
     private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+    private val favoriteRepository: FavoriteRepository = ServiceLocator.favoriteRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
@@ -131,6 +176,8 @@ class MyViewModel(
                 sessionEpoch += 1
                 coursesJob?.cancel()
                 coursesJob = null
+                favoritesJob?.cancel()
+                favoritesJob = null
                 resumedOnce = false
                 _uiState.update {
                     it.copy(
@@ -140,20 +187,27 @@ class MyViewModel(
                         // 앞 계정의 목록을 그대로 두지 않는다. 게스트면 빈 목록, 로그인이면
                         // 곧 부를 조회의 로딩으로 시작한다.
                         courses = if (profile == null) SavedCoursesState.Empty else SavedCoursesState.Loading,
+                        favorites = if (profile == null) {
+                            FavoriteRacesState.Empty
+                        } else {
+                            FavoriteRacesState.Loading
+                        },
                     )
                 }
                 // 서버 SSOT 를 다시 읽는다. 게스트면 캐시를 비운다 (SPEC §4.13 · AP-21).
-                FavoriteStore.refresh()
+                //
+                // **기다리지 않는다.** 하트 캐시는 두 목록과 독립인데, 여기서 await 하면
+                // 찜 id 를 마지막 장까지 받는 동안 동선·코스 목록이 시작조차 못 한다.
+                viewModelScope.launch { FavoriteStore.refresh() }
                 loadCourses() // 게스트면 스스로 빠진다
+                loadFavorites()
             }
         }
         viewModelScope.launch {
+            // 하트만 따라간다. **목록을 여기서 만들지 않는다** — 찜 목록은 서버가 주고
+            // (§7-C), 비활성·지난 대회도 유지하는 게 계약이라 앱이 걸러 낼 수 없다.
             FavoriteStore.favoriteIds.collect { ids ->
-                _uiState.update { state ->
-                    // 공개 목록이 아니라 전체를 본다 — 찜 목록은 비활성·지난 대회도
-                    // 유지하는 게 계약이다 (API 명세 §7-C · 결정-46).
-                    state.copy(favoriteRaces = SampleData.allRaces.filter { it.id in ids })
-                }
+                _uiState.update { it.copy(favoriteIds = ids) }
             }
         }
     }
@@ -166,7 +220,10 @@ class MyViewModel(
      * 컴포지션이 걷혀 화면 쪽 `remember` 는 지워지기 때문이다.
      */
     fun onResume() {
-        if (resumedOnce) loadCourses()
+        if (resumedOnce) {
+            loadCourses()
+            loadFavorites()
+        }
         resumedOnce = true
     }
 
@@ -185,6 +242,10 @@ class MyViewModel(
 
     /** 다음에 받을 장. [loadCourses] 가 0 으로 되돌리고 [loadMoreCourses] 가 올린다. */
     private var coursesPage = 0
+
+    /** 진행 중인 찜 목록 조회. 세션이 바뀌거나 다시 부를 때 끊는다. */
+    private var favoritesJob: Job? = null
+    private var favoritesPage = 0
 
     fun onSegmentSelect(segment: MySegment) {
         _uiState.update { it.copy(segment = segment) }
@@ -261,6 +322,70 @@ class MyViewModel(
             }
             if (epoch != sessionEpoch) return@launch
             _uiState.update { it.copy(courses = state) }
+        }
+    }
+
+    /**
+     * 찜한 대회 목록 — 첫 장부터 다시. (API 명세 §7-C · SPEC §3-5)
+     *
+     * [loadCourses] 와 같은 규칙이다 — 세 세그먼트 중 하나라 실패해도 화면 전체를 덮지 않고
+     * 이 안에 오류와 재시도를 둔다.
+     *
+     * **비활성·지난 대회를 걸러 내지 않는다.** 공개 목록과 달리 찜은 그대로 유지하는 것이
+     * 계약이고(§7-C 🔒 · 결정-46), 흐림과 "정보 제공 종료" 표기는 `RaceCard` 가 한다.
+     */
+    fun loadFavorites() {
+        if (_uiState.value.profile == null) return
+        val epoch = sessionEpoch
+        favoritesJob?.cancel()
+        favoritesPage = 0
+        favoritesJob = viewModelScope.launch {
+            _uiState.update { it.copy(favorites = FavoriteRacesState.Loading) }
+            val state = try {
+                val page = favoriteRepository.list(page = 0)
+                if (page.contests.isEmpty()) {
+                    FavoriteRacesState.Empty
+                } else {
+                    FavoriteRacesState.Content(
+                        races = page.contests.map { it.toRaceSummary() },
+                        hasNext = page.hasNext,
+                        totalElements = page.totalElements,
+                    )
+                }
+            } catch (e: ApiException) {
+                // 마이는 세그먼트가 셋이라 "정보를 불러오지 못했어요" 로는 어느 탭인지 모른다.
+                FavoriteRacesState.Error("찜한 대회를 불러오지 못했어요.")
+            }
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { it.copy(favorites = state) }
+        }
+    }
+
+    /** [더 보기] — 다음 장을 뒤에 이어 붙인다. (§0-4 Pageable) */
+    fun loadMoreFavorites() {
+        val current = _uiState.value.favorites as? FavoriteRacesState.Content ?: return
+        if (!current.canLoadMore) return
+        val epoch = sessionEpoch
+        favoritesJob?.cancel()
+        favoritesJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(favorites = current.copy(loadingMore = true, moreMessage = null))
+            }
+            val state = try {
+                val next = favoriteRepository.list(page = favoritesPage + 1)
+                favoritesPage += 1
+                current.copy(
+                    races = current.races + next.contests.map { it.toRaceSummary() },
+                    hasNext = next.hasNext,
+                    totalElements = next.totalElements,
+                    loadingMore = false,
+                    moreMessage = null,
+                )
+            } catch (e: ApiException) {
+                current.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
+            }
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { it.copy(favorites = state) }
         }
     }
 
