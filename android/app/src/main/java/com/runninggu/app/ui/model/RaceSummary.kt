@@ -108,8 +108,13 @@ fun RaceSummary.registrationStatus(today: LocalDate = today()): RegistrationStat
 data class NearbyFestival(
     val contentId: String,
     val name: String,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
+    /**
+     * **없을 수 있다.** 서버 DTO 는 non-null 문자열이지만 KTO 원본이 비었거나 형식이
+     * 깨지면 `NearbyFestivalMapper` 가 null 로 떨구고 항목은 남긴다 — 날짜 하나 때문에
+     * 축제를 통째로 버리지 않기로 한 계약이다(§3-5).
+     */
+    val startDate: LocalDate?,
+    val endDate: LocalDate?,
     /** 대회장 기준 직선거리(km). 카드에 "대회장 {d.d}km"로 표기한다. */
     val distanceKm: Double,
     val imageUrl: String?,

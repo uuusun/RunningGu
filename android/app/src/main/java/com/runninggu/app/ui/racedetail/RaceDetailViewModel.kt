@@ -2,10 +2,16 @@ package com.runninggu.app.ui.racedetail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.ContestRepository
+import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.favorite.FavoriteToggleResult
-import com.runninggu.app.ui.sample.SampleData
-import kotlinx.coroutines.delay
+import com.runninggu.app.ui.model.toNearbyFestival
+import com.runninggu.app.ui.model.toRaceSummary
+import com.runninggu.app.ui.userMessageOrDefault
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,13 +19,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * S3 대회 상세 ViewModel. (SPEC §4.6 · AP-11)
+ * S3 대회 상세 ViewModel. (SPEC §4.6 · AP-11 · AP-14)
  *
- * TODO(AP-14): 임시 데이터를 백엔드로 교체한다.
- *  - [load]        → `GET /api/contests/{id}`            (API 명세 §3-4)
- *  - [loadFestivals] → `GET /api/contests/{id}/festivals` (API 명세 §3-5)
+ * 본문과 인근 축제는 **서버 호출이 다르다**(§3-4 / §3-5). 축제는 KTO 프록시라 `502` 가
+ * 실제로 나는데, 그때 대회 본문까지 가려지면 안 되므로 상태를 따로 둔다.
  */
-class RaceDetailViewModel : ViewModel() {
+class RaceDetailViewModel(
+    private val repository: ContestRepository = ServiceLocator.contestRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RaceDetailUiState())
     val uiState: StateFlow<RaceDetailUiState> = _uiState.asStateFlow()
@@ -49,18 +56,39 @@ class RaceDetailViewModel : ViewModel() {
         load()
     }
 
+    /**
+     * 대회 본문. (`GET /api/contests/{id}` · API 명세 §3-4)
+     *
+     * **canonical id 가 없는 대회는 부르지 않는다.** 번들·오프라인 항목은 크롤 원천 문자열을
+     * id 로 갖는데(`roadrun-41543`), 그걸 숫자로 바꿔 보내면 서버에 없는 대회를 묻는 꼴이다.
+     * 서버에 없는 것은 사실이므로 [NOT_FOUND][RaceDetailUiState.Phase.NOT_FOUND] 로 둔다 —
+     * [다시 시도]를 줘도 생기지 않는다는 점에서 `404` 와 성격이 같다.
+     */
     fun load() {
         val id = raceId ?: return
+        val serverId = id.toLongOrNull()
+        if (serverId == null) {
+            _uiState.update { it.copy(phase = RaceDetailUiState.Phase.NOT_FOUND) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update {
                 it.copy(phase = RaceDetailUiState.Phase.LOADING, errorMessage = null)
             }
-            delay(LOADING_DELAY_MS) // 임시 — 실제 조회로 교체하면 제거한다.
-
-            val race = SampleData.raceById(id)
-            if (race == null) {
-                // 404 CONTEST_NOT_FOUND (API 명세 §3-4)
-                _uiState.update { it.copy(phase = RaceDetailUiState.Phase.NOT_FOUND) }
+            val race = try {
+                repository.detail(serverId).toRaceSummary()
+            } catch (e: ApiException) {
+                _uiState.update {
+                    if (e.apiErrorCode() == ApiErrorCode.NOT_FOUND) {
+                        // 404 CONTEST_NOT_FOUND — 다시 눌러도 소용없다 (§3-4)
+                        it.copy(phase = RaceDetailUiState.Phase.NOT_FOUND)
+                    } else {
+                        it.copy(
+                            phase = RaceDetailUiState.Phase.ERROR,
+                            errorMessage = e.userMessageOrDefault(),
+                        )
+                    }
+                }
                 return@launch
             }
             _uiState.update {
@@ -85,17 +113,26 @@ class RaceDetailViewModel : ViewModel() {
      * [다시 시도] 버튼이 이 함수를 직접 부르기 때문이다.
      */
     fun loadFestivals() {
-        val id = raceId ?: return
+        val serverId = raceId?.toLongOrNull() ?: return
         if (_uiState.value.race?.active == false) return
         viewModelScope.launch {
-            _uiState.update { it.copy(festivalPhase = RaceDetailUiState.Phase.LOADING) }
-            delay(FESTIVAL_DELAY_MS) // 임시 — 외부 API 경유라 본문보다 늦게 온다.
-
-            _uiState.update {
-                it.copy(
-                    festivalPhase = RaceDetailUiState.Phase.LOADED,
-                    festivals = SampleData.nearbyFestivals(id),
-                )
+            _uiState.update { it.copy(festivalPhase = RaceDetailUiState.FestivalPhase.LOADING) }
+            try {
+                val festivals = repository.festivals(serverId).map { it.toNearbyFestival() }
+                _uiState.update {
+                    it.copy(
+                        festivalPhase = RaceDetailUiState.FestivalPhase.LOADED,
+                        festivals = festivals,
+                    )
+                }
+            } catch (e: ApiException) {
+                // 409 는 좌표가 없다는 뜻이라 재시도가 헛돈다 — 별도 상태다 (§3-5)
+                val phase = if (e.apiErrorCode() == ApiErrorCode.CONTEST_LOCATION_UNAVAILABLE) {
+                    RaceDetailUiState.FestivalPhase.LOCATION_UNAVAILABLE
+                } else {
+                    RaceDetailUiState.FestivalPhase.ERROR
+                }
+                _uiState.update { it.copy(festivalPhase = phase, festivals = emptyList()) }
             }
         }
     }
@@ -122,8 +159,4 @@ class RaceDetailViewModel : ViewModel() {
         _loginRequired.value = false
     }
 
-    private companion object {
-        const val LOADING_DELAY_MS = 300L
-        const val FESTIVAL_DELAY_MS = 700L
-    }
 }
