@@ -319,6 +319,34 @@ class SaveCourseTest {
     }
 
     @Test
+    fun `다시 조회한 목록에는 이전 저장 결과가 붙지 않는다`() = runTest(dispatcher) {
+        // **`routeId` 비교만으로는 못 막는다.** §6-1 이 그걸 "near 응답 안에서만 유효한
+        // 불투명 식별자" 로 정의해서, 새 조회가 같은 id 를 재사용할 수 있다 —
+        // `FakeCourseRepository` 도 목표 거리가 바뀌어도 `osm:demo-1` 을 다시 쓴다.
+        // 그때 A 의 완료 문구가 **새 목록 아래** 다시 붙는다(#166 리뷰).
+        val gate = CompletableDeferred<Unit>()
+        val viewModel = loaded(viewModel(saved = RecordingSavedCourses(gate = gate)))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.save is SaveCourseState.Saving)
+
+        // 같은 routeId 를 그대로 돌려주는 새 조회
+        viewModel.refreshNearby()
+        advanceUntilIdle()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(
+            "다시 조회한 목록에 이전 결과가 붙었다",
+            SaveCourseState.Idle,
+            viewModel.uiState.value.save,
+        )
+    }
+
+    @Test
     fun `고른 코스가 그대로면 결과가 붙는다`() = runTest(dispatcher) {
         // 과하게 버리면 정상 저장도 아무 말이 없어진다
         val gate = CompletableDeferred<Unit>()

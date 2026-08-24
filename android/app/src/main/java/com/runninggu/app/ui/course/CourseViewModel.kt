@@ -56,6 +56,15 @@ class CourseViewModel(
     private var saveJob: Job? = null
 
     /**
+     * 내 주변 목록 세대. **조회할 때마다 올라간다.**
+     *
+     * 저장 결과가 어느 목록의 것인지 가리는 데 쓴다. `routeId` 만으로는 부족하다 —
+     * §6-1 이 그걸 "near 응답 안에서만 유효한 불투명 식별자" 로 정의해서, 서로 다른
+     * 조회 사이의 동일성을 보장하지 않는다(#166 리뷰).
+     */
+    private var nearbyGeneration = 0
+
+    /**
      * 위치 조회 세대. **출발지가 바뀔 때마다 올라간다.**
      *
      * GPS 는 최대 6초가 걸리는데 그동안 사용자가 프리셋이나 검색으로 출발지를 고를 수 있다.
@@ -249,6 +258,7 @@ class CourseViewModel(
         val route = state.selectedRoute ?: return
 
         val epoch = SessionStore.sessionEpoch
+        val generation = nearbyGeneration
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
             _uiState.update { it.copy(save = SaveCourseState.Saving) }
@@ -305,7 +315,8 @@ class CourseViewModel(
             // [SaveCourseState.NeedsLogin] 은 통과시킨다 — 로그인 모달은 코스별 안내가
             // 아니라 계정 상태 안내다. 위 세대 가드와 같은 이유다.
             if (done !is SaveCourseState.NeedsLogin &&
-                _uiState.value.selectedRoute?.routeId != route.routeId
+                (generation != nearbyGeneration ||
+                    _uiState.value.selectedRoute?.routeId != route.routeId)
             ) {
                 return@launch
             }
@@ -322,6 +333,10 @@ class CourseViewModel(
 
     fun refreshNearby() {
         val origin = _uiState.value.origin as? OriginState.Fixed ?: return
+        // **조회할 때마다 세대를 올린다.** `routeId` 는 near 응답 **안에서만** 유효한
+        // 불투명 식별자라(§6-1) 조회를 건너 비교할 수 없다 — 새 목록의 첫 경로가 같은
+        // id 를 재사용하면 남의 결과가 통과한다(#166 리뷰).
+        nearbyGeneration++
         nearbyJob?.cancel()
         nearbyJob = viewModelScope.launch {
             _uiState.update { it.copy(nearby = NearbyState.Loading) }
