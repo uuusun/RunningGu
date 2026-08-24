@@ -98,7 +98,10 @@ data class SignupUiState(
     val canProceedAgree: Boolean get() = tosAgreed && privacyAgreed
 
     val isEmailValid: Boolean get() = AuthValidation.isEmailValid(email)
-    val isPasswordValid: Boolean get() = AuthValidation.isPasswordValid(password)
+    val isPasswordValid: Boolean get() = passwordIssue == null
+
+    /** 어긋난 사유. 화면이 인라인 문구를 고르는 데 쓴다(§4.2-2 🔒). */
+    val passwordIssue: PasswordIssue? get() = AuthValidation.passwordIssue(password)
     val isPasswordConfirmed: Boolean get() = passwordConfirm.isNotEmpty() && password == passwordConfirm
     val isNicknameValid: Boolean get() = AuthValidation.isNicknameValid(nickname)
 

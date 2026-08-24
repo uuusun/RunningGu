@@ -180,7 +180,14 @@ private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         isError = state.password.isNotEmpty() && !state.isPasswordValid,
-        supportingText = inlineHint(state.password.isNotEmpty() && !state.isPasswordValid, "8자 이상, 영문과 숫자를 함께 써 주세요"),
+        supportingText = inlineHint(
+            state.password.isNotEmpty() && !state.isPasswordValid,
+            // 너무 길 때와 짧을 때는 할 일이 정반대라 문구를 가른다(§4.2-2 🔒).
+            when (state.passwordIssue) {
+                PasswordIssue.TOO_LONG -> "너무 길어요. 영문·숫자는 72자, 한글은 24자까지예요"
+                else -> "8자 이상, 영문과 숫자를 함께 써 주세요"
+            },
+        ),
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(8.dp))
