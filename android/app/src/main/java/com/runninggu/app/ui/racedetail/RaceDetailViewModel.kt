@@ -6,7 +6,7 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ContestRepository
-import com.runninggu.app.data.repository.apiErrorCode
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.favorite.FavoriteToggleResult
 import com.runninggu.app.ui.model.toNearbyFestival

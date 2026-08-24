@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.remote.ApiErrorCode
-import com.runninggu.app.data.repository.apiErrorCode
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
 

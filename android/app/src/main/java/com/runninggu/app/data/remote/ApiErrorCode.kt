@@ -85,3 +85,15 @@ enum class ApiErrorCode {
         }
     }
 }
+
+/**
+ * 실패에서 서버 에러 코드를 꺼낸다. 네트워크·해석 실패면 null. (API 명세 §0-2)
+ *
+ * **[ApiErrorCode] 옆에 둔다.** 원래는 `data/repository/AuthRepository.kt` 안에 있었는데,
+ * 인증과 무관한 화면들이 인증 저장소 파일에서 꺼내 쓰는 모양이 됐다 — 지금 쓰는 곳이
+ * 가입·계정·대회 상세 셋이고 더 늘어날 자리다(#157 리뷰).
+ *
+ * 꺼내는 대상이 [ApiErrorCode] 이므로 그 정의 옆이 찾기 쉽다.
+ */
+internal fun Throwable.apiErrorCode(): ApiErrorCode? = (this as? ApiException.Http)?.code
+
