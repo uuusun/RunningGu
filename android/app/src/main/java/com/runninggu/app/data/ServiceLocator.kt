@@ -30,6 +30,8 @@ import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.data.repository.RemoteFestivalRepository
 import com.runninggu.app.data.repository.GeocodeRepository
+import com.runninggu.app.data.repository.MemberRepository
+import com.runninggu.app.data.repository.RemoteMemberRepository
 import com.runninggu.app.data.repository.PoiRepository
 import com.runninggu.app.data.repository.RemoteGeocodeRepository
 import com.runninggu.app.data.repository.RemotePoiRepository
@@ -144,6 +146,9 @@ object ServiceLocator {
     val authApi: AuthApi by lazy { retrofit.create() }
 
     val meApi: MeApi by lazy { retrofit.create() }
+
+    /** 계정 화면의 닉네임·마케팅 동의 변경. (API 명세 §2 · AP-13) */
+    val memberRepository: MemberRepository by lazy { RemoteMemberRepository(meApi) }
 
     /**
      * 앱 시작 세션 검증. (`screen-api-matrix` A0 · API 명세 §2)
