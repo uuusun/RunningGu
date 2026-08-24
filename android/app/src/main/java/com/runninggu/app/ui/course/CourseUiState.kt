@@ -136,16 +136,23 @@ data class CourseUiState(
     }
 
     /**
-     * 지금 고른 경로. 없으면 null. (§4.11-4 · §7-A)
+     * [저장] 이 담는 경로. **지도가 그리는 것과 같다.** (§4.11-4 · §7-A)
+     *
+     * 고른 것이 있으면 그것, 없으면 첫 코스다 — [mappedRoute] 그대로다.
+     *
+     * **"지도에 보이는 것을 저장한다" 가 규칙이다.** 고른 것만 저장 대상으로 삼으면,
+     * 조회 직후 지도에는 1번 코스가 그려져 있는데 [저장] 은 회색인 화면이 된다. 목록
+     * 카드도 강조가 없어서 사용자 눈에는 "코스가 하나 떠 있는데 저장이 안 되는" 상태다
+     * (#166 리뷰). 그 코스는 목록에서도 1번이라 무엇이 저장되는지 분명하다.
+     *
+     * 걷기 스팟([NearbyItem.Place])을 고르면 [mappedRoute] 가 null 이라 여기도 null 이다 —
+     * 지도가 비어 있는데 저장이 눌리면 무엇을 저장하는지 알 수 없다.
      *
      * 저장 요청 본문에는 서버가 준 `pathPolyline` 과 원천 메타가 **그대로** 들어가야 한다
      * (이슈 #62). 화면이 값을 재조립하면 fingerprint 가 흔들려 같은 코스가 중복 저장된다.
-     * [selectedItem] 이 그 항목을 통째로 들고 있으므로 다시 찾을 필요가 없다.
-     *
-     * 걷기 스팟([NearbyItem.Place])은 경로가 아니라 여기 걸리지 않는다.
      */
     val selectedRoute: NearbyItem.Route?
-        get() = selectedItem as? NearbyItem.Route
+        get() = mappedRoute
 
     /** [저장] 을 누를 수 있는가. 고른 경로가 있고 보내는 중이 아니어야 한다. */
     val canSave: Boolean get() = selectedRoute != null && save !is SaveCourseState.Saving

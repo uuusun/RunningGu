@@ -107,10 +107,25 @@ class SaveCourseTest {
     }
 
     @Test
-    fun `아무것도 안 골랐으면 저장을 못 누른다`() = runTest(dispatcher) {
-        // 무엇이 저장되는지 알 수 없는 상태에서 버튼이 눌리면 안 된다
+    fun `고르기 전에도 지도에 뜬 코스를 저장할 수 있다`() = runTest(dispatcher) {
+        // **저장은 지도를 따라간다.** 조회 직후 지도에는 첫 코스가 그려지는데
+        // 그때 [저장] 이 회색이면 "코스가 떠 있는데 저장이 안 되는" 화면이 된다(#166 리뷰).
         val viewModel = loaded(viewModel())
 
+        assertTrue(viewModel.uiState.value.canSave)
+        assertEquals("r-1", viewModel.uiState.value.selectedRoute?.routeId)
+    }
+
+    @Test
+    fun `걷기 스팟을 고르면 저장할 수 없다`() = runTest(dispatcher) {
+        // 스팟을 고르면 지도에서 경로선이 사라진다(§4.11-4). 그때도 저장이 눌리면
+        // **화면에 없는 코스**가 저장돼 사용자가 무엇을 저장했는지 알 수 없다.
+        val viewModel = loaded(viewModel())
+
+        viewModel.onItemSelect(place)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.selectedRoute)
         assertFalse(viewModel.uiState.value.canSave)
     }
 
