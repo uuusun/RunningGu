@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.remote.ApiErrorCode
-import com.runninggu.app.data.repository.apiErrorCode
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.local.SessionStore
 
 /**
