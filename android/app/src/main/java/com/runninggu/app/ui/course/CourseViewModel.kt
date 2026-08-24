@@ -12,9 +12,11 @@ import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.LocationProvider
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.repository.FakeCourseRepository
 import com.runninggu.app.data.repository.GeocodeRepository
+import com.runninggu.app.data.repository.SavedCourseRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,7 @@ class CourseViewModel(
     private val repository: CourseRepository,
     private val geocodeRepository: GeocodeRepository,
     private val locationProvider: LocationProvider = ServiceLocator.locationProvider,
+    private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseUiState())
@@ -48,6 +51,9 @@ class CourseViewModel(
 
     /** [내 위치] 연타. 앞 조회를 끊고 마지막 것만 남긴다. */
     private var locationJob: Job? = null
+
+    /** [저장] 연타. 버튼도 막지만, 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
+    private var saveJob: Job? = null
 
     /**
      * 위치 조회 세대. **출발지가 바뀔 때마다 올라간다.**
@@ -205,8 +211,75 @@ class CourseViewModel(
         loadRegionCourses()
     }
 
+    /**
+     * 목록에서 항목을 고른다.
+     *
+     * **고른 것이 바뀌면 이전 저장 결과를 지운다.** 안 지우면 A 를 저장한 뒤 B 를 골랐을 때
+     * "저장했어요" 가 B 아래에 남아, 아직 안 누른 코스를 저장한 것처럼 읽힌다.
+     */
     fun onItemSelect(item: NearbyItem?) {
-        _uiState.update { it.copy(selectedItem = item) }
+        _uiState.update {
+            if (it.selectedItem == item) it
+            else it.copy(selectedItem = item, save = SaveCourseState.Idle)
+        }
+    }
+
+    /**
+     * [저장] — 고른 경로를 서버에 저장한다. (API 명세 §7-A · SPEC §4.11-6)
+     *
+     * ## 서버가 준 값을 그대로 되돌려보낸다
+     *
+     * 요청 본문은 `near` 응답에서 [toSaveRequest] 가 만든다. 화면이 값을 다시 조립하면
+     * 서버가 준 것과 미세하게 달라져 중복 판정(fingerprint)이 흔들린다(이슈 #62).
+     *
+     * ## 멱등이라 "이미 저장함" 이 실패가 아니다
+     *
+     * 같은 경로를 다시 저장하면 서버가 새 행 대신 기존 id 를 `created=false` 로 준다(§7-A).
+     * 사용자가 잘못한 게 없으므로 실패 색을 쓰지 않는다.
+     *
+     * ## 게스트는 로그인 유도 모달로 끝낸다
+     *
+     * `401` 이면 [SaveCourseState.NeedsLogin] 으로 모달을 띄운다(매핑표 S8 "게스트 modal").
+     * 로그인하고 돌아와도 **저장을 예약하지 않는다**(D-27) — 누른 적 없는 저장이 저절로
+     * 일어나면 사용자가 놀란다.
+     */
+    fun onSaveCourse() {
+        val state = _uiState.value
+        if (state.save is SaveCourseState.Saving) return
+        val route = state.selectedRoute ?: return
+
+        val epoch = SessionStore.sessionEpoch
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            _uiState.update { it.copy(save = SaveCourseState.Saving) }
+            val done = try {
+                val result = savedCourseRepository.save(route)
+                when {
+                    // 경로나 원천이 없어 fingerprint 를 만들 수 없다 — 저장 자체가 불가능하다
+                    result == null -> SaveCourseState.Done(
+                        message = "이 코스는 경로 정보가 없어 저장할 수 없어요.",
+                        failed = true,
+                    )
+
+                    result.created -> SaveCourseState.Done("저장했어요. 마이에서 볼 수 있어요.")
+                    else -> SaveCourseState.Done("이미 저장한 코스예요.")
+                }
+            } catch (e: ApiException) {
+                // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
+                if (e is ApiException.Http && e.needsLogin) SaveCourseState.NeedsLogin
+                else SaveCourseState.Done(message = e.saveMessage(), failed = true)
+            }
+            // 기다리는 사이 로그인·로그아웃이 있었으면 남의 결과다 (#107 리뷰와 같은 장치)
+            if (epoch != SessionStore.sessionEpoch) return@launch
+            _uiState.update { it.copy(save = done) }
+        }
+    }
+
+    /** 로그인 유도 모달을 닫는다. 고른 코스는 그대로 두어 로그인 뒤 다시 누를 수 있게 한다. */
+    fun onLoginPromptDismiss() {
+        _uiState.update {
+            if (it.save is SaveCourseState.NeedsLogin) it.copy(save = SaveCourseState.Idle) else it
+        }
     }
 
     fun refreshNearby() {
@@ -233,7 +306,10 @@ class CourseViewModel(
             } catch (e: ApiException) {
                 NearbyState.Error(e.nearbyMessage())
             }
-            _uiState.update { it.copy(nearby = state, selectedItem = null) }
+            // 목록이 갈렸으니 이전 저장 결과도 지운다 — 사라진 코스에 붙은 안내가 남으면 안 된다
+            _uiState.update {
+                it.copy(nearby = state, selectedItem = null, save = SaveCourseState.Idle)
+            }
         }
     }
 
@@ -269,8 +345,16 @@ class CourseViewModel(
             repository: CourseRepository = FakeCourseRepository,
             geocodeRepository: GeocodeRepository = ServiceLocator.geocodeRepository,
             locationProvider: LocationProvider = ServiceLocator.locationProvider,
+            savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
         ) = viewModelFactory {
-            initializer { CourseViewModel(repository, geocodeRepository, locationProvider) }
+            initializer {
+                CourseViewModel(
+                    repository,
+                    geocodeRepository,
+                    locationProvider,
+                    savedCourseRepository,
+                )
+            }
         }
     }
 
@@ -353,6 +437,16 @@ internal fun ApiException.nearbyMessage(): String = when {
     this is ApiException.Http && code == ApiErrorCode.COURSE_SOURCES_UNAVAILABLE ->
         "코스 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
     else -> userMessageOrDefault()
+}
+
+/**
+ * 저장 실패 문구. (API 명세 §7-A)
+ *
+ * **게스트(`401`)는 여기로 오지 않는다** — 모달이라 문구가 따로 없다.
+ */
+internal fun ApiException.saveMessage(): String = when (this) {
+    is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    else -> "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."
 }
 
 /**
