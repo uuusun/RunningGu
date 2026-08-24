@@ -73,20 +73,24 @@ A2 회원가입에서 사용자에게 보여주는 문안이다. 서버가 `USER
 | # | 내용 | 무엇이 없나 |
 |---|---|---|
 | **A** | **만료된 인증·세션 기록의 삭제 주기** | 서버에 정리 작업이 없다(`@Scheduled` 0건). 유효시간(10분·30분)이 지나도 행이 남고, **가입까지 안 간 이메일 주소도 남는다** — 탈퇴로도 안 지워진다 |
-| **B** | 마케팅 수신 끄기 | `PATCH /me/agreements` 와 **메일 수신거부 링크**가 없다 |
-| **C** | 내 정보 보기·고치기·탈퇴 | `PATCH /me` · `DELETE /me` 가 없다 |
+| **B** | 마케팅 수신 끄기 | `PATCH /me/agreements` 는 **섰다**(#151) 앱 연결도 끝났다(#164). 남은 것은 **메일 수신거부 링크** 뿐이다 |
+| **C** | 내 정보 보기·고치기·**탈퇴** | 보기·고치기는 `GET`·`PATCH /me` 로 **섰다**(#151 · 앱 #164). **탈퇴가 남았다** — `POST /me/reauth` · `DELETE /me` 둘 다 없다 |
 | **D** | 비밀번호 변경 | `PUT /me/password` 가 없다. **계약은 이미 있다** — API 명세 §2-1 에 경로·요청·응답·오류 코드가 확정돼 있으므로 그대로 구현하면 된다. 약관 제4조와 개인정보 7장이 이 동작을 이미 설명한다 (#133 리뷰) |
 
 A 가 제일 무겁다 — **보유 기간을 못 적으면 개인정보 문서가 성립하지 않는다.**
 
-구현된 인증 엔드포인트는 현재 이것뿐이다.
+현재 구현된 엔드포인트다 (2026-08-24 기준 · #169 리뷰).
 
 ```
-/api/auth  signup · login · refresh · logout
-           email/exists · email/send-code · email/verify · nickname/exists
+/api/auth       signup · login · refresh · logout
+                email/exists · email/send-code · email/verify · nickname/exists
+/api/me         GET · PATCH · PATCH /agreements                       (#151)
+/api/me/courses POST · GET · GET /{id} · DELETE /{id}                 (#152)
+/api/me/favorites GET · PUT /{id} · DELETE /{id}                      (#150)
 ```
 
-`/api/me/**` 는 하나도 없다.
+**아직 없는 것**은 `PUT /me/password` · `POST /me/reauth` · `DELETE /me` 셋이다.
+위 표의 A·D 와 C 의 탈퇴가 여기 걸린다.
 
 ### 문안에 적을 값이 **정해져야 하는 것**
 
