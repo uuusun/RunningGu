@@ -63,10 +63,16 @@ fun RunningGuApp(
      * 시작 지점은 **복원 직후 한 번만** 정한다. 이후 로그아웃으로 세션이 비어도 여기서
      * 다시 계산하면 앱 전체가 갈아엎어진다 — 로그아웃 뒤 이동은 내비게이션이 처리한다(D-27).
      *
-     * TODO(이슈 #99): **지금은 로컬 세션만 보고 정한다.** A0 계약(`screen-api-matrix`)은
-     *  `GET /api/me` 로 검증한 뒤 정하는 것인데 서버에 그 엔드포인트가 아직 없다. 그래서
-     *  폐기된 세션도 일단 홈으로 열리고, 첫 인증 요청이 `401` 을 받아야 로그인으로 간다
-     *  (#74 `TokenAuthenticator`). 엔드포인트가 서면 검증 결과를 여기 끼운다.
+     * **여기서 다시 물어보지 않는다.** 위에서 기다린 [SessionStore.restored] 가 이미
+     * `GET /api/me` 검증까지 끝난 신호다 — A0 계약이 "DataStore 값 + `GET /api/me`"
+     * 이고([SessionStore] 의 `validateRestored`), 검증이 `Expired` 면 그 안에서 이미
+     * 로그아웃까지 끝낸다. 그래서 [SessionStore.isLoggedIn] 만 봐도 계약대로다(#99).
+     *
+     * 순서가 뒤집히면 **폐기된 세션이 홈을 한 번 열었다가 로그인으로 튕긴다.**
+     * `SessionStoreTest.검증이 끝나기 전에는 시작 화면을 열지 않는다` 가 그것을 막는다.
+     *
+     * 못 물어본 경우(`Unknown`)는 세션을 지킨 채 연다 — 지하철에서 앱을 켰다고 로그아웃
+     * 되면 안 되고, 토큰이 정말 죽었으면 첫 요청의 `401` 을 #74 가 정리한다.
      */
     val startDestination = remember {
         if (SessionStore.isLoggedIn) Routes.HOME else Routes.authGraph()
