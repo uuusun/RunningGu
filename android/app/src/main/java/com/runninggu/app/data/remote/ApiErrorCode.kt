@@ -51,10 +51,17 @@ enum class ApiErrorCode {
      */
     KAKAO_ACCOUNT_DUPLICATED,
     NICKNAME_DUPLICATED,
-    IDENTITY_ALREADY_LINKED,
-    LAST_IDENTITY_REQUIRED,
     EMAIL_IDENTITY_REQUIRED,
-    REAUTH_PROVIDER_NOT_LINKED,
+
+    /**
+     * 가입한 방식과 다른 수단으로 재인증하려 했다. (§2-3 · 명세 오류표 884행)
+     *
+     * **이름을 서버와 정확히 맞춘다.** 앱에는 `REAUTH_PROVIDER_NOT_LINKED` 라는 비슷한
+     * 이름이 남아 있었는데 서버가 주는 것은 `_MISMATCH` 다. 비슷해서 다음 사람이 재인증
+     * 오류를 붙일 때 그걸 집으면, 서버가 절대 안 주는 코드로 분기하는 죽은 가지가 생기고
+     * 실제 `_MISMATCH` 는 `UNKNOWN` 으로 떨어진다(#175 리뷰).
+     */
+    REAUTH_PROVIDER_MISMATCH,
     CONTEST_LOCATION_UNAVAILABLE,
     SYSTEM_BLOCK_IMMUTABLE,
 

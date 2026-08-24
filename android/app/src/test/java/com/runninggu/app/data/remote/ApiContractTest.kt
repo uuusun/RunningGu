@@ -80,6 +80,18 @@ class ApiContractTest {
     }
 
     @Test
+    fun `재인증 provider 불일치는 서버 이름 그대로다`() {
+        // 서버는 `REAUTH_PROVIDER_MISMATCH` 를 준다(ErrorCode.java:39 · 명세 884행).
+        // 앱에 있던 `REAUTH_PROVIDER_NOT_LINKED` 는 서버에 없는 이름이라 지웠다 —
+        // 남겨 두면 다음 사람이 그걸 집어 죽은 가지를 만든다(#175 리뷰).
+        assertEquals(
+            ApiErrorCode.REAUTH_PROVIDER_MISMATCH,
+            ApiErrorCode.from("REAUTH_PROVIDER_MISMATCH"),
+        )
+        assertEquals(ApiErrorCode.UNKNOWN, ApiErrorCode.from("REAUTH_PROVIDER_NOT_LINKED"))
+    }
+
+    @Test
     fun `모르는 코드는 UNKNOWN 으로 떨어진다`() {
         // 서버가 코드를 새로 추가해도 앱이 깨지면 안 된다
         assertEquals(ApiErrorCode.UNKNOWN, ApiErrorCode.from("SOMETHING_NEW"))
