@@ -1,6 +1,8 @@
 package com.runninggu.server.course.api;
 
 import com.runninggu.server.course.application.CourseCatalog;
+import com.runninggu.server.course.application.CourseNearService;
+import java.math.BigDecimal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,9 +18,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class CourseController {
 
     private final CourseCatalog catalog;
+    private final CourseNearService nearService;
 
-    public CourseController(CourseCatalog catalog) {
+    public CourseController(CourseCatalog catalog, CourseNearService nearService) {
         this.catalog = catalog;
+        this.nearService = nearService;
+    }
+
+    @Operation(summary = "내 주변 경로·장소 통합 목록 조회")
+    @GetMapping("/near")
+    public CourseNearResponse near(
+            @RequestParam BigDecimal lat,
+            @RequestParam BigDecimal lng,
+            @RequestParam(defaultValue = "5") BigDecimal targetKm,
+            @RequestParam(defaultValue = "8") BigDecimal radiusKm,
+            @RequestParam(defaultValue = "12") int size) {
+        return CourseNearResponse.from(
+                nearService.find(lat, lng, targetKm, radiusKm, size));
     }
 
     @Operation(summary = "지역별 코스 목록 조회")

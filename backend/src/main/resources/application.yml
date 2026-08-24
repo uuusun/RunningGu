@@ -82,6 +82,7 @@ runninggu:
     enabled: ${MAIL_ENABLED:false}
     from-address: ${SMTP_FROM_ADDRESS:}
     from-name: ${SMTP_FROM_NAME:런닝구}
+    password-reset-url: ${PASSWORD_RESET_URL:http://localhost:8080/reset-password}
   external:
     kakao-user-info:
       base-url: https://kapi.kakao.com
@@ -109,3 +110,8 @@ runninggu:
       service-key: ${KTO_SERVICE_KEY:}
       connect-timeout: 1s
       read-timeout: 2500ms
+    graphhopper:
+      enabled: ${GRAPHHOPPER_ENABLED:false}
+      base-url: ${GRAPHHOPPER_BASE_URL:http://localhost:8989}
+      connect-timeout: 500ms
+      read-timeout: 5s

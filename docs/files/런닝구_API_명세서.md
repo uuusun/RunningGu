@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v3.1
+# 런닝구 백엔드 API 명세서 v3.2
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.5·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -172,7 +172,18 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
   }
 }
 ```
-오류: `401 LOGIN_FAILED` — 메시지 "이메일 또는 비밀번호를 확인해 주세요" 🔒(§4.1, 계정 존재 여부 비노출)
+오류: `401 LOGIN_FAILED` — 메시지 "이메일 또는 비밀번호를 확인해 주세요" 🔒(§4.1, 계정 존재 여부 비노출).
+
+로그인 공격 방어는 단일 서버 Caffeine의 고정 1분 창 두 개를 함께 적용한다(결정-55, 이슈 #112).
+
+- IP 창: 동일 IP의 성공·실패를 포함한 모든 로그인 요청 30회까지 허용하고 31번째부터 `429 RATE_LIMITED`다. 로그인 성공으로 초기화하지 않는다.
+- 이메일 창: 서버 정규화를 통과한 동일 이메일의 인증 실패 5회까지 `401 LOGIN_FAILED`로 처리하고, 이후 요청부터 `429 RATE_LIMITED`다. 로그인 성공 시 해당 이메일 창만 초기화한다.
+- 이메일 형식이 정규화를 통과하지 못하면 IP 창은 적용하고 이메일 창에는 기록하지 않는다.
+- 존재하지 않는 이메일과 검증 불가능한 비밀번호도 dummy BCrypt 비교를 수행한다. 계정 존재 여부와 무관하게 실패 status·code·메시지는 같다.
+- 제한 응답 메시지는 "로그인 시도가 많아요. 잠시 후 다시 시도해 주세요"다.
+- 이메일 제한 키는 정규화 이메일 원문이 아닌 SHA-256 lowercase hex를 사용하며 이메일·비밀번호·토큰 원문을 로그에 남기지 않는다.
+- 서버 재시작 시 창이 초기화되는 것은 단일 인스턴스 P0 제약이다. 다중 인스턴스에서는 분산 저장소 정책을 별도 확정한다.
+- `request.getRemoteAddr()`를 IP 키로 사용한다. `server.forward-headers-strategy=framework`는 신뢰 프록시가 외부 forwarded header를 제거·재작성하고 서버 직접 진입을 차단한 배포에서만 켠다.
 
 ### 1-7 `POST /auth/kakao` 🔒(U1 P0 — 목업 "카카오로 시작하기")
 
@@ -875,7 +886,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `CONTEST_INACTIVE` | 409 | 비활성 대회의 신규 동선 생성 시도 |
 | `SYSTEM_BLOCK_IMMUTABLE` | 409 | RACE 블록 수정·삭제·이동 시도 |
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
-| `RATE_LIMITED` | 429 | 공개 중복 확인 IP 30회/분 또는 정규화 입력 5회/분 초과 |
+| `RATE_LIMITED` | 429 | 공개 중복 확인 또는 이메일 로그인 시도 제한 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
 | `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |

@@ -10,14 +10,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -40,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,18 +59,35 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.NumberRail
+import com.runninggu.app.ui.map.MIN_ROUTE_POINTS
+import com.runninggu.app.ui.map.MapScene
+import com.runninggu.app.ui.map.RunningGuMap
 
 /**
- * S8 러닝코스. (SPEC §4.11 · AP-12)
+ * S8 러닝코스. (SPEC §4.11 · AP-12 · AP-03)
  *
- * 지도는 AP-03(카카오맵 SDK)에서 붙는다 — 지금은 자리만 비워 둔다.
+ * 지도는 카카오맵 SDK 로 붙어 있고 §4.11-4 의 **두 갈래가 다 선다** — 경로를 고르면
+ * 왕복 폴리라인, 그 외에는 잇지 않는 번호 핀이다. 가르는 기준과 핀 번호가 목록과
+ * 어떻게 맞물리는지는 [CourseMap] KDoc 에 모아 두었다.
  */
 @Composable
 fun CourseScreen(
     viewModel: CourseViewModel,
+    onLoginRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 게스트가 [저장] 을 눌렀다 (매핑표 S8 "게스트 modal")
+    if (state.save is SaveCourseState.NeedsLogin) {
+        LoginPromptDialog(
+            onConfirm = {
+                viewModel.onLoginPromptDismiss()
+                onLoginRequest()
+            },
+            onDismiss = viewModel::onLoginPromptDismiss,
+        )
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -103,7 +121,7 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
     LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item { OriginRow(state, viewModel) }
         item { TargetSlider(state, viewModel) }
-        item { MapPlaceholder() }
+        item { CourseMap(state) }
 
         when (val near = state.nearby) {
             NearbyState.Idle -> item {
@@ -143,11 +161,11 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                         item = item,
                         number = index + 1,
                         targetKm = state.targetKm,
-                        selected = (item as? NearbyItem.Route)?.routeId == state.selectedRouteId,
-                        onClick = { viewModel.onItemSelect((item as? NearbyItem.Route)?.routeId) },
+                        selected = state.selectedItem == item,
+                        onClick = { viewModel.onItemSelect(item) },
                     )
                 }
-                item { ActionRow(hasNoRoute = near.hasNoRoute) }
+                item { ActionRow(state = state, viewModel = viewModel, hasNoRoute = near.hasNoRoute) }
                 item { Attributions(near.attributions) }
             }
         }
@@ -311,24 +329,96 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
     }
 }
 
-/** TODO(AP-03): 카카오맵 SDK 가 붙으면 폴리라인·번호 핀을 그린다. (SPEC §4.11-4) */
+/**
+ * S8 지도. (SPEC §3-8 · §4.11-4)
+ *
+ * 동선(S7)과 달리 방문 순서라는 개념이 없어 **경로를 이을 핀을 세우지 않는다.** 카메라는
+ * [MapScene] 안의 규칙이 정한다 — 경로가 바뀌면 전체 맞춤이다.
+ *
+ * ## §4.11-4 의 두 갈래
+ *
+ * > 선택 항목이 **경로면 왕복 폴리라인**(경로 bounds), **그 외 번호 핀**(잇지 않음,
+ * > 리스트 번호 일치) — SPEC §4.11-4
+ *
+ * 앞 갈래는 #142, 뒤 갈래는 #162 에서 붙었다. 가르는 기준은 **그릴 경로가 있는가**다
+ * ([CourseUiState.mapPins]) — 걷기 스팟을 골랐을 때뿐 아니라 **코스가 아예 0건일 때도**
+ * 핀을 세운다. 서울 반경 8km 는 코스 0건에 스팟만 나오는 것이 기본이라(§4.11 📌 ·
+ * AGENTS 6장) 그러지 않으면 수도권에서 지도가 늘 비어 있다.
+ *
+ * 핀 번호는 목록 순번 그대로여서(#158 `itemsIndexed`) **중간이 빈다** — `1 경로 ·
+ * 2 스팟 · 3 스팟 · 4 경로 · 5 스팟` 이면 지도에는 `2 · 3 · 5` 만 선다. 스팟만 따로
+ * 1·2·3 으로 다시 매기면 "리스트 번호 일치" 가 깨지므로 비는 것이 맞다.
+ *
+ * ## ⚠️ [LazyColumn] 안이라 스크롤로 벗어나면 다시 만들어진다
+ *
+ * [RunningGuMap] 이 `MapView` 를 `remember` 로 붙드는데, 그 기억은 **이 item 의
+ * 컴포지션에 묶인다.** 목록을 내렸다 올리면 SDK 초기화와 카메라가 다시 돈다. 내 주변
+ * 목록이 최대 12건이라 화면 밖으로 밀려나는 것은 드문 일이 아니다.
+ *
+ * 고치는 방법이 여럿이라(고정 영역으로 빼기 등) **실기기에서 보고 정한다** — #104 확인
+ * 항목이다.
+ *
+ * ## 아직 모르는 동안에는 단정하지 않는다
+ *
+ * 이 카드는 [NearbyState] 바깥에 있어 조회 전·조회 중·실패에도 그려진다. 그때 "따라갈
+ * 경로가 없어요" 를 놓으면 아래에서 "이 근처를 찾는 중…" 이 도는 동안 위에서 없다고
+ * 단정하는 꼴이 된다. **결과가 실제로 나온 뒤에만**(Content · Empty) 그 문구를 쓴다.
+ *
+ * 경로가 있는데 [NearbyItem.Route.path] 가 비어 있을 수도 있다 — 매퍼가 폴리라인을
+ * 못 풀면 그렇다(#129). 그때는 목록이 `경로` 태그를 달고 있는데 지도만 비는데, 선이
+ * 안 되는 좌표열을 그리는 것보다 낫다고 보고 그대로 둔다.
+ */
 @Composable
-private fun MapPlaceholder() {
+private fun CourseMap(state: CourseUiState) {
+    val route = state.mappedRoute?.path.orEmpty()
+    // 그릴 경로가 없을 때 세우는 걷기 스팟 번호 핀 (§4.11-4)
+    val pins = state.mapPins
+    // 결과가 나온 뒤에만 "없다" 고 말할 수 있다
+    val settled = state.nearby is NearbyState.Content || state.nearby is NearbyState.Empty
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .height(140.dp),
+            .height(180.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("지도", style = MaterialTheme.typography.bodyMedium)
+        when {
+            route.size >= MIN_ROUTE_POINTS -> RunningGuMap(
+                scene = MapScene(route = route),
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // **잇지 않는다.** 흩어진 장소라 방문 순서라는 개념이 없다 (§4.11-4)
+            pins.isNotEmpty() -> RunningGuMap(
+                scene = MapScene(
+                    pins = pins,
+                    connectPins = false,
+                    activePinId = state.activePinId,
+                ),
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            settled -> MapNotice(
+                title = "따라갈 경로가 없어요",
+                detail = "걷기 스팟은 아래 목록에서 볼 수 있어요.",
+            )
+
+            else -> MapNotice(title = "지도", detail = null)
+        }
+    }
+}
+
+@Composable
+private fun MapNotice(title: String, detail: String?) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
+        if (detail != null) {
             Text(
-                text = "AP-03 카카오맵 연동 예정",
+                text = detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -415,12 +505,57 @@ private fun NearbyRow(
     }
 }
 
+/**
+ * 게스트 로그인 유도. (`docs/screen-api-matrix.md` S8 · D-27)
+ *
+ * **로그인 뒤 저장을 자동 실행하지 않는다**(D-27). 돌아온 자리에서 사용자가 다시 누른다 —
+ * 누른 적 없는 저장이 저절로 일어나면 무엇이 저장됐는지 모른다.
+ */
 @Composable
-private fun ActionRow(hasNoRoute: Boolean) {
+private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("로그인이 필요해요") },
+        text = { Text("코스를 저장하려면 로그인해 주세요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("로그인하기") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}
+
+/**
+ * [저장] · [뛰기]. (SPEC §4.11-6 · API 명세 §7-A)
+ *
+ * **[저장]은 고른 경로가 있어야 눌린다.** 아무것도 안 골랐는데 눌리면 무엇이 저장되는지
+ * 알 수 없고, 걷기 스팟만 있는 목록(수도권의 기본 경험)에서는 저장할 대상 자체가 없다.
+ *
+ * 결과는 버튼 아래 한 줄로만 남긴다 — 스낵바로 띄우면 화면을 벗어난 뒤에도 떠 있어서
+ * 어느 코스 이야기인지 알 수 없다.
+ */
+@Composable
+private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRoute: Boolean) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { /* TODO(AP-14 4단계): POST /me/courses */ }) { Text("저장") }
+            OutlinedButton(
+                onClick = viewModel::onSaveCourse,
+                enabled = state.canSave,
+            ) {
+                Text(if (state.save is SaveCourseState.Saving) "저장 중…" else "저장")
+            }
             OutlinedButton(onClick = { /* TODO(AP-22 · P1): GPS 기록 */ }) { Text("뛰기") }
+        }
+        val save = state.save
+        if (save is SaveCourseState.Done) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = save.message,
+                style = MaterialTheme.typography.bodySmall,
+                // "이미 저장한 코스예요" 는 실패가 아니다 — 붉게 쓰면 뭘 잘못한 것처럼 읽힌다
+                color = if (save.failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
         }
         if (hasNoRoute) {
             Spacer(Modifier.height(6.dp))

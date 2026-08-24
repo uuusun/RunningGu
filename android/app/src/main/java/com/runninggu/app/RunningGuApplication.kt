@@ -1,5 +1,6 @@
 package com.runninggu.app
 
+import com.runninggu.app.ui.map.MapAvailability
 import android.app.Application
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.DataStoreSessionPersistence
@@ -53,6 +54,8 @@ class RunningGuApplication : Application() {
         }
         try {
             KakaoMapSdk.init(this, appKey)
+            // 여기까지 와야 지도를 그린다 — MapView 는 초기화 실패를 안 알려 준다(#162)
+            MapAvailability.markReady()
         } catch (e: LinkageError) {
             // **Exception 과 따로 받는다.** SDK 가 네이티브 라이브러리를 여는데, 실패하면
             // UnsatisfiedLinkError — Exception 이 아닌 Error 라 catch(Exception) 을 빠져나가

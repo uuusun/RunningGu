@@ -6,4 +6,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record VerificationMailProperties(
         boolean enabled,
         String fromAddress,
-        String fromName) {}
+        String fromName,
+        String passwordResetUrl) {}

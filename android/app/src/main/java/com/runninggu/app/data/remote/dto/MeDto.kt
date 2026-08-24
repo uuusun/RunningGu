@@ -37,3 +37,15 @@ data class AgreementsDto(
     /** 계정 관리 화면 토글의 초기값이다. */
     val marketing: Boolean,
 )
+
+/** `PATCH /api/me` 요청 본문. (§2) */
+@Serializable
+data class UpdateNicknameRequest(val nickname: String)
+
+/**
+ * `PATCH /api/me/agreements` 요청 본문. (§2)
+ *
+ * **필수 약관은 여기로 못 바꾼다** — 철회는 탈퇴 절차로 안내한다(§2).
+ */
+@Serializable
+data class UpdateMarketingRequest(val marketing: Boolean)

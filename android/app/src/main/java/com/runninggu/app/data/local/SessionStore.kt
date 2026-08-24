@@ -292,6 +292,27 @@ object SessionStore {
     }
 
     /**
+     * 서버가 돌려준 프로필로 갈아끼운다. 토큰과 세대는 건드리지 않는다. (API 명세 §2)
+     *
+     * **[updateTokens] 와 같은 이유로 세대를 함께 받는다**(#169·#170 리뷰). 호출부가
+     * `sessionEpoch` 를 읽어 비교한 뒤 [signIn] 을 부르면 그 사이가 비어 있다 —
+     * `TokenAuthenticator` 는 OkHttp 스레드에서 도는데, 비교와 적용 사이에 `signOut()`
+     * 이 끼면 **로그아웃한 세션이 되살아나고**, 다른 계정 로그인이 끼면 **새 계정 토큰에
+     * 이전 계정 프로필이 얹힌다.**
+     *
+     * 확인과 적용을 한 임계구역에 두면 그 창이 없어진다.
+     *
+     * @return 반영했으면 true. false 면 세션이 바뀐 것이라 호출부는 결과를 버린다.
+     */
+    @Synchronized
+    fun updateProfile(expectedEpoch: Int, profile: SessionProfile): Boolean {
+        if (epoch.get() != expectedEpoch) return false
+        _session.value = profile
+        schedulePersist()
+        return true
+    }
+
+    /**
      * 재발급이 만료로 끝났을 때의 로그아웃. **세대가 같을 때만** 지운다. (#74 리뷰)
      *
      * A 토큰 재발급이 `401` 로 끝났는데 그사이 B 로 갈아탔다면, 그건 B 를 로그아웃시킬

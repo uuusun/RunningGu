@@ -25,7 +25,7 @@ class SpringMailVerificationMailSenderTest {
         when(javaMailSender.createMimeMessage()).thenReturn(message);
         SpringMailVerificationMailSender sender = new SpringMailVerificationMailSender(
                 javaMailSender,
-                new VerificationMailProperties(true, "noreply@runninggu.example", "런닝구"));
+                properties());
 
         sender.sendSignupCode("runner@example.com", "001234");
         message.saveChanges();
@@ -52,7 +52,7 @@ class SpringMailVerificationMailSenderTest {
                 .send(message);
         SpringMailVerificationMailSender sender = new SpringMailVerificationMailSender(
                 javaMailSender,
-                new VerificationMailProperties(true, "noreply@runninggu.example", "런닝구"));
+                properties());
 
         assertThatThrownBy(() -> sender.sendSignupCode("runner@example.com", "001234"))
                 .isInstanceOf(MailDeliveryException.class)
@@ -65,8 +65,56 @@ class SpringMailVerificationMailSenderTest {
 
         assertThatThrownBy(() -> new SpringMailVerificationMailSender(
                         javaMailSender,
-                        new VerificationMailProperties(true, " ", "런닝구")))
+                        new VerificationMailProperties(
+                                true,
+                                " ",
+                                "런닝구",
+                                "https://api.runninggu.example/reset-password")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("SMTP_FROM_ADDRESS");
+    }
+
+    @Test
+    void 비밀번호_재설정_링크를_UTF8_일반텍스트로_발송한다() throws Exception {
+        JavaMailSender javaMailSender = mock(JavaMailSender.class);
+        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+        when(javaMailSender.createMimeMessage()).thenReturn(message);
+        SpringMailVerificationMailSender sender = new SpringMailVerificationMailSender(
+                javaMailSender,
+                properties());
+
+        sender.sendPasswordResetLink("runner@example.com", "reset_token-123");
+        message.saveChanges();
+
+        verify(javaMailSender).send(message);
+        assertThat(message.getSubject()).isEqualTo("[런닝구] 비밀번호 재설정");
+        assertThat(new String(message.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+                .contains("https://api.runninggu.example/reset-password?token=reset_token-123")
+                .contains("30분")
+                .contains("한 번만")
+                .contains("본인이 요청하지 않았다면");
+    }
+
+    @Test
+    void 재설정_URL은_HTTP_절대_URL이어야_한다() {
+        JavaMailSender javaMailSender = mock(JavaMailSender.class);
+
+        assertThatThrownBy(() -> new SpringMailVerificationMailSender(
+                        javaMailSender,
+                        new VerificationMailProperties(
+                                true,
+                                "noreply@runninggu.example",
+                                "런닝구",
+                                "/reset-password")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PASSWORD_RESET_URL");
+    }
+
+    private VerificationMailProperties properties() {
+        return new VerificationMailProperties(
+                true,
+                "noreply@runninggu.example",
+                "런닝구",
+                "https://api.runninggu.example/reset-password");
     }
 }

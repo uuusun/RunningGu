@@ -23,6 +23,7 @@ import java.time.Instant;
 public class EmailVerification {
 
     public static final Duration CODE_VALIDITY = Duration.ofMinutes(10);
+    public static final Duration PASSWORD_RESET_VALIDITY = Duration.ofMinutes(30);
     public static final Duration SEND_COOLDOWN = Duration.ofSeconds(60);
     public static final Duration VERIFIED_VALIDITY = Duration.ofMinutes(30);
     public static final int MAX_ATTEMPTS = 5;
@@ -69,6 +70,17 @@ public class EmailVerification {
         return verification;
     }
 
+    public static EmailVerification passwordReset(
+            String email,
+            String tokenHash,
+            Instant sentAt) {
+        EmailVerification verification = new EmailVerification();
+        verification.email = email;
+        verification.purpose = EmailVerificationPurpose.PASSWORD_RESET;
+        verification.reissuePasswordReset(tokenHash, sentAt);
+        return verification;
+    }
+
     /** 재발송은 이전 코드·실패 횟수·인증 상태를 모두 무효화한다. (SPEC §4.2, 결정-50) */
     public void reissue(String codeHash, Instant sentAt) {
         this.codeHash = codeHash;
@@ -80,12 +92,32 @@ public class EmailVerification {
         this.consumedAt = null;
     }
 
+    /** 재발송은 이전 비밀번호 재설정 링크를 즉시 무효화한다. (SPEC §4.3, 결정-6) */
+    public void reissuePasswordReset(String tokenHash, Instant sentAt) {
+        if (purpose != EmailVerificationPurpose.PASSWORD_RESET) {
+            throw new IllegalStateException("PASSWORD_RESET 인증만 재발급할 수 있습니다.");
+        }
+        this.codeHash = null;
+        this.tokenHash = tokenHash;
+        this.attempts = 0;
+        this.sentAt = sentAt;
+        this.expiresAt = sentAt.plus(PASSWORD_RESET_VALIDITY);
+        this.verifiedAt = null;
+        this.consumedAt = null;
+    }
+
     public boolean isInSendCooldown(Instant now) {
         return now.isBefore(sentAt.plus(SEND_COOLDOWN));
     }
 
     public boolean isCodeExpired(Instant now) {
         return !now.isBefore(expiresAt);
+    }
+
+    public boolean isPasswordResetActive(Instant now) {
+        return purpose == EmailVerificationPurpose.PASSWORD_RESET
+                && consumedAt == null
+                && now.isBefore(expiresAt);
     }
 
     public boolean isVerifiedAndActive(Instant now) {
@@ -128,6 +160,10 @@ public class EmailVerification {
         return codeHash;
     }
 
+    public String getTokenHash() {
+        return tokenHash;
+    }
+
     public int getAttempts() {
         return attempts;
     }
@@ -142,5 +178,9 @@ public class EmailVerification {
 
     public Instant getVerifiedAt() {
         return verifiedAt;
+    }
+
+    public Instant getConsumedAt() {
+        return consumedAt;
     }
 }

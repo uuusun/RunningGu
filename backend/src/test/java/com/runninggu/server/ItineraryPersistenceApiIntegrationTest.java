@@ -229,6 +229,48 @@ class ItineraryPersistenceApiIntegrationTest extends PostgreSqlContainerSupport 
     }
 
     @Test
+    void USER_블록이_RACE_고정_경계를_넘으면_순서변경을_거부하고_원래순서를_유지한다() throws Exception {
+        long userId = insertUser("경계러너", "boundary");
+        long contestId = insertContest("boundary-running", "경계 대회장");
+        String accessToken = accessToken(userId);
+        long itineraryId = save(accessToken, contestId, "첫 관광");
+        JsonNode detail = details(accessToken, itineraryId);
+        long dayId = detail.path("days").get(1).path("id").asLong();
+        long raceId = detail.path("days").get(1).path("blocks").get(0).path("id").asLong();
+        long firstUserId = detail.path("days").get(1).path("blocks").get(1).path("id").asLong();
+        long secondUserId = detail.path("days").get(1).path("blocks").get(2).path("id").asLong();
+
+        jdbcTemplate.update(
+                """
+                UPDATE itinerary_block
+                SET order_no = CASE id
+                    WHEN ? THEN 1
+                    WHEN ? THEN 0
+                    ELSE order_no
+                END
+                WHERE id IN (?, ?)
+                """,
+                raceId,
+                firstUserId,
+                raceId,
+                firstUserId);
+
+        assertProblem(put("/api/itineraries/{id}/days/{dayId}/blocks/order", itineraryId, dayId)
+                        .header("Authorization", bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockIds\":[" + secondUserId + "," + firstUserId + "]}"),
+                409,
+                "SYSTEM_BLOCK_IMMUTABLE");
+
+        mockMvc.perform(get("/api/itineraries/{id}", itineraryId)
+                        .header("Authorization", bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.days[1].blocks[0].id").value(firstUserId))
+                .andExpect(jsonPath("$.days[1].blocks[1].id").value(raceId))
+                .andExpect(jsonPath("$.days[1].blocks[2].id").value(secondUserId));
+    }
+
+    @Test
     void 소유권과_재생성contestId를_검증하고_삭제한다() throws Exception {
         long ownerId = insertUser("소유러너", "owner-runner");
         long otherId = insertUser("다른러너", "other-runner");

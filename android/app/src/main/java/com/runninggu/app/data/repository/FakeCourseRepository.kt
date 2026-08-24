@@ -6,6 +6,9 @@ import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.domain.LatLng
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 백엔드 `/api/courses` 가 준비되기 전까지 쓰는 스텁. (AP-12 · 매핑표 §12)
@@ -43,6 +46,10 @@ object FakeCourseRepository : CourseRepository {
                     elevationProfileM = listOf(12, 14, 17, 15, 19, 18, 16, 13),
                     shortfall = false,
                     pathPolyline = null,
+                    // 지도에 그릴 것이 있어야 S8 을 눈으로 확인할 수 있다. **원문 대신
+                    // 좌표를 바로 채운다** — 여기는 와이어 형식을 거치지 않는 스텁이라
+                    // 인코딩할 이유가 없고, 인코더도 앱에 없다(디코더만 있다).
+                    path = demoLoop(lat, lng, routeKm),
                 ),
                 NearbyItem.Place(
                     name = "여의도공원",
@@ -138,3 +145,28 @@ object FakeCourseRepository : CourseRepository {
         ),
     )
 }
+
+/**
+ * 출발지를 도는 대략적인 순환 경로. **스텁 전용이다.**
+ *
+ * 서버 `/api/courses/near` 가 서면 실제 경로가 오므로 이 함수는 그때 지워진다. 그때까지
+ * S8 지도를 눈으로 확인할 방법이 없어서 둔다 — 도로를 따르지 않고 원을 그릴 뿐이다.
+ *
+ * 반지름은 둘레가 [routeKm] 가 되게 잡는다(`r = C / 2π`). 위도 1도는 약 111km 이고,
+ * 경도는 위도가 올라갈수록 좁아져 `cos(위도)` 로 나눈다.
+ */
+private fun demoLoop(lat: Double, lng: Double, routeKm: Double): List<LatLng> {
+    val radiusKm = routeKm / (2 * Math.PI)
+    val dLat = radiusKm / 111.0
+    val dLng = dLat / cos(Math.toRadians(lat)).coerceAtLeast(MIN_COS)
+    return (0..LOOP_POINTS).map { step ->
+        val angle = 2 * Math.PI * step / LOOP_POINTS
+        LatLng(lat + dLat * sin(angle), lng + dLng * cos(angle))
+    }
+}
+
+/** 극지방에서 0 으로 나누는 것을 막는다. 우리 서비스 범위에서는 닿지 않는 값이다. */
+private const val MIN_COS = 0.01
+
+/** 원으로 보일 만큼만. 스텁이라 더 촘촘할 이유가 없다. */
+private const val LOOP_POINTS = 36

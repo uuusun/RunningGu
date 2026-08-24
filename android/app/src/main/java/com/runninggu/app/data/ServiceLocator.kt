@@ -20,6 +20,7 @@ import com.runninggu.app.data.remote.FavoriteApi
 import com.runninggu.app.data.remote.FestivalApi
 import com.runninggu.app.data.remote.GeocodeApi
 import com.runninggu.app.data.remote.PoiApi
+import com.runninggu.app.data.remote.SavedCourseApi
 import com.runninggu.app.data.remote.RefreshRequestDto
 import com.runninggu.app.data.remote.RefreshResponseDto
 import com.runninggu.app.data.remote.TokenApi
@@ -33,10 +34,12 @@ import com.runninggu.app.data.repository.RemoteFestivalRepository
 import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.data.repository.RemoteFavoriteRepository
 import com.runninggu.app.data.repository.GeocodeRepository
+import com.runninggu.app.data.repository.MemberRepository
+import com.runninggu.app.data.repository.RemoteMemberRepository
 import com.runninggu.app.data.repository.PoiRepository
 import com.runninggu.app.data.repository.RemoteGeocodeRepository
 import com.runninggu.app.data.repository.RemotePoiRepository
-import com.runninggu.app.data.repository.FakeSavedCourseRepository
+import com.runninggu.app.data.repository.RemoteSavedCourseRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.RemoteContestRepository
 import com.runninggu.app.data.repository.RemoteCourseRepository
@@ -148,6 +151,9 @@ object ServiceLocator {
 
     val meApi: MeApi by lazy { retrofit.create() }
 
+    /** 계정 화면의 닉네임·마케팅 동의 변경. (API 명세 §2 · AP-13) */
+    val memberRepository: MemberRepository by lazy { RemoteMemberRepository(meApi) }
+
     /**
      * 앱 시작 세션 검증. (`screen-api-matrix` A0 · API 명세 §2)
      *
@@ -186,13 +192,18 @@ object ServiceLocator {
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
     val courseRepository: CourseRepository by lazy { RemoteCourseRepository(courseApi) }
 
+    val savedCourseApi: SavedCourseApi by lazy { retrofit.create() }
+
     /**
-     * 저장 코스. **아직 스텁이다** — 백엔드에 `/api/me/courses` 가 없다(§7-A · AP-07).
+     * 저장 코스. (API 명세 §7-A · `/api/me/courses`)
      *
-     * 다른 항목처럼 `Remote…` 로 바꾸면 화면은 그대로 붙는다. 그때까지 스텁으로 두는 이유는,
-     * 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을 확인할 수 없기 때문이다.
+     * **인증이 필요하다.** 게스트가 부르면 `401` 이라 `ApiException.Http.needsLogin` 이 뜬다 —
+     * 화면은 로그인 유도로 끝내고 저장을 예약하지 않는다(D-27). 마이는 게스트면 아예
+     * 부르지 않는다(`MyViewModel.loadCourses`).
      */
-    val savedCourseRepository: SavedCourseRepository by lazy { FakeSavedCourseRepository }
+    val savedCourseRepository: SavedCourseRepository by lazy {
+        RemoteSavedCourseRepository(savedCourseApi)
+    }
 
     val favoriteApi: FavoriteApi by lazy { retrofit.create() }
 

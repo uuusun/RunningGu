@@ -22,18 +22,35 @@ A2 회원가입에서 사용자에게 보여주는 문안이다. 서버가 `USER
 
 ## 파일
 
-| 파일 | `AgreementType` | 필수 |
-|---|---|---|
-| [`v1.0/tos.md`](v1.0/tos.md) | `TOS` | ✅ |
-| [`v1.0/privacy.md`](v1.0/privacy.md) | `PRIVACY` | ✅ |
-| [`v1.0/marketing.md`](v1.0/marketing.md) | `MARKETING` | 선택 |
+| 파일 | `AgreementType` | 필수 | 서버 활성 |
+|---|---|---|---|
+| [`v1.0/tos.md`](v1.0/tos.md) | `TOS` | ✅ | ✅ `1.0` |
+| [`v1.0/privacy.md`](v1.0/privacy.md) | `PRIVACY` | ✅ | ✅ `1.0` |
+| [`v1.0/marketing.md`](v1.0/marketing.md) | `MARKETING` | 선택 | ✅ `1.0` |
+| [`v1.1/privacy.md`](v1.1/privacy.md) | `PRIVACY` | ✅ | ⏸ **아직 아님** (#111) |
 
 ## 버전 규칙
 
 - 디렉터리 이름이 곧 버전이다. `v1.0/` ↔ 서버 `runninggu.auth.agreements.*-version: "1.0"`
 - **문안을 고치면 버전을 올린다.** 오타 수정도 마찬가지다 — 같은 버전에 다른 글이 있으면
   이력이 가리키는 대상이 흔들린다
-- 버전을 올릴 때는 서버 설정과 **같은 PR 에서** 바꾼다
+- **이미 나간 버전의 파일은 고치지 않는다.** 서버가 그 버전으로 저장한 동의 이력이
+  가리키는 글이라, 나중에 손대면 "무엇에 동의했는가" 가 달라진다
+
+### 문안을 쓰는 것과 그 버전을 켜는 것은 다른 일이다
+
+새 버전 디렉터리를 **추가하는 PR** 과 서버의 활성 버전을 **올리는 PR** 은 나눈다. 문안이
+먼저 있어야 검토할 수 있는데, 검토가 끝나기 전에 서버만 올리면 **앱은 옛 글을 보여주고
+서버는 새 버전으로 이력을 남긴다.**
+
+활성 버전을 올릴 때는 아래 셋을 **같은 PR 에서** 맞춘다.
+
+1. 서버 `runninggu.auth.agreements.*-version`
+2. A2 가 그 버전의 문안을 실제로 보여주는 연결
+3. 위 표의 "서버 활성" 열
+
+> 지금 `v1.1/privacy.md` 가 ⏸ 인 이유다 — 문안은 있고, A2 연결과 서버 전환은 아직이다.
+> 이 순서는 #111 에서 합의했다.
 
 ## 어디에 두고 어떻게 보여줄 것인가 — **미정**
 
@@ -56,20 +73,24 @@ A2 회원가입에서 사용자에게 보여주는 문안이다. 서버가 `USER
 | # | 내용 | 무엇이 없나 |
 |---|---|---|
 | **A** | **만료된 인증·세션 기록의 삭제 주기** | 서버에 정리 작업이 없다(`@Scheduled` 0건). 유효시간(10분·30분)이 지나도 행이 남고, **가입까지 안 간 이메일 주소도 남는다** — 탈퇴로도 안 지워진다 |
-| **B** | 마케팅 수신 끄기 | `PATCH /me/agreements` 와 **메일 수신거부 링크**가 없다 |
-| **C** | 내 정보 보기·고치기·탈퇴 | `PATCH /me` · `DELETE /me` 가 없다 |
+| **B** | 마케팅 수신 끄기 | `PATCH /me/agreements` 는 **섰다**(#151) 앱 연결도 끝났다(#164). 남은 것은 **메일 수신거부 링크** 뿐이다 |
+| **C** | 내 정보 보기·고치기·**탈퇴** | 보기·고치기는 `GET`·`PATCH /me` 로 **섰다**(#151 · 앱 #164). **탈퇴가 남았다** — `POST /me/reauth` · `DELETE /me` 둘 다 없다 |
 | **D** | 비밀번호 변경 | `PUT /me/password` 가 없다. **계약은 이미 있다** — API 명세 §2-1 에 경로·요청·응답·오류 코드가 확정돼 있으므로 그대로 구현하면 된다. 약관 제4조와 개인정보 7장이 이 동작을 이미 설명한다 (#133 리뷰) |
 
 A 가 제일 무겁다 — **보유 기간을 못 적으면 개인정보 문서가 성립하지 않는다.**
 
-구현된 인증 엔드포인트는 현재 이것뿐이다.
+현재 구현된 엔드포인트다 (2026-08-24 기준 · #169 리뷰).
 
 ```
-/api/auth  signup · login · refresh · logout
-           email/exists · email/send-code · email/verify · nickname/exists
+/api/auth       signup · login · refresh · logout
+                email/exists · email/send-code · email/verify · nickname/exists
+/api/me         GET · PATCH · PATCH /agreements                       (#151)
+/api/me/courses POST · GET · GET /{id} · DELETE /{id}                 (#152)
+/api/me/favorites GET · PUT /{id} · DELETE /{id}                      (#150)
 ```
 
-`/api/me/**` 는 하나도 없다.
+**아직 없는 것**은 `PUT /me/password` · `POST /me/reauth` · `DELETE /me` 셋이다.
+위 표의 A·D 와 C 의 탈퇴가 여기 걸린다.
 
 ### 문안에 적을 값이 **정해져야 하는 것**
 

@@ -15,5 +15,22 @@ services:
     volumes:
       - runninggu-postgres-data:/var/lib/postgresql/data
 
+  graphhopper:
+    profiles: ["routing"]
+    build:
+      context: ./graphhopper
+    ports:
+      - "127.0.0.1:${GRAPHHOPPER_PORT:-8989}:8989"
+    volumes:
+      - type: bind
+        source: ${GRAPHHOPPER_PBF_PATH:-../.cache/osm/korea.osm.pbf}
+        target: /data/korea.osm.pbf
+        read_only: true
+      - runninggu-graphhopper-graph:/data/graph-cache
+      - runninggu-graphhopper-srtm:/data/srtm-cache
+    restart: unless-stopped
+
 volumes:
   runninggu-postgres-data:
+  runninggu-graphhopper-graph:
+  runninggu-graphhopper-srtm:

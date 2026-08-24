@@ -3,14 +3,17 @@ package com.runninggu.app.ui.my
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.ui.auth.AuthValidation
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
+import com.runninggu.app.data.repository.MemberRepository
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +30,10 @@ data class AccountUiState(
     val profile: SessionProfile? = null,
     val message: String? = null,
     val signedOut: Boolean = false,
+    /** 마케팅 토글이 서버에 다녀오는 중. 스위치를 잠가 연타로 요청이 겹치지 않게 한다. */
+    val savingMarketing: Boolean = false,
+    /** 닉네임 다이얼로그. `null` 이면 닫혀 있다. */
+    val nicknameEdit: NicknameEdit? = null,
 ) {
     /** 비밀번호 변경 메뉴는 EMAIL 가입자에게만 보인다 (#59 · 결정-38). */
     val showsPasswordMenu: Boolean get() = profile?.loginProvider == LoginProvider.EMAIL
@@ -35,26 +42,50 @@ data class AccountUiState(
      * 마케팅 수신 동의. **세션 프로필에서 읽는다** — 화면이 자체 기본값을 들면
      * 가입 때 동의한 사용자에게도 꺼진 것으로 보인다.
      *
-     * TODO(AP-14): `GET /me` 의 `agreements.marketing` 이 세션을 채우고,
-     *  토글은 `PATCH /me/agreements` 왕복으로 바뀐다 (명세 §2).
+     * 세션은 `GET /me` · `PATCH /me/agreements` 응답으로만 채워지므로(명세 §2)
+     * **여기 보이는 값은 언제나 서버가 말한 값**이다.
      */
     val marketingAgreed: Boolean get() = profile?.marketingAgreed == true
 }
 
 /**
- * 계정 관리. (SPEC §4.13 · AP-13)
+ * 닉네임 다이얼로그의 상태. (SPEC §4.13 · API 명세 §2)
  *
- * **로그아웃만 서버를 본다**(이슈 #113). 나머지는 아직 Fake 다 —
- * TODO(AP-14): `PATCH /me`(닉네임) · `PATCH /me/agreements` ·
- * `PUT /me/password`(EMAIL만, 토큰 쌍 재발급 D-28) ·
+ * **화면이 아니라 여기서 여닫는다.** 성공해야 닫히고 실패하면 열린 채 남아야 하는데,
+ * 그 판단이 서버 응답에 달려 있기 때문이다. 화면이 `remember` 로 들고 있으면 확인을
+ * 누른 순간 닫혀서 `409 NICKNAME_DUPLICATED` 를 **고칠 자리가 사라진다** (이슈 #164).
+ *
+ * @param error 다이얼로그 안에 그대로 그린다. 스낵바로 보내면 닫힌 뒤에 뜬다
+ */
+data class NicknameEdit(
+    val saving: Boolean = false,
+    val error: String? = null,
+)
+
+/**
+ * 계정 관리. (SPEC §4.13 · AP-13 · AP-14)
+ *
+ * **닉네임·마케팅 동의·로그아웃이 서버를 본다.** 남은 것은 아직 Fake 다 —
+ * TODO(AP-14): `PUT /me/password`(EMAIL만, 토큰 쌍 재발급 D-28) ·
  * `POST /me/reauth` + `DELETE /me`(탈퇴 재인증 D-23) 로 교체한다.
+ *
+ * ## 값을 스스로 뒤집지 않는다
+ *
+ * 세 엔드포인트가 모두 **프로필 전체**를 돌려주므로(명세 §2), 화면은 무엇이 바뀌었는지
+ * 따지지 않고 세션을 통째로 갈아끼운다. 그래서 낙관적 갱신도, 롤백도 없다 — **서버가
+ * 답하기 전에는 화면이 움직이지 않는다.** 되돌릴 것이 없으니 되돌리다 틀릴 일도 없다.
  */
 class AccountViewModel(
     private val repository: AuthRepository = ServiceLocator.authRepository,
+    private val memberRepository: MemberRepository = ServiceLocator.memberRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AccountUiState())
     val uiState: StateFlow<AccountUiState> = _uiState.asStateFlow()
+
+    /** 마케팅 토글 연타. 스위치도 잠그지만 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
+    private var marketingJob: Job? = null
+    private var nicknameJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -64,49 +95,119 @@ class AccountViewModel(
         }
     }
 
+    /** 닉네임 다이얼로그를 연다. */
+    fun onNicknameEditOpen() {
+        _uiState.update { it.copy(nicknameEdit = NicknameEdit()) }
+    }
+
+    /** 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다. */
+    fun onNicknameEditDismiss() {
+        _uiState.update { if (it.nicknameEdit?.saving == true) it else it.copy(nicknameEdit = null) }
+    }
+
     /**
-     * 닉네임 변경. 규칙은 가입과 같다(2~12자).
+     * 닉네임 변경. (`PATCH /me` · 명세 §2) 규칙은 가입과 같다(2~12자).
      *
-     * **낙관적 갱신 + 롤백**이다 — 서버에 `409 NICKNAME_DUPLICATED` 가 있어서(§1-2 · §2)
-     * 성공만 가정하면 중복 닉네임이 화면에 남는다.
+     * **성공해야 다이얼로그가 닫힌다.** `409 NICKNAME_DUPLICATED` 는 사용자가 **고쳐야
+     * 넘어가는** 오류라, 닫고 스낵바로 알리면 다시 열어 처음부터 입력해야 한다. 그래서
+     * 안내를 다이얼로그 안에 둔다(이슈 #164).
      *
-     * TODO(AP-14): `PATCH /me` 로 교체한다. 아래 `runCatching` 자리에 호출만 끼우면 된다.
+     * 길이 규칙은 서버에 묻기 전에 여기서 거른다 — 왕복할 이유가 없다.
      */
     fun onNicknameChange(nickname: String) {
         val trimmed = nickname.trim()
+        if (_uiState.value.nicknameEdit?.saving == true) return
         if (!AuthValidation.isNicknameValid(trimmed)) {
-            _uiState.update { it.copy(message = "닉네임은 2~12자로 지어 주세요") }
+            _uiState.update { it.copy(nicknameEdit = NicknameEdit(error = "닉네임은 2~12자로 지어 주세요")) }
             return
         }
-        val previous = _uiState.value.profile ?: return
-        viewModelScope.launch {
-            SessionStore.signIn(previous.copy(nickname = trimmed))
-            val outcome = runCatching { delay(FAKE_DELAY_MS) } // TODO(AP-14): PATCH /me
-            _uiState.update {
-                outcome.fold(
-                    onSuccess = { _ -> it.copy(message = "닉네임을 바꿨어요") },
-                    onFailure = { cause ->
-                        SessionStore.signIn(previous) // 롤백
+        val epoch = SessionStore.sessionEpoch
+        nicknameJob?.cancel()
+        nicknameJob = viewModelScope.launch {
+            _uiState.update { it.copy(nicknameEdit = NicknameEdit(saving = true)) }
+            val result = runCatching { memberRepository.updateNickname(trimmed) }
+            result.fold(
+                onSuccess = { profile ->
+                    // **확인과 적용을 한 임계구역에서 한다**(#170 리뷰). 세대를 밖에서 비교한
+                    // 뒤 signIn 하면 그 사이에 TokenAuthenticator 의 signOut 이 끼어 로그아웃한
+                    // 세션이 되살아날 수 있다.
+                    //
+                    // 세대가 달라 못 넣었으면 남의 결과다. **버리되 화면은 되돌린다** —
+                    // 그냥 빠져나가면 "저장 중" 이 굳어 다이얼로그가 안 닫힌다.
+                    val applied = SessionStore.updateProfile(epoch, profile)
+                    _uiState.update {
                         it.copy(
-                            message = if (cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED) {
-                                "이미 쓰고 있는 닉네임이에요"
-                            } else {
-                                "닉네임을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
-                            },
+                            nicknameEdit = null,
+                            message = if (applied) "닉네임을 바꿨어요" else null,
                         )
-                    },
-                )
-            }
+                    }
+                },
+                onFailure = { cause ->
+                    // 세션이 바뀐 뒤의 실패는 남의 것이다 — 다이얼로그만 닫는다
+                    val stale = epoch != SessionStore.sessionEpoch
+                    _uiState.update {
+                        if (stale) {
+                            it.copy(nicknameEdit = null)
+                        } else {
+                            it.copy(nicknameEdit = NicknameEdit(error = cause.nicknameMessage()))
+                        }
+                    }
+                },
+            )
         }
     }
 
-    /** TODO(AP-14): `PATCH /me/agreements {marketing}` 왕복 + 실패 시 롤백 (명세 §2). */
+    /**
+     * 마케팅 수신 동의 토글. (`PATCH /me/agreements {marketing}` · 명세 §2)
+     *
+     * **미리 뒤집지 않는다.** 스위치는 세션 프로필을 그리므로, 서버가 답해야 움직인다.
+     * 예전에는 여기서 `SessionStore.signIn(profile.copy(...))` 로 로컬 값만 뒤집어서
+     * **앱을 지웠다 깔면 되돌아갔다**(이슈 #164).
+     *
+     * 보내는 중에는 [AccountUiState.savingMarketing] 로 스위치를 잠근다. 서버가 멱등이라
+     * 겹쳐도 이력이 중복되지는 않지만(§2), 응답이 엇갈려 도착하면 화면이 튄다.
+     */
     fun onToggleMarketing() {
         val profile = _uiState.value.profile ?: return
+        if (_uiState.value.savingMarketing) return
         val next = !profile.marketingAgreed
-        SessionStore.signIn(profile.copy(marketingAgreed = next))
-        _uiState.update {
-            it.copy(message = if (next) "마케팅 수신에 동의했어요" else "마케팅 수신 동의를 철회했어요")
+        val epoch = SessionStore.sessionEpoch
+        marketingJob?.cancel()
+        marketingJob = viewModelScope.launch {
+            _uiState.update { it.copy(savingMarketing = true) }
+            val result = runCatching { memberRepository.updateMarketing(next) }
+            result.fold(
+                onSuccess = { updated ->
+                    // 확인과 적용을 한 임계구역에서 (#170 리뷰). 못 넣었으면 남의 결과다.
+                    val applied = SessionStore.updateProfile(epoch, updated)
+                    _uiState.update {
+                        it.copy(
+                            // 세대가 바뀌었어도 **잠금은 반드시 푼다.** 안 그러면 스위치가
+                            // 잠긴 채 남는다.
+                            savingMarketing = false,
+                            // 서버가 답한 값으로 말한다 — 보낸 값이 아니다
+                            message = when {
+                                !applied -> null
+                                updated.marketingAgreed -> "마케팅 수신에 동의했어요"
+                                else -> "마케팅 수신 동의를 철회했어요"
+                            },
+                        )
+                    }
+                },
+                onFailure = {
+                    val stale = epoch != SessionStore.sessionEpoch
+                    _uiState.update {
+                        it.copy(
+                            savingMarketing = false,
+                            message = if (stale) {
+                                null
+                            } else {
+                                "설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
+                            },
+                        )
+                    }
+                },
+            )
         }
     }
 
@@ -187,6 +288,18 @@ class AccountViewModel(
 
     fun onMessageShown() {
         _uiState.update { it.copy(message = null) }
+    }
+
+    /**
+     * 닉네임 변경 실패 문구. 다이얼로그 안에 그린다.
+     *
+     * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
+     * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
+     */
+    private fun Throwable.nicknameMessage(): String = when {
+        apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED -> "이미 쓰고 있는 닉네임이에요"
+        this is ApiException.Network -> "네트워크에 연결할 수 없어요"
+        else -> "닉네임을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
     }
 
     private companion object {

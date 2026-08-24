@@ -159,4 +159,37 @@ class MapContractTest {
 
         assertTrue(cameraCommandFor(before, after) is CameraCommand.FitBounds)
     }
+
+    @Test
+    fun `핀이 있으면 여백이 핀 절반보다 크다`() {
+        // 라벨은 좌표를 중심에 두고 그려져 **절반이 바깥으로 솟는다.** 여백이 그보다
+        // 작으면 가장자리 핀의 위쪽이 잘린다 — 실제로 잘렸다(#162).
+        for (density in listOf(1f, 2f, 2.75f, 3.5f, 4f)) {
+            val padding = cameraFitPaddingPx(density, hasPins = true)
+            val halfPin = PinBitmap.MAX_SIZE_DP * density / 2f
+
+            assertTrue(
+                "density=$density 에서 여백 $padding 이 핀 절반 $halfPin 보다 작다",
+                padding > halfPin,
+            )
+        }
+    }
+
+    @Test
+    fun `여백은 밀도를 따라 커진다`() {
+        // 밀도와 무관한 px 상수였던 것이 문제였다 — 고밀도 기기에서만 잘렸다.
+        assertTrue(
+            cameraFitPaddingPx(3.5f, hasPins = true) >
+                cameraFitPaddingPx(1f, hasPins = true),
+        )
+    }
+
+    @Test
+    fun `경로만 있으면 핀 몫을 더하지 않는다`() {
+        // 폴리라인은 위로 솟지 않는다. 괜히 여백을 키우면 경로가 필요 이상으로 작아진다.
+        assertTrue(
+            cameraFitPaddingPx(2.75f, hasPins = false) <
+                cameraFitPaddingPx(2.75f, hasPins = true),
+        )
+    }
 }

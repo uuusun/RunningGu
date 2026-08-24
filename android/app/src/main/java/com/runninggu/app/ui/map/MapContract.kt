@@ -106,3 +106,25 @@ private fun MapScene.layoutDiffersFrom(other: MapScene): Boolean =
 
 /** 선이 되려면 두 점은 있어야 한다. */
 internal const val MIN_ROUTE_POINTS = 2
+
+/**
+ * `fitMapPoints` 에 줄 여백(px). (SPEC §3-8 · #162)
+ *
+ * **좌표 기준 여백이라 핀 그림 크기가 저절로 들어가지 않는다.** 라벨은 좌표를 중심에
+ * 두고 그려지므로 절반이 바깥으로 솟는데, 여백이 그보다 작으면 가장자리 핀의 위쪽이
+ * 잘린다. 경로만 그릴 때는 폴리라인이 위로 솟지 않아 드러나지 않던 자리다.
+ *
+ * 예전에는 밀도와 무관한 `60px` 상수였다. 그 값은 densityDpi 가 낮은 기기에서만 우연히
+ * 맞고, 고밀도 기기에서는 핀 절반(약 [PinBitmap.MAX_SIZE_DP] `/ 2`)이 그보다 커져서
+ * **반드시 잘린다.**
+ *
+ * @param hasPins 핀이 있는 장면인가. 경로만이면 여백만 준다
+ */
+internal fun cameraFitPaddingPx(density: Float, hasPins: Boolean): Int {
+    val base = BASE_FIT_PADDING_DP * density
+    val halfPin = if (hasPins) PinBitmap.MAX_SIZE_DP * density / 2f else 0f
+    return kotlin.math.ceil(base + halfPin).toInt()
+}
+
+/** 지도 가장자리와 내용 사이 최소 숨통. 핀 크기와 별개다. */
+private const val BASE_FIT_PADDING_DP = 16f

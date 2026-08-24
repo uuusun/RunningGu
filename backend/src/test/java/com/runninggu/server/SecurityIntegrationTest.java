@@ -1,8 +1,10 @@
 package com.runninggu.server;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +40,12 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/auth/password/reset-request")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest())
@@ -79,6 +87,23 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(get("/api/me/favorites"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(put("/api/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"run4life1\",\"newPassword\":\"newRun4life2\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(post("/api/me/reauth")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"EMAIL\",\"password\":\"run4life1\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(delete("/api/me")
+                        .header("X-Reauth-Token", "reauth-token"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
