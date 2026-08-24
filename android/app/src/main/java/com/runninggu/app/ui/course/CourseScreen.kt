@@ -62,9 +62,10 @@ import com.runninggu.app.ui.map.MapScene
 import com.runninggu.app.ui.map.RunningGuMap
 
 /**
- * S8 러닝코스. (SPEC §4.11 · AP-12)
+ * S8 러닝코스. (SPEC §4.11 · AP-12 · AP-03)
  *
- * 지도는 AP-03(카카오맵 SDK)에서 붙는다 — 지금은 자리만 비워 둔다.
+ * 지도는 카카오맵 SDK 로 붙어 있다(AP-03). 다만 §4.11-4 의 **앞 갈래(경로 폴리라인)뿐**이라
+ * 남은 절반은 [CourseMap] KDoc 에 적어 둔다.
  */
 @Composable
 fun CourseScreen(
@@ -332,8 +333,9 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
  * 늘 비어 있다.**
  *
  * 뒤 갈래는 `pins = 걷기 스팟` · `connectPins = false` 로 채운다. **목록에 번호가 먼저
- * 있어야** "리스트 번호 일치" 가 성립하는데 지금 목록은 번호를 안 그린다 — 앱 UI 담당이
- * 목록 번호와 함께 넣기로 했다(#142 리뷰).
+ * 있어야** "리스트 번호 일치" 가 성립하는데, 그 번호는 #158 로 들어왔다(`itemsIndexed` 의
+ * `index + 1`). 핀은 그 순번을 그대로 쓰면 되고 **#162** 에서 붙인다 — 경로가 섞인 목록이라
+ * 핀 번호는 중간이 빈다(2·3·5).
  *
  * ## ⚠️ [LazyColumn] 안이라 스크롤로 벗어나면 다시 만들어진다
  *
