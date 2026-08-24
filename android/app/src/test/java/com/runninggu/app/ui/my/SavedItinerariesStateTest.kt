@@ -11,6 +11,7 @@ import com.runninggu.app.data.repository.GenerateItineraryRequest
 import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.data.repository.SavedItineraryPage
 import com.runninggu.app.data.model.ItineraryResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -19,9 +20,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 /**
  * 마이 [동선] 세그먼트가 서버를 본다. (SPEC §4.13 · §3-5 · API 명세 §5-4)
@@ -124,6 +127,76 @@ class SavedItinerariesStateTest {
     }
 
     @Test
+    fun `더 보기를 누르면 받는 동안 버튼이 잠긴다`() = runTest(dispatcher) {
+        // 눌린 것이 화면에 안 보이면 사용자는 안 눌렸다고 여기고 또 누른다 (§3-5 · #181 리뷰).
+        // 요청을 묵살하는 것과 "받는 중" 이라고 말하는 것은 다르다
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        repository.gate = CompletableDeferred()
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        val loading = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertTrue("받는 중이라고 말하지 않는다", loading.loadingMore)
+        assertFalse("받는 중인데 버튼이 열려 있다", loading.canLoadMore)
+        assertEquals("받는 동안 목록이 흔들렸다", 20, loading.itineraries.size)
+
+        repository.gate?.complete(Unit)
+        advanceUntilIdle()
+
+        val done = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertFalse(done.loadingMore)
+        assertEquals(40, done.itineraries.size)
+        assertTrue("아직 7건 남았는데 버튼이 닫혔다", done.canLoadMore)
+    }
+
+    @Test
+    fun `받는 중에 또 눌러도 요청은 한 번만 간다`() = runTest(dispatcher) {
+        // 버튼을 잠그는 것과 별개로 상태도 스스로를 막는다 — 화면이 잠깐 어긋나도 새지 않는다
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        repository.gate = CompletableDeferred()
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+        repository.gate?.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(0, 1), repository.requestedPages)
+    }
+
+    @Test
+    fun `다음 장을 못 받아도 목록은 남고 다시 누를 수 있다`() = runTest(dispatcher) {
+        // 보이던 20건이 사라지면 안 된다. 그리고 재시도가 **그 자리에서** 돼야 한다 —
+        // 스낵바만 띄우고 버튼이 잠긴 채면 사용자는 화면을 떠났다 와야 한다
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        repository.failOnce = true
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        val failed = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertEquals("실패에 목록이 날아갔다", 20, failed.itineraries.size)
+        assertEquals("더 불러오지 못했어요.", failed.moreMessage)
+        assertFalse(failed.loadingMore)
+        assertTrue("재시도할 수 없다", failed.canLoadMore)
+
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        val retried = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertEquals(40, retried.itineraries.size)
+        assertEquals("성공했는데 오류 문구가 남았다", null, retried.moreMessage)
+    }
+
+    @Test
     fun `게스트는 서버를 부르지 않는다`() = runTest(dispatcher) {
         // 마이 진입 자체가 로그인 필요다(결정-4). 헛 왕복을 만들지 않는다
         val stub = StubItineraries(emptyList())
@@ -155,6 +228,61 @@ private class StubItineraries(
             totalElements = itineraries.size.toLong(),
         )
     }
+
+    override suspend fun delete(id: Long) = Unit
+
+    override suspend fun generate(request: GenerateItineraryRequest): ItineraryResult =
+        throw UnsupportedOperationException("이 테스트는 생성을 부르지 않는다")
+}
+
+/**
+ * 47건을 20건씩 주는 가짜. [gate] 로 다음 장을 잡아 두고 "받는 중" 상태를 들여다본다.
+ *
+ * 첫 장은 곧바로 답한다 — 화면이 열리는 것까지 문에 걸리면 준비 자체가 안 된다.
+ */
+private class PagedItineraries(
+    private val pageSize: Int = 20,
+    private val total: Int = 47,
+) : ItineraryRepository {
+
+    /** 완료시킬 때까지 다음 장을 붙들어 둔다. null 이면 곧바로 답한다. */
+    var gate: CompletableDeferred<Unit>? = null
+
+    /** 다음 장 조회를 **한 번만** 실패시킨다. 재시도는 성공한다. */
+    var failOnce = false
+
+    /** 요청이 두 번 가지 않았는지 보려고 순서대로 쌓는다. */
+    val requestedPages = mutableListOf<Int>()
+
+    override suspend fun list(page: Int, size: Int): SavedItineraryPage {
+        requestedPages += page
+        if (page > 0) {
+            gate?.await()
+            if (failOnce) {
+                failOnce = false
+                throw ApiException.Network(IOException("끊김"))
+            }
+        }
+        val start = page * pageSize
+        val items = (start until minOf(start + pageSize, total)).map { itinerary(it) }
+        return SavedItineraryPage(
+            itineraries = items,
+            hasNext = start + items.size < total,
+            totalElements = total.toLong(),
+        )
+    }
+
+    private fun itinerary(i: Int) = SavedItinerary(
+        id = i.toString(),
+        title = "부산 2박 3일",
+        raceName = "부산 마라톤",
+        event = "HALF",
+        recoveryLabel = null,
+        period = "09.05~09.07",
+        placeCount = 8,
+        needsRegeneration = false,
+        active = true,
+    )
 
     override suspend fun delete(id: Long) = Unit
 

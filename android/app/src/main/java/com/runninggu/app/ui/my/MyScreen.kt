@@ -313,12 +313,32 @@ private fun ItineraryList(
             }
         }
 
-        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4)
+        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4).
+        // 받는 동안은 잠그고 그렇게 말한다 — [러닝코스] 와 같은 모양이다 (§3-5).
         if (state.hasNext) {
             Spacer(Modifier.height(2.dp))
-            OutlinedButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
-                Text("더 보기 (${state.itineraries.size}/${state.totalElements})")
+            OutlinedButton(
+                onClick = onLoadMore,
+                enabled = state.canLoadMore,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (state.loadingMore) {
+                        "불러오는 중…"
+                    } else {
+                        "더 보기 (${state.itineraries.size}/${state.totalElements})"
+                    },
+                )
             }
+        }
+
+        // 다음 장을 못 받았다. 위 목록은 그대로 두고 이 줄만 붙인다.
+        state.moreMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

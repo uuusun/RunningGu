@@ -143,10 +143,19 @@ sealed interface SavedItinerariesState {
     data object Loading : SavedItinerariesState
 
     data class Content(
+        /** 지금까지 받아온 것을 **이어 붙인** 목록. 다음 장을 받으면 뒤에 붙는다. */
         val itineraries: List<SavedItinerary>,
         val hasNext: Boolean,
+        /** 저장한 동선 전체 수. `itineraries.size` 가 아니다 — 한 번에 20건씩 온다. */
         val totalElements: Long,
-    ) : SavedItinerariesState
+        /** [더 보기] 로 다음 장을 받는 중. 목록은 그대로 두고 버튼만 바뀐다. */
+        val loadingMore: Boolean = false,
+        /** 다음 장을 못 받았다. **이미 받은 목록은 지우지 않는다.** */
+        val moreMessage: String? = null,
+    ) : SavedItinerariesState {
+        /** 더 받을 게 남았고 지금 받는 중이 아니다. */
+        val canLoadMore: Boolean get() = hasNext && !loadingMore
+    }
 
     /** 정상 조회했는데 0건. "저장한 동선이 없어요." */
     data object Empty : SavedItinerariesState
@@ -347,33 +356,41 @@ class MyViewModel(
         }
     }
 
-    /** [더 보기] — 다음 장을 뒤에 이어 붙인다. (§0-4) */
+    /**
+     * [더 보기] — 다음 장을 받아 **뒤에 이어 붙인다**. (API 명세 §0-4 Pageable)
+     *
+     * [loadMoreCourses] 와 같은 규칙이다. **받는 동안 버튼을 잠그고 "불러오는 중" 을
+     * 띄운다**(§3-5) — 눌린 것이 화면에 보이지 않으면 사용자는 안 눌렸다고 여기고 또 누른다.
+     * 중복 요청은 `canLoadMore` 가 막지만, 그건 화면이 할 말을 대신해 주지 않는다(#181 리뷰).
+     *
+     * 실패해도 **이미 받은 목록은 두고** 문구만 붙인다 — 보이던 게 사라지면 안 된다.
+     * 버튼은 다시 눌리는 상태로 돌아가므로 그 자리에서 재시도할 수 있다.
+     */
     fun loadMoreItineraries() {
         val current = _uiState.value.itineraries as? SavedItinerariesState.Content ?: return
-        if (!current.hasNext) return
+        if (!current.canLoadMore) return
         val epoch = sessionEpoch
-        if (itinerariesJob?.isActive == true) return
+        itinerariesJob?.cancel()
         itinerariesJob = viewModelScope.launch {
-            val next = itinerariesPage + 1
-            val page = try {
-                itineraryRepository.list(page = next)
+            _uiState.update {
+                it.copy(itineraries = current.copy(loadingMore = true, moreMessage = null))
+            }
+            val state = try {
+                val next = itineraryRepository.list(page = itinerariesPage + 1)
+                itinerariesPage += 1
+                current.copy(
+                    itineraries = current.itineraries + next.itineraries,
+                    hasNext = next.hasNext,
+                    // 총 건수는 매 응답에 온다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
+                    totalElements = next.totalElements,
+                    loadingMore = false,
+                    moreMessage = null,
+                )
             } catch (e: ApiException) {
-                // 이미 받은 목록은 지우지 않는다 — 더 못 받은 것뿐이다
-                _message.value = "동선을 더 불러오지 못했어요."
-                return@launch
+                current.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
             }
             if (epoch != sessionEpoch) return@launch
-            itinerariesPage = next
-            _uiState.update {
-                val shown = it.itineraries as? SavedItinerariesState.Content ?: return@update it
-                it.copy(
-                    itineraries = shown.copy(
-                        itineraries = shown.itineraries + page.itineraries,
-                        hasNext = page.hasNext,
-                        totalElements = page.totalElements,
-                    ),
-                )
-            }
+            _uiState.update { it.copy(itineraries = state) }
         }
     }
 
