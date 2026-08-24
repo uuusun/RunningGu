@@ -85,7 +85,19 @@ object FavoriteStore {
      * id 를 지워 버린다. 그 틈에 조회가 들어오면 **아직 반영 안 된 서버 상태**를 화면에 씌우고,
      * 뒤이은 요청은 성공 경로라 화면을 다시 손대지 않아 그대로 갈린다(#64 리뷰).
      */
-    private val inFlight = ConcurrentHashMap<String, Int>()
+    private val inFlight = ConcurrentHashMap<PendingKey, Int>()
+
+    /**
+     * [inFlight] 의 키. **세션 세대를 함께 든다.** (#173 리뷰)
+     *
+     * 대회 id 만으로 세면, A 계정의 토글이 떠 있는 채로 B 로 갈아탔을 때 **B 의 조회가 그
+     * 대회를 "진행 중" 으로 보고 결과에서 빼 버린다.** A 의 요청은 이전 세대라 끝나도
+     * 화면을 안 고치므로 B 의 하트가 꺼진 채 남는다.
+     *
+     * [clear] 에서 통째로 비우는 방법도 있지만, 그러면 뒤늦게 끝난 A 의 요청이
+     * `computeIfPresent` 로 **B 의 카운터를 깎는다.** 키를 나누는 편이 안전하다.
+     */
+    private data class PendingKey(val epoch: Int, val raceId: String)
 
     /**
      * 세션 세대. [clear] 마다 올라간다.
@@ -169,7 +181,7 @@ object FavoriteStore {
             // 조회가 도는 사이 로그아웃했으면 이전 사용자의 목록이다. 버린다.
             if (epoch != sessionEpoch.get()) return
             if (mutations != mutationEpoch.get()) return@repeat // 쓰기가 끼어들었다. 다시 읽는다
-            val pending = inFlight.keys
+            val pending = pendingRaceIds(epoch)
             _favoriteIds.update { current ->
                 // 요청이 떠 있는 대회는 조회 결과보다 화면 값이 최신이다. 조회가 덮으면
                 // 방금 누른 하트가 되돌아갔다가 다시 켜지는 것처럼 깜빡인다.
@@ -195,7 +207,7 @@ object FavoriteStore {
     fun mergeKnownFavorites(raceIds: Collection<String>) {
         if (raceIds.isEmpty() || !SessionStore.isLoggedIn) return
         val epoch = sessionEpoch.get()
-        val known = raceIds.toSet() - inFlight.keys
+        val known = raceIds.toSet() - pendingRaceIds(epoch)
         if (known.isEmpty() || epoch != sessionEpoch.get()) return
         confirmed += known
         _favoriteIds.update { it + known }
@@ -221,7 +233,7 @@ object FavoriteStore {
         // 탭이 첫 번째가 정한 방향을 보고 자기 방향을 정해야 하기 때문이다(#64 리뷰).
         applyLocally(raceId, nowFavorite)
         // 같은 대회에 대기 중인 토글이 남아 있으면 id 가 유지된다.
-        inFlight.merge(raceId, 1, Int::plus)
+        inFlight.merge(PendingKey(epoch, raceId), 1, Int::plus)
 
         // 서버 왕복만 [writeScope] 로 넘긴다. 호출자가 취소되면 아래 `await` 만 끊기고
         // **쓰기는 끝까지 간다** — 서버에 반영된 것을 앱이 실패로 오해하지 않는다(#173 리뷰).
@@ -271,7 +283,9 @@ object FavoriteStore {
             }
         } finally {
             // 마지막 하나가 끝날 때만 지운다. `null` 이면 내가 마지막이었다는 뜻이다.
-            val remaining = inFlight.computeIfPresent(raceId) { _, n -> if (n <= 1) null else n - 1 }
+            val remaining = inFlight.computeIfPresent(PendingKey(epoch, raceId)) { _, n ->
+                if (n <= 1) null else n - 1
+            }
             if (remaining == null && epoch == sessionEpoch.get()) {
                 // 대기 중인 토글이 더 없으니 화면을 서버 상태에 맞춘다.
                 //
@@ -301,6 +315,10 @@ object FavoriteStore {
 
     /** [refresh] 재시도 횟수. 쓰기가 끼어들면 한 번 더 읽고, 그래도 겹치면 다음 조회에 맡긴다. */
     private const val REFRESH_ATTEMPTS = 2
+
+    /** **이 세대에서** 떠 있는 대회 id 만. 다른 계정의 요청은 섞이지 않는다(#173 리뷰). */
+    private fun pendingRaceIds(epoch: Int): Set<String> =
+        inFlight.keys.mapNotNullTo(mutableSetOf()) { it.raceId.takeIf { _ -> it.epoch == epoch } }
 
     private fun applyLocally(raceId: String, favorite: Boolean) {
         _favoriteIds.update { current ->

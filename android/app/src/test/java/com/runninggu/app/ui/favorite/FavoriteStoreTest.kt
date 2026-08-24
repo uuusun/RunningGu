@@ -57,6 +57,40 @@ class FavoriteStoreTest {
     }
 
     @Test
+    fun `계정을 갈아타면 이전 계정의 진행 중 요청이 새 조회를 가리지 않는다`() = runBlocking {
+        // A 의 토글이 떠 있는 채로 로그아웃 → B 로 로그인 → refresh.
+        //
+        // inFlight 를 대회 id 만으로 세면 **B 의 조회가 그 대회를 "진행 중" 으로 보고
+        // 빼 버린다.** A 의 요청은 이전 세대라 끝나도 화면을 안 고치므로, B 가 그 대회를
+        // 찜해 뒀는데도 하트가 꺼진 채 남는다(#173 리뷰).
+        val gate = repository.gate("add")
+        val aToggle = async { FavoriteStore.toggle(RACE) }
+        yield()
+
+        SessionStore.signOut()
+        // 실제로는 `bind` 의 세션 구독이 이걸 부른다. 테스트는 구독을 끊어 두므로 직접 부른다.
+        FavoriteStore.clear()
+        SessionStore.signIn(
+            SessionProfile(
+                nickname = "다른사람",
+                email = "other@example.com",
+                loginProvider = LoginProvider.EMAIL,
+            ),
+        )
+
+        // B 서버에는 같은 대회가 찜으로 있다
+        repository.stored += RACE
+        FavoriteStore.refresh()
+
+        assertTrue(FavoriteStore.isFavorite(RACE))
+
+        gate.complete(Unit)
+        aToggle.await()
+        // A 의 요청이 늦게 끝나도 B 의 화면을 되돌리지 않는다
+        assertTrue(FavoriteStore.isFavorite(RACE))
+    }
+
+    @Test
     fun `연타해도 같은 대회 요청이 겹치지 않는다`() = runBlocking {
         // 첫 요청(PUT)이 느리고 두 번째(DELETE)가 빠른, 순서가 뒤집히기 딱 좋은 조건.
         repository.delaysMs = ArrayDeque(listOf(300L, 10L))
