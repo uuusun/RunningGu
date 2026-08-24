@@ -1,5 +1,6 @@
 package com.runninggu.app.data.local
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -227,6 +228,32 @@ class SessionStoreTest {
     }
 
     @Test
+    fun `검증이 끝나기 전에는 시작 화면을 열지 않는다`() = runBlocking {
+        // A0 계약이 "DataStore 값 + `GET /api/me`" 라, 디스크만 읽고 화면을 고르면
+        // **폐기된 세션도 홈이 한 번 열렸다가 로그인으로 튕긴다**(#99). 그래서 복원 완료
+        // 신호는 검증까지 끝난 뒤에 올라와야 한다 — `RunningGuApp` 이 이 신호를 기다린다.
+        persistence.stored = PersistedSession(tokens, profile)
+        val gate = CompletableDeferred<Unit>()
+        validator.gate = gate
+        validator.result = SessionValidation.Expired
+
+        bind()
+        withTimeout(TIMEOUT_MS) { while (validator.calls == 0) delay(POLL_MS) }
+
+        assertFalse(
+            "검증 중에 시작 화면이 열리면 홈이 번쩍였다 로그인으로 튕긴다",
+            SessionStore.restored.value,
+        )
+
+        gate.complete(Unit)
+        awaitRestored()
+        awaitPersisted { !SessionStore.isLoggedIn }
+
+        // 열렸을 때는 이미 로그아웃이 끝나 있어야 로그인 화면으로 곧장 간다
+        assertFalse(SessionStore.isLoggedIn)
+    }
+
+    @Test
     fun `게스트로 시작하면 서버에 물어보지 않는다`() {
         // 토큰이 없으면 물어볼 것도 없다. 앱 시작마다 헛 왕복을 만들지 않는다
         bind()
@@ -329,8 +356,13 @@ private class RecordingValidator : SessionValidator {
     var calls = 0
         private set
 
+    /** 세워 두고 싶을 때 넣는다. 완료시켜야 검증이 끝난다. */
+    @Volatile
+    var gate: CompletableDeferred<Unit>? = null
+
     override suspend fun validate(): SessionValidation {
         calls++
+        gate?.await()
         return result
     }
 }
