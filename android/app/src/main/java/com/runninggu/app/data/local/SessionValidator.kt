@@ -33,5 +33,10 @@ fun interface SessionValidator {
     suspend fun validate(): SessionValidation
 }
 
-/** 물어보지 않는 구현. 서버가 아직 없거나 테스트일 때 쓴다. */
+/**
+ * 물어보지 않는 구현. **테스트·미리보기용 기본값**이다.
+ *
+ * 운영은 [SessionStore.bind] 에 `ServiceLocator.sessionValidator`(`GET /api/me`)를 넘긴다 —
+ * 여기로 떨어지면 검증 없이 디스크 값만 믿는 것이라, 실수로 기본값이 쓰이면 A0 이 사라진다.
+ */
 val NoSessionValidator = SessionValidator { SessionValidation.Unknown }

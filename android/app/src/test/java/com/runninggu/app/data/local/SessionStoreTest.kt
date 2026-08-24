@@ -185,6 +185,12 @@ class SessionStoreTest {
         const val TIMEOUT_MS = 3_000L
         const val POLL_MS = 5L
         const val SLOW_LOAD_MS = 150L
+
+        /**
+         * 검증이 늦게 답하는 시간. 순서가 뒤집혔다면 `restored` 가 이 시간만큼 먼저
+         * 올라오므로, 기다리지 않고 확인하는 테스트가 그 틈을 잡는다.
+         */
+        const val SLOW_VALIDATE_MS = 150L
     }
 
     @Test
@@ -197,6 +203,29 @@ class SessionStoreTest {
         awaitRestored()
         awaitPersisted { !SessionStore.isLoggedIn }
 
+        assertNull(SessionStore.tokens)
+    }
+
+    /**
+     * A0 시작 게이트의 전제. (이슈 #99 · `screen-api-matrix` A0)
+     *
+     * `RunningGuApp` 은 `restored` 가 올라온 **그 순간의** `isLoggedIn` 하나로 홈/로그인을
+     * 정하고 다시 계산하지 않는다. 그러니 검증이 그 전에 끝나 있어야 한다.
+     *
+     * 위 "죽었으면 로그아웃한다" 와 달리 여기서는 **기다리지 않고** 곧바로 확인한다.
+     * 검증기가 일부러 늦게 답하므로, `restored` 를 검증보다 먼저 올리도록 순서를 바꾸면
+     * 이 테스트만 실패한다 — 그 상태가 곧 "죽은 세션으로 홈이 열렸다 튕기는" 화면이다.
+     */
+    @Test
+    fun `검증이 끝나기 전에는 시작 화면을 열지 않는다`() {
+        persistence.stored = PersistedSession(tokens, profile)
+        validator.result = SessionValidation.Expired
+        validator.delayMs = SLOW_VALIDATE_MS
+
+        bind()
+        awaitRestored()
+
+        assertFalse(SessionStore.isLoggedIn)
         assertNull(SessionStore.tokens)
     }
 
@@ -329,8 +358,13 @@ private class RecordingValidator : SessionValidator {
     var calls = 0
         private set
 
+    /** 늦게 답하게 만든다. 검증과 `restored` 의 순서를 보는 테스트가 쓴다. */
+    @Volatile
+    var delayMs = 0L
+
     override suspend fun validate(): SessionValidation {
         calls++
+        if (delayMs > 0) delay(delayMs)
         return result
     }
 }
