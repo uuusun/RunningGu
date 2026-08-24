@@ -70,8 +70,16 @@ class ResetViewModel(
         else -> "메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."
     }
 
+    /**
+     * **보내는 중에는 무시한다.** (#187 리뷰)
+     *
+     * 발송 중에 이메일이 바뀌면 **요청한 주소와 화면에 보이는 주소가 엇갈린다** — 사용자는
+     * 새 주소로 메일이 갔다고 읽는다. 버튼도 잠겨 있어(`canSubmit`) 다시 보낼 수도 없다.
+     */
     fun onEmailChange(value: String) {
-        _uiState.update { it.copy(email = value, errorMessage = null) }
+        _uiState.update {
+            if (it.isSubmitting) it else it.copy(email = value, errorMessage = null)
+        }
     }
 
     fun onSubmit() {
@@ -85,8 +93,14 @@ class ResetViewModel(
         // 쿨다운 문구를 띄운다.
         _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
         viewModelScope.launch {
+            // **호출을 `update` 밖에서 한 번만 한다.** (#187 리뷰)
+            //
+            // `MutableStateFlow.update` 는 CAS 에 실패하면 **람다를 다시 평가한다.** 안에
+            // 네트워크 호출을 두면 그때 요청이 한 번 더 나간다 — 첫 요청이 성공해 메일이
+            // 갔는데도 두 번째가 `429 SEND_COOLDOWN` 을 받아 화면은 쿨다운 문구가 된다.
+            val outcome = repository.requestPasswordReset(state.email.trim())
             _uiState.update {
-                repository.requestPasswordReset(state.email.trim()).fold(
+                outcome.fold(
                     // 가입 여부는 서버가 항상 202 로 감춘다 — 앱이 응답을 더 가릴 것은 없다(§1-11).
                     onSuccess = { _ -> it.copy(isSubmitting = false, sent = true) },
                     onFailure = { cause ->

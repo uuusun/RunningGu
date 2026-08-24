@@ -5,6 +5,7 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.AuthSession
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -125,6 +126,42 @@ class ResetRequestTest {
         assertEquals(1, repository.calls)
     }
 
+    @Test
+    fun `보내는 사이 이메일이 바뀌어도 요청은 한 번이다`() = runTest(dispatcher) {
+        // `MutableStateFlow.update` 는 CAS 에 실패하면 람다를 **다시 평가한다.** 안에
+        // 네트워크 호출을 두면 그때 요청이 한 번 더 나가고, 첫 요청으로 메일이 갔는데도
+        // 두 번째가 `429 SEND_COOLDOWN` 을 받아 화면은 쿨다운 문구가 된다(#187 리뷰).
+        val repository = GatedAuthRepository()
+        val viewModel = ResetViewModel(repository)
+        viewModel.onEmailChange("runner@test.com")
+
+        viewModel.onSubmit()
+        advanceUntilIdle() // 요청이 응답을 기다리는 중이다
+
+        viewModel.onEmailChange("other@test.com") // 그 사이 입력이 바뀐다
+        repository.gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, repository.calls)
+        assertEquals("runner@test.com", repository.requestedEmail)
+    }
+
+    @Test
+    fun `보내는 중에는 이메일이 바뀌지 않는다`() = runTest(dispatcher) {
+        // 요청한 주소와 화면에 보이는 주소가 엇갈리면 사용자는 새 주소로 갔다고 읽는다.
+        val repository = GatedAuthRepository()
+        val viewModel = ResetViewModel(repository)
+        viewModel.onEmailChange("runner@test.com")
+
+        viewModel.onSubmit()
+        advanceUntilIdle()
+        viewModel.onEmailChange("other@test.com")
+
+        assertEquals("runner@test.com", viewModel.uiState.value.email)
+        repository.gate.complete(Unit)
+        advanceUntilIdle()
+    }
+
     private fun TestScope.submit(
         repository: StubAuthRepository,
         email: String = "runner@test.com",
@@ -134,6 +171,24 @@ class ResetRequestTest {
         viewModel.onSubmit()
         advanceUntilIdle()
         return viewModel.uiState.value
+    }
+
+    /**
+     * 응답을 붙들어 둔다. "보내는 중" 에 다른 일이 끼어드는 상황을 실제로 만들려면 필요하다.
+     */
+    private class GatedAuthRepository : AuthRepository by StubAuthRepository(Result.success(Unit)) {
+        val gate = CompletableDeferred<Unit>()
+        var calls = 0
+            private set
+        var requestedEmail: String? = null
+            private set
+
+        override suspend fun requestPasswordReset(email: String): Result<Unit> {
+            calls++
+            requestedEmail = email
+            gate.await()
+            return Result.success(Unit)
+        }
     }
 
     /** 재설정 요청만 실제로 동작시킨다. 나머지는 이 테스트가 부르지 않는다. */
