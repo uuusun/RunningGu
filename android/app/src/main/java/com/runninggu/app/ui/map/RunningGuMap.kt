@@ -63,6 +63,13 @@ fun RunningGuMap(
     modifier: Modifier = Modifier,
     onPinClick: (String) -> Unit = {},
 ) {
+    // **초기화가 안 됐으면 시작조차 하지 않는다.** 그대로 start() 를 부르면 SDK 가 자기
+    // 로그에만 남기고 onMapError 를 안 불러서, 실패를 못 알아챈 채 빈 판만 남는다(#162)
+    if (!MapAvailability.isReady) {
+        MapUnavailable(modifier)
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnPinClick by rememberUpdatedState(onPinClick)
@@ -129,21 +136,23 @@ fun RunningGuMap(
     Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-        failure?.let { message ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        failure?.let { message -> MapUnavailable(Modifier.fillMaxSize(), message) }
+    }
+}
+
+/** 지도를 못 띄웠을 때 그 자리에 놓는 안내. (SPEC §3-8) */
+@Composable
+private fun MapUnavailable(modifier: Modifier = Modifier, message: String = MAP_UNAVAILABLE) {
+    Box(
+        modifier = modifier.padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -192,7 +201,7 @@ private class ScenePainter {
 
         drawRoute(map, scene)
         drawPins(map, metrics, scene)
-        moveCamera(map, scene)
+        moveCamera(map, metrics, scene)
 
         previous = scene
     }
@@ -255,12 +264,13 @@ private class ScenePainter {
         }
     }
 
-    private fun moveCamera(map: KakaoMap, scene: MapScene) {
+    private fun moveCamera(map: KakaoMap, metrics: DisplayMetrics, scene: MapScene) {
         when (val command = cameraCommandFor(previous, scene)) {
             is CameraCommand.FitBounds -> map.moveCamera(
                 CameraUpdateFactory.fitMapPoints(
                     command.points.map { it.toKakao() }.toTypedArray(),
-                    FIT_PADDING_PX,
+                    // 핀 절반이 바깥으로 솟는다 — 여백이 그보다 작으면 잘린다(#162)
+                    cameraFitPaddingPx(metrics.density, scene.pins.isNotEmpty()),
                 ),
             )
 
@@ -275,7 +285,6 @@ private class ScenePainter {
 
     private companion object {
         const val ROUTE_WIDTH_DP = 5f
-        const val FIT_PADDING_PX = 60
         const val CAMERA_ANIMATION_MS = 300
         const val BASE_RANK = 0L
         const val ACTIVE_RANK = 10L

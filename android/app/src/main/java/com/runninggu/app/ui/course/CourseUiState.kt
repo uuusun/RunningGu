@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.ui.map.MapMarker
 
 /**
  * S8 러닝코스의 UI 계약. (SPEC §4.11 · API 명세 §6)
@@ -26,8 +27,18 @@ data class CourseUiState(
     /** 지역 칩 선택. null 이면 전국이다. 재탭하면 해제된다. (§4.11-b) */
     val selectedRegion: String? = null,
     val regionCourses: RegionCoursesState = RegionCoursesState.Loading,
-    /** 목록에서 고른 항목. 지도 폴리라인이 이걸 따라간다. (§4.11-4) */
-    val selectedRouteId: String? = null,
+    /**
+     * 목록에서 고른 항목. 지도 폴리라인과 카드 강조가 이걸 따라간다. (§4.11-4)
+     *
+     * **경로 id 하나로 들지 않는다.** 그러면 "아직 아무것도 안 골랐다" 와 "걷기 스팟을
+     * 골랐다" 가 둘 다 null 이 되어 구분되지 않는다. 그 탓에 스팟을 탭하면 관계없는 첫
+     * 코스 선이 그려지고, 조회 직후에는 `null == null` 이 참이라 **모든 스팟 카드가
+     * 강조**됐다(#142 리뷰).
+     *
+     * 같은 항목이 목록에 두 번 오면 둘 다 강조된다. 서버가 거리순으로 섞어 주되 중복은
+     * 주지 않으므로 실제로는 생기지 않는다(§4.11-5).
+     */
+    val selectedItem: NearbyItem? = null,
     /**
      * [내 위치] 가 실패한 이유. (SPEC §4.11-1 ① · NFR-15)
      *
@@ -37,6 +48,86 @@ data class CourseUiState(
      */
     val locationMessage: String? = null,
 ) {
+    /**
+     * 지도에 그릴 경로. (SPEC §4.11-4 · §3-8)
+     *
+     * **고르기 전에는 첫 코스를 그린다.** 조회 직후 [selectedItem] 은 null 인데
+     * (`CourseViewModel` 이 새 조회마다 지운다) 그때 지도를 비워 두면 목록을 한 번
+     * 탭하기 전까지 빈 회색 판이 놓인다. 서버가 거리순으로 준 첫 코스가 기본이다.
+     *
+     * **걷기 스팟을 골랐으면 그릴 것이 없다.** 첫 코스로 되돌리면 방금 탭한 것과 아무
+     * 상관 없는 선이 지도에 남는다. §4.11-4 의 번호 핀이 붙기 전까지는 비어 있는 것이
+     * 맞다.
+     */
+    val mappedRoute: NearbyItem.Route?
+        get() {
+            val routes = (nearby as? NearbyState.Content)
+                ?.items
+                ?.filterIsInstance<NearbyItem.Route>()
+                ?: return null
+            return when (val picked = selectedItem) {
+                is NearbyItem.Place -> null
+                is NearbyItem.Route ->
+                    routes.firstOrNull { it.routeId == picked.routeId } ?: routes.firstOrNull()
+                null -> routes.firstOrNull()
+            }
+        }
+
+    /**
+     * 지도에 세울 번호 핀. (SPEC §4.11-4)
+     *
+     * 명세가 지도를 두 갈래로 가른다.
+     *
+     * > 선택 항목이 **경로면 왕복 폴리라인**(경로 bounds), **그 외 번호 핀**(잇지 않음,
+     * > 리스트 번호 일치)
+     *
+     * **"그릴 경로가 없을 때" 를 기준으로 삼는다.** 그러면 세 경우가 한 규칙으로 덮인다 —
+     * 걷기 스팟을 골랐을 때, 코스가 아예 0건일 때, 그리고 조회 직후 기본 경로도 없을 때다.
+     * 서울 반경 8km 는 코스 0건에 스팟만 나오는 것이 기본이라(§4.11 📌 · AGENTS 6장)
+     * 마지막 경우를 빼면 **수도권에서 지도가 늘 비어 있다.**
+     *
+     * **번호는 목록 순번 그대로다.** `index + 1` 은 화면이 목록에 붙이는 번호와 같은
+     * 값이다(#158 `itemsIndexed`). 스팟만 따로 1·2·3 으로 다시 매기면 그 순간 명세가
+     * 요구하는 "리스트 번호 일치" 가 깨진다.
+     *
+     * 그래서 **핀 번호는 중간이 빈다.** 목록이 `1 경로 · 2 스팟 · 3 스팟 · 4 경로 ·
+     * 5 스팟` 이면 지도에는 `2 · 3 · 5` 만 선다. 비는 것이 계약대로 맞는 동작이다.
+     */
+    val mapPins: List<MapMarker>
+        get() {
+            // 그릴 경로가 있으면 그쪽이 화면을 갖는다 — 선과 핀을 같이 그리지 않는다
+            if (mappedRoute != null) return emptyList()
+            val items = (nearby as? NearbyState.Content)?.items ?: return emptyList()
+            return items.mapIndexedNotNull { index, item ->
+                (item as? NearbyItem.Place)?.let {
+                    MapMarker(id = pinId(index), order = index + 1, lat = it.lat, lng = it.lng)
+                }
+            }
+        }
+
+    /**
+     * 지금 보고 있는 핀. 카메라가 여기로 따라간다. (SPEC §3-8)
+     *
+     * 고른 것이 스팟일 때만 있다 — 경로를 골랐으면 핀 자체가 없다.
+     */
+    val activePinId: String?
+        get() {
+            if (selectedItem !is NearbyItem.Place) return null
+            val items = (nearby as? NearbyState.Content)?.items ?: return null
+            val index = items.indexOf(selectedItem)
+            return if (index >= 0) pinId(index) else null
+        }
+
+    /**
+     * 핀 식별자. **목록 위치로 만든다.**
+     *
+     * `NearbyItem.Place` 에는 서버가 준 id 가 없다(§6-1 은 `ROUTE` 에만 `routeId` 를
+     * 준다). 이름·좌표를 이어 붙이면 같은 장소가 두 번 왔을 때 id 가 겹치므로, 목록
+     * 안에서 반드시 유일한 값인 위치를 쓴다. 목록이 바뀌면 새로 계산되는 값이라
+     * 저장하거나 서버로 보내지 않는다.
+     */
+    private fun pinId(index: Int): String = "nearby-$index"
+
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
         BY_REGION("지역별"),

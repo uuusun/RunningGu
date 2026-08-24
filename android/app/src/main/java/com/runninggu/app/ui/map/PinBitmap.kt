@@ -24,6 +24,15 @@ internal object PinBitmap {
     private const val RING_DP = 2.5f
 
     /**
+     * 가장 큰 핀(활성)의 한 변 길이(dp).
+     *
+     * 카메라 여백이 이 값의 절반보다 작으면 **핀이 지도 가장자리에서 잘린다** — 라벨은
+     * 좌표를 중심에 두고 그려지므로 절반이 바깥으로 솟는다(#162). [cameraFitPaddingPx] 가
+     * 이걸 쓴다.
+     */
+    const val MAX_SIZE_DP = BASE_DP * ACTIVE_SCALE + RING_DP * 2
+
+    /**
      * @param order 핀 안에 찍을 번호. 1부터.
      * @param accent 핀 바탕색. 회복일은 주황이 넘어온다(§3-8 범례).
      */
