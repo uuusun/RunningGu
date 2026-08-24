@@ -2,7 +2,7 @@ package com.runninggu.app.ui.auth
 
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
-import com.runninggu.app.data.repository.apiErrorCode
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

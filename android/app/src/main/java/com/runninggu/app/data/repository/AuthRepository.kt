@@ -209,8 +209,5 @@ object FakeAuthRepository : AuthRepository {
     private const val NETWORK_DELAY_MS = 400L
 }
 
-/** 실패에서 서버 에러 코드를 꺼낸다. 네트워크·해석 실패면 null. */
-internal fun Throwable.apiErrorCode(): ApiErrorCode? = (this as? ApiException.Http)?.code
-
 /** 통신 자체가 안 된 경우. 화면 문구를 서버 오류와 갈라야 한다. */
 internal fun Throwable.isNetworkFailure(): Boolean = this is ApiException.Network
