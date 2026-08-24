@@ -64,8 +64,9 @@ import com.runninggu.app.ui.map.RunningGuMap
 /**
  * S8 러닝코스. (SPEC §4.11 · AP-12 · AP-03)
  *
- * 지도는 카카오맵 SDK 로 붙어 있다(AP-03). 다만 §4.11-4 의 **앞 갈래(경로 폴리라인)뿐**이라
- * 남은 절반은 [CourseMap] KDoc 에 적어 둔다.
+ * 지도는 카카오맵 SDK 로 붙어 있고 §4.11-4 의 **두 갈래가 다 선다** — 경로를 고르면
+ * 왕복 폴리라인, 그 외에는 잇지 않는 번호 핀이다. 가르는 기준과 핀 번호가 목록과
+ * 어떻게 맞물리는지는 [CourseMap] KDoc 에 모아 두었다.
  */
 @Composable
 fun CourseScreen(
