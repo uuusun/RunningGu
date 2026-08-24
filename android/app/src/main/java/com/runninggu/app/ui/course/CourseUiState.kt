@@ -39,6 +39,8 @@ data class CourseUiState(
      * 주지 않으므로 실제로는 생기지 않는다(§4.11-5).
      */
     val selectedItem: NearbyItem? = null,
+    /** [저장] 버튼. (API 명세 §7-A · SPEC §4.11-6) */
+    val save: SaveCourseState = SaveCourseState.Idle,
     /**
      * [내 위치] 가 실패한 이유. (SPEC §4.11-1 ① · NFR-15)
      *
@@ -132,6 +134,28 @@ data class CourseUiState(
         NEARBY("내 주변"),
         BY_REGION("지역별"),
     }
+
+    /**
+     * [저장] 이 담는 경로. **지도가 그리는 것과 같다.** (§4.11-4 · §7-A)
+     *
+     * 고른 것이 있으면 그것, 없으면 첫 코스다 — [mappedRoute] 그대로다.
+     *
+     * **"지도에 보이는 것을 저장한다" 가 규칙이다.** 고른 것만 저장 대상으로 삼으면,
+     * 조회 직후 지도에는 1번 코스가 그려져 있는데 [저장] 은 회색인 화면이 된다. 목록
+     * 카드도 강조가 없어서 사용자 눈에는 "코스가 하나 떠 있는데 저장이 안 되는" 상태다
+     * (#166 리뷰). 그 코스는 목록에서도 1번이라 무엇이 저장되는지 분명하다.
+     *
+     * 걷기 스팟([NearbyItem.Place])을 고르면 [mappedRoute] 가 null 이라 여기도 null 이다 —
+     * 지도가 비어 있는데 저장이 눌리면 무엇을 저장하는지 알 수 없다.
+     *
+     * 저장 요청 본문에는 서버가 준 `pathPolyline` 과 원천 메타가 **그대로** 들어가야 한다
+     * (이슈 #62). 화면이 값을 재조립하면 fingerprint 가 흔들려 같은 코스가 중복 저장된다.
+     */
+    val selectedRoute: NearbyItem.Route?
+        get() = mappedRoute
+
+    /** [저장] 을 누를 수 있는가. 고른 경로가 있고 보내는 중이 아니어야 한다. */
+    val canSave: Boolean get() = selectedRoute != null && save !is SaveCourseState.Saving
 }
 
 /**
@@ -212,6 +236,46 @@ sealed interface NearbyState {
 
     /** 원천 실패로 표시할 게 하나도 없다. 재시도를 제공한다. */
     data class Error(val message: String) : NearbyState
+}
+
+/**
+ * [저장] 버튼 상태. (API 명세 §7-A · `POST /me/courses`)
+ *
+ * ## 결과를 문구 하나로 모은다
+ *
+ * 저장은 **한 번 누르고 끝나는 동작**이라 화면에 남는 것이 안내 한 줄뿐이다. 성공·중복·
+ * 실패마다 상태를 따로 만들면 화면이 `when` 을 세 갈래로 벌리는데, 정작 그리는 것은 셋 다
+ * 같은 자리의 같은 문구다. 대신 [Done.failed] 로 **색만** 가른다.
+ *
+ * 목록·조회의 네 상태(§3-5)와 다른 모양인 것은 성격이 달라서다 — 저장에는 "빈 결과" 가 없다.
+ */
+sealed interface SaveCourseState {
+
+    /** 아직 안 눌렀거나, 고른 항목이 바뀌어 이전 결과를 지웠다. */
+    data object Idle : SaveCourseState
+
+    /** 보내는 중. 버튼을 막아 연타로 같은 코스가 두 번 나가지 않게 한다. */
+    data object Saving : SaveCourseState
+
+    /**
+     * 게스트가 눌렀다 — 로그인 유도 **모달**을 띄운다.
+     * (`docs/screen-api-matrix.md` S8 "코스 저장 … 게스트 modal")
+     *
+     * 아래 [Done] 의 문구 한 줄로 처리하지 않는 이유는, 로그인은 **화면을 옮겨야 끝나는
+     * 일**이라서다. 안내만 남기면 어디로 가야 하는지 모른 채 버튼만 다시 누르게 된다.
+     *
+     * 로그인하고 돌아와도 **저장이 저절로 일어나지 않는다**(D-27) — 누른 적 없는 저장이
+     * 실행되면 사용자가 놀란다. 돌아온 자리에서 다시 누르면 된다.
+     */
+    data object NeedsLogin : SaveCourseState
+
+    /**
+     * 끝났다. [message] 를 버튼 아래 한 줄로 그린다.
+     *
+     * @param failed 실패·로그인 필요처럼 **사용자가 뭔가 해야 하는** 결과인가. 화면이 색을
+     *  가르는 데만 쓴다 — "이미 저장한 코스예요" 는 실패가 아니라 false 다.
+     */
+    data class Done(val message: String, val failed: Boolean = false) : SaveCourseState
 }
 
 /** 지역 칩. 코스 수 내림차순은 서버가 정한다. (§4.11-b · §6-3) */

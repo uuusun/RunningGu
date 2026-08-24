@@ -84,6 +84,8 @@ fun RunningGuNavHost(
         composable(Routes.COURSES) {
             CourseScreen(
                 viewModel = viewModel(factory = CourseViewModel.factory()),
+                // 게스트가 코스를 저장하려 하면 로그인으로 보내고, 끝나면 러닝코스로 돌아온다 (D-27)
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.COURSES)) },
                 modifier = Modifier.statusBarsPadding(),
             )
         }

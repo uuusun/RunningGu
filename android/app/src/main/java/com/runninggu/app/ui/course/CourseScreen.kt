@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -39,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -71,9 +73,21 @@ import com.runninggu.app.ui.map.RunningGuMap
 @Composable
 fun CourseScreen(
     viewModel: CourseViewModel,
+    onLoginRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 게스트가 [저장] 을 눌렀다 (매핑표 S8 "게스트 modal")
+    if (state.save is SaveCourseState.NeedsLogin) {
+        LoginPromptDialog(
+            onConfirm = {
+                viewModel.onLoginPromptDismiss()
+                onLoginRequest()
+            },
+            onDismiss = viewModel::onLoginPromptDismiss,
+        )
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -151,7 +165,7 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                         onClick = { viewModel.onItemSelect(item) },
                     )
                 }
-                item { ActionRow(hasNoRoute = near.hasNoRoute) }
+                item { ActionRow(state = state, viewModel = viewModel, hasNoRoute = near.hasNoRoute) }
                 item { Attributions(near.attributions) }
             }
         }
@@ -491,12 +505,57 @@ private fun NearbyRow(
     }
 }
 
+/**
+ * 게스트 로그인 유도. (`docs/screen-api-matrix.md` S8 · D-27)
+ *
+ * **로그인 뒤 저장을 자동 실행하지 않는다**(D-27). 돌아온 자리에서 사용자가 다시 누른다 —
+ * 누른 적 없는 저장이 저절로 일어나면 무엇이 저장됐는지 모른다.
+ */
 @Composable
-private fun ActionRow(hasNoRoute: Boolean) {
+private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("로그인이 필요해요") },
+        text = { Text("코스를 저장하려면 로그인해 주세요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("로그인하기") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
+}
+
+/**
+ * [저장] · [뛰기]. (SPEC §4.11-6 · API 명세 §7-A)
+ *
+ * **[저장]은 고른 경로가 있어야 눌린다.** 아무것도 안 골랐는데 눌리면 무엇이 저장되는지
+ * 알 수 없고, 걷기 스팟만 있는 목록(수도권의 기본 경험)에서는 저장할 대상 자체가 없다.
+ *
+ * 결과는 버튼 아래 한 줄로만 남긴다 — 스낵바로 띄우면 화면을 벗어난 뒤에도 떠 있어서
+ * 어느 코스 이야기인지 알 수 없다.
+ */
+@Composable
+private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRoute: Boolean) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { /* TODO(AP-14 4단계): POST /me/courses */ }) { Text("저장") }
+            OutlinedButton(
+                onClick = viewModel::onSaveCourse,
+                enabled = state.canSave,
+            ) {
+                Text(if (state.save is SaveCourseState.Saving) "저장 중…" else "저장")
+            }
             OutlinedButton(onClick = { /* TODO(AP-22 · P1): GPS 기록 */ }) { Text("뛰기") }
+        }
+        val save = state.save
+        if (save is SaveCourseState.Done) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = save.message,
+                style = MaterialTheme.typography.bodySmall,
+                // "이미 저장한 코스예요" 는 실패가 아니다 — 붉게 쓰면 뭘 잘못한 것처럼 읽힌다
+                color = if (save.failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
         }
         if (hasNoRoute) {
             Spacer(Modifier.height(6.dp))
