@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.ui.map.MapMarker
 
 /**
  * S8 러닝코스의 UI 계약. (SPEC §4.11 · API 명세 §6)
@@ -71,6 +72,61 @@ data class CourseUiState(
                 null -> routes.firstOrNull()
             }
         }
+
+    /**
+     * 지도에 세울 번호 핀. (SPEC §4.11-4)
+     *
+     * 명세가 지도를 두 갈래로 가른다.
+     *
+     * > 선택 항목이 **경로면 왕복 폴리라인**(경로 bounds), **그 외 번호 핀**(잇지 않음,
+     * > 리스트 번호 일치)
+     *
+     * **"그릴 경로가 없을 때" 를 기준으로 삼는다.** 그러면 세 경우가 한 규칙으로 덮인다 —
+     * 걷기 스팟을 골랐을 때, 코스가 아예 0건일 때, 그리고 조회 직후 기본 경로도 없을 때다.
+     * 서울 반경 8km 는 코스 0건에 스팟만 나오는 것이 기본이라(§4.11 📌 · AGENTS 6장)
+     * 마지막 경우를 빼면 **수도권에서 지도가 늘 비어 있다.**
+     *
+     * **번호는 목록 순번 그대로다.** `index + 1` 은 화면이 목록에 붙이는 번호와 같은
+     * 값이다(#158 `itemsIndexed`). 스팟만 따로 1·2·3 으로 다시 매기면 그 순간 명세가
+     * 요구하는 "리스트 번호 일치" 가 깨진다.
+     *
+     * 그래서 **핀 번호는 중간이 빈다.** 목록이 `1 경로 · 2 스팟 · 3 스팟 · 4 경로 ·
+     * 5 스팟` 이면 지도에는 `2 · 3 · 5` 만 선다. 비는 것이 계약대로 맞는 동작이다.
+     */
+    val mapPins: List<MapMarker>
+        get() {
+            // 그릴 경로가 있으면 그쪽이 화면을 갖는다 — 선과 핀을 같이 그리지 않는다
+            if (mappedRoute != null) return emptyList()
+            val items = (nearby as? NearbyState.Content)?.items ?: return emptyList()
+            return items.mapIndexedNotNull { index, item ->
+                (item as? NearbyItem.Place)?.let {
+                    MapMarker(id = pinId(index), order = index + 1, lat = it.lat, lng = it.lng)
+                }
+            }
+        }
+
+    /**
+     * 지금 보고 있는 핀. 카메라가 여기로 따라간다. (SPEC §3-8)
+     *
+     * 고른 것이 스팟일 때만 있다 — 경로를 골랐으면 핀 자체가 없다.
+     */
+    val activePinId: String?
+        get() {
+            if (selectedItem !is NearbyItem.Place) return null
+            val items = (nearby as? NearbyState.Content)?.items ?: return null
+            val index = items.indexOf(selectedItem)
+            return if (index >= 0) pinId(index) else null
+        }
+
+    /**
+     * 핀 식별자. **목록 위치로 만든다.**
+     *
+     * `NearbyItem.Place` 에는 서버가 준 id 가 없다(§6-1 은 `ROUTE` 에만 `routeId` 를
+     * 준다). 이름·좌표를 이어 붙이면 같은 장소가 두 번 왔을 때 id 가 겹치므로, 목록
+     * 안에서 반드시 유일한 값인 위치를 쓴다. 목록이 바뀌면 새로 계산되는 값이라
+     * 저장하거나 서버로 보내지 않는다.
+     */
+    private fun pinId(index: Int): String = "nearby-$index"
 
     enum class Tab(val label: String) {
         NEARBY("내 주변"),
