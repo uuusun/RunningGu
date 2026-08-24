@@ -27,6 +27,7 @@ import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
+import com.runninggu.app.data.repository.NearStubbedCourseRepository
 import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.data.repository.RemoteFestivalRepository
 import com.runninggu.app.data.repository.GeocodeRepository
@@ -181,7 +182,16 @@ object ServiceLocator {
 
     /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
     val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
-    val courseRepository: CourseRepository by lazy { RemoteCourseRepository(courseApi) }
+    /**
+     * S8 러닝코스. (API 명세 §6)
+     *
+     * **[내 주변]만 아직 스텁이다** — `/courses/near` 가 AP-25 에 묶여 있다.
+     * 지역별·지역 칩은 #156 으로 서버가 섰다. 자세한 이유는
+     * [NearStubbedCourseRepository] KDoc 에 있다.
+     */
+    val courseRepository: CourseRepository by lazy {
+        NearStubbedCourseRepository(remote = RemoteCourseRepository(courseApi))
+    }
 
     /**
      * 저장 코스. **아직 스텁이다** — 백엔드에 `/api/me/courses` 가 없다(§7-A · AP-07).
