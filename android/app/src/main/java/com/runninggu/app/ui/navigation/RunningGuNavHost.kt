@@ -82,9 +82,13 @@ fun RunningGuNavHost(
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.COURSES) {
+        composable(Routes.COURSES) { entry ->
             CourseScreen(
-                viewModel = viewModel(factory = CourseViewModel.factory()),
+                // S7 연계로 열렸으면 출발지·목표 거리가 **이 항목의 상태**에 담겨 온다
+                // (매핑표 D-15). 탭바로 연 항목은 비어 있어 아무것도 반영되지 않는다
+                viewModel = viewModel(
+                    factory = CourseViewModel.factory(launchState = entry.savedStateHandle),
+                ),
                 // 게스트가 코스를 저장하려 하면 로그인으로 보내고, 끝나면 러닝코스로 돌아온다 (D-27)
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.COURSES)) },
                 modifier = Modifier.statusBarsPadding(),
@@ -279,13 +283,18 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 // 빈 상태의 [조건 바꾸기] — 입력을 유지한 채 위저드로 돌아간다 (SPEC §4.10).
                 onChangeConditions = { navController.popBackStack() },
                 // 출발지(숙소)와 목표 거리를 [CourseLaunchContext] 로 넘긴다 — route 문자열에
-                // 좌표를 넣지 않는다(매핑표 D-15 개정 · AGENTS 8장).
+                // 좌표를 넣지 않는다(매핑표 D-15 · AGENTS 8장).
+                //
+                // **띄운 뒤에 그 항목에 담는다.** 값이 S8 항목보다 오래 살지 않아야
+                // 연계가 끊겼을 때 다음 진입에 남지 않는다(#178 리뷰). 항목은 navigate 로
+                // 곧바로 쌓이고 화면 구성은 그다음이라, 여기서 담으면 ViewModel 이 읽는다
                 onOpenCourses = { targetKm ->
+                    navController.navigate(Routes.COURSES)
                     CourseLaunchContext.set(
+                        handle = navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
                         stay = wizardViewModel.uiState.value.stay,
                         targetKm = targetKm,
                     )
-                    navController.navigate(Routes.COURSES)
                 },
                 wizardViewModel = wizardViewModel,
                 viewModel = resultViewModel,
