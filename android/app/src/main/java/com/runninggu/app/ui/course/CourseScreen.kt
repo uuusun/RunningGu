@@ -10,15 +10,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -54,6 +57,7 @@ import com.runninggu.app.ui.common.ElevationLine
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.NumberRail
 
 /**
  * S8 러닝코스. (SPEC §4.11 · AP-12)
@@ -132,9 +136,12 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                     )
                 }
                 // 서버가 거리순으로 섞어 준 순서 그대로 그린다 — 앱은 재정렬하지 않는다(결정-27)
-                items(near.items) { item ->
+                // **번호는 지도 핀과 짝이다.** §4.11-4 가 "리스트 번호 일치" 를 요구하므로
+                // 목록 순서 그대로 1부터 매긴다 — 서버가 거리순으로 준 순서다(§4.11-5).
+                itemsIndexed(near.items) { index, item ->
                     NearbyRow(
                         item = item,
+                        number = index + 1,
                         targetKm = state.targetKm,
                         selected = (item as? NearbyItem.Route)?.routeId == state.selectedRouteId,
                         onClick = { viewModel.onItemSelect((item as? NearbyItem.Route)?.routeId) },
@@ -332,6 +339,8 @@ private fun MapPlaceholder() {
 @Composable
 private fun NearbyRow(
     item: NearbyItem,
+    /** 목록 순번. 지도 번호 핀과 같은 값이다. (SPEC §4.11-4) */
+    number: Int,
     targetKm: Double,
     selected: Boolean,
     onClick: () -> Unit,
@@ -349,53 +358,57 @@ private fun NearbyRow(
             },
         ),
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (item is NearbyItem.Route) {
-                    // 원천 이름 대신 "따라갈 경로가 있는가" 만 표시한다 (§4.11-5)
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            NumberRail(number)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (item is NearbyItem.Route) {
+                        // 원천 이름 대신 "따라갈 경로가 있는가" 만 표시한다 (§4.11-5)
+                        Text(
+                            text = "경로",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
                     Text(
-                        text = "경로",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        text = item.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
                     )
-                    Spacer(Modifier.width(6.dp))
                 }
+
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    text = nearbySubtitle(item),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
 
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = nearbySubtitle(item),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (item is NearbyItem.Route) {
-                if (item.elevationProfileM.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    ElevationLine(
-                        seed = item.routeId.hashCode(),
-                        closed = false,
-                        profile = item.elevationProfileM.map { it.toFloat() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(28.dp),
-                    )
-                }
-                if (item.shortfall) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "이 근처 경로가 짧아 목표(${formatKm(targetKm)}km)보다 짧게 짜였어요.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                if (item is NearbyItem.Route) {
+                    if (item.elevationProfileM.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        ElevationLine(
+                            seed = item.routeId.hashCode(),
+                            closed = false,
+                            profile = item.elevationProfileM.map { it.toFloat() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp),
+                        )
+                    }
+                    if (item.shortfall) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "이 근처 경로가 짧아 목표(${formatKm(targetKm)}km)보다 짧게 짜였어요.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         }

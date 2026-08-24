@@ -79,6 +79,7 @@ import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.NumberRail
 import com.runninggu.app.ui.common.SourceBadge
 import com.runninggu.app.data.model.PoiItem
 import kotlinx.coroutines.launch
@@ -907,24 +908,6 @@ private fun TimelineRow(number: Int, block: ItineraryBlock) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NumberRail(number: Int) {
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "$number",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
     }
 }
 
