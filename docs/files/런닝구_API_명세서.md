@@ -65,6 +65,7 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 
 - **대회 목록만 불투명 커서 페이징** — 서버 내부 `(contestDate, id)`를 URL-safe Base64 `nextCursor`로 인코딩하고 클라이언트는 해석하지 않는다. 기본 20·최대 50.
 - **개인 목록은 Spring Pageable** — `?page=0&size=20`, `createdAt DESC, id DESC`, 최대 50. 응답은 `content[] + page{number, size, totalElements, hasNext}`.
+- **지역별 코스 목록**은 `?page=0&size=20`, 기본 20·최대 50이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`, 마지막 페이지를 넘으면 `200`의 빈 `content[]`를 반환한다.
 - 집계·Enum·지역 목록은 페이징하지 않는다.
 
 ### 0-5. 외부 API 프록시 방어 정책 🔒(정리본 공통 방어 + SPEC NFR-3~5)
@@ -642,7 +643,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - OSM 규칙 🔒(SPEC §5.8): 적격 큐레이션 경로가 0건일 때 `run` 프로파일·보정 거리 0.78·seed 16개로 후보를 만든다. 목표 75~125%·상승 `<50m/km`·차도 실제 거리 비율 `≤10%`·실제 방향 전환 `≤6회/km`를 모두 통과한 후보만 남기고, 차도 `≤5%` 그룹 우선 → 거리 오차 → 방향 전환/km → 차도 비율 순으로 최대 1건을 고른다. 통과 후보가 없으면 상한을 완화하지 않고 OSM 경로 0건으로 처리한다.
 - 차도 비율은 `PRIMARY|SECONDARY|TRUNK|TERTIARY|MOTORWAY` path detail 각 구간의 폴리라인 실거리 합으로 계산한다. `toRef-fromRef` 포인트 인덱스 개수를 거리로 사용하지 않는다. 방향 전환은 instruction sign `-98|-8|-3|-2|2|3|6|8`만 세고 직진·출발·도착·길 이름 변경은 제외한다.
 - 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 내 주변 `ROUTE`는 `EASY|NORMAL`만 나오며, 지역별 큐레이션 목록은 `HARD`도 표시와 함께 제공한다. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
-- 경로 공통 계산은 분당 110m로 `durationMin`, `shortfall = routeKm < targetKm-0.3`이다.
+- 경로 공통 계산은 분당 110m로 `durationMin = max(1, Math.round(km × 1000 / 110))`,
+  `shortfall = routeKm < targetKm-0.3`이다. 여기서 `km`는 근처 경로의 `routeKm` 또는 지역별
+  코스의 `distanceKm`이며 두 API가 같은 반올림 규칙을 쓴다.
 - 장소 규칙 🔒(SPEC §5.9): 4-3의 카카오 후보를 포함/제외·중복 제거한 뒤 합친다.
 - 서버가 `ROUTE`와 `PLACE`를 `distanceM` 오름차순으로 합쳐 최대 `size`건을 반환한다. 앱은 받은 순서를 다시 정렬하지 않는다.
 - `degradedSources`는 호출·동기화 실패로 제외된 `DURUNUBI|OSM|KAKAO` 원천이다. 품질 상한 통과 후보 0건은 정상 결과이므로 `OSM` degraded가 아니다. 항목이 하나라도 있으면 부분 실패도 `200`이며 앱은 Content와 비차단 안내를 함께 표시한다.
@@ -687,6 +690,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
   `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
+- `page` 기본값은 `0`, `size` 기본값은 `20`이며 `size` 최대값은 `50`이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`다. 마지막 페이지를 넘은 `page`는 오류가 아니라 `200`의 빈 `content[]`, `hasNext=false`, 빈 `attributions[]`로 응답한다.
 
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
 

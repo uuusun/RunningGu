@@ -60,6 +60,13 @@ logging:
     level: "%5p [traceId=%X{traceId:-}]"
 
 runninggu:
+  course:
+    catalog:
+      bundle-resource: classpath:data/courses.json
+      minimum-course-count: 261
+    sync:
+      enabled: ${COURSE_SYNC_ENABLED:true}
+      interval: 24h
   auth:
     jwt:
       secret: ${JWT_SECRET}
@@ -94,6 +101,11 @@ runninggu:
     kto-poi:
       base-url: https://apis.data.go.kr/B551011/KorService2
       wellness-base-url: https://apis.data.go.kr/B551011/WellnessTursmService
+      service-key: ${KTO_SERVICE_KEY:}
+      connect-timeout: 1s
+      read-timeout: 2500ms
+    kto-course:
+      base-url: https://apis.data.go.kr/B551011/Durunubi
       service-key: ${KTO_SERVICE_KEY:}
       connect-timeout: 1s
       read-timeout: 2500ms

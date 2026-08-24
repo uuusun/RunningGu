@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "key": "durunubi",
+      "attribution": "두루누비 걷기길(한국관광공사)",
+      "license": "공공데이터포털 이용약관 — 출처표시",
+      "derivable": true
+    },
+    {
+      "key": "trail-lab",
+      "attribution": "테스트 트레일 원천",
+      "license": "테스트 라이선스",
+      "derivable": true
+    }
+  ],
+  "courses": [
+    {
+      "courseId": "C001",
+      "source": "durunubi",
+      "dataSource": "API_GPX",
+      "courseName": "서울 짧은길",
+      "sido": "서울",
+      "sigun": "서울 종로구",
+      "distanceKm": 3.0,
+      "gainM": 10,
+      "difficulty": "EASY",
+      "cycle": "비순환형",
+      "summary": "서울 테스트 코스",
+      "points": [[37.5700, 126.9800, 10.0, 0.0], [37.5710, 126.9810, 11.0, 1.0]]
+    },
+    {
+      "courseId": "C002",
+      "source": "durunubi",
+      "dataSource": "GPX_ONLY",
+      "courseName": "부산 바닷길",
+      "sido": "부산",
+      "sigun": "부산 해운대구",
+      "distanceKm": 5.0,
+      "gainM": 20,
+      "difficulty": "NORMAL",
+      "cycle": "순환형",
+      "summary": "부산 테스트 코스",
+      "points": [[35.1590, 129.1600, 5.0, 0.0], [35.1600, 129.1610, 6.0, 1.0]]
+    },
+    {
+      "courseId": "C003",
+      "source": "trail-lab",
+      "dataSource": "GPX_ONLY",
+      "courseName": "서울 실험길",
+      "sido": "서울",
+      "sigun": "서울 마포구",
+      "distanceKm": 4.0,
+      "gainM": 30,
+      "difficulty": "HARD",
+      "cycle": "비순환형",
+      "summary": "다른 원천 코스",
+      "points": [[37.5500, 126.9100, 8.0, 0.0], [37.5510, 126.9110, 9.0, 1.0]]
+    },
+    {
+      "courseId": "C004",
+      "source": "durunubi",
+      "dataSource": "API_GPX",
+      "courseName": "서울 같은 거리길",
+      "sido": "서울",
+      "sigun": "서울 강남구",
+      "distanceKm": 3.0,
+      "gainM": 12,
+      "difficulty": "EASY",
+      "cycle": "순환형",
+      "summary": "정렬 테스트 코스",
+      "points": [[37.4900, 127.0200, 7.0, 0.0], [37.4910, 127.0210, 8.0, 1.0]]
+    }
+  ]
+}

@@ -48,6 +48,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/pois").permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/courses",
+                                "/api/courses/regions")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
                                 "/api/auth/email/exists",
                                 "/api/auth/nickname/exists")
                         .permitAll()

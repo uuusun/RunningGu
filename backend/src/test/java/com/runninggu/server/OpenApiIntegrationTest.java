@@ -28,6 +28,8 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/contests/daily-counts']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/contests/closing-soon']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/contests/{id}']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/courses']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/courses/regions']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/email/exists']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/nickname/exists']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/email/send-code']['post']").exists())

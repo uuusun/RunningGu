@@ -27,5 +27,7 @@ abstract class PostgreSqlContainerSupport {
         registry.add("spring.datasource.hikari.minimum-idle", () -> 0);
         registry.add("runninggu.auth.jwt.secret", () -> TEST_JWT_SECRET);
         registry.add("runninggu.external.kakao-user-info.app-id", () -> 1234L);
+        registry.add("runninggu.course.catalog.minimum-course-count", () -> "1");
+        registry.add("runninggu.course.sync.enabled", () -> "false");
     }
 }

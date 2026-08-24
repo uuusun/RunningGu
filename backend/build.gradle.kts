@@ -49,6 +49,19 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+val courseBundleFile = rootProject.projectDir.parentFile.resolve("data/courses.json")
+
+tasks.processResources {
+    doFirst {
+        require(courseBundleFile.isFile) {
+            "서버 코스 번들이 없습니다: ${courseBundleFile.absolutePath}"
+        }
+    }
+    from(courseBundleFile) {
+        into("data")
+    }
+}
+
 tasks.register<JavaExec>("contestImport") {
     group = "application"
     description = "서버용 대회 snapshot을 검증하고 PostgreSQL에 적재한다"
