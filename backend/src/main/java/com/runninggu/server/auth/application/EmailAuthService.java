@@ -35,6 +35,7 @@ public class EmailAuthService {
     private final NicknamePolicy nicknamePolicy;
     private final PasswordPolicy passwordPolicy;
     private final PasswordHasher passwordHasher;
+    private final LoginAttemptRateLimiter loginAttemptRateLimiter;
     private final AppUserRepository appUserRepository;
     private final LoginIdentityRepository loginIdentityRepository;
     private final EmailVerificationRepository verificationRepository;
@@ -51,6 +52,7 @@ public class EmailAuthService {
             NicknamePolicy nicknamePolicy,
             PasswordPolicy passwordPolicy,
             PasswordHasher passwordHasher,
+            LoginAttemptRateLimiter loginAttemptRateLimiter,
             AppUserRepository appUserRepository,
             LoginIdentityRepository loginIdentityRepository,
             EmailVerificationRepository verificationRepository,
@@ -64,6 +66,7 @@ public class EmailAuthService {
         this.nicknamePolicy = nicknamePolicy;
         this.passwordPolicy = passwordPolicy;
         this.passwordHasher = passwordHasher;
+        this.loginAttemptRateLimiter = loginAttemptRateLimiter;
         this.appUserRepository = appUserRepository;
         this.loginIdentityRepository = loginIdentityRepository;
         this.verificationRepository = verificationRepository;
@@ -148,6 +151,7 @@ public class EmailAuthService {
         return result(issued, user, normalizedEmail);
     }
 
+    /** 정규화 이메일 제한을 통과한 요청만 BCrypt로 검증한다. (SPEC §4.1, 결정-55) */
     @Transactional
     public AuthSessionResult login(String email, String password) {
         String normalizedEmail;
@@ -157,6 +161,7 @@ public class EmailAuthService {
             performDummyMatch(password);
             throw loginFailed();
         }
+        loginAttemptRateLimiter.checkEmail(normalizedEmail);
 
         LoginIdentity identity = loginIdentityRepository
                 .findByProviderAndProviderSubject(LoginProvider.EMAIL, normalizedEmail)
@@ -176,6 +181,7 @@ public class EmailAuthService {
         Instant now = clock.instant();
         identity.markLoggedIn(now);
         IssuedTokenPair issued = issueNewFamily(identity.getUser(), now);
+        loginAttemptRateLimiter.resetEmail(normalizedEmail);
         return result(issued, identity.getUser(), normalizedEmail);
     }
 
