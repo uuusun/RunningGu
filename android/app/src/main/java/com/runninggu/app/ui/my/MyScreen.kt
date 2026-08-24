@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.domain.today
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
@@ -114,9 +115,11 @@ fun MyScreen(
         Spacer(Modifier.height(16.dp))
         when (state.segment) {
             MySegment.ITINERARY -> ItineraryList(
-                items = state.itineraries,
+                state = state.itineraries,
                 onDelete = viewModel::onDeleteItinerary,
                 onBrowseRaces = onBrowseRaces,
+                onRetry = viewModel::loadItineraries,
+                onLoadMore = viewModel::loadMoreItineraries,
             )
 
             MySegment.COURSE -> CourseList(
@@ -216,17 +219,35 @@ private fun ProfileHeader(profile: SessionProfile, onOpenAccount: () -> Unit) {
 
 @Composable
 private fun ItineraryList(
-    items: List<SavedItinerary>,
+    state: SavedItinerariesState,
     onDelete: (String) -> Unit,
     onBrowseRaces: () -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
-    if (items.isEmpty()) {
-        EmptyState("아직 저장한 동선이 없어요.")
-        BrowseButton("대회 둘러보기", onBrowseRaces)
-        return
+    // 조회 중·실패를 빈 상태로 뭉뚱그리지 않는다 (§3-5). 저장 코스와 같은 규칙이다.
+    when (state) {
+        SavedItinerariesState.Loading -> {
+            LoadingState("저장한 동선을 불러오는 중…")
+            return
+        }
+
+        SavedItinerariesState.Empty -> {
+            EmptyState("아직 저장한 동선이 없어요.")
+            BrowseButton("대회 둘러보기", onBrowseRaces)
+            return
+        }
+
+        is SavedItinerariesState.Error -> {
+            ErrorState(message = state.message, onRetry = onRetry)
+            return
+        }
+
+        is SavedItinerariesState.Content -> Unit
     }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { item ->
+        state.itineraries.forEach { item ->
             Surface(
                 // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-3, D-14). 서버 조회가 붙는
                 //  연동에서 연결한다 — 지금 데모 데이터는 복원할 응답이 없다.
@@ -248,18 +269,30 @@ private fun ItineraryList(
                             )
                             item.recoveryLabel?.let { label ->
                                 Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    )
-                                }
+                                CardBadge(
+                                    text = label,
+                                    container = MaterialTheme.colorScheme.tertiaryContainer,
+                                    content = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
                             }
+                            // 저장 당시와 대회가 달라졌다 — 다시 만들어야 한다 (§5-4)
+                            if (item.needsRegeneration) {
+                                Spacer(Modifier.width(6.dp))
+                                CardBadge(
+                                    text = "대회 변경",
+                                    container = MaterialTheme.colorScheme.errorContainer,
+                                    content = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                        // 비활성 대회의 동선도 목록에서 지우지 않는다 (§5-4). 왜 그런지만 알린다
+                        if (!item.active) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "정보 제공이 끝난 대회예요.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -277,6 +310,14 @@ private fun ItineraryList(
                         Icon(Icons.Default.Delete, contentDescription = "삭제")
                     }
                 }
+            }
+        }
+
+        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4)
+        if (state.hasNext) {
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                Text("더 보기 (${state.itineraries.size}/${state.totalElements})")
             }
         }
     }
@@ -451,5 +492,22 @@ private fun FavoriteList(
 private fun BrowseButton(label: String, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         TextButton(onClick = onClick) { Text(label) }
+    }
+}
+
+/** 카드 제목 옆 작은 배지. 회복 라벨과 "대회 변경" 이 같은 모양을 쓴다. (SPEC §4.13) */
+@Composable
+private fun CardBadge(
+    text: String,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+) {
+    Surface(color = container, shape = MaterialTheme.shapes.extraSmall) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = content,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }

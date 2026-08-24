@@ -2,6 +2,8 @@ package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryResult
+import com.runninggu.app.data.model.SavedItinerary
+import com.runninggu.app.data.remote.mapper.toSavedItinerary
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.ItineraryApi
 import com.runninggu.app.data.remote.apiCall
@@ -45,12 +47,52 @@ data class HotelInput(val name: String, val lat: Double, val lng: Double)
  */
 interface ItineraryRepository {
     suspend fun generate(request: GenerateItineraryRequest): ItineraryResult
+
+    /**
+     * 내 동선 목록 한 장. (`GET /api/itineraries` · §5-4)
+     *
+     * **비활성 대회의 동선도 그대로 온다**(§5-4). 걸러 내면 사용자가 저장한 것이 말없이
+     * 사라진다 — 흐리게 보여 주고 왜 그런지 알리는 것이 맞다.
+     */
+    suspend fun list(page: Int = 0, size: Int = DEFAULT_PAGE_SIZE): SavedItineraryPage =
+        SavedItineraryPage()
+
+    /**
+     * 저장 동선 삭제. (`DELETE /api/itineraries/{id}` · §5-6)
+     *
+     * [list] 와 함께 **기본 구현을 둔다.** 생성만 쓰는 구현(S7 스텁·위저드 테스트)이
+     * 여럿인데 목록까지 채우게 하면 빈 override 만 늘어난다. 서버 구현이 둘 다 덮는다.
+     */
+    suspend fun delete(id: Long) = Unit
+
+    companion object {
+        /** 개인 목록 기본 페이지 크기 🔒(§0-4). */
+        const val DEFAULT_PAGE_SIZE = 20
+    }
 }
+
+/** 저장 동선 목록 한 장. (§5-4) */
+data class SavedItineraryPage(
+    val itineraries: List<SavedItinerary> = emptyList(),
+    val hasNext: Boolean = false,
+    val totalElements: Long = 0,
+)
 
 /** 서버 구현. (API 명세 §5-1 — 게스트도 부를 수 있다) */
 class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryRepository {
     override suspend fun generate(request: GenerateItineraryRequest): ItineraryResult =
         apiCall { api.generate(request.toDto()).toResult() }
+
+    override suspend fun list(page: Int, size: Int): SavedItineraryPage = apiCall {
+        val dto = api.list(page = page, size = size)
+        SavedItineraryPage(
+            itineraries = dto.content.map { it.toSavedItinerary() },
+            hasNext = dto.page.hasNext,
+            totalElements = dto.page.totalElements,
+        )
+    }
+
+    override suspend fun delete(id: Long) = apiCall { api.delete(id) }
 }
 
 /**

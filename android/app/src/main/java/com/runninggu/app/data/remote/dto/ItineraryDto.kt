@@ -1,5 +1,8 @@
 package com.runninggu.app.data.remote.dto
 
+import kotlinx.serialization.Contextual
+import java.time.Instant
+import java.time.LocalDate
 import kotlinx.serialization.Serializable
 
 /**
@@ -81,3 +84,31 @@ data class BlockDto(
     val blockType: String = "USER",
     val systemManaged: Boolean = false,
 )
+
+/**
+ * `GET /api/itineraries` 목록 항목. (API 명세 §5-4)
+ *
+ * **상세(§5-5)와 다른 모양이다.** 목록은 카드가 쓰는 값만 오고 `days`·`blocks` 는 없다 —
+ * 카드 하나를 그리려고 트리 전체를 받지 않는다.
+ *
+ * [needsRegeneration] 은 저장 snapshot 과 현재 canonical 대회가 다를 때 참이다. 이름만
+ * 바뀌거나 [active] 만 달라진 것으로는 참이 되지 않는다(§5-4).
+ */
+@Serializable
+data class ItinerarySummaryDto(
+    val id: Long,
+    val title: String,
+    val contestId: Long,
+    val contestName: String,
+    val event: String,
+    val region: String? = null,
+    val recovery: RecoveryDto? = null,
+    @Contextual val startDate: LocalDate,
+    @Contextual val endDate: LocalDate,
+    val placeCount: Int = 0,
+    @Contextual val createdAt: Instant? = null,
+    /** 대회가 원천에서 사라져도 **목록에서 지우지 않는다**(§5-4). 표시만 흐려진다. */
+    val active: Boolean = true,
+    val needsRegeneration: Boolean = false,
+)
+

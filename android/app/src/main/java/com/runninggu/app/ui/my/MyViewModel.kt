@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.model.SavedCourse
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -28,25 +30,6 @@ enum class MySegment(val label: String) {
 }
 
 /**
- * 저장한 동선 카드 한 장. (SPEC §4.13 [동선] · API 명세 §5-3 목록)
- *
- * TODO(AP-14): `GET /api/itineraries` 응답 DTO 매핑으로 교체한다. 회복 배지 등 카드
- *  표시 필드는 TBD-DB-04(저장 snapshot 정책, 이슈 #55) 결정에 따라 달라질 수 있다.
- */
-data class SavedItinerary(
-    val id: String,
-    /** "{지역} {당일치기|n박 n일}" */
-    val title: String,
-    val raceName: String,
-    val event: String,
-    /** 회복 배지 라벨. noHard 종목이 아니면 null. */
-    val recoveryLabel: String?,
-    /** "MM.DD~MM.DD" */
-    val period: String,
-    val placeCount: Int,
-)
-
-/**
  * 저장한 러닝코스는 `data/model` 의 [SavedCourse] 를 그대로 쓴다. P0는 saved만이다
  * (SPEC §4.13 · 결정 D-25).
  *
@@ -65,7 +48,7 @@ data class SavedItinerary(
 data class MyUiState(
     val profile: SessionProfile? = null,
     val segment: MySegment = MySegment.ITINERARY,
-    val itineraries: List<SavedItinerary> = emptyList(),
+    val itineraries: SavedItinerariesState = SavedItinerariesState.Loading,
     val courses: SavedCoursesState = SavedCoursesState.Loading,
     val favorites: FavoriteRacesState = FavoriteRacesState.Loading,
     /**
@@ -147,16 +130,45 @@ sealed interface SavedCoursesState {
 }
 
 /**
+ * [동선] 세그먼트의 상태. (SPEC §3-5 · 매핑표 S10 · API 명세 §5-4)
+ *
+ * **[SavedCoursesState] 와 같은 모양이다.** 같은 Pageable 목록에 [더 보기] 도 같은데
+ * 두 세그먼트가 다른 규칙으로 갈라지면 다음 사람이 어느 쪽을 믿을지 모른다.
+ *
+ * 목록만 들고 있던 때는 조회 중이거나 서버가 실패해도 **"저장한 동선이 없어요"** 가
+ * 떴다 — 저장 코스에서 #107 이 고친 것과 같은 결함이 동선 쪽에 남아 있었다.
+ */
+sealed interface SavedItinerariesState {
+
+    data object Loading : SavedItinerariesState
+
+    data class Content(
+        val itineraries: List<SavedItinerary>,
+        val hasNext: Boolean,
+        val totalElements: Long,
+    ) : SavedItinerariesState
+
+    /** 정상 조회했는데 0건. "저장한 동선이 없어요." */
+    data object Empty : SavedItinerariesState
+
+    /** 못 불러왔다. 재시도를 준다. */
+    data class Error(val message: String) : SavedItinerariesState
+}
+
+/**
  * S10 마이. (SPEC §4.13 · AP-13)
  *
- * 저장소 SSOT는 서버다. **코스·찜 목록은 서버를 본다**(#107 · #163). 동선만 아직
- * 데모 목록이다 — TODO(AP-14): `GET /api/itineraries` 로 교체한다.
+
+ * 저장소 SSOT 는 서버다 — **동선·코스·찜 목록을 모두 서버가 준다**(§5-4 · §7-A · §7-C).
  *
  * 찜은 두 갈래로 읽는다. **목록은 `GET /me/favorites`**(비활성도 유지 §7-C), **하트는
  * [FavoriteStore]** 다 — S2 카드·S3 상세와 같은 값이어야 하기 때문이다.
+ *
+ * TODO(#105): Room 읽기 캐시가 정해지면 조회 앞에 붙인다.
  */
 class MyViewModel(
     private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+    private val itineraryRepository: ItineraryRepository = ServiceLocator.itineraryRepository,
     private val favoriteRepository: FavoriteRepository = ServiceLocator.favoriteRepository,
 ) : ViewModel() {
 
@@ -176,14 +188,19 @@ class MyViewModel(
                 sessionEpoch += 1
                 coursesJob?.cancel()
                 coursesJob = null
+                itinerariesJob?.cancel()
+                itinerariesJob = null
                 favoritesJob?.cancel()
                 favoritesJob = null
                 resumedOnce = false
                 _uiState.update {
                     it.copy(
                         profile = profile,
-                        // 데모 목록은 로그인 상태에서만 보인다 — 게스트 화면 검증을 막지 않게.
-                        itineraries = if (profile != null) SAMPLE_ITINERARIES else emptyList(),
+                        itineraries = if (profile == null) {
+                            SavedItinerariesState.Empty
+                        } else {
+                            SavedItinerariesState.Loading
+                        },
                         // 앞 계정의 목록을 그대로 두지 않는다. 게스트면 빈 목록, 로그인이면
                         // 곧 부를 조회의 로딩으로 시작한다.
                         courses = if (profile == null) SavedCoursesState.Empty else SavedCoursesState.Loading,
@@ -200,6 +217,7 @@ class MyViewModel(
                 // 찜 id 를 마지막 장까지 받는 동안 동선·코스 목록이 시작조차 못 한다.
                 viewModelScope.launch { FavoriteStore.refresh() }
                 loadCourses() // 게스트면 스스로 빠진다
+                loadItineraries()
                 loadFavorites()
             }
         }
@@ -222,6 +240,7 @@ class MyViewModel(
     fun onResume() {
         if (resumedOnce) {
             loadCourses()
+            loadItineraries()
             loadFavorites()
         }
         resumedOnce = true
@@ -242,6 +261,10 @@ class MyViewModel(
 
     /** 다음에 받을 장. [loadCourses] 가 0 으로 되돌리고 [loadMoreCourses] 가 올린다. */
     private var coursesPage = 0
+
+    /** 진행 중인 저장 동선 조회. */
+    private var itinerariesJob: Job? = null
+    private var itinerariesPage = 0
 
     /** 진행 중인 찜 목록 조회. 세션이 바뀌거나 다시 부를 때 끊는다. */
     private var favoritesJob: Job? = null
@@ -286,6 +309,71 @@ class MyViewModel(
             // 기다리는 사이 계정이 바뀌었으면 버린다 (#107 리뷰).
             if (epoch != sessionEpoch) return@launch
             _uiState.update { it.copy(courses = state) }
+        }
+    }
+
+    /**
+     * 저장 동선 목록 — 첫 장부터 다시. (API 명세 §5-4 · SPEC §4.13 · §3-5)
+     *
+     * [loadCourses] 와 같은 규칙이다 — 세그먼트 안에서만 실패를 그리고, 세대가 바뀌면
+     * 결과를 버린다. 게스트 차단도 여기서 한다.
+     *
+     * **비활성 대회의 동선도 걸러 내지 않는다**(§5-4). 사용자가 저장한 것이 말없이
+     * 사라지면 안 된다 — 카드가 흐려지고 안내가 붙을 뿐이다.
+     */
+    fun loadItineraries() {
+        if (_uiState.value.profile == null) return
+        val epoch = sessionEpoch
+        itinerariesJob?.cancel()
+        itinerariesPage = 0
+        itinerariesJob = viewModelScope.launch {
+            _uiState.update { it.copy(itineraries = SavedItinerariesState.Loading) }
+            val state = try {
+                val page = itineraryRepository.list(page = 0)
+                if (page.itineraries.isEmpty()) {
+                    SavedItinerariesState.Empty
+                } else {
+                    SavedItinerariesState.Content(
+                        itineraries = page.itineraries,
+                        hasNext = page.hasNext,
+                        totalElements = page.totalElements,
+                    )
+                }
+            } catch (e: ApiException) {
+                SavedItinerariesState.Error("저장한 동선을 불러오지 못했어요.")
+            }
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { it.copy(itineraries = state) }
+        }
+    }
+
+    /** [더 보기] — 다음 장을 뒤에 이어 붙인다. (§0-4) */
+    fun loadMoreItineraries() {
+        val current = _uiState.value.itineraries as? SavedItinerariesState.Content ?: return
+        if (!current.hasNext) return
+        val epoch = sessionEpoch
+        if (itinerariesJob?.isActive == true) return
+        itinerariesJob = viewModelScope.launch {
+            val next = itinerariesPage + 1
+            val page = try {
+                itineraryRepository.list(page = next)
+            } catch (e: ApiException) {
+                // 이미 받은 목록은 지우지 않는다 — 더 못 받은 것뿐이다
+                _message.value = "동선을 더 불러오지 못했어요."
+                return@launch
+            }
+            if (epoch != sessionEpoch) return@launch
+            itinerariesPage = next
+            _uiState.update {
+                val shown = it.itineraries as? SavedItinerariesState.Content ?: return@update it
+                it.copy(
+                    itineraries = shown.copy(
+                        itineraries = shown.itineraries + page.itineraries,
+                        hasNext = page.hasNext,
+                        totalElements = page.totalElements,
+                    ),
+                )
+            }
         }
     }
 
@@ -397,10 +485,36 @@ class MyViewModel(
         }
     }
 
-    /** [동선] 카드의 [삭제]. (SPEC §4.13 🔧정책) */
+    /**
+     * [동선] 카드의 [삭제]. (`DELETE /api/itineraries/{id}` · §5-6 · SPEC §4.13 🔧정책)
+     *
+     * **서버가 지운 뒤에 목록에서 뺀다.** 먼저 빼고 실패하면 되돌려야 하는데, 그러면
+     * 사라졌다 다시 나타나는 카드를 보게 된다. 삭제는 하트처럼 연타하는 조작이 아니라
+     * 왕복을 기다려도 된다.
+     */
     fun onDeleteItinerary(id: String) {
-        _uiState.update { state ->
-            state.copy(itineraries = state.itineraries.filterNot { it.id == id })
+        val serverId = id.toLongOrNull() ?: return
+        val epoch = sessionEpoch
+        viewModelScope.launch {
+            try {
+                itineraryRepository.delete(serverId)
+            } catch (e: ApiException) {
+                _message.value = "동선을 삭제하지 못했어요."
+                return@launch
+            }
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { state ->
+                val shown = state.itineraries as? SavedItinerariesState.Content
+                    ?: return@update state
+                val left = shown.itineraries.filterNot { it.id == id }
+                state.copy(
+                    itineraries = if (left.isEmpty()) {
+                        SavedItinerariesState.Empty
+                    } else {
+                        shown.copy(itineraries = left, totalElements = shown.totalElements - 1)
+                    },
+                )
+            }
         }
     }
 
@@ -432,28 +546,4 @@ class MyViewModel(
         _message.value = null
     }
 
-    private companion object {
-        /** TODO(AP-14): `GET /api/itineraries`·`GET /api/me/courses` 로 교체하는 데모 데이터. */
-        val SAMPLE_ITINERARIES = listOf(
-            SavedItinerary(
-                id = "it_1",
-                title = "서울 2박 3일",
-                raceName = "서울 한강 러닝 페스티벌",
-                event = "10K",
-                recoveryLabel = null,
-                period = "09.05~09.07",
-                placeCount = 10,
-            ),
-            SavedItinerary(
-                id = "it_2",
-                title = "세종 1박 2일",
-                raceName = "세종 호수공원 마라톤",
-                event = "하프",
-                recoveryLabel = "회복 모드",
-                period = "09.08~09.09",
-                placeCount = 6,
-            ),
-        )
-        // 저장 코스는 SavedCourseRepository 가 준다 — 데모 목록을 여기 두지 않는다.
-    }
 }
