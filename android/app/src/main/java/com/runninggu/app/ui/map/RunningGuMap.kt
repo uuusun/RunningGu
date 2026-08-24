@@ -63,6 +63,13 @@ fun RunningGuMap(
     modifier: Modifier = Modifier,
     onPinClick: (String) -> Unit = {},
 ) {
+    // **초기화가 안 됐으면 시작조차 하지 않는다.** 그대로 start() 를 부르면 SDK 가 자기
+    // 로그에만 남기고 onMapError 를 안 불러서, 실패를 못 알아챈 채 빈 판만 남는다(#162)
+    if (!MapAvailability.isReady) {
+        MapUnavailable(modifier)
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnPinClick by rememberUpdatedState(onPinClick)
@@ -129,21 +136,23 @@ fun RunningGuMap(
     Box(modifier) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-        failure?.let { message ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        failure?.let { message -> MapUnavailable(Modifier.fillMaxSize(), message) }
+    }
+}
+
+/** 지도를 못 띄웠을 때 그 자리에 놓는 안내. (SPEC §3-8) */
+@Composable
+private fun MapUnavailable(modifier: Modifier = Modifier, message: String = MAP_UNAVAILABLE) {
+    Box(
+        modifier = modifier.padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
