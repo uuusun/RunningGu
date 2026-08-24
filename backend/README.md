@@ -27,6 +27,7 @@ $env:DB_USERNAME = 'runninggu'
 $env:DB_PASSWORD = '<로컬 비밀번호>'
 $env:JWT_SECRET = '<Base64로 인코딩한 32바이트 이상 키>'
 $env:KAKAO_REST_KEY = '<서버용 REST API 키>'
+$env:KAKAO_APP_ID = '<카카오 Developers 내 앱의 숫자형 앱 ID>'
 $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 .\gradlew.bat bootRun
 ```
@@ -38,6 +39,10 @@ $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
 `KAKAO_REST_KEY`는 지오코딩·POI 등 카카오 로컬 프록시에만 사용하며 앱이나 저장소에
 포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
 `502 EXTERNAL_API_ERROR`를 반환한다.
+
+`KAKAO_APP_ID`는 카카오 로그인 액세스 토큰이 런닝구 카카오 앱에서 발급됐는지 검증하는
+숫자형 앱 ID다. REST API 키·네이티브 앱 키와 다른 값이며, 카카오 Developers의 같은 앱에서
+확인해 서버 환경변수로 넣는다. 누락하거나 0 이하이면 서버는 기동하지 않는다.
 
 `KTO_SERVICE_KEY`는 홈·대회 인근 축제, POI, 두루누비 코스 메타 동기화의 한국관광공사 클라이언트가 함께 사용하며,
 HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한다. 키가 없으면 홈·대회 인근

@@ -119,7 +119,12 @@ class CalendarViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        assertEquals(YearMonth.of(2026, 8), viewModel.uiState.value.currentMonth)
+        // **기대 월을 픽스처에서 파생한다.** 달 이름을 박아 두면 픽스처 날짜가 달을
+        // 넘는 날(예: 8/31 에 첫 대회가 9/1) CI 가 다시 깨진다 (#149 리뷰).
+        assertEquals(
+            YearMonth.from(repository.firstDate),
+            viewModel.uiState.value.currentMonth,
+        )
     }
 
     @Test
@@ -304,9 +309,14 @@ private class RecordingContestRepository : ContestRepository {
      * 박아 두었다가 08-23 에 `develop` 이 빨간불이 됐다.
      *
      * 이 테스트가 보는 것은 페이징의 이어 붙이기·중복 제거지 특정 날짜가 아니다.
+     *
+     * **오늘 자신을 쓰지 않고 하루 뒤부터 잡는다**(#146 리뷰). 픽스처와 `CalendarViewModel`
+     * 이 `today()` 를 **각각** 부르므로, 오늘을 경계로 쓰면 두 호출 사이에 자정이 지날 때
+     * 갈린다. 확률은 낮지만 경계를 아예 안 밟는 편이 낫다 — 이 테스트가 오늘이라는 날짜를
+     * 검사하는 것도 아니다.
      */
-    private val firstDate: LocalDate = today()
-    private val secondDate: LocalDate = today().plusDays(14)
+    val firstDate: LocalDate = today().plusDays(1)
+    val secondDate: LocalDate = today().plusDays(15)
 
     var lastFilter: ContestFilter? = null
         private set

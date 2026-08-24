@@ -36,6 +36,16 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/auth/email/verify']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/signup']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/login']['post']").exists())
+                .andExpect(jsonPath("$['paths']['/api/auth/kakao']['post']").exists())
+                .andExpect(jsonPath("$['paths']['/api/auth/kakao/signup']['post']").exists())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/auth/kakao']['post']['responses']['200']"
+                                        + "['content']['application/json']['schema']['oneOf']")
+                        .isArray())
+                .andExpect(jsonPath(
+                                "$['paths']['/api/auth/kakao/signup']['post']['responses']['201']"
+                                        + "['content']['application/json']['schema']")
+                        .exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/refresh']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/auth/logout']['post']").exists())
                 .andExpect(jsonPath("$['paths']['/api/itineraries/generate']['post']").exists())
@@ -91,6 +101,15 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.components.schemas.SavedCourseListResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.SavedCourseDetailResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.MemberProfileResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.AuthUserResponse.properties.email.type"
+                                + "[?(@ == 'null')]")
+                        .isNotEmpty())
+                .andExpect(jsonPath("$.components.schemas.KakaoProfileResponse.properties.nickname.type"
+                                + "[?(@ == 'null')]")
+                        .isNotEmpty())
+                .andExpect(jsonPath("$.components.schemas.KakaoProfileResponse.properties.email.type"
+                                + "[?(@ == 'null')]")
+                        .isNotEmpty())
                 .andExpect(jsonPath(
                                 "$.components.schemas.MemberProfileResponse.properties.email.type"
                                         + "[?(@ == 'null')]")

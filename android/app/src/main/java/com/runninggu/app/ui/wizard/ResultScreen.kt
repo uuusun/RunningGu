@@ -79,6 +79,7 @@ import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.common.NumberRail
 import com.runninggu.app.ui.common.SourceBadge
 import com.runninggu.app.data.model.PoiItem
 import kotlinx.coroutines.launch
@@ -573,10 +574,10 @@ internal fun EditList(
                                 Spacer(Modifier.width(4.dp))
                                 DragGrip(
                                     label = block.title,
-                                    // 이웃이 대회 블록이어도 막지 않는다 — 옮기는 것은 내
-                                    // 블록이고 대회 블록은 밀릴 뿐이다 (ItineraryEdits.moveBlock).
-                                    canMoveUp = index > 0,
-                                    canMoveDown = index < blocks.lastIndex,
+                                    // 이웃이 대회 블록이면 막는다 — 계약이 대회 블록의 고정
+                                    // 위치를 넘는 요청을 `409` 로 거부한다 (API 명세 §5-10).
+                                    canMoveUp = canMoveTo(blocks, index - 1),
+                                    canMoveDown = canMoveTo(blocks, index + 1),
                                     onMoveUp = { onMove(index, index - 1) },
                                     onMoveDown = { onMove(index, index + 1) },
                                     modifier = Modifier.pointerInput(block.id) {
@@ -600,8 +601,17 @@ internal fun EditList(
 
                                                 // 이웃 행의 절반을 넘으면 실제로 한 칸 옮긴다. 옮긴 만큼
                                                 // 시각 오프셋을 되돌려 행이 손가락 밑에 그대로 남는다.
+                                                //
+                                                // **이웃이 대회 블록이면 그 문턱에서 멈춘다.** 계약이 그
+                                                // 요청을 `409` 로 거부하므로(§5-10) 오프셋만 되돌리면
+                                                // 행이 손가락과 어긋난 채 남는다. 더 끌어도 안 넘어가는
+                                                // 것이 "여기까지" 를 손으로 알려 준다.
                                                 val below = blocks.getOrNull(from + 1)?.let { rowHeights[it.id] }
                                                 if (below != null && dragOffsetY > (below + rowSpacing) / 2f) {
+                                                    if (!canMoveTo(blocks, from + 1)) {
+                                                        dragOffsetY = (below + rowSpacing) / 2f
+                                                        return@detectDragGesturesAfterLongPress
+                                                    }
                                                     onMove(from, from + 1)
                                                     pendingMoveFrom = from
                                                     dragOffsetY -= below + rowSpacing
@@ -609,6 +619,10 @@ internal fun EditList(
                                                 }
                                                 val above = blocks.getOrNull(from - 1)?.let { rowHeights[it.id] }
                                                 if (above != null && dragOffsetY < -(above + rowSpacing) / 2f) {
+                                                    if (!canMoveTo(blocks, from - 1)) {
+                                                        dragOffsetY = -(above + rowSpacing) / 2f
+                                                        return@detectDragGesturesAfterLongPress
+                                                    }
                                                     onMove(from, from - 1)
                                                     pendingMoveFrom = from
                                                     dragOffsetY += above + rowSpacing
@@ -644,6 +658,15 @@ internal fun EditList(
         }
     }
 }
+
+/**
+ * 그 자리로 옮길 수 있는가. (API 명세 §5-10 · #148)
+ *
+ * 목록 밖이거나 **대회 블록 자리**면 못 간다. 서버가 대회 블록의 순번을 고정하므로,
+ * 넘긴 순서로 저장하면 오류도 없이 다른 순서가 된다.
+ */
+private fun canMoveTo(blocks: List<ItineraryBlock>, index: Int): Boolean =
+    index in blocks.indices && ItineraryEdits.canEdit(blocks[index])
 
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
@@ -907,24 +930,6 @@ private fun TimelineRow(number: Int, block: ItineraryBlock) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NumberRail(number: Int) {
-    Box(
-        Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "$number",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
     }
 }
 

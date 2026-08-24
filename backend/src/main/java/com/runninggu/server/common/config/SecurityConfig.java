@@ -62,6 +62,8 @@ public class SecurityConfig {
                                 "/api/auth/email/verify",
                                 "/api/auth/signup",
                                 "/api/auth/login",
+                                "/api/auth/kakao",
+                                "/api/auth/kakao/signup",
                                 "/api/auth/refresh",
                                 "/api/auth/logout")
                         .permitAll()
