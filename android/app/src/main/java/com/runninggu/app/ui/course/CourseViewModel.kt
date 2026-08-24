@@ -14,7 +14,6 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.LocationProvider
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.local.LocationResult
-import com.runninggu.app.data.repository.FakeCourseRepository
 import com.runninggu.app.data.repository.GeocodeRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import kotlinx.coroutines.Job
@@ -388,14 +387,14 @@ class CourseViewModel(
         private const val MY_LOCATION_LABEL = "내 위치"
 
         /**
-         * 출발지 검색만 서버로 옮겼다. (AP-14)
+         * 출발지 검색과 **지역별 목록**이 서버를 본다. (AP-14 · AP-12)
          *
-         * 코스 자체는 아직 가짜다 — 서버에 `/api/courses`·`/api/courses/near` 가 없다
-         * (AP-07 · AP-25). 없는 엔드포인트를 부르면 화면이 오류만 보여줘서 만든 것을
-         * 확인할 수 없다. 서면 [ServiceLocator.courseRepository] 로 바꾼다.
+         * [내 주변]만 아직 스텁이다 — `/courses/near` 가 AP-25 에 묶여 있어서,
+         * 없는 엔드포인트를 부르면 화면이 오류만 보여준다. 지역별·지역 칩은 #156 으로
+         * 섰으므로 서버를 본다. 가르는 자리는 [ServiceLocator.courseRepository] 다.
          */
         fun factory(
-            repository: CourseRepository = FakeCourseRepository,
+            repository: CourseRepository = ServiceLocator.courseRepository,
             geocodeRepository: GeocodeRepository = ServiceLocator.geocodeRepository,
             locationProvider: LocationProvider = ServiceLocator.locationProvider,
             savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
