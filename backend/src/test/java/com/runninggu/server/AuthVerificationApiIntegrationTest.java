@@ -448,6 +448,11 @@ class AuthVerificationApiIntegrationTest extends PostgreSqlContainerSupport {
             sentCount.incrementAndGet();
         }
 
+        @Override
+        public void sendPasswordResetLink(String recipient, String rawToken) {
+            throw new UnsupportedOperationException("이 테스트에서는 사용하지 않습니다.");
+        }
+
         String lastCode(String recipient) {
             return lastCodes.get(recipient);
         }

@@ -7,6 +7,7 @@ Java 21 · Spring Boot · PostgreSQL 기반 런닝구 API 서버다. API 계약�
 
 - JDK 21
 - Docker Desktop 또는 PostgreSQL 17
+- 내 주변 자동 경로를 사용할 때 GraphHopper용 메모리 6GB와 디스크 약 1GB
 
 ## 로컬 PostgreSQL
 
@@ -29,12 +30,34 @@ $env:JWT_SECRET = '<Base64로 인코딩한 32바이트 이상 키>'
 $env:KAKAO_REST_KEY = '<서버용 REST API 키>'
 $env:KAKAO_APP_ID = '<카카오 Developers 내 앱의 숫자형 앱 ID>'
 $env:KTO_SERVICE_KEY = '<디코딩된 한국관광공사 서비스 키>'
+$env:PASSWORD_RESET_URL = 'http://localhost:8080/reset-password'
+$env:GRAPHHOPPER_ENABLED = 'true'
+$env:GRAPHHOPPER_BASE_URL = 'http://localhost:8989'
 .\gradlew.bat bootRun
 ```
 
 `JWT_SECRET`은 HS256 서명 키이며 Base64 디코딩 결과가 최소 32바이트여야 한다. 로컬용 키는
 `[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`로 생성할 수
 있고 저장소에 커밋하지 않는다. 누락·Base64 형식 오류·길이 미달이면 서버는 기동하지 않는다.
+
+비밀번호 재설정 메일을 발송하려면 SMTP 환경변수와 `MAIL_ENABLED=true`를 설정한다.
+`PASSWORD_RESET_URL`은 사용자가 접근할 수 있는 백엔드의 `/reset-password` 공개 URL이며,
+운영에서는 HTTPS 절대 URL을 사용한다. 링크 토큰은 30분 동안 한 번만 사용할 수 있고 서버에는
+SHA-256 해시만 저장한다.
+
+## 계정 보안 API
+
+- `PUT /api/me/password`: EMAIL 계정의 현재 비밀번호를 확인하고 비밀번호와 전체 세션을
+  원자적으로 교체한 뒤 현재 기기의 새 token pair를 반환한다.
+- `POST /api/auth/password/reset-request`: 가입 여부와 관계없이 같은 `202`를 반환하며, EMAIL
+  계정에만 30분짜리 일회용 링크를 발송한다. `/reset-password` 웹 페이지가 새 비밀번호를 받는다.
+- `POST /api/me/reauth`: EMAIL은 비밀번호, KAKAO는 새 SDK access token의 회원번호를 검증해
+  탈퇴 전용 5분 reauth token을 발급한다.
+- `DELETE /api/me`: `X-Reauth-Token`을 검증하고 전체 refresh token과 사용자 종속 데이터를
+  삭제한다. 탈퇴 후 기존 access/refresh token은 모두 사용할 수 없다.
+
+비밀번호 원문·재설정 token·refresh token은 저장하거나 로그에 남기지 않는다. 비밀번호 변경·
+재설정·탈퇴는 모두 전체 세션 무효화 계약을 따른다.
 
 `KAKAO_REST_KEY`는 지오코딩·POI 등 카카오 로컬 프록시에만 사용하며 앱이나 저장소에
 포함하지 않는다. 키가 없으면 대회 공개 조회는 계속 동작하지만 카카오 로컬 프록시는
@@ -50,6 +73,27 @@ HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한�
 원천에서 한 건 이상 표시할 수 있을 때만 부분 성공 `200`을 반환한다. 다른 공개 API는 계속
 동작한다. 두루누비 키가 없거나 전체 페이지 동기화가 실패하면 현재 코스 snapshot을 유지한다.
 홈 축제는 전국 월간 결과를 5분, 대회 인근 축제는 대회별 결과를 하루 캐시한다.
+
+## GraphHopper 러닝 경로
+
+`GET /api/courses/near`는 적격 큐레이션 경로가 없을 때만 별도 GraphHopper 11 프로세스에
+`run` 프로파일의 순환 경로를 요청한다. 한국 OSM PBF를 저장소 밖의 ignore 대상 경로에 내려받고
+`routing` 프로필을 켜서 실행한다.
+
+```powershell
+New-Item -ItemType Directory -Force ..\.cache\osm
+curl.exe -L -o ..\.cache\osm\korea.osm.pbf https://download.geofabrik.de/asia/south-korea-latest.osm.pbf
+docker compose --profile routing up -d --build postgres graphhopper
+```
+
+첫 실행은 OSM 그래프와 SRTM 고도 캐시를 만드는 데 수분이 걸린다. `runninggu-graphhopper-graph`와
+`runninggu-graphhopper-srtm` 볼륨은 컨테이너를 재기동해도 유지된다. PBF를 갱신해 그래프를 다시
+만들 때는 기존 그래프와의 버전 일관성을 확인한 뒤 별도 배포 절차로 볼륨을 교체한다.
+
+Spring Boot에는 `GRAPHHOPPER_ENABLED=true`와 호스트 실행 기준
+`GRAPHHOPPER_BASE_URL=http://localhost:8989`를 설정한다. GraphHopper가 꺼져 있거나 호출에
+실패하면 OSM만 `degradedSources`로 표시하고 큐레이션·카카오 장소 결과는 유지한다. 품질 상한을
+통과한 후보가 없는 경우는 장애가 아니라 정상 0건이다.
 
 ## 두루누비 코스 catalog
 

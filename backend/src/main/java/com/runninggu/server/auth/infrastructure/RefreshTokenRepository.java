@@ -15,4 +15,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<RefreshToken> findAllByFamilyIdAndRevokedAtIsNull(UUID familyId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<RefreshToken> findAllByUser_IdAndRevokedAtIsNull(Long userId);
 }

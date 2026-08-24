@@ -96,6 +96,14 @@ public class LoginIdentity {
         lastLoginAt = now;
     }
 
+    /** EMAIL 로그인 수단의 비밀번호 해시만 교체한다. (SPEC §4.13, 결정-38) */
+    public void changeEmailPassword(String passwordHash) {
+        if (provider != LoginProvider.EMAIL) {
+            throw new IllegalStateException("EMAIL 로그인 수단만 비밀번호를 변경할 수 있습니다.");
+        }
+        this.passwordHash = passwordHash;
+    }
+
     public Long getId() {
         return id;
     }

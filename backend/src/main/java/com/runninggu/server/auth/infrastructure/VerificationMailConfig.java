@@ -26,8 +26,20 @@ public class VerificationMailConfig {
             havingValue = "false",
             matchIfMissing = true)
     VerificationMailSender disabledVerificationMailSender() {
-        return (recipient, code) -> {
-            throw new MailDeliveryException("메일 발송 기능이 비활성화되어 있습니다.");
+        return new VerificationMailSender() {
+            @Override
+            public void sendSignupCode(String recipient, String code) {
+                throw disabled();
+            }
+
+            @Override
+            public void sendPasswordResetLink(String recipient, String rawToken) {
+                throw disabled();
+            }
+
+            private MailDeliveryException disabled() {
+                return new MailDeliveryException("메일 발송 기능이 비활성화되어 있습니다.");
+            }
         };
     }
 }
