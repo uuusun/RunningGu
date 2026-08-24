@@ -9,6 +9,7 @@ import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.model.SaveCourseResult
 import com.runninggu.app.data.model.SavedCourseDetail
 import com.runninggu.app.data.repository.CoursePage
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeGeocodeRepository
 import com.runninggu.app.data.repository.SavedCoursePage
@@ -275,6 +276,36 @@ class SaveCourseTest {
         assertEquals(SaveCourseState.Idle, viewModel.uiState.value.save)
         assertNull(viewModel.uiState.value.selectedItem)
     }
+
+    @Test
+    fun `보내는 사이 세션이 죽어도 로그인 모달을 띄운다`() = runTest(dispatcher) {
+        // 세대 가드가 이 결과를 버리면 **정작 로그인하라는 말을 해야 할 때 아무 말도 못 한다.**
+        // 게스트 모달을 살리려고 만든 기능이 가장 필요한 순간에 삼켜지는 셈이다(#166 리뷰).
+        val viewModel = loaded(viewModel(saved = ExpiringSavedCourses()))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+
+        assertEquals(SaveCourseState.NeedsLogin, viewModel.uiState.value.save)
+    }
+
+    @Test
+    fun `결과를 버리더라도 저장 버튼은 풀어 준다`() = runTest(dispatcher) {
+        // `Saving` 인 채로 두면 `canSave` 가 계속 false 라 "저장 중…" 이 굳는다.
+        // 같은 코스를 다시 눌러도 `onItemSelect` 가 아무것도 안 해서 빠져나올 수 없다.
+        val viewModel = loaded(viewModel(saved = SignOutThenSucceed()))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+
+        assertTrue(
+            "저장 중인 채로 굳으면 버튼이 영영 안 풀린다: ${viewModel.uiState.value.save}",
+            viewModel.uiState.value.save !is SaveCourseState.Saving,
+        )
+        assertTrue(viewModel.uiState.value.canSave)
+    }
 }
 
 /** 이 테스트는 [내 위치] 를 안 쓴다 — 출발지는 프리셋으로 정한다. */
@@ -313,6 +344,42 @@ private class RecordingSavedCourses(
         gate?.await()
         error?.let { throw it }
         return result
+    }
+
+    override suspend fun list(page: Int, size: Int) = SavedCoursePage()
+
+    override suspend fun detail(id: Long): SavedCourseDetail = throw NotImplementedError()
+
+    override suspend fun delete(id: Long) = Unit
+}
+
+/**
+ * 응답 **전에** 세션이 죽는 가짜. (#166 리뷰)
+ *
+ * 실제 순서가 이렇다 — `POST /me/courses` 가 `401` 을 받으면 재발급이 먼저 끼어들고,
+ * 그것이 만료로 끝나면 `onGiveUp` 이 `signOut()` 으로 세대를 올린다. **그 다음에야**
+ * 원래 요청의 `401` 이 화면에 닿는다. 즉 결과가 도착할 때 세대는 이미 달라져 있다.
+ */
+private class ExpiringSavedCourses : SavedCourseRepository {
+
+    override suspend fun save(route: NearbyItem.Route): SaveCourseResult? {
+        SessionStore.signOut(expectedEpoch = SessionStore.sessionEpoch)
+        throw ApiException.Http(401, ApiErrorCode.UNAUTHORIZED, null)
+    }
+
+    override suspend fun list(page: Int, size: Int) = SavedCoursePage()
+
+    override suspend fun detail(id: Long): SavedCourseDetail = throw NotImplementedError()
+
+    override suspend fun delete(id: Long) = Unit
+}
+
+/** 세대는 바뀌었는데 결과는 성공인 가짜. 결과를 **버리는** 쪽 경로를 본다. */
+private class SignOutThenSucceed : SavedCourseRepository {
+
+    override suspend fun save(route: NearbyItem.Route): SaveCourseResult {
+        SessionStore.signOut(expectedEpoch = SessionStore.sessionEpoch)
+        return SaveCourseResult(id = 1L, created = true)
     }
 
     override suspend fun list(page: Int, size: Int) = SavedCoursePage()

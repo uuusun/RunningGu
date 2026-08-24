@@ -269,8 +269,27 @@ class CourseViewModel(
                 if (e is ApiException.Http && e.needsLogin) SaveCourseState.NeedsLogin
                 else SaveCourseState.Done(message = e.saveMessage(), failed = true)
             }
-            // 기다리는 사이 로그인·로그아웃이 있었으면 남의 결과다 (#107 리뷰와 같은 장치)
-            if (epoch != SessionStore.sessionEpoch) return@launch
+            // 기다리는 사이 세션이 바뀌었으면 남의 결과다. 다만 두 가지를 지킨다.
+            //
+            // **`NeedsLogin` 은 통과시킨다.** 여기서 세대가 오르는 흔한 이유가 바로
+            // "세션이 죽었다" 이다 — `401` 을 받은 `TokenAuthenticator` 가 재발급에
+            // 실패하면 `onGiveUp` 으로 `signOut()` 을 부르고, 그게 응답이 화면에 닿기
+            // **전에** 세대를 올린다. 그 결과를 버리면 정작 로그인하라는 말을 못 한다.
+            // 모달은 계정별 데이터를 안 보여주고 로그인 뒤 자동 저장도 없어서(D-27)
+            // 남의 결과가 새는 위험도 없다(#166 리뷰).
+            //
+            // **버리더라도 버튼은 풀어 준다.** `save` 를 `Saving` 인 채로 두면 `canSave`
+            // 가 계속 false 라 "저장 중…" 이 굳는다. 같은 코스를 다시 눌러도 안 풀린다.
+            //
+            // `MyViewModel`(#107)의 세대와 같은 장치가 아니다. 저쪽은 ViewModel 로컬이고
+            // 세대를 올리는 그 자리에서 화면 상태도 함께 초기화한다. 이건 전역이라
+            // 되돌려 줄 관찰자가 없다.
+            if (epoch != SessionStore.sessionEpoch && done !is SaveCourseState.NeedsLogin) {
+                _uiState.update {
+                    if (it.save is SaveCourseState.Saving) it.copy(save = SaveCourseState.Idle) else it
+                }
+                return@launch
+            }
             _uiState.update { it.copy(save = done) }
         }
     }
