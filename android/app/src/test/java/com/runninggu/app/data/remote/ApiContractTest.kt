@@ -70,6 +70,16 @@ class ApiContractTest {
     }
 
     @Test
+    fun `카카오 중복 가입은 UNKNOWN 이 아니다`() {
+        // `UNKNOWN` 으로 떨어지면 화면이 일반 오류 문구를 내고, 사용자는 이미 가입된
+        // 계정으로 **로그인하면 된다는 것을 모른 채** 가입을 다시 시도한다(#154 리뷰).
+        assertEquals(
+            ApiErrorCode.KAKAO_ACCOUNT_DUPLICATED,
+            ApiErrorCode.from("KAKAO_ACCOUNT_DUPLICATED"),
+        )
+    }
+
+    @Test
     fun `모르는 코드는 UNKNOWN 으로 떨어진다`() {
         // 서버가 코드를 새로 추가해도 앱이 깨지면 안 된다
         assertEquals(ApiErrorCode.UNKNOWN, ApiErrorCode.from("SOMETHING_NEW"))

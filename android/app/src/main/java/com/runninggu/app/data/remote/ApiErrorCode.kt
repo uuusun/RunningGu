@@ -41,6 +41,15 @@ enum class ApiErrorCode {
 
     // 409
     EMAIL_DUPLICATED,
+
+    /**
+     * 이미 가입된 카카오 계정으로 다시 가입을 시도했다. (§1-7 · SPEC 결정-22 개정)
+     *
+     * **자동 로그인으로 넘기지 않는다.** 서버가 기존 계정으로 이어 주지 않으므로
+     * 화면은 "이미 가입된 카카오 계정이에요. 로그인해 주세요" 로 안내해야 한다 —
+     * `UNKNOWN` 으로 떨어지면 사용자가 무엇을 해야 하는지 알 수 없다(#154 리뷰).
+     */
+    KAKAO_ACCOUNT_DUPLICATED,
     NICKNAME_DUPLICATED,
     IDENTITY_ALREADY_LINKED,
     LAST_IDENTITY_REQUIRED,
