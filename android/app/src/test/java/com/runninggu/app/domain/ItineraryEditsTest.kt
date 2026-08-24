@@ -222,6 +222,48 @@ class ItineraryEditsTest {
     }
 
     @Test
+    fun `사용자 블록은 대회 블록을 넘어갈 수 없다`() {
+        // 계약이 대회 블록의 고정 위치를 넘는 요청을 `409 SYSTEM_BLOCK_IMMUTABLE` 로
+        // 거부한다(API 명세 §5-10). 화면이 애초에 그 상태를 못 만들게 여기서 막는다.
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        // 대회 블록 뒤에 있는 USER 블록을 맨 앞(대회 앞)으로 끌어 본다
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 1, raceIndex)
+
+        assertEquals(before, after[i].blocks.map { it.id })
+    }
+
+    @Test
+    fun `대회 블록을 지나 여러 칸 옮기는 것도 막는다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        // 대회 블록이 0번이면 2번을 0번으로 — 사이에 대회가 있다
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 2, raceIndex)
+
+        assertEquals(before, after[i].blocks.map { it.id })
+    }
+
+    @Test
+    fun `대회 블록을 지나지 않으면 그대로 옮긴다`() {
+        // 막는 것은 "넘는 것" 뿐이다. 같은 쪽에서 자리를 바꾸는 것은 계약상 문제없다.
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days.dday().blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val before = days[i].blocks.map { it.id }
+
+        val after = ItineraryEdits.moveBlock(days, i, raceIndex + 1, raceIndex + 2)
+
+        assertEquals(before[raceIndex + 2], after[i].blocks[raceIndex + 1].id)
+        assertEquals(before[raceIndex + 1], after[i].blocks[raceIndex + 2].id)
+    }
+
+    @Test
     fun `범위를 벗어난 인덱스는 무시한다`() {
         val days = itinerary()
         val i = days.ddayIndex()
