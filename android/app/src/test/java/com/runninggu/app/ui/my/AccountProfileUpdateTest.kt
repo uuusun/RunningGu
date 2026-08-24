@@ -117,6 +117,20 @@ class AccountProfileUpdateTest {
     }
 
     @Test
+    fun `세대 확인과 프로필 교체가 한 번에 일어난다`() = runTest(dispatcher) {
+        // #170 리뷰 — 밖에서 비교한 뒤 signIn 하면 그 사이에 TokenAuthenticator 의
+        // signOut 이 끼어 로그아웃한 세션이 되살아난다. SessionStore 가 한 임계구역에서
+        // 확인하고 넣으므로, 세대가 다른 프로필은 **아예 들어가지 않는다.**
+        val stale = SessionStore.sessionEpoch
+        SessionStore.signOut()
+
+        val applied = SessionStore.updateProfile(stale, 원래프로필.copy(nickname = "되살아난이름"))
+
+        assertFalse(applied)
+        assertNull(SessionStore.session.value)
+    }
+
+    @Test
     fun `세션이 바뀌면 결과를 버리되 잠금은 푼다`() = runTest(dispatcher) {
         // 왕복 중에 토큰이 만료돼 TokenAuthenticator 가 signOut 하면 세대가 오른다.
         // 결과를 그대로 쓰면 로그아웃한 세션이 되살아나고, 그냥 빠져나가면 스위치가

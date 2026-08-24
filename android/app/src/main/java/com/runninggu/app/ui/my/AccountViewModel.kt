@@ -126,20 +126,31 @@ class AccountViewModel(
         nicknameJob = viewModelScope.launch {
             _uiState.update { it.copy(nicknameEdit = NicknameEdit(saving = true)) }
             val result = runCatching { memberRepository.updateNickname(trimmed) }
-            // 기다리는 사이 로그아웃·계정 전환이 있었으면 남의 결과다. **버리되 화면은
-            // 되돌린다** — 그냥 빠져나가면 "저장 중" 이 굳어 다이얼로그가 안 닫힌다
-            if (epoch != SessionStore.sessionEpoch) {
-                _uiState.update { it.copy(nicknameEdit = null) }
-                return@launch
-            }
             result.fold(
                 onSuccess = { profile ->
-                    SessionStore.signIn(profile)
-                    _uiState.update { it.copy(nicknameEdit = null, message = "닉네임을 바꿨어요") }
+                    // **확인과 적용을 한 임계구역에서 한다**(#170 리뷰). 세대를 밖에서 비교한
+                    // 뒤 signIn 하면 그 사이에 TokenAuthenticator 의 signOut 이 끼어 로그아웃한
+                    // 세션이 되살아날 수 있다.
+                    //
+                    // 세대가 달라 못 넣었으면 남의 결과다. **버리되 화면은 되돌린다** —
+                    // 그냥 빠져나가면 "저장 중" 이 굳어 다이얼로그가 안 닫힌다.
+                    val applied = SessionStore.updateProfile(epoch, profile)
+                    _uiState.update {
+                        it.copy(
+                            nicknameEdit = null,
+                            message = if (applied) "닉네임을 바꿨어요" else null,
+                        )
+                    }
                 },
                 onFailure = { cause ->
+                    // 세션이 바뀐 뒤의 실패는 남의 것이다 — 다이얼로그만 닫는다
+                    val stale = epoch != SessionStore.sessionEpoch
                     _uiState.update {
-                        it.copy(nicknameEdit = NicknameEdit(error = cause.nicknameMessage()))
+                        if (stale) {
+                            it.copy(nicknameEdit = null)
+                        } else {
+                            it.copy(nicknameEdit = NicknameEdit(error = cause.nicknameMessage()))
+                        }
                     }
                 },
             )
@@ -165,31 +176,34 @@ class AccountViewModel(
         marketingJob = viewModelScope.launch {
             _uiState.update { it.copy(savingMarketing = true) }
             val result = runCatching { memberRepository.updateMarketing(next) }
-            // 세대가 바뀌었어도 **잠금은 반드시 푼다.** 안 그러면 스위치가 잠긴 채 남는다
-            if (epoch != SessionStore.sessionEpoch) {
-                _uiState.update { it.copy(savingMarketing = false) }
-                return@launch
-            }
             result.fold(
                 onSuccess = { updated ->
-                    SessionStore.signIn(updated)
+                    // 확인과 적용을 한 임계구역에서 (#170 리뷰). 못 넣었으면 남의 결과다.
+                    val applied = SessionStore.updateProfile(epoch, updated)
                     _uiState.update {
                         it.copy(
+                            // 세대가 바뀌었어도 **잠금은 반드시 푼다.** 안 그러면 스위치가
+                            // 잠긴 채 남는다.
                             savingMarketing = false,
                             // 서버가 답한 값으로 말한다 — 보낸 값이 아니다
-                            message = if (updated.marketingAgreed) {
-                                "마케팅 수신에 동의했어요"
-                            } else {
-                                "마케팅 수신 동의를 철회했어요"
+                            message = when {
+                                !applied -> null
+                                updated.marketingAgreed -> "마케팅 수신에 동의했어요"
+                                else -> "마케팅 수신 동의를 철회했어요"
                             },
                         )
                     }
                 },
                 onFailure = {
+                    val stale = epoch != SessionStore.sessionEpoch
                     _uiState.update {
                         it.copy(
                             savingMarketing = false,
-                            message = "설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.",
+                            message = if (stale) {
+                                null
+                            } else {
+                                "설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
+                            },
                         )
                     }
                 },
