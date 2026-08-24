@@ -16,8 +16,10 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Entity
@@ -27,6 +29,12 @@ import java.util.Set;
                 name = "uq_itinerary_day_index",
                 columnNames = {"itinerary_id", "day_index"}))
 public class ItineraryDay {
+
+    public enum ReorderResult {
+        REORDERED,
+        BLOCK_SET_MISMATCH,
+        SYSTEM_BLOCK_IMMUTABLE
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -78,34 +86,49 @@ public class ItineraryDay {
         return block;
     }
 
-    /** USER 전체 집합만 순서를 바꾸며 RACE의 orderNo는 그대로 둔다. (API G-2) */
-    public boolean reorderUserBlocks(List<Long> blockIds) {
+    /** USER 전체 집합만 재정렬하며 RACE의 고정 경계를 넘지 않는다. (SPEC §4.10·§5.7, API 명세 §5-10) */
+    public ReorderResult reorderUserBlocks(List<Long> blockIds) {
         List<ItineraryBlock> userBlocks = blocks.stream()
                 .filter(block -> block.getBlockType() == BlockType.USER)
                 .toList();
+        if (blockIds == null) {
+            return ReorderResult.BLOCK_SET_MISMATCH;
+        }
         Set<Long> expected = new HashSet<>(userBlocks.stream()
                 .map(ItineraryBlock::getId)
                 .toList());
         if (blockIds.size() != expected.size()
                 || new HashSet<>(blockIds).size() != blockIds.size()
                 || !expected.equals(new HashSet<>(blockIds))) {
-            return false;
+            return ReorderResult.BLOCK_SET_MISMATCH;
         }
 
+        Map<Long, ItineraryBlock> userBlocksById = new HashMap<>();
+        userBlocks.forEach(block -> userBlocksById.put(block.getId(), block));
         List<Integer> userSlots = userBlocks.stream()
                 .map(ItineraryBlock::getOrderNo)
                 .sorted()
                 .toList();
+        List<Integer> raceSlots = blocks.stream()
+                .filter(block -> block.getBlockType() == BlockType.RACE)
+                .map(ItineraryBlock::getOrderNo)
+                .sorted()
+                .toList();
         for (int index = 0; index < blockIds.size(); index++) {
-            Long blockId = blockIds.get(index);
-            ItineraryBlock block = userBlocks.stream()
-                    .filter(candidate -> candidate.getId().equals(blockId))
-                    .findFirst()
-                    .orElseThrow();
+            ItineraryBlock block = userBlocksById.get(blockIds.get(index));
+            int currentSegment = segmentOf(block.getOrderNo(), raceSlots);
+            int targetSegment = segmentOf(userSlots.get(index), raceSlots);
+            if (currentSegment != targetSegment) {
+                return ReorderResult.SYSTEM_BLOCK_IMMUTABLE;
+            }
+        }
+
+        for (int index = 0; index < blockIds.size(); index++) {
+            ItineraryBlock block = userBlocksById.get(blockIds.get(index));
             block.changeOrder(userSlots.get(index));
         }
         blocks.sort(Comparator.comparingInt(ItineraryBlock::getOrderNo));
-        return true;
+        return ReorderResult.REORDERED;
     }
 
     public void remove(ItineraryBlock block) {
@@ -142,5 +165,11 @@ public class ItineraryDay {
 
     private static String normalizeNullable(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private static int segmentOf(int orderNo, List<Integer> raceSlots) {
+        return Math.toIntExact(raceSlots.stream()
+                .filter(raceOrderNo -> raceOrderNo < orderNo)
+                .count());
     }
 }

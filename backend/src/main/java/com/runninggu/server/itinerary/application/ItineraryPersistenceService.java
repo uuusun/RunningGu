@@ -202,10 +202,16 @@ public class ItineraryPersistenceService {
                     ErrorCode.SYSTEM_BLOCK_IMMUTABLE,
                     "대회 일정은 순서를 변경할 수 없습니다.");
         }
-        if (blockIds == null || !day.reorderUserBlocks(blockIds)) {
-            throw error(
+        switch (day.reorderUserBlocks(blockIds)) {
+            case SYSTEM_BLOCK_IMMUTABLE -> throw error(
+                    ErrorCode.SYSTEM_BLOCK_IMMUTABLE,
+                    "대회 일정의 고정 위치를 넘어서 순서를 변경할 수 없습니다.");
+            case BLOCK_SET_MISMATCH -> throw error(
                     ErrorCode.BLOCK_SET_MISMATCH,
                     "blockIds는 해당 일자의 USER 블록 전체 집합과 일치해야 합니다.");
+            case REORDERED -> {
+                // 변경 감지는 JPA dirty checking에 맡긴다.
+            }
         }
         dayRepository.flush();
         return new Reordered(day.getId(), day.getBlocks().stream()
