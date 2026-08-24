@@ -72,7 +72,8 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 정책 | 값 |
 |---|---|
 | 타임아웃 | 연결 1초 · 응답 2.5초 🔧 → 초과 시 504 |
-| 카카오 429 | 1회 재시도 후 실패 처리 (NFR-5) |
+| 카카오 로컬 REST 429 | 1회 재시도 후 실패 처리 (NFR-5) |
+| 카카오 로그인 검증 429 | 재시도 없이 `502 EXTERNAL_API_ERROR` 반환 (NFR-5) |
 | KTO 오류 방어 | `resultCode≠0000` · **JSON 요청에도 XML로 오는 포털 오류**를 컨버터 예외로 구분 처리·로깅 (NFR-4) |
 | 캐시 | 대회별 인근 축제 1일 · 기타 프록시 5분 · 두루누비 메타 24시간(주최측 허용 확인 후) |
 | 캐시 구현 | 단일 서버 MVP는 Spring Cache + Caffeine 인메모리 캐시. Redis는 MVP에서 사용하지 않음 🔒 |
@@ -177,13 +178,13 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 ```json
 { "kakaoAccessToken": "카카오 SDK가 발급한 액세스 토큰" }
 ```
-서버가 카카오 API(`/v2/user/me`)로 토큰 검증 → `(provider=KAKAO, providerSubject=카카오 회원번호)`로 `LOGIN_IDENTITY`를 조회한다.
-- 기존 KAKAO 가입 계정: `200` — 1-6과 동일 응답
-- 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명", "email": null}}` → 앱은 약관 동의 화면으로 → 1-8 호출
+서버가 카카오 API `/v1/user/access_token_info`로 토큰의 유효성과 발급 앱을 확인한다. 응답 `app_id`가 서버 환경변수 `KAKAO_APP_ID`와 다르면 `401 INVALID_KAKAO_TOKEN`으로 거부하고 `/v2/user/me`를 호출하지 않는다. 일치할 때만 `/v2/user/me`로 회원번호와 동의된 프로필을 조회하며, 두 응답의 회원번호가 다르면 `502 EXTERNAL_API_ERROR`로 처리한다. 검증된 회원번호로 `(provider=KAKAO, providerSubject=카카오 회원번호)` `LOGIN_IDENTITY`를 조회한다.
+- 기존 KAKAO 가입 계정: `200` — 1-6과 동일 응답. `user.email`은 가입 때 이메일이 제공되지 않았다면 null이다.
+- 미가입: `200 {"isNewUser": true, "kakaoProfile": {"nickname": "카카오프로필명 또는 null", "email": null}}` → 앱은 약관 동의 화면으로 → 1-8 호출. 이 판별 호출에서는 DB에 사용자 데이터를 저장하지 않는다.
 
-카카오 이메일은 동의 항목에 따라 없을 수 있는 **nullable 프로필 스냅샷**일 뿐 로그인 식별자가 아니다. 동일 이메일의 EMAIL 계정이 있어도 자동 병합하지 않는다. 한 USER는 가입 시 선택한 EMAIL 또는 KAKAO 수단 하나만 가지며 P0에서는 연결·추가·전환을 지원하지 않는다(결정-22 개정).
+카카오 사용자 정보의 닉네임과 이메일은 동의 상태에 따라 둘 다 없을 수 있다. `kakaoProfile.nickname`과 `kakaoProfile.email`은 모두 nullable이며 가입 화면의 초기값으로만 사용한다. 카카오 이메일은 제공된 경우에만 보관하는 **nullable 프로필 스냅샷**일 뿐 로그인 식별자가 아니다. 동일 이메일의 EMAIL 계정이 있어도 자동 병합하지 않는다. 한 USER는 가입 시 선택한 EMAIL 또는 KAKAO 수단 하나만 가지며 P0에서는 연결·추가·전환을 지원하지 않는다(결정-22 개정).
 
-오류: `401 INVALID_KAKAO_TOKEN`
+오류: `401 INVALID_KAKAO_TOKEN` · `502 EXTERNAL_API_ERROR` · `504 EXTERNAL_API_TIMEOUT`
 
 ### 1-8 `POST /auth/kakao/signup`
 
@@ -197,6 +198,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 `201` — 1-6과 동일 응답. **이메일 인증 생략** 🔒(§4.2 카카오 가입). KAKAO 로그인 수단에는 비밀번호를 저장하지 않는다.
 구현은 `USER`와 `LOGIN_IDENTITY(provider=KAKAO)`를 한 트랜잭션에서 생성한다. 비밀번호는 USER가 아니라 EMAIL 로그인 수단에만 존재한다.
 `LOGIN_IDENTITY.user_id`와 `(provider, provider_subject)`는 각각 UNIQUE다. EMAIL은 `password_hash`·`email_verified_at`이 필수이고, KAKAO는 둘 다 null이다.
+동일 카카오 회원번호의 가입 요청은 회원번호별로 직렬화하고, 이미 가입된 경우 기존 계정으로 자동 로그인하지 않고 `409 KAKAO_ACCOUNT_DUPLICATED`를 반환한다. 토큰 검증은 1-7의 결과를 신뢰하지 않고 가입 요청마다 다시 수행한다.
 
 ### 1-9 ~ 1-10 토큰 관리
 
@@ -862,7 +864,8 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
 | `NO_RESULT` | 404 | 지오코딩 검색 결과 없음 |
-| `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 유니크 충돌 |
+| `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 이메일·닉네임 유니크 충돌 |
+| `KAKAO_ACCOUNT_DUPLICATED` | 409 | 이미 가입된 카카오 회원번호로 신규 가입 재요청 |
 | `EMAIL_IDENTITY_REQUIRED` / `REAUTH_PROVIDER_MISMATCH` | 409 | KAKAO 가입자의 비밀번호 변경 / 가입 방식과 다른 수단으로 재인증 |
 | `CONTEST_LOCATION_UNAVAILABLE` | 409 | 좌표 없는 대회의 인근 축제·동선 생성 시도 |
 | `CONTEST_INACTIVE` | 409 | 비활성 대회의 신규 동선 생성 시도 |

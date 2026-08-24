@@ -74,6 +74,24 @@ public class LoginIdentity {
         return identity;
     }
 
+    /** 카카오 회원번호만 로그인 식별자로 사용하고 이메일은 nullable snapshot으로 둔다. (SPEC §4.1, §6.5) */
+    public static LoginIdentity kakao(
+            AppUser user,
+            String providerSubject,
+            String emailSnapshot,
+            Instant createdAt) {
+        LoginIdentity identity = new LoginIdentity();
+        identity.user = user;
+        identity.provider = LoginProvider.KAKAO;
+        identity.providerSubject = providerSubject;
+        identity.emailSnapshot = emailSnapshot;
+        identity.passwordHash = null;
+        identity.emailVerifiedAt = null;
+        identity.createdAt = createdAt;
+        identity.lastLoginAt = createdAt;
+        return identity;
+    }
+
     public void markLoggedIn(Instant now) {
         lastLoginAt = now;
     }

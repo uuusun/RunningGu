@@ -5,7 +5,7 @@ import com.runninggu.server.auth.application.AuthSessionResult;
 public record AuthSessionResponse(
         String accessToken,
         String refreshToken,
-        AuthUserResponse user) {
+        AuthUserResponse user) implements KakaoLoginResponse {
 
     static AuthSessionResponse from(AuthSessionResult result) {
         return new AuthSessionResponse(
