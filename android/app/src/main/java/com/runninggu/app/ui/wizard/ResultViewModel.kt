@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
+import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
 
@@ -281,13 +283,21 @@ class ResultViewModel(
                         region = lastRegion,
                     )
                 },
-                onFailure = {
+                onFailure = { cause ->
                     // 네트워크·timeout·4xx/5xx 는 Error 이며 Empty 로 강등하지 않는다 (API 명세 §5-1).
+                    val inactive = cause.apiErrorCode() == ApiErrorCode.CONTEST_INACTIVE
                     ResultUiState(
                         phase = ResultUiState.Phase.ERROR,
                         event = request.event,
                         region = lastRegion,
-                        errorMessage = "동선을 만들지 못했어요.",
+                        errorMessage = if (inactive) {
+                            // 원천에서 사라진 대회다. 사용자가 할 일은 다른 대회를 고르는 것이지
+                            // 다시 누르는 게 아니다 (결정-46 · 결정-53).
+                            "정보 제공이 끝난 대회예요. 다른 대회를 골라 주세요."
+                        } else {
+                            "동선을 만들지 못했어요."
+                        },
+                        canRetry = !inactive,
                     )
                 },
             )
