@@ -72,11 +72,28 @@ public class AuthJwtConfig {
         return decoder(secretKey, properties, clock, "REFRESH");
     }
 
+    @Bean("reauthJwtDecoder")
+    JwtDecoder reauthJwtDecoder(
+            SecretKey secretKey,
+            JwtProperties properties,
+            Clock clock) {
+        return decoder(secretKey, properties, clock, "REAUTH", "DELETE_ACCOUNT");
+    }
+
     private JwtDecoder decoder(
             SecretKey secretKey,
             JwtProperties properties,
             Clock clock,
             String tokenType) {
+        return decoder(secretKey, properties, clock, tokenType, null);
+    }
+
+    private JwtDecoder decoder(
+            SecretKey secretKey,
+            JwtProperties properties,
+            Clock clock,
+            String tokenType,
+            String requiredPurpose) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
@@ -101,12 +118,24 @@ public class AuthJwtConfig {
                     "필수 JWT claim이 없습니다.",
                     null));
         };
+        OAuth2TokenValidator<Jwt> purpose = jwt -> {
+            boolean valid = requiredPurpose == null
+                    || requiredPurpose.equals(jwt.getClaimAsString("purpose"));
+            if (valid) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            return OAuth2TokenValidatorResult.failure(new OAuth2Error(
+                    "invalid_token",
+                    "JWT 목적이 올바르지 않습니다.",
+                    null));
+        };
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 timestamps,
                 new JwtIssuerValidator(properties.issuer()),
                 audience,
                 type,
-                requiredClaims));
+                requiredClaims,
+                purpose));
         return decoder;
     }
 }

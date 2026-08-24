@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(OPENAPI_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/contests/*/festivals").permitAll()
@@ -49,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/courses",
+                                "/api/courses/near",
                                 "/api/courses/regions")
                         .permitAll()
                         .requestMatchers(
@@ -65,7 +67,9 @@ public class SecurityConfig {
                                 "/api/auth/kakao",
                                 "/api/auth/kakao/signup",
                                 "/api/auth/refresh",
-                                "/api/auth/logout")
+                                "/api/auth/logout",
+                                "/api/auth/password/reset-request",
+                                "/api/auth/password/reset")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/itineraries/generate")
                         .permitAll()
