@@ -293,6 +293,48 @@ class SaveCourseTest {
     }
 
     @Test
+    fun `보내는 사이 다른 코스를 고르면 결과가 그쪽에 붙지 않는다`() = runTest(dispatcher) {
+        // A 저장 중에 B 를 고르면 `onItemSelect` 가 `save` 를 Idle 로 되돌린다. 그 뒤
+        // A 응답이 도착해 "저장했어요" 를 다시 쓰면 **B 아래에 붙는다** — 사용자는
+        // 누른 적 없는 코스를 저장한 것으로 읽는다(#166 리뷰).
+        val gate = CompletableDeferred<Unit>()
+        val viewModel = loaded(viewModel(saved = RecordingSavedCourses(gate = gate)))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.save is SaveCourseState.Saving)
+
+        viewModel.onItemSelect(route("r-2"))
+        advanceUntilIdle()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(
+            "A 의 결과가 B 아래에 붙었다",
+            SaveCourseState.Idle,
+            viewModel.uiState.value.save,
+        )
+    }
+
+    @Test
+    fun `고른 코스가 그대로면 결과가 붙는다`() = runTest(dispatcher) {
+        // 과하게 버리면 정상 저장도 아무 말이 없어진다
+        val gate = CompletableDeferred<Unit>()
+        val viewModel = loaded(viewModel(saved = RecordingSavedCourses(gate = gate)))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val save = viewModel.uiState.value.save
+        assertTrue("정상 저장인데 아무 말이 없다: $save", save is SaveCourseState.Done)
+    }
+
+    @Test
     fun `보내는 사이 세션이 죽어도 로그인 모달을 띄운다`() = runTest(dispatcher) {
         // 세대 가드가 이 결과를 버리면 **정작 로그인하라는 말을 해야 할 때 아무 말도 못 한다.**
         // 게스트 모달을 살리려고 만든 기능이 가장 필요한 순간에 삼켜지는 셈이다(#166 리뷰).

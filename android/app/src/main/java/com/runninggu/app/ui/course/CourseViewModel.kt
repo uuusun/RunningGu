@@ -290,6 +290,25 @@ class CourseViewModel(
                 }
                 return@launch
             }
+
+            // **보내는 사이 다른 코스를 골랐으면 이 결과는 지금 화면의 것이 아니다.**
+            // A 를 저장하는 중에 B 를 고르면 `onItemSelect` 가 `save` 를 `Idle` 로
+            // 되돌리는데, 그 뒤 A 응답이 도착해 "저장했어요" 를 다시 쓰면 **B 아래에
+            // 붙는다.** 사용자는 누른 적 없는 코스를 저장한 것으로 읽는다(#166 리뷰).
+            //
+            // 재조회로 목록이 갈리는 경로도 같다 — 그때는 `selectedItem` 이 null 이 되고
+            // [CourseUiState.selectedRoute] 가 새 목록의 첫 코스를 가리킨다.
+            //
+            // **작업을 취소하지 않고 결과만 버린다.** 요청은 이미 서버에 갔고 저장은
+            // 멱등이라(§7-A), 끊어도 저장은 되고 확인만 못 하는 상태가 된다.
+            //
+            // [SaveCourseState.NeedsLogin] 은 통과시킨다 — 로그인 모달은 코스별 안내가
+            // 아니라 계정 상태 안내다. 위 세대 가드와 같은 이유다.
+            if (done !is SaveCourseState.NeedsLogin &&
+                _uiState.value.selectedRoute?.routeId != route.routeId
+            ) {
+                return@launch
+            }
             _uiState.update { it.copy(save = done) }
         }
     }
