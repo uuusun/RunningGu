@@ -62,7 +62,7 @@ enum class LoginProvider(val label: String) {
  * 토큰을 읽어 가는 자리다.
  *
  * 세션 영속은 SPEC §2.2(시작 화면 분기) · NFR-11 을 따른다. 시작 시 서버 검증(A0)은
- * `GET /api/me` 가 서면 붙인다 — 이슈 #99.
+ * [bind] 가 받은 [SessionValidator] 로 **복원 절차 안에서** 끝낸다 — 이슈 #99.
  *
  * **메모리가 기준이고 디스크는 사본이다.** 읽기는 전부 메모리에서 즉시 끝난다 — OkHttp 의
  * `Authenticator` 가 블로킹 계약이라 토큰을 읽으려고 코루틴을 기다릴 수 없기 때문이다.
@@ -159,6 +159,10 @@ object SessionStore {
      *
      * 읽는 동안 사용자가 로그인했으면 **덮지 않는다.** 게스트로 둘러보다 로그인한 사람이
      * 디스크에 남아 있던 이전 계정으로 되돌아가면 안 된다.
+     *
+     * **[validateRestored] 가 끝난 뒤에 [_restored] 를 올린다. 순서를 바꾸지 말 것** — 시작
+     * 화면이 `restored` 하나만 보고 홈/로그인을 정하므로(`RunningGuApp`), 검증보다 먼저
+     * 올리면 폐기된 세션도 홈으로 열렸다가 첫 요청의 `401` 로 튕긴다(A0 · #99).
      */
     private suspend fun restore(persistence: SessionPersistence, validator: SessionValidator) {
         try {
