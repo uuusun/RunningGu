@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.repository.apiErrorCode
 import com.runninggu.app.data.local.SessionStore
 
 /**
@@ -74,15 +76,33 @@ class LoginViewModel(
                             isSubmitting = false,
                             // 인증 실패는 사유를 감추지만(§4.1), 통신 실패까지 같은 문구로
                             // 덮으면 사용자가 비밀번호를 계속 고쳐 입력하게 된다.
-                            errorMessage = if (cause.isNetworkFailure()) {
-                                "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
-                            } else {
-                                "이메일 또는 비밀번호를 확인해 주세요"
-                            },
+                            errorMessage = cause.loginMessage(),
                         )
                     },
                 )
             }
         }
     }
+}
+
+/**
+ * 로그인 실패 문구. (SPEC §4.1 · 결정-55 · API 명세 §1-6)
+ *
+ * **세 갈래다.** 셋을 하나로 묶으면 사용자가 할 일을 못 찾는다.
+ *
+ * | 무엇 | 왜 갈라야 하나 |
+ * |---|---|
+ * | 통신 실패 | 비밀번호를 계속 고쳐 입력하게 된다 |
+ * | `429 RATE_LIMITED` | **고쳐도 안 풀린다.** 기다려야 한다 |
+ * | 그 외(`401 LOGIN_FAILED`) | 사유는 감춘다 — 계정 존재 여부 비노출 |
+ *
+ * 시도 제한을 일반 실패로 덮으면 사용자는 비밀번호가 틀린 줄 알고 **다시 누른다.**
+ * 그 요청이 또 IP 창에 쌓여 상황이 나빠지고, 결정-55 가 "성공 시 이메일 창만
+ * 초기화하고 IP 창은 유지" 라 다른 계정으로 로그인해도 안 풀린다.
+ */
+private fun Throwable.loginMessage(): String = when {
+    isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+    apiErrorCode() == ApiErrorCode.RATE_LIMITED ->
+        "로그인 시도가 많아요. 잠시 후 다시 시도해 주세요."
+    else -> "이메일 또는 비밀번호를 확인해 주세요"
 }
