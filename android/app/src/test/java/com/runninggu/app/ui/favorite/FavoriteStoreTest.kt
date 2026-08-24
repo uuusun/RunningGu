@@ -7,9 +7,14 @@ import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -196,6 +201,85 @@ class FavoriteStoreTest {
         assertFalse(RACE in repository.stored)
     }
 
+    @Test
+    fun `서버에 반영된 뒤 호출자가 취소돼도 하트가 되돌아가지 않는다`() = runBlocking {
+        // 하트를 누르고 **바로 화면을 뜬** 상황이다. `viewModelScope` 가 취소돼도 서버는
+        // 이미 찜을 반영했는데, 쓰기를 호출자 스코프에서 돌리면 그 취소가 실패로 접혀
+        // [FavoriteStore] 가 이전 상태로 하트를 되돌린다(#173 리뷰 P1).
+        val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        FavoriteStore.resetForTest(repository, writeScope)
+
+        val applied = repository.appliedSignal("add")
+        val response = repository.responseGate("add")
+
+        val caller = async { FavoriteStore.toggle(RACE) }
+        applied.await()          // 서버가 찜을 반영했다
+        caller.cancel()          // 화면을 떠났다 — 호출자만 죽는다
+        response.complete(Unit)  // 응답은 그 뒤에 도착한다
+        writeScope.coroutineContext.job.children.forEach { it.join() }
+        caller.join()
+
+        assertTrue("전제가 깨졌다 — 서버에 반영되지 않았다", RACE in repository.stored)
+        assertTrue(
+            "서버는 찜인데 화면이 미찜으로 되돌아갔다",
+            RACE in FavoriteStore.favoriteIds.value,
+        )
+        writeScope.cancel()
+    }
+
+    @Test
+    fun `쓰기가 끝난 뒤 도착한 조회는 화면을 덮지 않는다`() = runBlocking {
+        // GET 시작 → 토글 완료 → GET 응답. [inFlight] 로는 못 막는 창이다 — 쓰기가 이미
+        // 끝나서 pending 에서 빠진 뒤에 낡은 목록이 도착한다(#173 리뷰 P1).
+        val read = repository.listReadSignal()   // 조회가 (아직 빈) 목록을 읽은 순간
+        val response = repository.listGate()     // 그 조회의 응답을 붙잡아 둔다
+
+        val refreshing = async { FavoriteStore.refresh() }
+        read.await()
+
+        FavoriteStore.toggle(RACE)               // 토글이 끝까지 간다 — pending 에서도 빠진다
+        assertTrue("전제가 깨졌다 — 토글이 서버에 반영되지 않았다", RACE in repository.stored)
+        assertTrue(RACE in FavoriteStore.favoriteIds.value)
+
+        response.complete(Unit)                  // 이제 쓰기 전 목록이 도착한다
+        refreshing.await()
+
+        assertTrue(
+            "쓰기 전에 뜬 조회가 방금 성공한 토글을 과거 값으로 덮었다",
+            RACE in FavoriteStore.favoriteIds.value,
+        )
+    }
+
+    @Test
+    fun `목록 조회로 알게 된 찜은 하트에 더해진다`() = runBlocking {
+        // 목록 GET 은 성공했는데 전체 id 조회가 늦거나 실패한 창. 목록에 있다는 것 자체가
+        // 찜이라는 뜻이므로(§7-C) 빈 하트로 두지 않는다(#173 리뷰 P2).
+        FavoriteStore.mergeKnownFavorites(listOf(RACE))
+
+        assertTrue(RACE in FavoriteStore.favoriteIds.value)
+        // 서버가 안다고 확신하는 값이라 되돌림 기준에도 들어간다 — 다시 눌러 끌 수 있다.
+        assertEquals(FavoriteToggleResult.Done(false), FavoriteStore.toggle(RACE))
+        assertFalse(RACE in repository.stored)
+    }
+
+    @Test
+    fun `목록 병합이 진행 중인 해제를 되살리지 않는다`() = runBlocking {
+        // 하트를 꺼서 DELETE 가 떠 있는데 목록 조회가 돌아왔다. 그 목록에는 아직 이 대회가
+        // 들어 있다 — 그걸 병합하면 방금 끈 하트가 다시 켜진다.
+        FavoriteStore.mergeKnownFavorites(listOf(RACE))
+        val removeGate = repository.gate("remove")
+
+        val toggling = async { FavoriteStore.toggle(RACE) }
+        yield() // 해제 요청이 서버에 닿은 상태로 만든다
+        FavoriteStore.mergeKnownFavorites(listOf(RACE))
+
+        assertFalse("목록 병합이 진행 중인 해제를 덮었다", RACE in FavoriteStore.favoriteIds.value)
+
+        removeGate.complete(Unit)
+        toggling.await()
+        assertFalse(RACE in FavoriteStore.favoriteIds.value)
+    }
+
     private companion object {
         const val RACE = "roadrun-41543"
     }
@@ -227,6 +311,20 @@ private class RecordingFavoriteRepository : FavoriteRepository {
     /** 그 연산이 서버에 반영된 순간 완료된다. 테스트가 이걸 기다린다. */
     val applied = mutableMapOf<String, CompletableDeferred<Unit>>()
 
+    /**
+     * **반영을 끝낸 뒤 응답만** 늦추는 게이트. [gates] 와 다른 자리다.
+     *
+     * [gates] 는 서버가 아직 처리하지 않은 상태를, 이건 **처리는 끝났는데 응답이 아직인**
+     * 상태를 만든다. 「서버 반영 후 호출자 취소」가 이 창에서만 재현된다(#173 리뷰).
+     */
+    val responseGates = mutableMapOf<String, CompletableDeferred<Unit>>()
+
+    /** 조회 응답을 순서대로 붙잡아 둔다. `refresh` 가 다시 읽을 수 있어서 하나가 아니라 큐다. */
+    val listGates: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque()
+
+    /** 조회가 서버 목록을 **읽은** 순간 완료된다. */
+    val listReads: ArrayDeque<CompletableDeferred<Unit>> = ArrayDeque()
+
     private var running = 0
 
     fun gate(op: String): CompletableDeferred<Unit> =
@@ -235,11 +333,27 @@ private class RecordingFavoriteRepository : FavoriteRepository {
     fun appliedSignal(op: String): CompletableDeferred<Unit> =
         CompletableDeferred<Unit>().also { applied[op] = it }
 
+    fun responseGate(op: String): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { responseGates[op] = it }
+
+    fun listGate(): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { listGates.addLast(it) }
+
+    fun listReadSignal(): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also { listReads.addLast(it) }
+
     /** 이 파일은 목록 화면을 보지 않는다 — 하트만 본다. */
     override suspend fun list(page: Int, size: Int): FavoritePage =
         FavoritePage(contests = emptyList(), hasNext = false, totalElements = 0)
 
-    override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(stored.toSet())
+    override suspend fun loadFavoriteIds(): Result<Set<String>> {
+        // **읽는 시점을 먼저 고정한다.** 뒤에서 붙잡아 두면 "목록은 읽었는데 응답은 아직"
+        // 창이 시간이 아니라 상태로 정해진다.
+        val snapshot = stored.toSet()
+        listReads.removeFirstOrNull()?.complete(Unit)
+        listGates.removeFirstOrNull()?.await()
+        return Result.success(snapshot)
+    }
 
     override suspend fun add(contestId: String): Result<Unit> =
         call("add", contestId) { stored += contestId }
@@ -263,8 +377,13 @@ private class RecordingFavoriteRepository : FavoriteRepository {
             withContext(NonCancellable) {
                 delay(wait)
                 apply()
+                // **서버가 반영을 끝낸 시점.** 여기까지는 클라 취소와 무관하게 일어난다.
+                applied[op]?.complete(Unit)
             }
-            applied[op]?.complete(Unit)
+            // **응답 수신은 취소된다.** 호출자가 이미 사라졌으면 여기서 깨진다 — 실제
+            // Retrofit `suspend` 호출과 같은 조건이고, 「서버는 반영했는데 앱은 실패로
+            // 안다」가 정확히 이 창에서 생긴다(#173 리뷰).
+            responseGates[op]?.await()
             return Result.success(Unit)
         } finally {
             running--

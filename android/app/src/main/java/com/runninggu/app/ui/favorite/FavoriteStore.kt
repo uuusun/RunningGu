@@ -5,6 +5,7 @@ import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.FavoriteRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,6 +96,27 @@ object FavoriteStore {
      */
     private val sessionEpoch = AtomicInteger(0)
 
+    /**
+     * 쓰기 세대. **서버 상태를 실제로 바꾼 요청**이 끝날 때마다 올라간다.
+     *
+     * [inFlight] 로는 못 막는 창이 있다 — 조회가 뜬 뒤 쓰기가 **끝나서 pending 에서 빠진
+     * 다음** 그 조회 응답이 도착하면, [refresh] 는 대기 중인 게 없다고 보고 방금 성공한
+     * 토글을 과거 값으로 덮는다. 조회 시작 시점의 세대를 적어 두고 대조한다(#173 리뷰).
+     */
+    private val mutationEpoch = AtomicInteger(0)
+
+    /**
+     * 쓰기를 돌릴 **앱 수명 스코프**. [bind] 가 채운다.
+     *
+     * 호출자의 `viewModelScope` 에서 서버 왕복을 돌리면, 하트를 누르고 바로 화면을 뜰 때
+     * 요청이 취소된다. **서버는 클라 취소를 모르므로 찜은 이미 반영돼 있는데** 앱만 실패로
+     * 알고 [confirmed] 의 이전 값으로 하트를 되돌린다 — 이 객체가 경고하는 바로 그
+     * 서버/화면 갈림이 실제 HTTP 경로에 남았다(#173 리뷰).
+     *
+     * `null` 이면 [bind] 전이다. 단위 테스트가 스코프 없이 부르는 경로라 그 자리에서 돈다.
+     */
+    private var writeScope: CoroutineScope? = null
+
     private var sessionJob: Job? = null
 
     /**
@@ -108,6 +130,7 @@ object FavoriteStore {
      * 잡으면 단위 테스트에서 이 객체를 건드릴 수조차 없기 때문이다.
      */
     fun bind(scope: CoroutineScope) {
+        writeScope = scope
         sessionJob?.cancel()
         sessionJob = scope.launch {
             SessionStore.session
@@ -131,9 +154,21 @@ object FavoriteStore {
             return
         }
         val epoch = sessionEpoch.get()
-        repository.loadFavoriteIds().onSuccess { ids ->
+        // **읽기 전에 쓰기 세대를 적어 둔다.** 조회가 도는 사이 토글이 끝나면 이 목록은
+        // 그 쓰기 **전**의 상태라, 그대로 씌우면 방금 성공한 토글이 과거 값으로 덮인다.
+        //
+        // 버리기만 하면 로그인 직후 첫 조회가 토글 한 번에 날아가 하트가 빈 채로 남는다.
+        // 그래서 폐기하고 **다시 읽는다**(#173 리뷰).
+        repeat(REFRESH_ATTEMPTS) {
+            val mutations = mutationEpoch.get()
+            val ids = repository.loadFavoriteIds().getOrElse {
+                // 실패는 조용히 둔다 — 마지막 성공 목록을 계속 보여주는 편이 낫다
+                // (§4.13 오프라인 규칙).
+                return
+            }
             // 조회가 도는 사이 로그아웃했으면 이전 사용자의 목록이다. 버린다.
-            if (epoch != sessionEpoch.get()) return@onSuccess
+            if (epoch != sessionEpoch.get()) return
+            if (mutations != mutationEpoch.get()) return@repeat // 쓰기가 끼어들었다. 다시 읽는다
             val pending = inFlight.keys
             _favoriteIds.update { current ->
                 // 요청이 떠 있는 대회는 조회 결과보다 화면 값이 최신이다. 조회가 덮으면
@@ -142,8 +177,28 @@ object FavoriteStore {
             }
             confirmed.removeAll { it !in pending }
             confirmed += ids - pending
+            return
         }
-        // 실패는 조용히 둔다 — 마지막 성공 목록을 계속 보여주는 편이 낫다(§4.13 오프라인 규칙).
+    }
+
+    /**
+     * 목록 조회로 알게 된 찜을 캐시에 **더한다**. (#173 리뷰 P2)
+     *
+     * `GET /me/favorites` 가 준 항목은 전부 찜이다(§7-C). 그런데 카드 목록 조회와
+     * [refresh] 의 전체 id 조회가 따로 돌아서, **목록은 떴는데 하트가 전부 빈** 순간이
+     * 생긴다. id 조회가 뒤쪽 장에서 실패하면 그 상태로 눌러앉는다.
+     *
+     * **더하기만 하고 빼지 않는다.** 한 장짜리 부분 목록이라 여기 없다는 것이 해제됐다는
+     * 뜻이 아니다. 진행 중인 토글([inFlight])도 건드리지 않는다 — 방금 끈 하트를 목록이
+     * 다시 켜면 안 된다.
+     */
+    fun mergeKnownFavorites(raceIds: Collection<String>) {
+        if (raceIds.isEmpty() || !SessionStore.isLoggedIn) return
+        val epoch = sessionEpoch.get()
+        val known = raceIds.toSet() - inFlight.keys
+        if (known.isEmpty() || epoch != sessionEpoch.get()) return
+        confirmed += known
+        _favoriteIds.update { it + known }
     }
 
     /**
@@ -162,10 +217,41 @@ object FavoriteStore {
 
         val epoch = sessionEpoch.get()
         val nowFavorite = raceId !in _favoriteIds.value
+        // 화면 반영과 [inFlight] 등록은 **호출자 자리에서 동기로** 끝낸다. 연타의 두 번째
+        // 탭이 첫 번째가 정한 방향을 보고 자기 방향을 정해야 하기 때문이다(#64 리뷰).
         applyLocally(raceId, nowFavorite)
-
         // 같은 대회에 대기 중인 토글이 남아 있으면 id 가 유지된다.
         inFlight.merge(raceId, 1, Int::plus)
+
+        // 서버 왕복만 [writeScope] 로 넘긴다. 호출자가 취소되면 아래 `await` 만 끊기고
+        // **쓰기는 끝까지 간다** — 서버에 반영된 것을 앱이 실패로 오해하지 않는다(#173 리뷰).
+        val scope = writeScope
+        if (scope == null) {
+            writeThrough(raceId, nowFavorite, epoch)
+        } else {
+            scope.async { writeThrough(raceId, nowFavorite, epoch) }.await()
+        }
+
+        // 세션이 바뀌었으면 이번 토글은 없던 일이다. LoginRequired 를 주면 방금 로그아웃한
+        // 사용자를 로그인 화면으로 떠민다 — 그건 아니다.
+        if (epoch != sessionEpoch.get()) return FavoriteToggleResult.Failed
+
+        // 서버가 내 의도대로 됐는지로만 판단한다. 뒤이은 토글이 상태를 또 바꿨더라도
+        // 그 호출자가 자기 결과를 따로 알린다.
+        return if ((raceId in confirmed) == nowFavorite) {
+            FavoriteToggleResult.Done(nowFavorite)
+        } else {
+            FavoriteToggleResult.Failed
+        }
+    }
+
+    /**
+     * 서버에 실제로 쓰는 부분. **[writeScope] 에서 돈다 — 호출자 취소가 닿지 않는다.**
+     *
+     * 화면 반영은 이미 [toggle] 이 끝냈다. 여기서는 서버를 대회별로 한 줄로 세우고,
+     * 대기 중인 요청이 다 빠지면 화면을 서버 상태에 맞춘다.
+     */
+    private suspend fun writeThrough(raceId: String, nowFavorite: Boolean, epoch: Int) {
         try {
             locks.computeIfAbsent(raceId) { Mutex() }.withLock {
                 // 자물쇠를 기다리는 사이 로그아웃했으면 이전 사용자의 찜을 서버에 쓰지 않는다.
@@ -178,6 +264,8 @@ object FavoriteStore {
                     // 요청이 도는 사이 로그아웃했으면 이번 세션에 반영하지 않는다.
                     if (outcome.isSuccess && epoch == sessionEpoch.get()) {
                         if (nowFavorite) confirmed += raceId else confirmed -= raceId
+                        // 이 쓰기 전에 뜬 조회가 화면을 과거 값으로 덮지 못하게 한다(#173 리뷰).
+                        mutationEpoch.incrementAndGet()
                     }
                 }
             }
@@ -197,18 +285,6 @@ object FavoriteStore {
                 applyLocally(raceId, raceId in confirmed)
             }
         }
-
-        // 세션이 바뀌었으면 이번 토글은 없던 일이다. LoginRequired 를 주면 방금 로그아웃한
-        // 사용자를 로그인 화면으로 떠민다 — 그건 아니다.
-        if (epoch != sessionEpoch.get()) return FavoriteToggleResult.Failed
-
-        // 서버가 내 의도대로 됐는지로만 판단한다. 뒤이은 토글이 상태를 또 바꿨더라도
-        // 그 호출자가 자기 결과를 따로 알린다.
-        return if ((raceId in confirmed) == nowFavorite) {
-            FavoriteToggleResult.Done(nowFavorite)
-        } else {
-            FavoriteToggleResult.Failed
-        }
     }
 
     /**
@@ -223,16 +299,25 @@ object FavoriteStore {
         confirmed.clear()
     }
 
+    /** [refresh] 재시도 횟수. 쓰기가 끼어들면 한 번 더 읽고, 그래도 겹치면 다음 조회에 맡긴다. */
+    private const val REFRESH_ATTEMPTS = 2
+
     private fun applyLocally(raceId: String, favorite: Boolean) {
         _favoriteIds.update { current ->
             if (favorite) current + raceId else current - raceId
         }
     }
 
-    /** 테스트 전용. 스텁 저장소를 갈아끼우고 캐시를 비운다. */
-    internal fun resetForTest(repository: FavoriteRepository) {
+    /**
+     * 테스트 전용. 스텁 저장소를 갈아끼우고 캐시를 비운다.
+     *
+     * [writeScope] 를 받으면 쓰기가 그 스코프에서 돈다 — 호출자 취소가 쓰기를 끊지 않는
+     * 것을 확인하는 테스트가 이걸 쓴다. 넘기지 않으면 그 자리에서 돈다(기존 테스트 경로).
+     */
+    internal fun resetForTest(repository: FavoriteRepository, writeScope: CoroutineScope? = null) {
         sessionJob?.cancel()
         sessionJob = null
+        this.writeScope = writeScope
         this.override = repository
         sessionEpoch.incrementAndGet()
         _favoriteIds.value = emptySet()

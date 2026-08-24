@@ -4,6 +4,7 @@ import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.remote.FavoriteApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.mapper.toContest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /**
@@ -108,10 +109,24 @@ class RemoteFavoriteRepository(private val api: FavoriteApi) : FavoriteRepositor
     override suspend fun remove(contestId: String): Result<Unit> =
         withServerId(contestId) { apiCall { api.remove(it) } }
 
+    /**
+     * **취소를 실패로 접지 않는다.** `runCatching` 은 [CancellationException] 까지 잡는데,
+     * 쓰기에서 그러면 서버는 이미 반영했는데 앱만 실패로 알고 하트를 되돌린다. 취소는
+     * 요청 결과가 아니라 **호출자가 사라졌다는 신호**라 그대로 올려보낸다(#173 리뷰).
+     *
+     * 이 경로 자체는 `FavoriteStore` 가 앱 수명 스코프에서 돌려 호출자 취소가 닿지
+     * 않지만, 여기서도 막아 둔다 — 다음에 다른 자리에서 부를 때 같은 사고가 나지 않게.
+     */
     private inline fun withServerId(contestId: String, call: (Long) -> Unit): Result<Unit> {
         val serverId = contestId.toLongOrNull()
             ?: return Result.failure(IllegalArgumentException("canonical id 가 없는 대회: $contestId"))
-        return runCatching { call(serverId) }
+        return try {
+            Result.success(call(serverId))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
     }
 
     private companion object {

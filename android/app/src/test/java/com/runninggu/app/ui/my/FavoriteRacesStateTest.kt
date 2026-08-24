@@ -162,6 +162,48 @@ class FavoriteRacesStateTest {
     }
 
     @Test
+    fun `id 조회가 실패해도 목록의 하트는 켜진다`() = runTest(dispatcher) {
+        // 카드 목록 GET 과 전체 id 조회는 따로 돈다. id 조회가 뒤쪽 장에서 실패하면
+        // **찜 목록인데 하트가 전부 빈** 상태로 눌러앉는다 (#173 리뷰 P2).
+        signIn()
+        val repository = FakeFavorites(
+            listOf(FavoritePage(listOf(contest(1, "서울마라톤")), hasNext = false, totalElements = 1)),
+            idsFail = true,
+        )
+        FavoriteStore.resetForTest(repository)
+
+        val viewModel = viewModel(repository)
+
+        assertTrue(
+            "목록에 있는 대회인데 하트가 꺼져 있다",
+            "1" in viewModel.uiState.value.favoriteIds,
+        )
+    }
+
+    @Test
+    fun `재찜에 실패하면 해제가 아니라 찜 실패를 알린다`() = runTest(dispatcher) {
+        // S10 에서 해제해도 카드가 남는다(#163). 그래서 이 자리에는 재찜도 온다 —
+        // 그게 실패했는데 "해제하지 못했어요" 가 뜨면 반대로 읽힌다(#173 리뷰).
+        signIn()
+        val repository = FakeFavorites(
+            listOf(FavoritePage(listOf(contest(1, "서울마라톤")), hasNext = false, totalElements = 1)),
+            idsFail = true,
+            addFails = true,
+        )
+        FavoriteStore.resetForTest(repository)
+        val viewModel = viewModel(repository)
+
+        viewModel.onFavoriteToggle("1") // 해제 — 성공한다
+        advanceUntilIdle()
+        assertFalse("1" in viewModel.uiState.value.favoriteIds)
+
+        viewModel.onFavoriteToggle("1") // 재찜 — 실패한다
+        advanceUntilIdle()
+
+        assertEquals("찜하지 못했어요. 잠시 후 다시 시도해 주세요.", viewModel.message.value)
+    }
+
+    @Test
     fun `게스트는 서버를 부르지 않는다`() = runTest(dispatcher) {
         // 마이 진입 자체가 로그인 필요다 (결정-4).
         val repository = FakeFavorites(emptyList())
@@ -179,6 +221,10 @@ private class FakeFavorites(
     private val pages: List<FavoritePage>,
     private val failure: ApiException? = null,
     private val failFrom: Int = -1,
+    /** 전체 id 조회만 실패한다. 목록은 떴는데 하트를 못 받는 창을 만든다(#173 리뷰 P2). */
+    private val idsFail: Boolean = false,
+    /** `PUT` 만 실패한다. 재찜 실패 문구를 확인하는 데 쓴다. */
+    private val addFails: Boolean = false,
 ) : FavoriteRepository {
     var calls = 0
         private set
@@ -190,8 +236,11 @@ private class FakeFavorites(
         return pages.getOrElse(page) { FavoritePage(emptyList(), hasNext = false, totalElements = 0) }
     }
 
-    override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(emptySet())
-    override suspend fun add(contestId: String): Result<Unit> = Result.success(Unit)
+    override suspend fun loadFavoriteIds(): Result<Set<String>> =
+        if (idsFail) Result.failure(ApiException.Network(IOException())) else Result.success(emptySet())
+
+    override suspend fun add(contestId: String): Result<Unit> =
+        if (addFails) Result.failure(IllegalStateException("서버 오류")) else Result.success(Unit)
     override suspend fun remove(contestId: String): Result<Unit> = Result.success(Unit)
 }
 

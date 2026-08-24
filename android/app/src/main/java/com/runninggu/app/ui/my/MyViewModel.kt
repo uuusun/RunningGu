@@ -341,8 +341,10 @@ class MyViewModel(
         favoritesPage = 0
         favoritesJob = viewModelScope.launch {
             _uiState.update { it.copy(favorites = FavoriteRacesState.Loading) }
+            var known: List<String> = emptyList()
             val state = try {
                 val page = favoriteRepository.list(page = 0)
+                known = page.contests.map { it.id }
                 if (page.contests.isEmpty()) {
                     FavoriteRacesState.Empty
                 } else {
@@ -357,6 +359,9 @@ class MyViewModel(
                 FavoriteRacesState.Error("찜한 대회를 불러오지 못했어요.")
             }
             if (epoch != sessionEpoch) return@launch
+            // 이 목록에 있다는 것 자체가 찜이라는 뜻이다(§7-C). 하트 조회가 늦거나 뒤쪽
+            // 장에서 실패해도 목록의 카드가 빈 하트로 남지 않게 한다(#173 리뷰).
+            FavoriteStore.mergeKnownFavorites(known)
             _uiState.update { it.copy(favorites = state) }
         }
     }
@@ -371,9 +376,11 @@ class MyViewModel(
             _uiState.update {
                 it.copy(favorites = current.copy(loadingMore = true, moreMessage = null))
             }
+            var known: List<String> = emptyList()
             val state = try {
                 val next = favoriteRepository.list(page = favoritesPage + 1)
                 favoritesPage += 1
+                known = next.contests.map { it.id }
                 current.copy(
                     races = current.races + next.contests.map { it.toRaceSummary() },
                     hasNext = next.hasNext,
@@ -385,6 +392,7 @@ class MyViewModel(
                 current.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
             }
             if (epoch != sessionEpoch) return@launch
+            FavoriteStore.mergeKnownFavorites(known)
             _uiState.update { it.copy(favorites = state) }
         }
     }
@@ -397,14 +405,25 @@ class MyViewModel(
     }
 
     /**
-     * 찜 해제 — 하트 재탭. 목록에서 바로 빠진다 (SPEC §4.13 · AP-21).
+     * 찜 하트 재탭. (SPEC §4.13 · AP-21)
+     *
+     * **카드는 목록에 남는다.** 목록은 서버가 주고 하트만 [FavoriteStore] 를 보므로,
+     * 해제해도 카드가 사라지지 않는다 — 잘못 눌렀을 때 그 자리에서 다시 켤 수 있어야
+     * 한다(#163). 그래서 이 자리에는 **해제와 재찜이 둘 다** 온다.
      *
      * 마이는 로그인 상태에서만 열리므로 `LoginRequired` 는 오지 않는다. 서버 실패만 알린다.
      */
     fun onFavoriteToggle(raceId: String) {
+        // 어느 쪽을 하려던 것인지 누르기 **전에** 적어 둔다. 실패 문구가 방향을 말해야
+        // 하는데, 재찜이 실패했는데 "해제하지 못했어요" 가 뜨면 반대로 읽힌다(#173 리뷰).
+        val wasFavorite = raceId in _uiState.value.favoriteIds
         viewModelScope.launch {
             if (FavoriteStore.toggle(raceId) == FavoriteToggleResult.Failed) {
-                _message.value = "찜을 해제하지 못했어요. 잠시 후 다시 시도해 주세요."
+                _message.value = if (wasFavorite) {
+                    "찜을 해제하지 못했어요. 잠시 후 다시 시도해 주세요."
+                } else {
+                    "찜하지 못했어요. 잠시 후 다시 시도해 주세요."
+                }
             }
         }
     }
