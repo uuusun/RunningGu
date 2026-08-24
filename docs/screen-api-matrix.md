@@ -1,10 +1,10 @@
-# 런닝구 화면–API 매핑표 v1.11
+# 런닝구 화면–API 매핑표 v1.12
 
-> 갱신일: 2026-08-23
+> 갱신일: 2026-08-24
 > 목적: 화면 플로우, Android Navigation, 백엔드 API, 데이터 원천과 저장 위치를 하나의 추적표로 연결한다.
 > 화면 기준: `docs/mockup-design/shots/README.md`의 기본 화면·상태·오버레이 89개와 화면 간 커넥터
 > 제품 기준: `SPEC.md` v4(SSOT)
-> API 기준: `docs/files/런닝구_API_명세서.md` v3.1(시드 계약)
+> API 기준: `docs/files/런닝구_API_명세서.md` v3.2(시드 계약)
 
 이 문서에서 **화면 커버리지 완료**는 플로우의 모든 화면·상태·행동에 API 또는 로컬 처리 주체가 연결됐다는 뜻이다. API 응답이나 정책이 아직 합의되지 않은 항목은 임의로 확정하지 않고 10장의 결정 목록에 남긴다.
 
@@ -174,7 +174,7 @@ Compose 화면
 
 | 행동 | API/SDK | 요청 | 응답 | 성공 | 실패 |
 |---|---|---|---|---|---|
-| 이메일 로그인 | `POST /api/auth/login` | email, password | token pair + user | pending route가 있으면 복귀, 없으면 홈 | `LOGIN_FAILED` 인라인 오류 |
+| 이메일 로그인 | `POST /api/auth/login` | email, password | token pair + user | pending route가 있으면 복귀, 없으면 홈 | `LOGIN_FAILED` 인라인 오류, `RATE_LIMITED` 일반 재시도 안내 |
 | 카카오 시작 | Kakao Android SDK | 없음 | kakaoAccessToken | 다음 API 호출 | SDK 취소/오류 |
 | 카카오 계정 확인 | `POST /api/auth/kakao` | kakaoAccessToken | 서버가 토큰 `app_id=KAKAO_APP_ID` 검증 후 기존 token+user / 신규 `isNewUser=true`+nullable nickname/email profile | 기존 로그인 / 신규 회원가입 | 다른 앱 토큰·무효 토큰은 `INVALID_KAKAO_TOKEN`, 외부 502/504 |
 | 게스트 둘러보기 | 로컬 | guest=true | 없음 | 홈 | 없음 |
@@ -495,6 +495,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
 | SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
+| SPEC 결정-55 | 이메일 로그인은 IP별 모든 요청 30회/고정 1분과 정규화 이메일별 실패 5회/고정 1분을 함께 제한한다. 초과는 `429 RATE_LIMITED`, 성공은 이메일 창만 초기화한다. 존재하지 않는 이메일도 dummy BCrypt 비교 후 동일한 `401 LOGIN_FAILED`를 반환한다 |
 
 ### P1 착수 시 재논의
 
