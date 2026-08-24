@@ -1,5 +1,6 @@
 package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.ItineraryApi
@@ -103,7 +104,19 @@ object FakeItineraryRepository : ItineraryRepository {
                 dateLabel = "%02d.%02d".format(date.monthValue, date.dayOfMonth),
             )
         }
-        return copy(days = aligned)
+        // 스냅샷은 **요청을 그대로 되비춘다.** fixture 의 리터럴을 두면 §5-2 저장 요청이
+        // 엉뚱한 대회·기간으로 나간다 — 화면에는 안 보여서 저장할 때야 드러난다.
+        return copy(
+            days = aligned,
+            request = this.request.copy(
+                contestId = request.contestId,
+                event = request.event.toServerName(),
+                themes = request.themes.map { it.name },
+                startDate = request.startDate.toString(),
+                endDate = request.endDate.toString(),
+                hotel = request.hotel?.let { HotelSnapshot(it.name, it.lat, it.lng) },
+            ),
+        )
     }
 
     private const val NETWORK_DELAY_MS = 600L
@@ -113,6 +126,10 @@ object FakeItineraryRepository : ItineraryRepository {
         {
           "title": "2박 3일",
           "event": "HALF",
+          "contestId": 1,
+          "themes": ["TOUR", "WELLNESS"],
+          "startDate": "2026-09-03",
+          "endDate": "2026-09-05",
           "recovery": { "label": "D+1 회복 모드", "note": "온천+짧은 산책(고강도 제외)" },
           "days": [
             {
@@ -172,7 +189,11 @@ object FakeItineraryRepository : ItineraryRepository {
     private val NORMAL_FIXTURE = """
         {
           "title": "2박 3일",
-          "event": "TEN_K",
+          "event": "K10",
+          "contestId": 1,
+          "themes": ["TOUR", "FOOD"],
+          "startDate": "2026-09-03",
+          "endDate": "2026-09-05",
           "recovery": null,
           "days": [
             {
