@@ -1,5 +1,6 @@
 package com.runninggu.app.data.local
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -190,7 +191,6 @@ class SessionStoreTest {
          * 검증이 늦게 답하는 시간. 순서가 뒤집혔다면 `restored` 가 이 시간만큼 먼저
          * 올라오므로, 기다리지 않고 확인하는 테스트가 그 틈을 잡는다.
          */
-        const val SLOW_VALIDATE_MS = 150L
     }
 
     @Test
@@ -212,19 +212,33 @@ class SessionStoreTest {
      * `RunningGuApp` 은 `restored` 가 올라온 **그 순간의** `isLoggedIn` 하나로 홈/로그인을
      * 정하고 다시 계산하지 않는다. 그러니 검증이 그 전에 끝나 있어야 한다.
      *
-     * 위 "죽었으면 로그아웃한다" 와 달리 여기서는 **기다리지 않고** 곧바로 확인한다.
-     * 검증기가 일부러 늦게 답하므로, `restored` 를 검증보다 먼저 올리도록 순서를 바꾸면
-     * 이 테스트만 실패한다 — 그 상태가 곧 "죽은 세션으로 홈이 열렸다 튕기는" 화면이다.
+     * **시간이 아니라 게이트로 본다.** 검증기를 늦게 답하게 만드는 방식은 그 지연보다
+     * 폴링이 느려지면 흔들린다. 여기서는 검증기를 아예 세워 두고 `restored` 가 아직
+     * 올라오지 않았음을 확인한 뒤 풀어 준다 — 기계가 느려도 결과가 같다(#167 리뷰).
+     *
+     * `restored` 를 검증보다 먼저 올리도록 순서를 바꾸면 이 테스트만 실패한다 — 그 상태가
+     * 곧 "죽은 세션으로 홈이 열렸다 튕기는" 화면이다.
      */
     @Test
-    fun `검증이 끝나기 전에는 시작 화면을 열지 않는다`() {
+    fun `검증이 끝나기 전에는 시작 화면을 열지 않는다`() = runBlocking {
         persistence.stored = PersistedSession(tokens, profile)
+        val gate = CompletableDeferred<Unit>()
+        validator.gate = gate
         validator.result = SessionValidation.Expired
-        validator.delayMs = SLOW_VALIDATE_MS
 
         bind()
+        withTimeout(TIMEOUT_MS) { while (validator.calls == 0) delay(POLL_MS) }
+
+        // 검증이 도는 중이다. 이때 시작 화면이 열리면 죽은 세션으로 홈이 뜬다
+        assertFalse(
+            "검증 중에 시작 화면이 열리면 홈이 번쩍였다 로그인으로 튕긴다",
+            SessionStore.restored.value,
+        )
+
+        gate.complete(Unit)
         awaitRestored()
 
+        // 열렸을 때는 이미 정리가 끝나 있어야 로그인 화면으로 곧장 간다
         assertFalse(SessionStore.isLoggedIn)
         assertNull(SessionStore.tokens)
     }
@@ -358,13 +372,13 @@ private class RecordingValidator : SessionValidator {
     var calls = 0
         private set
 
-    /** 늦게 답하게 만든다. 검증과 `restored` 의 순서를 보는 테스트가 쓴다. */
+    /** 세워 두고 싶을 때 넣는다. 완료시켜야 검증이 끝난다 — 검증과 `restored` 의 순서를 보는 테스트가 쓴다. */
     @Volatile
-    var delayMs = 0L
+    var gate: CompletableDeferred<Unit>? = null
 
     override suspend fun validate(): SessionValidation {
         calls++
-        if (delayMs > 0) delay(delayMs)
+        gate?.await()
         return result
     }
 }
