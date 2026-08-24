@@ -11,6 +11,7 @@ import com.runninggu.server.auth.application.PasswordHasher;
 import com.runninggu.server.auth.application.PasswordResetTokenManager;
 import com.runninggu.server.auth.application.VerificationMailSender;
 import com.runninggu.server.auth.infrastructure.MailDeliveryException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -209,13 +210,24 @@ class PasswordResetApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_RESET_TOKEN"));
 
-        mockMvc.perform(get("/reset-password").param("token", "<script>alert(1)</script>"))
+        String page = mockMvc.perform(
+                        get("/reset-password").param("token", "<script>alert(1)</script>"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/api/auth/password/reset")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("<script>alert(1)</script>"))));
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(page)
+                .contains(
+                        "/api/auth/password/reset",
+                        "const MIN_PASSWORD_CODE_POINTS = 8;",
+                        "const MAX_PASSWORD_UTF8_BYTES = 72;",
+                        "new TextEncoder()",
+                        "8자 이상, 영문과 숫자를 함께 써 주세요.",
+                        "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.",
+                        "aria-describedby=\"password-hint\"")
+                .doesNotContain("<script>alert(1)</script>");
     }
 
     private org.springframework.test.web.servlet.ResultActions requestReset(String email)
