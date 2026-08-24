@@ -60,7 +60,6 @@ fun AccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var editingNickname by remember { mutableStateOf(false) }
     var changingPassword by remember { mutableStateOf(false) }
     var withdrawing by remember { mutableStateOf(false) }
 
@@ -100,7 +99,7 @@ fun AccountScreen(
             SettingRow(
                 label = "닉네임",
                 value = profile.nickname,
-                onClick = { editingNickname = true },
+                onClick = viewModel::onNicknameEditOpen,
             )
             // 이메일은 읽기 전용이고, KAKAO 가입자가 미제공이면 행 자체를 숨긴다 (#59 확정).
             profile.email?.let { email ->
@@ -118,6 +117,8 @@ fun AccountScreen(
                 label = "마케팅 정보 수신",
                 description = "혜택·소식 메일을 받아요",
                 checked = state.marketingAgreed,
+                // 서버가 답할 때까지 잠근다. 스위치는 세션 값을 그리므로 그때까지 안 움직인다
+                enabled = !state.savingMarketing,
                 onToggle = viewModel::onToggleMarketing,
             )
 
@@ -145,14 +146,13 @@ fun AccountScreen(
         }
     }
 
-    if (editingNickname) {
+    // 여닫는 판단이 서버 응답에 달려 있어 ViewModel 이 들고 있다 (이슈 #164)
+    state.nicknameEdit?.let { edit ->
         NicknameDialog(
             initial = state.profile?.nickname.orEmpty(),
-            onDismiss = { editingNickname = false },
-            onConfirm = { nickname ->
-                viewModel.onNicknameChange(nickname)
-                editingNickname = false
-            },
+            edit = edit,
+            onDismiss = viewModel::onNicknameEditDismiss,
+            onConfirm = viewModel::onNicknameChange,
         )
     }
 
@@ -231,6 +231,7 @@ private fun SwitchRow(
     label: String,
     description: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
     Row(
@@ -247,30 +248,52 @@ private fun SwitchRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = { onToggle() })
+        Switch(checked = checked, enabled = enabled, onCheckedChange = { onToggle() })
     }
 }
 
 @Composable
 private fun NicknameDialog(
     initial: String,
+    edit: NicknameEdit,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var value by remember { mutableStateOf(initial) }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        // 보내는 중에는 바깥을 눌러도 닫히지 않는다 — 결과를 받을 자리가 없어진다
+        onDismissRequest = { if (!edit.saving) onDismiss() },
         title = { Text("닉네임 변경", fontWeight = FontWeight.Bold) },
         text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text("닉네임 (2~12자)") },
-                singleLine = true,
-            )
+            Column {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("닉네임 (2~12자)") },
+                    singleLine = true,
+                    enabled = !edit.saving,
+                    isError = edit.error != null,
+                )
+                // 중복 닉네임은 여기서 고쳐야 넘어간다. 스낵바로 보내면 다이얼로그가
+                // 닫힌 뒤라 처음부터 다시 입력해야 한다 (이슈 #164)
+                edit.error?.let { error ->
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text("저장") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }, enabled = !edit.saving) {
+                Text(if (edit.saving) "저장 중…" else "저장")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !edit.saving) { Text("취소") }
+        },
     )
 }
 
