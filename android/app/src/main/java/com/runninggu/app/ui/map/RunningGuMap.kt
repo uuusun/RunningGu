@@ -201,7 +201,7 @@ private class ScenePainter {
 
         drawRoute(map, scene)
         drawPins(map, metrics, scene)
-        moveCamera(map, scene)
+        moveCamera(map, metrics, scene)
 
         previous = scene
     }
@@ -264,12 +264,13 @@ private class ScenePainter {
         }
     }
 
-    private fun moveCamera(map: KakaoMap, scene: MapScene) {
+    private fun moveCamera(map: KakaoMap, metrics: DisplayMetrics, scene: MapScene) {
         when (val command = cameraCommandFor(previous, scene)) {
             is CameraCommand.FitBounds -> map.moveCamera(
                 CameraUpdateFactory.fitMapPoints(
                     command.points.map { it.toKakao() }.toTypedArray(),
-                    FIT_PADDING_PX,
+                    // 핀 절반이 바깥으로 솟는다 — 여백이 그보다 작으면 잘린다(#162)
+                    cameraFitPaddingPx(metrics.density, scene.pins.isNotEmpty()),
                 ),
             )
 
@@ -284,7 +285,6 @@ private class ScenePainter {
 
     private companion object {
         const val ROUTE_WIDTH_DP = 5f
-        const val FIT_PADDING_PX = 60
         const val CAMERA_ANIMATION_MS = 300
         const val BASE_RANK = 0L
         const val ACTIVE_RANK = 10L
