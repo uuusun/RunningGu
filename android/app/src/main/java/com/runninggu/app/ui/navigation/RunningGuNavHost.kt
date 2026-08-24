@@ -14,6 +14,7 @@ import com.runninggu.app.ui.auth.SignupScreen
 import com.runninggu.app.ui.calendar.CalendarScreen
 import com.runninggu.app.ui.course.CourseDetailScreen
 import com.runninggu.app.ui.course.CourseDetailViewModel
+import com.runninggu.app.ui.course.CourseLaunchContext
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
@@ -277,8 +278,15 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 // 빈 상태의 [조건 바꾸기] — 입력을 유지한 채 위저드로 돌아간다 (SPEC §4.10).
                 onChangeConditions = { navController.popBackStack() },
-                // TODO(AP-12): S8에 출발지(숙소)와 목표 거리를 실어 넘긴다 (SPEC §4.10 · §4.11).
-                onOpenCourses = { navController.navigate(Routes.COURSES) },
+                // 출발지(숙소)와 목표 거리를 [CourseLaunchContext] 로 넘긴다 — route 문자열에
+                // 좌표를 넣지 않는다(매핑표 D-15 개정 · AGENTS 8장).
+                onOpenCourses = { targetKm ->
+                    CourseLaunchContext.set(
+                        stay = wizardViewModel.uiState.value.stay,
+                        targetKm = targetKm,
+                    )
+                    navController.navigate(Routes.COURSES)
+                },
                 wizardViewModel = wizardViewModel,
                 viewModel = resultViewModel,
             )
