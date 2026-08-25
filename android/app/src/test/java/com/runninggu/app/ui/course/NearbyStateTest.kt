@@ -21,6 +21,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -125,6 +127,59 @@ class NearbyStateTest {
         assertEquals(listOf(CourseSource.OSM), content.degradedSources)
         assertTrue("부분 실패 안내가 없다", content.degradedMessage != null)
     }
+
+    @Test
+    fun `장소가 앞에 와도 저장 대상은 강조된 경로다`() = runTest(dispatcher) {
+        // **서버는 경로와 장소를 거리순으로 섞는다**(§6-1). 스팟이 더 가까우면 목록 1번이
+        // 스팟이고 경로는 뒤에 온다. 지도는 그 경로를 그리는데 선택이 비어 있으면 목록
+        // 카드가 강조되지 않아, 사용자는 **어느 코스인지 모르는 채 [저장]** 을 누른다(#190 리뷰).
+        val viewModel = CourseViewModel(
+            repository = StubCourses(NearbyCourses(items = listOf(place(), route()))),
+            geocodeRepository = FakeGeocodeRepository,
+            locationProvider = NoLocation,
+            savedCourseRepository = NoSavedCourses,
+        )
+
+        viewModel.onOriginChange(origin)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        // 지도가 그리는 것 · 목록에서 강조되는 것 · 저장되는 것이 **셋 다 같아야 한다**
+        assertEquals("r-1", (state.selectedItem as? NearbyItem.Route)?.routeId)
+        assertEquals("r-1", state.mappedRoute?.routeId)
+        assertEquals("r-1", state.selectedRoute?.routeId)
+        assertTrue("저장이 잠겼다", state.canSave)
+    }
+
+    @Test
+    fun `경로가 없으면 아무것도 고르지 않고 저장도 잠긴다`() = runTest(dispatcher) {
+        // 수도권 기본값이다 — 코스 0건에 걷기 스팟만 온다(§4.11 📌 · AGENTS 6장).
+        // 그릴 경로가 없으니 저장할 것도 없다.
+        val viewModel = CourseViewModel(
+            repository = StubCourses(NearbyCourses(items = listOf(place()))),
+            geocodeRepository = FakeGeocodeRepository,
+            locationProvider = NoLocation,
+            savedCourseRepository = NoSavedCourses,
+        )
+
+        viewModel.onOriginChange(origin)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.selectedItem)
+        assertNull(state.mappedRoute)
+        assertFalse("경로가 없는데 저장이 열려 있다", state.canSave)
+    }
+
+    private fun place() = NearbyItem.Place(
+        name = "여의도 한강공원",
+        distanceM = 120,
+        lat = 37.5285,
+        lng = 126.9327,
+        category = "공원",
+        address = "서울 영등포구 여의동로 330",
+        placeUrl = null,
+    )
 
     private fun route() = NearbyItem.Route(
         routeId = "r-1",

@@ -289,7 +289,8 @@ class SaveCourseTest {
         advanceUntilIdle()
 
         assertEquals(SaveCourseState.Idle, viewModel.uiState.value.save)
-        assertNull(viewModel.uiState.value.selectedItem)
+        // 고른 것은 **새 목록의 첫 경로** 로 다시 잡힌다 — 이전 선택이 남지 않는다(#190 리뷰)
+        assertEquals("r-1", (viewModel.uiState.value.selectedItem as? NearbyItem.Route)?.routeId)
     }
 
     @Test

@@ -360,10 +360,24 @@ class CourseViewModel(
             }
             // 목록이 갈렸으니 이전 저장 결과도 지운다 — 사라진 코스에 붙은 안내가 남으면 안 된다
             _uiState.update {
-                it.copy(nearby = state, selectedItem = null, save = SaveCourseState.Idle)
+                it.copy(nearby = state, selectedItem = defaultSelection(state), save = SaveCourseState.Idle)
             }
         }
     }
+
+    /**
+     * 조회 직후 무엇을 고른 상태로 둘 것인가. (#190 리뷰)
+     *
+     * **첫 경로를 명시로 고른다.** 지도는 고르기 전에도 첫 경로를 그리는데(§4.11-4 ·
+     * [CourseUiState.mappedRoute]), 선택을 비워 두면 **목록 카드는 강조되지 않는다.**
+     * 서버는 경로와 장소를 거리순으로 섞어 주므로(§6-1) 그 경로가 목록 1번이라는 보장이
+     * 없다 — 스팟이 앞에 오면 사용자는 **어느 코스인지 모르는 채 [저장]** 을 누른다.
+     *
+     * 경로가 하나도 없으면(수도권 기본 · §4.11 📌) null 이다. 그때는 번호 핀이 서고
+     * [저장] 은 잠긴다 — 그릴 경로가 없으니 저장할 것도 없다.
+     */
+    private fun defaultSelection(state: NearbyState): NearbyItem.Route? =
+        (state as? NearbyState.Content)?.items?.filterIsInstance<NearbyItem.Route>()?.firstOrNull()
 
     fun loadRegions() {
         viewModelScope.launch {
@@ -379,19 +393,15 @@ class CourseViewModel(
     }
 
     companion object {
-        /**
-         * 백엔드가 준비되면 [com.runninggu.app.data.repository.RemoteCourseRepository] 로 바꾼다.
-         * 화면은 안 건드린다 — Repository 인터페이스만 보기 때문이다(AGENTS 4장).
-         */
         /** 좌표를 그대로 보여줄 수는 없다. 목업도 "내 위치" 로 적는다. */
         private const val MY_LOCATION_LABEL = "내 위치"
 
         /**
-         * 출발지 검색과 **지역별 목록**이 서버를 본다. (AP-14 · AP-12)
+         * **세 갈래가 다 서버를 본다.** (AP-14 · AP-12)
          *
-         * [내 주변]만 아직 스텁이다 — `/courses/near` 가 AP-25 에 묶여 있어서,
-         * 없는 엔드포인트를 부르면 화면이 오류만 보여준다. 지역별·지역 칩은 #156 으로
-         * 섰으므로 서버를 본다. 가르는 자리는 [ServiceLocator.courseRepository] 다.
+         * 출발지 검색과 지역별 목록은 #156, [내 주변]은 `/courses/near` 가 #174
+         * (AP-25 OSM 경로 생성)로 서면서 붙었다. 그전까지 `near` 만 스텁으로 보내던
+         * 한시적인 조합은 예정대로 지웠다(#190).
          */
         fun factory(
             repository: CourseRepository = ServiceLocator.courseRepository,
