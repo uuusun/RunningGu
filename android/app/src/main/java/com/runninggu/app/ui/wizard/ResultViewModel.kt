@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.ui.runCatchingUnlessCancelled
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.repository.FakeItineraryRepository
@@ -230,7 +231,7 @@ class ResultViewModel(
             return
         }
         viewModelScope.launch {
-            val outcome = runCatching { poiRepository.search(sheet.category, lat, lng) }
+            val outcome = runCatchingUnlessCancelled { poiRepository.search(sheet.category, lat, lng) }
             _uiState.update { state ->
                 // 그 사이 닫혔거나 새 조회가 시작됐으면 낡은 응답을 버린다. 대상 비교가 아니라
                 // 세대 비교다 — 같은 대상을 닫았다 다시 열어도 이전 응답이 새 결과를 못 덮는다.
@@ -268,7 +269,7 @@ class ResultViewModel(
             _uiState.update {
                 it.copy(phase = ResultUiState.Phase.LOADING, errorMessage = null)
             }
-            val outcome = runCatching { repository.generate(request) }
+            val outcome = runCatchingUnlessCancelled { repository.generate(request) }
             _uiState.value = outcome.fold(
                 onSuccess = { result ->
                     ResultUiState(

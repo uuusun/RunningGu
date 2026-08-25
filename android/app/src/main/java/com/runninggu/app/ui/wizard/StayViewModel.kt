@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.ui.runCatchingUnlessCancelled
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.domain.PoiCategory
@@ -92,7 +93,7 @@ class StayViewModel(
         val (lat, lng) = center ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(phase = StayUiState.Phase.LOADING, errorMessage = null) }
-            val outcome = runCatching {
+            val outcome = runCatchingUnlessCancelled {
                 repository.search(PoiCategory.LODGING, lat, lng, query)
             }
             _uiState.update { state ->

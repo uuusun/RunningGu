@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.my
 
+import com.runninggu.app.ui.runCatchingUnlessCancelled
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.remote.ApiErrorCode
@@ -126,7 +127,7 @@ class AccountViewModel(
         nicknameJob?.cancel()
         nicknameJob = viewModelScope.launch {
             _uiState.update { it.copy(nicknameEdit = NicknameEdit(saving = true)) }
-            val result = runCatching { memberRepository.updateNickname(trimmed) }
+            val result = runCatchingUnlessCancelled { memberRepository.updateNickname(trimmed) }
             result.fold(
                 onSuccess = { profile ->
                     // **확인과 적용을 한 임계구역에서 한다**(#170 리뷰). 세대를 밖에서 비교한
@@ -176,7 +177,7 @@ class AccountViewModel(
         marketingJob?.cancel()
         marketingJob = viewModelScope.launch {
             _uiState.update { it.copy(savingMarketing = true) }
-            val result = runCatching { memberRepository.updateMarketing(next) }
+            val result = runCatchingUnlessCancelled { memberRepository.updateMarketing(next) }
             result.fold(
                 onSuccess = { updated ->
                     // 확인과 적용을 한 임계구역에서 (#170 리뷰). 못 넣었으면 남의 결과다.
