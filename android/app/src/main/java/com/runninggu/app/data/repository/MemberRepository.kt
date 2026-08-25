@@ -4,7 +4,9 @@ import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.remote.MeApi
 import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.remote.dto.PasswordChangeRequest
+import com.runninggu.app.data.remote.dto.ReauthRequest
 import com.runninggu.app.data.remote.dto.UpdateMarketingRequest
 import com.runninggu.app.data.remote.dto.UpdateNicknameRequest
 import com.runninggu.app.data.remote.mapper.toSessionProfile
@@ -40,6 +42,28 @@ interface MemberRepository {
      * 전자는 다시 입력할 일이고 후자는 다른 비밀번호를 고를 일이다.
      */
     suspend fun updatePassword(currentPassword: String, newPassword: String): AuthTokens
+
+    /**
+     * 탈퇴 재인증. **가입한 수단과 같은 것으로** 한다. (§2-2 · D-23)
+     *
+     * 돌려주는 것은 **탈퇴에만 쓰는 5분 토큰**이다. [withdraw] 의 헤더로만 넘기고 저장하지
+     * 않는다 — 로그에도 남기지 않는다(명세 명시 · AGENTS 8장).
+     *
+     * 비밀번호·카카오 토큰이 틀리면 `REAUTH_FAILED`, 가입한 것과 다른 수단이면
+     * `REAUTH_PROVIDER_MISMATCH` 가 올라온다.
+     */
+    suspend fun reauth(provider: LoginProvider, password: String? = null, kakaoAccessToken: String? = null): String
+
+    /**
+     * 회원 탈퇴. (§2-2 · SPEC §4.13 · D-23)
+     *
+     * **서버가 지운 뒤에 앱이 정리한다.** 성공하면 서버가 refresh token 전부와 동의·찜·동선·
+     * 저장 코스·기록을 지운다. 호출부는 **그 뒤에** 세션과 로컬 캐시를 지운다 — 먼저 로그아웃
+     * 하면 탈퇴가 안 된 채 세션만 사라져서, 사용자는 지웠다고 믿는데 계정이 남는다.
+     *
+     * [reauth] 토큰이 만료(5분)면 `INVALID_REAUTH_TOKEN` 이다. 재인증부터 다시 한다.
+     */
+    suspend fun withdraw(reauthToken: String)
 }
 
 class RemoteMemberRepository(private val api: MeApi) : MemberRepository {
@@ -59,4 +83,20 @@ class RemoteMemberRepository(private val api: MeApi) : MemberRepository {
             )
             AuthTokens(accessToken = tokens.accessToken, refreshToken = tokens.refreshToken)
         }
+
+    override suspend fun reauth(
+        provider: LoginProvider,
+        password: String?,
+        kakaoAccessToken: String?,
+    ): String = apiCall {
+        api.reauth(
+            ReauthRequest(
+                provider = provider.name,
+                password = password,
+                kakaoAccessToken = kakaoAccessToken,
+            ),
+        ).reauthToken
+    }
+
+    override suspend fun withdraw(reauthToken: String) = apiCall { api.withdraw(reauthToken) }
 }

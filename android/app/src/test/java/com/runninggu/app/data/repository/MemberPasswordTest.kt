@@ -100,6 +100,14 @@ private class RecordingMeApi(
         return requireNotNull(response)
     }
 
+    override suspend fun reauth(
+        body: com.runninggu.app.data.remote.dto.ReauthRequest,
+    ): com.runninggu.app.data.remote.dto.ReauthResponseDto =
+        throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
+
+    override suspend fun withdraw(reauthToken: String) =
+        throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
+
     override suspend fun me(): MeDto = throw UnsupportedOperationException("이 테스트는 안 부른다")
 
     override suspend fun updateNickname(body: UpdateNicknameRequest): MeDto =

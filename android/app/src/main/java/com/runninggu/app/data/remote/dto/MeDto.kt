@@ -72,3 +72,30 @@ data class PasswordChangeRequest(val currentPassword: String, val newPassword: S
  */
 @Serializable
 data class PasswordChangeResponseDto(val accessToken: String, val refreshToken: String)
+
+/**
+ * `POST /api/me/reauth` 요청 본문. (§2-2 · D-23)
+ *
+ * **가입한 수단과 같은 것으로만 재인증한다.** EMAIL 은 현재 비밀번호, KAKAO 는 SDK 가
+ * 방금 발급한 액세스 토큰이다. 다른 수단을 보내면 `409 REAUTH_PROVIDER_MISMATCH` 다.
+ *
+ * 한 계정은 수단을 하나만 갖는다(결정-22 개정). 그래서 두 필드가 다 nullable 이고 둘 중
+ * 하나만 채운다 — 화면이 `loginProvider` 를 보고 고른다.
+ */
+@Serializable
+data class ReauthRequest(
+    /** `EMAIL` 또는 `KAKAO`. */
+    val provider: String,
+    val password: String? = null,
+    val kakaoAccessToken: String? = null,
+)
+
+/**
+ * `POST /api/me/reauth` 응답 — **탈퇴 전용 5분 토큰**. (§2-2)
+ *
+ * `DELETE /api/me` 의 `X-Reauth-Token` 헤더로만 쓴다. 다른 요청에 붙이지 않는다.
+ *
+ * **로그에 남기지 않는다**(명세 명시 · AGENTS 8장). 액세스 토큰과 같은 급으로 다룬다.
+ */
+@Serializable
+data class ReauthResponseDto(val reauthToken: String, val expiresInSec: Int = 0)

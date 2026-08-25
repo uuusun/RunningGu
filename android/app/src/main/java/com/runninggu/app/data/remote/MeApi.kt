@@ -3,11 +3,16 @@ package com.runninggu.app.data.remote
 import com.runninggu.app.data.remote.dto.MeDto
 import com.runninggu.app.data.remote.dto.PasswordChangeRequest
 import com.runninggu.app.data.remote.dto.PasswordChangeResponseDto
+import com.runninggu.app.data.remote.dto.ReauthRequest
+import com.runninggu.app.data.remote.dto.ReauthResponseDto
 import com.runninggu.app.data.remote.dto.UpdateMarketingRequest
 import com.runninggu.app.data.remote.dto.UpdateNicknameRequest
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.PATCH
+import retrofit2.http.POST
 import retrofit2.http.PUT
 
 /**
@@ -49,4 +54,31 @@ interface MeApi {
      */
     @PUT("me/password")
     suspend fun updatePassword(@Body body: PasswordChangeRequest): PasswordChangeResponseDto
+
+    /**
+     * 탈퇴 재인증 — **가입한 수단과 같은 것으로** 한다. (§2-2 · D-23)
+     *
+     * 5분짜리 [ReauthResponseDto.reauthToken] 을 준다. 실패는 `401 REAUTH_FAILED`,
+     * 다른 수단을 보내면 `409 REAUTH_PROVIDER_MISMATCH` 다.
+     */
+    @POST("me/reauth")
+    suspend fun reauth(@Body body: ReauthRequest): ReauthResponseDto
+
+    /**
+     * 회원 탈퇴. `204`. (§2-2 · D-23)
+     *
+     * **[reauth] 로 받은 토큰이 헤더로 필요하다.** 없거나 만료면 `401 INVALID_REAUTH_TOKEN`
+     * 이다 — 5분이 지나면 재인증부터 다시 한다.
+     *
+     * 성공하면 서버가 refresh token 전부와 동의·찜·동선·저장 코스·기록을 지운다. **앱은
+     * 그 뒤에 세션과 로컬 캐시를 지운다** — 서버가 지우기 전에 로그아웃하면 탈퇴가 안 된
+     * 채 세션만 사라진다.
+     */
+    @DELETE("me")
+    suspend fun withdraw(@Header(REAUTH_HEADER) reauthToken: String)
+
+    companion object {
+        /** 탈퇴 전용 헤더 이름. 서버 `MemberAccountController.REAUTH_HEADER` 와 같아야 한다. */
+        const val REAUTH_HEADER = "X-Reauth-Token"
+    }
 }
