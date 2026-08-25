@@ -197,6 +197,31 @@ class SavedItinerariesStateTest {
     }
 
     @Test
+    fun `다음 장을 받는 사이에 지운 동선은 되살아나지 않는다`() = runTest(dispatcher) {
+        // 응답이 요청 전에 잡아 둔 목록을 통째 덮으면, 그사이 지운 카드가
+        // 사라졌다 다시 나타난다 (#181 리뷰)
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        repository.gate = CompletableDeferred()
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        viewModel.onDeleteItinerary("3")
+        advanceUntilIdle()
+        val afterDelete = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertEquals("삭제가 반영되지 않았다", 19, afterDelete.itineraries.size)
+
+        repository.gate?.complete(Unit)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertFalse("지운 카드가 되살아났다", state.itineraries.any { it.id == "3" })
+        assertEquals("받은 다음 장이 안 붙었거나 삭제가 되돌려졌다", 39, state.itineraries.size)
+    }
+
+    @Test
     fun `게스트는 서버를 부르지 않는다`() = runTest(dispatcher) {
         // 마이 진입 자체가 로그인 필요다(결정-4). 헛 왕복을 만들지 않는다
         val stub = StubItineraries(emptyList())

@@ -365,6 +365,9 @@ class MyViewModel(
      *
      * 실패해도 **이미 받은 목록은 두고** 문구만 붙인다 — 보이던 게 사라지면 안 된다.
      * 버튼은 다시 눌리는 상태로 돌아가므로 그 자리에서 재시도할 수 있다.
+     *
+     * 응답은 **붙일 때의 목록** 위에 얹는다(#181 리뷰). 요청 전에 잡아 둔 목록으로
+     * 통째 덮으면 그사이 [삭제]로 뺀 카드가 되살아난다.
      */
     fun loadMoreItineraries() {
         val current = _uiState.value.itineraries as? SavedItinerariesState.Content ?: return
@@ -375,22 +378,33 @@ class MyViewModel(
             _uiState.update {
                 it.copy(itineraries = current.copy(loadingMore = true, moreMessage = null))
             }
-            val state = try {
-                val next = itineraryRepository.list(page = itinerariesPage + 1)
-                itinerariesPage += 1
-                current.copy(
-                    itineraries = current.itineraries + next.itineraries,
-                    hasNext = next.hasNext,
-                    // 총 건수는 매 응답에 온다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
-                    totalElements = next.totalElements,
-                    loadingMore = false,
-                    moreMessage = null,
-                )
+            val next = try {
+                itineraryRepository.list(page = itinerariesPage + 1)
             } catch (e: ApiException) {
-                current.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
+                null
             }
+            if (next != null) itinerariesPage += 1
             if (epoch != sessionEpoch) return@launch
-            _uiState.update { it.copy(itineraries = state) }
+            _uiState.update { state ->
+                // 붙일 자리는 "지금" 의 목록이다. 그사이 전부 지워 목록이 아니게 됐으면
+                // 받은 장을 버린다 — 사용자가 지운 것을 되돌려 보이는 것보다 낫다.
+                val shown = state.itineraries as? SavedItinerariesState.Content
+                    ?: return@update state
+                state.copy(
+                    itineraries = if (next == null) {
+                        shown.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
+                    } else {
+                        shown.copy(
+                            itineraries = shown.itineraries + next.itineraries,
+                            hasNext = next.hasNext,
+                            // 총 건수는 매 응답에 온다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
+                            totalElements = next.totalElements,
+                            loadingMore = false,
+                            moreMessage = null,
+                        )
+                    },
+                )
+            }
         }
     }
 
