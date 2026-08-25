@@ -2,8 +2,14 @@ package com.runninggu.app.data.remote
 
 import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
+import com.runninggu.app.data.remote.dto.ItinerarySummaryDto
+import com.runninggu.app.data.remote.dto.PageDto
 import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * 동선 API. (API 명세 §5 · 생성은 공개)
@@ -21,4 +27,15 @@ interface ItineraryApi {
      */
     @POST("itineraries/generate")
     suspend fun generate(@Body body: GenerateItineraryRequestDto): GenerateItineraryResponse
+
+    /** 내 동선 목록. Pageable 이다 (§5-4 · §0-4). */
+    @GET("itineraries")
+    suspend fun list(
+        @Query("page") page: Int,
+        @Query("size") size: Int,
+    ): PageDto<ItinerarySummaryDto>
+
+    /** 저장 동선 삭제. `204` 다 (§5-6). */
+    @DELETE("itineraries/{id}")
+    suspend fun delete(@Path("id") id: Long)
 }

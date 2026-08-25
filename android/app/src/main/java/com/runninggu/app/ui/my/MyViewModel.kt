@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.model.SavedCourse
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.repository.FavoriteRepository
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -28,25 +30,6 @@ enum class MySegment(val label: String) {
 }
 
 /**
- * 저장한 동선 카드 한 장. (SPEC §4.13 [동선] · API 명세 §5-3 목록)
- *
- * TODO(AP-14): `GET /api/itineraries` 응답 DTO 매핑으로 교체한다. 회복 배지 등 카드
- *  표시 필드는 TBD-DB-04(저장 snapshot 정책, 이슈 #55) 결정에 따라 달라질 수 있다.
- */
-data class SavedItinerary(
-    val id: String,
-    /** "{지역} {당일치기|n박 n일}" */
-    val title: String,
-    val raceName: String,
-    val event: String,
-    /** 회복 배지 라벨. noHard 종목이 아니면 null. */
-    val recoveryLabel: String?,
-    /** "MM.DD~MM.DD" */
-    val period: String,
-    val placeCount: Int,
-)
-
-/**
  * 저장한 러닝코스는 `data/model` 의 [SavedCourse] 를 그대로 쓴다. P0는 saved만이다
  * (SPEC §4.13 · 결정 D-25).
  *
@@ -65,7 +48,7 @@ data class SavedItinerary(
 data class MyUiState(
     val profile: SessionProfile? = null,
     val segment: MySegment = MySegment.ITINERARY,
-    val itineraries: List<SavedItinerary> = emptyList(),
+    val itineraries: SavedItinerariesState = SavedItinerariesState.Loading,
     val courses: SavedCoursesState = SavedCoursesState.Loading,
     val favorites: FavoriteRacesState = FavoriteRacesState.Loading,
     /**
@@ -147,16 +130,54 @@ sealed interface SavedCoursesState {
 }
 
 /**
+ * [동선] 세그먼트의 상태. (SPEC §3-5 · 매핑표 S10 · API 명세 §5-4)
+ *
+ * **[SavedCoursesState] 와 같은 모양이다.** 같은 Pageable 목록에 [더 보기] 도 같은데
+ * 두 세그먼트가 다른 규칙으로 갈라지면 다음 사람이 어느 쪽을 믿을지 모른다.
+ *
+ * 목록만 들고 있던 때는 조회 중이거나 서버가 실패해도 **"저장한 동선이 없어요"** 가
+ * 떴다 — 저장 코스에서 #107 이 고친 것과 같은 결함이 동선 쪽에 남아 있었다.
+ */
+sealed interface SavedItinerariesState {
+
+    data object Loading : SavedItinerariesState
+
+    data class Content(
+        /** 지금까지 받아온 것을 **이어 붙인** 목록. 다음 장을 받으면 뒤에 붙는다. */
+        val itineraries: List<SavedItinerary>,
+        val hasNext: Boolean,
+        /** 저장한 동선 전체 수. `itineraries.size` 가 아니다 — 한 번에 20건씩 온다. */
+        val totalElements: Long,
+        /** [더 보기] 로 다음 장을 받는 중. 목록은 그대로 두고 버튼만 바뀐다. */
+        val loadingMore: Boolean = false,
+        /** 다음 장을 못 받았다. **이미 받은 목록은 지우지 않는다.** */
+        val moreMessage: String? = null,
+    ) : SavedItinerariesState {
+        /** 더 받을 게 남았고 지금 받는 중이 아니다. */
+        val canLoadMore: Boolean get() = hasNext && !loadingMore
+    }
+
+    /** 정상 조회했는데 0건. "저장한 동선이 없어요." */
+    data object Empty : SavedItinerariesState
+
+    /** 못 불러왔다. 재시도를 준다. */
+    data class Error(val message: String) : SavedItinerariesState
+}
+
+/**
  * S10 마이. (SPEC §4.13 · AP-13)
  *
- * 저장소 SSOT는 서버다. **코스·찜 목록은 서버를 본다**(#107 · #163). 동선만 아직
- * 데모 목록이다 — TODO(AP-14): `GET /api/itineraries` 로 교체한다.
+
+ * 저장소 SSOT 는 서버다 — **동선·코스·찜 목록을 모두 서버가 준다**(§5-4 · §7-A · §7-C).
  *
  * 찜은 두 갈래로 읽는다. **목록은 `GET /me/favorites`**(비활성도 유지 §7-C), **하트는
  * [FavoriteStore]** 다 — S2 카드·S3 상세와 같은 값이어야 하기 때문이다.
+ *
+ * TODO(#105): Room 읽기 캐시가 정해지면 조회 앞에 붙인다.
  */
 class MyViewModel(
     private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+    private val itineraryRepository: ItineraryRepository = ServiceLocator.itineraryRepository,
     private val favoriteRepository: FavoriteRepository = ServiceLocator.favoriteRepository,
 ) : ViewModel() {
 
@@ -176,14 +197,19 @@ class MyViewModel(
                 sessionEpoch += 1
                 coursesJob?.cancel()
                 coursesJob = null
+                itinerariesJob?.cancel()
+                itinerariesJob = null
                 favoritesJob?.cancel()
                 favoritesJob = null
                 resumedOnce = false
                 _uiState.update {
                     it.copy(
                         profile = profile,
-                        // 데모 목록은 로그인 상태에서만 보인다 — 게스트 화면 검증을 막지 않게.
-                        itineraries = if (profile != null) SAMPLE_ITINERARIES else emptyList(),
+                        itineraries = if (profile == null) {
+                            SavedItinerariesState.Empty
+                        } else {
+                            SavedItinerariesState.Loading
+                        },
                         // 앞 계정의 목록을 그대로 두지 않는다. 게스트면 빈 목록, 로그인이면
                         // 곧 부를 조회의 로딩으로 시작한다.
                         courses = if (profile == null) SavedCoursesState.Empty else SavedCoursesState.Loading,
@@ -200,6 +226,7 @@ class MyViewModel(
                 // 찜 id 를 마지막 장까지 받는 동안 동선·코스 목록이 시작조차 못 한다.
                 viewModelScope.launch { FavoriteStore.refresh() }
                 loadCourses() // 게스트면 스스로 빠진다
+                loadItineraries()
                 loadFavorites()
             }
         }
@@ -222,6 +249,7 @@ class MyViewModel(
     fun onResume() {
         if (resumedOnce) {
             loadCourses()
+            loadItineraries()
             loadFavorites()
         }
         resumedOnce = true
@@ -242,6 +270,18 @@ class MyViewModel(
 
     /** 다음에 받을 장. [loadCourses] 가 0 으로 되돌리고 [loadMoreCourses] 가 올린다. */
     private var coursesPage = 0
+
+    /** 진행 중인 저장 동선 조회. */
+    private var itinerariesJob: Job? = null
+    private var itinerariesPage = 0
+
+    /**
+     * 삭제 뒤 범위 재조회의 세대. **가장 나중에 뜬 것만 화면에 적용한다.** (#181 리뷰)
+     *
+     * 서로 다른 동선을 연속으로 지우면 재조회가 겹친다. 먼저 뜬 조회는 **그 삭제가 반영되기
+     * 전 목록**을 들고 오므로, 늦게 도착해 적용되면 이미 지운 카드가 다시 뜬다.
+     */
+    private var itineraryReloadGeneration = 0
 
     /** 진행 중인 찜 목록 조회. 세션이 바뀌거나 다시 부를 때 끊는다. */
     private var favoritesJob: Job? = null
@@ -286,6 +326,93 @@ class MyViewModel(
             // 기다리는 사이 계정이 바뀌었으면 버린다 (#107 리뷰).
             if (epoch != sessionEpoch) return@launch
             _uiState.update { it.copy(courses = state) }
+        }
+    }
+
+    /**
+     * 저장 동선 목록 — 첫 장부터 다시. (API 명세 §5-4 · SPEC §4.13 · §3-5)
+     *
+     * [loadCourses] 와 같은 규칙이다 — 세그먼트 안에서만 실패를 그리고, 세대가 바뀌면
+     * 결과를 버린다. 게스트 차단도 여기서 한다.
+     *
+     * **비활성 대회의 동선도 걸러 내지 않는다**(§5-4). 사용자가 저장한 것이 말없이
+     * 사라지면 안 된다 — 카드가 흐려지고 안내가 붙을 뿐이다.
+     */
+    fun loadItineraries() {
+        if (_uiState.value.profile == null) return
+        val epoch = sessionEpoch
+        itinerariesJob?.cancel()
+        itinerariesPage = 0
+        itinerariesJob = viewModelScope.launch {
+            _uiState.update { it.copy(itineraries = SavedItinerariesState.Loading) }
+            val state = try {
+                val page = itineraryRepository.list(page = 0)
+                if (page.itineraries.isEmpty()) {
+                    SavedItinerariesState.Empty
+                } else {
+                    SavedItinerariesState.Content(
+                        itineraries = page.itineraries,
+                        hasNext = page.hasNext,
+                        totalElements = page.totalElements,
+                    )
+                }
+            } catch (e: ApiException) {
+                SavedItinerariesState.Error("저장한 동선을 불러오지 못했어요.")
+            }
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { it.copy(itineraries = state) }
+        }
+    }
+
+    /**
+     * [더 보기] — 다음 장을 받아 **뒤에 이어 붙인다**. (API 명세 §0-4 Pageable)
+     *
+     * [loadMoreCourses] 와 같은 규칙이다. **받는 동안 버튼을 잠그고 "불러오는 중" 을
+     * 띄운다**(§3-5) — 눌린 것이 화면에 보이지 않으면 사용자는 안 눌렸다고 여기고 또 누른다.
+     * 중복 요청은 `canLoadMore` 가 막지만, 그건 화면이 할 말을 대신해 주지 않는다(#181 리뷰).
+     *
+     * 실패해도 **이미 받은 목록은 두고** 문구만 붙인다 — 보이던 게 사라지면 안 된다.
+     * 버튼은 다시 눌리는 상태로 돌아가므로 그 자리에서 재시도할 수 있다.
+     *
+     * 응답은 **붙일 때의 목록** 위에 얹는다(#181 리뷰). 요청 전에 잡아 둔 목록으로
+     * 통째 덮으면 그사이 [삭제]로 뺀 카드가 되살아난다.
+     */
+    fun loadMoreItineraries() {
+        val current = _uiState.value.itineraries as? SavedItinerariesState.Content ?: return
+        if (!current.canLoadMore) return
+        val epoch = sessionEpoch
+        itinerariesJob?.cancel()
+        itinerariesJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(itineraries = current.copy(loadingMore = true, moreMessage = null))
+            }
+            val next = try {
+                itineraryRepository.list(page = itinerariesPage + 1)
+            } catch (e: ApiException) {
+                null
+            }
+            if (next != null) itinerariesPage += 1
+            if (epoch != sessionEpoch) return@launch
+            _uiState.update { state ->
+                // 붙일 자리는 "지금" 의 목록이다. 그사이 전부 지워 목록이 아니게 됐으면
+                // 받은 장을 버린다 — 사용자가 지운 것을 되돌려 보이는 것보다 낫다.
+                val shown = state.itineraries as? SavedItinerariesState.Content
+                    ?: return@update state
+                state.copy(
+                    itineraries = if (next == null) {
+                        shown.copy(loadingMore = false, moreMessage = "더 불러오지 못했어요.")
+                    } else {
+                        shown.copy(
+                            itineraries = shown.itineraries + next.itineraries,
+                            hasNext = next.hasNext,
+                            // 총 건수는 매 응답에 온다 — 사이에 늘거나 줄었을 수 있어 최신값을 쓴다
+                            totalElements = next.totalElements,
+                            loadingMore = false,
+                            moreMessage = null,
+                        )
+                    },
+                )
+            }
         }
     }
 
@@ -397,10 +524,116 @@ class MyViewModel(
         }
     }
 
-    /** [동선] 카드의 [삭제]. (SPEC §4.13 🔧정책) */
-    fun onDeleteItinerary(id: String) {
+    /** 버려진 [더 보기] 가 켜 둔 잠금을 푼다. 목록은 건드리지 않는다. */
+    private fun unlockItineraryLoadMore() {
         _uiState.update { state ->
-            state.copy(itineraries = state.itineraries.filterNot { it.id == id })
+            val shown = state.itineraries as? SavedItinerariesState.Content ?: return@update state
+            state.copy(itineraries = shown.copy(loadingMore = false))
+        }
+    }
+
+    /**
+     * [동선] 카드의 [삭제]. (`DELETE /api/itineraries/{id}` · §5-6 · SPEC §4.13 🔧정책)
+     *
+     * **서버가 지운 뒤에 목록에서 뺀다.** 먼저 빼고 실패하면 되돌려야 하는데, 그러면
+     * 사라졌다 다시 나타나는 카드를 보게 된다. 삭제는 하트처럼 연타하는 조작이 아니라
+     * 왕복을 기다려도 된다.
+     *
+     * 지운 다음에는 **보고 있던 범위를 서버에서 다시 받는다**(#181 리뷰). 목록에서 빼는
+     * 것만으로 끝내면 안 되는 이유는 [reloadShownItineraries] 에 적었다.
+     */
+    fun onDeleteItinerary(id: String) {
+        val serverId = id.toLongOrNull() ?: return
+        val epoch = sessionEpoch
+        viewModelScope.launch {
+            try {
+                itineraryRepository.delete(serverId)
+            } catch (e: ApiException) {
+                _message.value = "동선을 삭제하지 못했어요."
+                return@launch
+            }
+            if (epoch != sessionEpoch) return@launch
+            // 왕복을 기다린 뒤라 카드는 곧바로 뺀다 — 재조회를 기다리는 동안 지운 것이
+            // 남아 있으면 삭제가 안 먹은 것처럼 보인다.
+            _uiState.update { state ->
+                val shown = state.itineraries as? SavedItinerariesState.Content
+                    ?: return@update state
+                val left = shown.itineraries.filterNot { it.id == id }
+                state.copy(
+                    itineraries = if (left.isEmpty()) {
+                        SavedItinerariesState.Empty
+                    } else {
+                        shown.copy(itineraries = left, totalElements = shown.totalElements - 1)
+                    },
+                )
+            }
+            reloadShownItineraries(epoch)
+        }
+    }
+
+    /**
+     * 삭제 뒤 **보고 있던 범위(0장~[itinerariesPage])를 다시 받아** 목록을 서버와 맞춘다.
+     *
+     * `GET /api/itineraries` 는 `createdAt DESC, id DESC` 의 **offset Pageable** 이다(§0-4).
+     * 앞 장에서 하나가 빠지면 뒤 항목이 전부 한 칸씩 당겨지므로, 지우기 전 기준으로 다음
+     * 장을 받으면 **경계에 있던 항목 하나가 조용히 건너뛰어진다.** 화면에서 지운 것만
+     * 빼고 두면 그 누락이 전체 새로고침 전까지 남는다(#181 리뷰).
+     *
+     * 진행 중이던 [loadMoreItineraries] 는 **버린다.** 그 응답은 삭제 전 offset 으로 뜬
+     * 것이라 이어 붙이면 같은 누락이 생긴다 — 사용자는 [더 보기] 를 다시 누르면 되고,
+     * 그때는 일관된 범위 위에서 요청이 나간다.
+     *
+     * 재조회가 실패하면 **지운 것만 반영된 목록을 그대로 두고** 알린다. 보이던 목록을
+     * 오류로 덮으면 삭제 하나 때문에 화면이 통째로 사라진다.
+     *
+     * 이때 **[더 보기] 잠금은 반드시 푼다**(#181 리뷰). 버리는 load-more 가 켜 둔
+     * `loadingMore` 가 그대로 남으면 `canLoadMore` 가 false 라, 사용자는 화면을 나갔다
+     * 오기 전까지 다음 장을 다시 받을 수 없다.
+     */
+    private fun reloadShownItineraries(epoch: Int) {
+        val pages = itinerariesPage
+        val generation = ++itineraryReloadGeneration
+        // 진행 중이던 [더 보기] 도, 앞선 재조회도 함께 끊는다.
+        itinerariesJob?.cancel()
+        itinerariesJob = viewModelScope.launch {
+            reloadShownItineraries(epoch = epoch, pages = pages, generation = generation)
+        }
+    }
+
+    private suspend fun reloadShownItineraries(epoch: Int, pages: Int, generation: Int) {
+        val collected = mutableListOf<SavedItinerary>()
+        var hasNext = false
+        var totalElements = 0L
+        try {
+            for (page in 0..pages) {
+                val received = itineraryRepository.list(page = page)
+                collected += received.itineraries
+                hasNext = received.hasNext
+                totalElements = received.totalElements
+            }
+        } catch (e: ApiException) {
+            _message.value = "목록을 새로 고치지 못했어요."
+            if (epoch == sessionEpoch && generation == itineraryReloadGeneration) {
+                unlockItineraryLoadMore()
+            }
+            return
+        }
+        if (epoch != sessionEpoch) return
+        // **가장 나중에 뜬 재조회만 적용한다.** `cancel()` 로는 부족하다 — 응답이 이미
+        // 도착한 뒤에는 중단점이 없어 취소가 닿지 않는다(#181 리뷰).
+        if (generation != itineraryReloadGeneration) return
+        _uiState.update { state ->
+            state.copy(
+                itineraries = if (collected.isEmpty()) {
+                    SavedItinerariesState.Empty
+                } else {
+                    SavedItinerariesState.Content(
+                        itineraries = collected,
+                        hasNext = hasNext,
+                        totalElements = totalElements,
+                    )
+                },
+            )
         }
     }
 
@@ -432,28 +665,4 @@ class MyViewModel(
         _message.value = null
     }
 
-    private companion object {
-        /** TODO(AP-14): `GET /api/itineraries`·`GET /api/me/courses` 로 교체하는 데모 데이터. */
-        val SAMPLE_ITINERARIES = listOf(
-            SavedItinerary(
-                id = "it_1",
-                title = "서울 2박 3일",
-                raceName = "서울 한강 러닝 페스티벌",
-                event = "10K",
-                recoveryLabel = null,
-                period = "09.05~09.07",
-                placeCount = 10,
-            ),
-            SavedItinerary(
-                id = "it_2",
-                title = "세종 1박 2일",
-                raceName = "세종 호수공원 마라톤",
-                event = "하프",
-                recoveryLabel = "회복 모드",
-                period = "09.08~09.09",
-                placeCount = 6,
-            ),
-        )
-        // 저장 코스는 SavedCourseRepository 가 준다 — 데모 목록을 여기 두지 않는다.
-    }
 }

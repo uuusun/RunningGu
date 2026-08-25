@@ -4,9 +4,11 @@ import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryRequestSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.model.RecoveryNote
+import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.data.remote.dto.BlockDto
 import com.runninggu.app.data.remote.dto.DayDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
+import com.runninggu.app.data.remote.dto.ItinerarySummaryDto
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
@@ -66,3 +68,31 @@ private fun BlockDto.toDomain(dayIndex: Int, blockIndex: Int): ItineraryBlock {
 /** 서버 Enum(대문자)을 화면 분류로. 모르는 값은 관광지로 떨어뜨린다. (API 명세 부록 C) */
 private fun categoryOf(raw: String): BlockCategory =
     BlockCategory.entries.firstOrNull { it.name == raw } ?: BlockCategory.TOUR
+
+/**
+ * 목록 항목 → 카드. (API 명세 §5-4 · SPEC §4.13)
+ *
+ * **표시 문자열은 여기서 만든다.** 화면이 날짜를 조립하면 같은 규칙이 여러 곳에 흩어지고,
+ * KST 해석이 매퍼 밖으로 새는 자리가 된다(AGENTS 2장-4).
+ *
+ * `id` 는 문자열로 바꾼다 — 화면·내비게이션 키가 문자열이다(#52 리뷰). 삭제는 서버가 준
+ * `Long` 이 필요해서 호출부가 다시 파싱한다.
+ */
+fun ItinerarySummaryDto.toSavedItinerary(): SavedItinerary = SavedItinerary(
+    id = id.toString(),
+    title = title,
+    raceName = contestName,
+    // 서버 enum(`HALF`·`K10`)을 그대로 두면 카드에 계약 값이 그대로 보인다(#181 리뷰).
+    // 모르는 값은 **버리지 않고 그대로** 둔다 — 빈 칸보다 낯선 글자가 낫고, 서버가 종목을
+    // 늘렸다는 사실이 화면에 드러난다.
+    event = eventTypeOf(event)?.label ?: event,
+    recoveryLabel = recovery?.label,
+    period = "%s~%s".format(startDate.toPeriodLabel(), endDate.toPeriodLabel()),
+    placeCount = placeCount,
+    needsRegeneration = needsRegeneration,
+    active = active,
+)
+
+/** 카드의 기간 표기 `MM.DD`. (SPEC §4.13) */
+private fun LocalDate.toPeriodLabel(): String = "%02d.%02d".format(monthValue, dayOfMonth)
+

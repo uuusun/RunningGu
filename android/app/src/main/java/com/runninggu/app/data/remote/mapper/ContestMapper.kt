@@ -47,7 +47,7 @@ fun ContestDto.toContest(): Contest = Contest(
  * 도메인 [EventType] 은 한국어 라벨(`풀`·`하프`)을 쓰므로 이름이 다르다.
  * 서버가 값을 추가하면 null 이 되고 그 항목만 빠진다.
  */
-private fun eventTypeOf(raw: String): EventType? = when (raw) {
+internal fun eventTypeOf(raw: String): EventType? = when (raw) {
     "FULL" -> EventType.FULL
     "HALF" -> EventType.HALF
     "K10" -> EventType.TEN_K

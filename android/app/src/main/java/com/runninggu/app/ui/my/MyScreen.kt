@@ -28,11 +28,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -43,6 +46,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.domain.today
 import com.runninggu.app.ui.calendar.RaceCard
 import com.runninggu.app.ui.common.EmptyState
@@ -114,9 +118,11 @@ fun MyScreen(
         Spacer(Modifier.height(16.dp))
         when (state.segment) {
             MySegment.ITINERARY -> ItineraryList(
-                items = state.itineraries,
+                state = state.itineraries,
                 onDelete = viewModel::onDeleteItinerary,
                 onBrowseRaces = onBrowseRaces,
+                onRetry = viewModel::loadItineraries,
+                onLoadMore = viewModel::loadMoreItineraries,
             )
 
             MySegment.COURSE -> CourseList(
@@ -214,22 +220,87 @@ private fun ProfileHeader(profile: SessionProfile, onOpenAccount: () -> Unit) {
 
 // ── [동선] (SPEC §4.13) ─────────────────────────────────────────
 
+/**
+ * 동선 삭제 확인. (매핑표 S10 `동선 삭제 — 확인 modal, 실패 시 유지`)
+ *
+ * 제목을 넣는 이유는 저장 코스 삭제와 같다 — 목록에서 여러 개를 보다 누른 사용자가
+ * **어느 것을 지우는지** 확인할 수 있어야 한다.
+ *
+ * 실패는 여기서 다루지 않는다. 서버가 지운 뒤에 목록에서 빼므로(`MyViewModel`),
+ * 실패하면 카드가 그대로 남고 스낵바만 뜬다 — 그게 "실패 시 유지" 다.
+ */
 @Composable
-private fun ItineraryList(
-    items: List<SavedItinerary>,
+private fun DeleteItineraryDialog(
+    title: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("저장한 동선을 지울까요?") },
+        text = { Text("‘$title’을 마이에서 지웁니다. 되돌릴 수 없어요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("삭제") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
+}
+
+/**
+ * **`internal` 인 이유** — 삭제 확인 모달이 서버 요청을 실제로 막는지는 화면을 그려야만
+ * 확인된다. `EditList` 를 계측 테스트가 직접 그리는 것과 같은 방식이다(#71).
+ */
+@Composable
+internal fun ItineraryList(
+    state: SavedItinerariesState,
     onDelete: (String) -> Unit,
     onBrowseRaces: () -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
 ) {
-    if (items.isEmpty()) {
-        EmptyState("아직 저장한 동선이 없어요.")
-        BrowseButton("대회 둘러보기", onBrowseRaces)
-        return
+    /**
+     * 지울 동선을 고른 상태. **확인 전에는 서버 요청이 나가지 않는다** (매핑표 S10 · #181 리뷰).
+     *
+     * 동선은 되돌릴 수 없는 사용자 데이터라 휴지통이 곧바로 `DELETE` 를 쏘면 안 된다.
+     * 저장 코스 상세가 이미 같은 규칙을 쓴다(`CourseDetailScreen` 의 삭제 확인).
+     */
+    var pendingDelete by remember { mutableStateOf<SavedItinerary?>(null) }
+
+    pendingDelete?.let { target ->
+        DeleteItineraryDialog(
+            title = target.title,
+            onConfirm = {
+                pendingDelete = null
+                onDelete(target.id)
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
+
+    // 조회 중·실패를 빈 상태로 뭉뚱그리지 않는다 (§3-5). 저장 코스와 같은 규칙이다.
+    when (state) {
+        SavedItinerariesState.Loading -> {
+            LoadingState("저장한 동선을 불러오는 중…")
+            return
+        }
+
+        SavedItinerariesState.Empty -> {
+            EmptyState("아직 저장한 동선이 없어요.")
+            BrowseButton("대회 둘러보기", onBrowseRaces)
+            return
+        }
+
+        is SavedItinerariesState.Error -> {
+            ErrorState(message = state.message, onRetry = onRetry)
+            return
+        }
+
+        is SavedItinerariesState.Content -> Unit
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { item ->
+        state.itineraries.forEach { item ->
             Surface(
-                // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-3, D-14). 서버 조회가 붙는
-                //  연동에서 연결한다 — 지금 데모 데이터는 복원할 응답이 없다.
+                // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-5 `GET /api/itineraries/{id}`,
+                //  D-14). `ItineraryApi` 에 상세 조회가 아직 없어서 미룬다 — 이 PR 은 목록·삭제까지다(#181).
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 1.dp,
@@ -248,18 +319,30 @@ private fun ItineraryList(
                             )
                             item.recoveryLabel?.let { label ->
                                 Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    )
-                                }
+                                CardBadge(
+                                    text = label,
+                                    container = MaterialTheme.colorScheme.tertiaryContainer,
+                                    content = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
                             }
+                            // 저장 당시와 대회가 달라졌다 — 다시 만들어야 한다 (§5-4)
+                            if (item.needsRegeneration) {
+                                Spacer(Modifier.width(6.dp))
+                                CardBadge(
+                                    text = "대회 변경",
+                                    container = MaterialTheme.colorScheme.errorContainer,
+                                    content = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                        // 비활성 대회의 동선도 목록에서 지우지 않는다 (§5-4). 왜 그런지만 알린다
+                        if (!item.active) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "정보 제공이 끝난 대회예요.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -273,11 +356,39 @@ private fun ItineraryList(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = { onDelete(item.id) }) {
+                    IconButton(onClick = { pendingDelete = item }) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제")
                     }
                 }
             }
+        }
+
+        // 한 번에 20건씩 온다 — 더 있으면 눌러서 이어 받는다 (API 명세 §0-4).
+        // 받는 동안은 잠그고 그렇게 말한다 — [러닝코스] 와 같은 모양이다 (§3-5).
+        if (state.hasNext) {
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(
+                onClick = onLoadMore,
+                enabled = state.canLoadMore,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (state.loadingMore) {
+                        "불러오는 중…"
+                    } else {
+                        "더 보기 (${state.itineraries.size}/${state.totalElements})"
+                    },
+                )
+            }
+        }
+
+        // 다음 장을 못 받았다. 위 목록은 그대로 두고 이 줄만 붙인다.
+        state.moreMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -451,5 +562,22 @@ private fun FavoriteList(
 private fun BrowseButton(label: String, onClick: () -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         TextButton(onClick = onClick) { Text(label) }
+    }
+}
+
+/** 카드 제목 옆 작은 배지. 회복 라벨과 "대회 변경" 이 같은 모양을 쓴다. (SPEC §4.13) */
+@Composable
+private fun CardBadge(
+    text: String,
+    container: androidx.compose.ui.graphics.Color,
+    content: androidx.compose.ui.graphics.Color,
+) {
+    Surface(color = container, shape = MaterialTheme.shapes.extraSmall) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = content,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }

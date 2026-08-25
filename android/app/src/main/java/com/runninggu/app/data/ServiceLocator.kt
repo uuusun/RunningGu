@@ -1,5 +1,8 @@
 package com.runninggu.app.data
 
+import com.runninggu.app.data.repository.RemoteItineraryRepository
+import com.runninggu.app.data.repository.ItineraryRepository
+import com.runninggu.app.data.remote.ItineraryApi
 import android.content.Context
 import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.FusedLocationProvider
@@ -209,6 +212,20 @@ object ServiceLocator {
      * 화면은 로그인 유도로 끝내고 저장을 예약하지 않는다(D-27). 마이는 게스트면 아예
      * 부르지 않는다(`MyViewModel.loadCourses`).
      */
+    val itineraryApi: ItineraryApi by lazy { retrofit.create() }
+
+    /**
+     * 저장 동선. (API 명세 §5-4 · §5-6)
+     *
+     * **S10 마이 목록이 이걸 쓴다.** S7 결과 화면(`ResultViewModel`)은 아직
+     * [com.runninggu.app.data.repository.FakeItineraryRepository] 를 직접 들고 있다 —
+     * 생성(`POST /itineraries/generate`)을 서버로 옮기는 것은 대회 데이터가 붙는
+     * 시점의 별도 작업이다.
+     */
+    val itineraryRepository: ItineraryRepository by lazy {
+        RemoteItineraryRepository(itineraryApi)
+    }
+
     val savedCourseRepository: SavedCourseRepository by lazy {
         RemoteSavedCourseRepository(savedCourseApi)
     }
