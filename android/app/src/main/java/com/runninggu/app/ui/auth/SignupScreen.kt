@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
@@ -42,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.runninggu.app.data.local.AgreementDoc
+import com.runninggu.app.data.local.AgreementMarkdown
+import com.runninggu.app.data.local.AgreementTexts
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -109,6 +114,9 @@ fun SignupScreen(
 private fun AgreeStep(state: SignupUiState, viewModel: SignupViewModel) {
     StepTitle("약관에 동의해 주세요", "필수 항목에 동의해야 가입할 수 있어요.")
 
+    // 어떤 문안을 열어 뒀는가. null 이면 닫혀 있다.
+    var reading by remember { mutableStateOf<AgreementDoc?>(null) }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
@@ -122,22 +130,49 @@ private fun AgreeStep(state: SignupUiState, viewModel: SignupViewModel) {
                 emphasized = true,
             )
             HorizontalDivider()
-            AgreeRow("(필수) 이용약관 동의", state.tosAgreed, viewModel::onToggleTos)
-            AgreeRow("(필수) 개인정보 수집·이용 동의", state.privacyAgreed, viewModel::onTogglePrivacy)
-            AgreeRow("(선택) 마케팅 정보 수신 동의", state.marketingAgreed, viewModel::onToggleMarketing)
+            AgreeRow(
+                label = AgreementDoc.TOS.checkboxLabel,
+                checked = state.tosAgreed,
+                onToggle = viewModel::onToggleTos,
+                onRead = { reading = AgreementDoc.TOS },
+            )
+            AgreeRow(
+                label = AgreementDoc.PRIVACY.checkboxLabel,
+                checked = state.privacyAgreed,
+                onToggle = viewModel::onTogglePrivacy,
+                onRead = { reading = AgreementDoc.PRIVACY },
+            )
+            AgreeRow(
+                label = AgreementDoc.MARKETING.checkboxLabel,
+                checked = state.marketingAgreed,
+                onToggle = viewModel::onToggleMarketing,
+                onRead = { reading = AgreementDoc.MARKETING },
+            )
         }
     }
 
     Spacer(Modifier.height(24.dp))
     CtaButton(text = "다음", enabled = state.canProceedAgree, onClick = viewModel::onAgreeNext)
+
+    reading?.let { doc ->
+        AgreementDialog(doc = doc, onDismiss = { reading = null })
+    }
 }
 
+/**
+ * 동의 한 줄. [onRead] 가 있으면 [보기] 를 붙인다.
+ *
+ * **체크박스와 [보기] 를 갈라 둔다.** 줄 전체를 눌러 문안이 열리면 체크하려다 열리고,
+ * 반대로 줄 전체가 체크면 읽으려다 동의한 것이 된다. 동의는 되돌리기 쉬워야 하는 만큼
+ * **누른 것과 일어난 일이 같아야** 한다.
+ */
 @Composable
 private fun AgreeRow(
     label: String,
     checked: Boolean,
     onToggle: () -> Unit,
     emphasized: Boolean = false,
+    onRead: (() -> Unit)? = null,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = { onToggle() })
@@ -145,8 +180,55 @@ private fun AgreeRow(
             text = label,
             style = if (emphasized) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
             fontWeight = if (emphasized) FontWeight.Bold else null,
+            modifier = Modifier.weight(1f),
         )
+        onRead?.let {
+            TextButton(onClick = it) { Text("보기") }
+        }
     }
+}
+
+/**
+ * 약관 전문. (이슈 #111)
+ *
+ * **버전을 함께 보여준다.** 서버는 가입 시 활성 버전을 이력에 남기는데(§1-5), 사용자가
+ * 무엇에 동의했는지 나중에 확인하려면 그때 본 글의 버전이 화면에도 있어야 한다.
+ *
+ * 마크다운 **기호만** 걷어 낸다([AgreementMarkdown]). 렌더러를 넣지 않는 이유는 새
+ * 의존성이기도 하지만, 표가 접히거나 강조가 사라지는 식으로 **표시가 원문과 달라질 여지**를
+ * 만들고 싶지 않아서다 — 동의 대상이 되는 글이다. 문장은 한 글자도 바뀌지 않는다.
+ */
+@Composable
+private fun AgreementDialog(doc: AgreementDoc, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    // 파일 하나를 읽는 것이라 여기서 기억해 둔다. 스크롤할 때마다 다시 읽지 않는다.
+    val text = remember(doc) {
+        AgreementTexts.load(context, doc)?.let(AgreementMarkdown::toPlainText)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(doc.label, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "버전 ${doc.version}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    // 못 읽어도 가입을 막지 않는다 — 내용만 못 보는 상태로 둔다.
+                    text = text ?: "문안을 열지 못했어요. 앱을 다시 시작해 주세요.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
 }
 
 // ── 2단계: 정보 입력 (SPEC §4.2-2) ──────────────────────────────
