@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -34,6 +35,11 @@ class CourseViewModel(
     private val geocodeRepository: GeocodeRepository,
     private val locationProvider: LocationProvider = ServiceLocator.locationProvider,
     private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+    /**
+     * 이 S8 **백스택 항목**의 상태. S7 연계로 열렸으면 여기에 출발지·목표 거리가 들어 있다
+     * (매핑표 D-15). 탭바로 그냥 열었으면 비어 있다.
+     */
+    launchState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseUiState())
@@ -78,6 +84,30 @@ class CourseViewModel(
     init {
         loadRegions()
         // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 내 주변이라 미리 부르면 헛 호출이다
+        applyLaunchContext(launchState)
+    }
+
+    /**
+     * S7 에서 넘어온 출발지·목표 거리를 반영한다. (SPEC §4.11-1 · 매핑표 D-15)
+     *
+     * **목표 거리를 먼저 넣고 출발지를 정한다.** 순서가 뒤집히면 [onOriginChange] 가
+     * 옛 목표 거리로 조회를 걸어, 화면에 보이는 슬라이더와 결과가 어긋난다.
+     *
+     * 숙소 없이 추천받은 동선이면(§4.9) 출발지는 프리필하지 않고 목표 거리만 남긴다 —
+     * 없는 좌표를 지어내는 것보다 사용자가 직접 고르게 하는 편이 맞다.
+     */
+    private fun applyLaunchContext(launchState: SavedStateHandle) {
+        val request = CourseLaunchContext.from(launchState) ?: return
+        _uiState.update { it.copy(targetKm = snapTargetKm(request.targetKm)) }
+        val stay = request.stay ?: return
+        onOriginChange(
+            OriginState.Fixed(
+                name = stay.name,
+                lat = stay.lat,
+                lng = stay.lng,
+                from = OriginState.Fixed.Source.ITINERARY,
+            ),
+        )
     }
 
     fun onTabChange(tab: CourseUiState.Tab) {
@@ -398,6 +428,12 @@ class CourseViewModel(
             geocodeRepository: GeocodeRepository = ServiceLocator.geocodeRepository,
             locationProvider: LocationProvider = ServiceLocator.locationProvider,
             savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
+            /**
+             * S8 백스택 항목의 상태를 그대로 넘긴다 — S7 연계 값이 여기 담겨 온다
+             * (매핑표 D-15). `createSavedStateHandle()` 은 항목의 것과 다른 handle 이라
+             * S7 이 쓴 값이 보이지 않는다.
+             */
+            launchState: SavedStateHandle = SavedStateHandle(),
         ) = viewModelFactory {
             initializer {
                 CourseViewModel(
@@ -405,6 +441,7 @@ class CourseViewModel(
                     geocodeRepository,
                     locationProvider,
                     savedCourseRepository,
+                    launchState,
                 )
             }
         }
