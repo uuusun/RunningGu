@@ -26,8 +26,22 @@ object AgreementMarkdown {
     private val TABLE_ROW = Regex("""^\s*\|.*\|\s*$""")
     private val TABLE_DIVIDER = Regex("""^\s*\|[\s|:-]+\|\s*$""")
 
+    /**
+     * 인용 표시. **다른 판정보다 먼저 걷어 낸다.** (#191 리뷰)
+     *
+     * `privacy.md` 의 보유기간 표가 `> | 기록 | 탈퇴하면 | …` 처럼 인용문 **안에** 있다.
+     * 줄이 `|` 로 시작할 때만 표로 보면 이런 줄이 규칙을 통째로 비켜 가서, 화면에
+     * `> |---|---|---|` 가 그대로 남는다.
+     *
+     * 평문에는 인용을 나타낼 방법이 없으므로 표시 자체도 지운다 — `>` 만 남으면 노이즈다.
+     */
+    private val BLOCKQUOTE = Regex("""^\s{0,3}>\s?""")
+
     fun toPlainText(raw: String): String = inline(raw)
         .lineSequence()
+        // **인용 표시를 가장 먼저 걷는다.** 아래 판정이 전부 줄 앞을 보므로, 여기서 안
+        // 걷으면 인용 안의 표·구분선이 규칙을 통째로 비켜 간다(#191 리뷰).
+        .map { it.replace(BLOCKQUOTE, "") }
         .filterNot { TABLE_DIVIDER.matches(it) } // `|---|---|` 는 읽을 내용이 아니다
         .map { line ->
             when {

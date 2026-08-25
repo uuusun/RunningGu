@@ -212,7 +212,7 @@ private fun AgreementDialog(doc: AgreementDoc, onDismiss: () -> Unit) {
             Column {
                 Text(doc.label, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "버전 ${AgreementTexts.VERSION}",
+                    text = "버전 ${doc.version}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

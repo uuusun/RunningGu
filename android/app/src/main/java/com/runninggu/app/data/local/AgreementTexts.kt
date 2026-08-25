@@ -19,15 +19,14 @@ import java.io.IOException
  *
  * 가입 요청은 boolean 만 보내고 버전은 서버가 붙인다(§1-5). 그래서 앱이 보여주는 문안과
  * 서버 활성 버전이 **반드시 같아야** 한다 — 어느 한쪽만 올리면 안 된다(D-32 · 이슈 #111).
- * 지금은 양쪽 다 [VERSION] 이다.
  *
- * `v1.1/privacy.md` 도 저장소에 있고 함께 번들되지만 **읽지 않는다.** A2 연결과 서버
- * `PRIVACY=1.1` 전환을 같은 계약으로 맞춘 뒤에 [VERSION] 을 올린다.
+ * **버전은 약관마다 따로 든다**([AgreementDoc.version]). 서버도
+ * `tos-version` · `privacy-version` · `marketing-version` 을 각각 관리하고, 실제로
+ * `v1.1/privacy.md` 만 준비돼 있다. 하나로 묶으면 PRIVACY 를 올리는 순간 있지도 않은
+ * `v1.1/tos.md` 를 읽어 **두 문안이 안 열리고 버전 표시까지 틀린다**(#191 리뷰).
  */
 object AgreementTexts {
 
-    /** 지금 보여주는 문안 버전. 서버 `runninggu.auth.agreements.*-version` 과 같아야 한다. */
-    const val VERSION = "1.0"
 
     /**
      * 문안을 읽는다. 못 읽으면 null — 화면은 "지금 열 수 없어요" 로 떨어진다.
@@ -42,8 +41,7 @@ object AgreementTexts {
     }
 
     /** `docs/agreements/v1.0/tos.md` 가 assets 에서는 `v1.0/tos.md` 다. */
-    fun assetPath(doc: AgreementDoc, version: String = VERSION): String =
-        "v$version/${doc.fileName}"
+    fun assetPath(doc: AgreementDoc): String = "v${doc.version}/${doc.fileName}"
 }
 
 /**
@@ -54,15 +52,20 @@ object AgreementTexts {
  *
  * @param required 필수인가. 마케팅만 선택이고, **미동의도 정상 가입**이다 —
  *  그때도 `agreed=false` 이력이 남는다(이슈 #111).
+ * @param version 이 약관의 활성 버전. 서버 `runninggu.auth.agreements.{type}-version` 과
+ *  **같아야 한다.** 셋을 하나로 묶지 않는 이유는 서버가 따로 관리하기 때문이다 — 실제로
+ *  `v1.1/privacy.md` 만 준비돼 있어서, 묶으면 PRIVACY 를 올릴 때 나머지 둘이 깨진다
+ *  (#191 리뷰). 올릴 때는 서버 설정과 **같은 PR 에서** 바꾼다(D-32).
  */
 enum class AgreementDoc(
     val label: String,
     val fileName: String,
     val required: Boolean,
+    val version: String,
 ) {
-    TOS("이용약관", "tos.md", required = true),
-    PRIVACY("개인정보 수집·이용", "privacy.md", required = true),
-    MARKETING("마케팅 정보 수신", "marketing.md", required = false),
+    TOS("이용약관", "tos.md", required = true, version = "1.0"),
+    PRIVACY("개인정보 수집·이용", "privacy.md", required = true, version = "1.0"),
+    MARKETING("마케팅 정보 수신", "marketing.md", required = false, version = "1.0"),
     ;
 
     /** 체크박스에 쓰는 말. "(필수) 이용약관 동의" */

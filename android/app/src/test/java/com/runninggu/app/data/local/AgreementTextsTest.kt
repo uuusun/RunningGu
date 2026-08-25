@@ -12,8 +12,8 @@ import org.junit.Test
  * 저장소 문서는 **같은 파일**이다(`ContestBundleTest` 가 `races.json` 을 그렇게 읽는 것과
  * 같은 방식이다). 사본을 두지 않았으므로 드리프트할 자리가 없다.
  *
- * **이 테스트가 지키는 것은 버전 올림 사고다.** [AgreementTexts.VERSION] 만 올리고 그
- * 버전 폴더에 파일을 안 넣으면, 앱은 "문안을 열지 못했어요" 를 띄우면서도 **동의는 받는다** —
+ * **이 테스트가 지키는 것은 버전 올림 사고다.** [AgreementDoc.version] 만 올리고 그 버전
+ * 폴더에 파일을 안 넣으면, 앱은 "문안을 열지 못했어요" 를 띄우면서도 **동의는 받는다** —
  * 서버는 그 버전으로 이력을 남기고, 사용자는 무엇에 동의했는지 볼 방법이 없다(NFR-12).
  */
 class AgreementTextsTest {
@@ -46,8 +46,8 @@ class AgreementTextsTest {
         AgreementDoc.entries.forEach { doc ->
             val text = read(AgreementTexts.assetPath(doc))!!
             assertTrue(
-                "${doc.fileName} 본문에 '버전 ${AgreementTexts.VERSION}' 이 없다",
-                text.contains("버전 ${AgreementTexts.VERSION}"),
+                "${doc.fileName} 본문에 '버전 ${doc.version}' 이 없다",
+                text.contains("버전 ${doc.version}"),
             )
         }
     }
@@ -71,5 +71,15 @@ class AgreementTextsTest {
         // v1.1 privacy 도 저장소에 있어 함께 번들되지만, A2 연결과 서버 전환을 같은 계약으로
         // 맞추기 전에는 쓰지 않는다(#111 운영 규칙 1). 지금 경로가 v1.0 을 가리키는지 본다.
         assertEquals("v1.0/privacy.md", AgreementTexts.assetPath(AgreementDoc.PRIVACY))
+    }
+
+    @Test
+    fun `버전은 약관마다 따로 든다`() {
+        // 서버가 tos-version · privacy-version · marketing-version 을 각각 관리한다.
+        // 하나로 묶으면 PRIVACY 만 1.1 로 올릴 때 있지도 않은 v1.1/tos.md 를 읽어
+        // **두 문안이 안 열리고 버전 표시까지 틀린다**(#191 리뷰).
+        AgreementDoc.entries.forEach { doc ->
+            assertEquals("v${doc.version}/${doc.fileName}", AgreementTexts.assetPath(doc))
+        }
     }
 }

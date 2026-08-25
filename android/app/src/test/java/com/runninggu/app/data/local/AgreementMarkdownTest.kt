@@ -60,6 +60,45 @@ class AgreementMarkdownTest {
     }
 
     @Test
+    fun `인용문 안의 표도 평문이 된다`() {
+        // privacy.md 의 보유기간 표가 인용문 안에 있다(109-111행). 줄이 `|` 로 시작할
+        // 때만 표로 보면 이런 줄이 규칙을 비켜 가서 `> |---|---|` 가 그대로 남는다(#191 리뷰).
+        val quoted = """
+            > | 기록 | 탈퇴하면 | 만료되면 |
+            > |---|---|---|
+            > | 로그인 세션 | 삭제됩니다 | 남습니다 |
+        """.trimIndent()
+
+        assertEquals(
+            "기록 · 탈퇴하면 · 만료되면\n로그인 세션 · 삭제됩니다 · 남습니다",
+            AgreementMarkdown.toPlainText(quoted),
+        )
+    }
+
+    @Test
+    fun `인용 표시는 남지 않는다`() {
+        // 평문에는 인용을 나타낼 방법이 없다. `>` 만 남으면 노이즈다.
+        assertEquals("미결 — 삭제 주기가 정해지지 않았습니다", AgreementMarkdown.toPlainText("> 미결 — 삭제 주기가 정해지지 않았습니다"))
+    }
+
+    @Test
+    fun `실제 개인정보 문안에 마크다운 표 기호가 남지 않는다`() {
+        // @uuusun 이 요청한 회귀 테스트다. 규칙을 만족하는 가짜 입력만 보면 이 형태를 놓친다.
+        val raw = javaClass.classLoader
+            ?.getResourceAsStream(AgreementTexts.assetPath(AgreementDoc.PRIVACY))
+            ?.bufferedReader()?.use { it.readText() }
+        checkNotNull(raw) { "번들에 개인정보 문안이 없다" }
+
+        val plain = AgreementMarkdown.toPlainText(raw)
+
+        assertFalse("표 구분선이 남았다", plain.contains("|---"))
+        assertFalse("인용 표시가 남았다", plain.lineSequence().any { it.trimStart().startsWith(">") })
+        assertFalse("칸 구분자가 남았다", plain.contains("|"))
+        // 표 내용은 살아 있다
+        assertTrue(plain.contains("로그인 세션"))
+    }
+
+    @Test
     fun `실제 문안에서 기호가 사라지고 문장은 남는다`() {
         // 번들된 진짜 파일로 확인한다 — 규칙을 만족하는 가짜 입력만 보면 놓친다.
         val raw = javaClass.classLoader
