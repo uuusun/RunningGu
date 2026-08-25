@@ -60,7 +60,6 @@ fun AccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var changingPassword by remember { mutableStateOf(false) }
     var withdrawing by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.signedOut) {
@@ -129,7 +128,7 @@ fun AccountScreen(
                 SettingRow(
                     label = "비밀번호 변경",
                     value = "",
-                    onClick = { changingPassword = true },
+                    onClick = viewModel::onPasswordEditOpen,
                 )
             }
 
@@ -156,13 +155,14 @@ fun AccountScreen(
         )
     }
 
-    if (changingPassword) {
+    // 닉네임과 같다 — 성공해야 닫힌다. 틀린 현재 비밀번호를 스낵바로 알리면
+    // 사용자가 다시 열어 두 칸을 처음부터 입력해야 한다 (이슈 #164 · §2-1)
+    state.passwordEdit?.let { edit ->
         PasswordDialog(
-            onDismiss = { changingPassword = false },
-            onConfirm = { current, new ->
-                viewModel.onChangePassword(current, new)
-                changingPassword = false
-            },
+            saving = edit.saving,
+            error = edit.error,
+            onDismiss = viewModel::onPasswordEditDismiss,
+            onConfirm = viewModel::onChangePassword,
         )
     }
 
@@ -299,6 +299,8 @@ private fun NicknameDialog(
 
 @Composable
 private fun PasswordDialog(
+    saving: Boolean,
+    error: String?,
     onDismiss: () -> Unit,
     onConfirm: (current: String, new: String) -> Unit,
 ) {
@@ -309,9 +311,27 @@ private fun PasswordDialog(
         title = { Text("비밀번호 변경", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                PasswordField(value = current, onValueChange = { current = it }, label = "현재 비밀번호")
+                PasswordField(
+                    value = current,
+                    onValueChange = { current = it },
+                    label = "현재 비밀번호",
+                    enabled = !saving,
+                )
                 Spacer(Modifier.height(8.dp))
-                PasswordField(value = new, onValueChange = { new = it }, label = "새 비밀번호 (8자 이상, 영문+숫자)")
+                PasswordField(
+                    value = new,
+                    onValueChange = { new = it },
+                    label = "새 비밀번호 (8자 이상, 영문+숫자)",
+                    enabled = !saving,
+                )
+                error?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     // D-28 — 변경 성공 시 다른 기기 세션은 전부 끊긴다.
@@ -324,10 +344,12 @@ private fun PasswordDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(current, new) },
-                enabled = current.isNotEmpty() && new.isNotEmpty(),
-            ) { Text("변경") }
+                enabled = !saving && current.isNotEmpty() && new.isNotEmpty(),
+            ) { Text(if (saving) "바꾸는 중…" else "변경") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("취소") }
+        },
     )
 }
 
@@ -371,11 +393,17 @@ private fun WithdrawDialog(
 }
 
 @Composable
-private fun PasswordField(value: String, onValueChange: (String) -> Unit, label: String) {
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    enabled: Boolean = true,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
+        enabled = enabled,
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
