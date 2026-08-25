@@ -12,10 +12,44 @@ import java.util.Properties
  *
  * REST 키는 여기 두지 않는다. 서버에만 있다(AGENTS 8장).
  */
-val kakaoNativeAppKey: String = Properties().apply {
+val localProperties: Properties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
-}.getProperty("KAKAO_NATIVE_APP_KEY").orEmpty()
+}
+
+val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KEY").orEmpty()
+
+/**
+ * 릴리스가 볼 백엔드 주소. (AP-07 배포 · 이슈 #195)
+ *
+ * **배포 호스트가 정해지면 `local.properties` 에 `API_BASE_URL` 한 줄만 넣는다.** 그전에는
+ * 아래 자리표시자가 들어가는데, 그 상태로 만든 APK 는 **서버를 못 찾는다** — 화면은 전부
+ * 네트워크 오류다. 스토어에 그대로 올리면 심사에서 바로 걸린다.
+ *
+ * 그래서 자리표시자면 빌드할 때 경고를 띄운다. 조용히 지나가면 알아채는 자리가 없다.
+ */
+val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
+    ?: "https://api.runninggu.example/api/"
+
+/**
+ * 릴리스 서명. (AGENTS 8장 · 이슈 #108)
+ *
+ * **keystore 와 비밀번호는 저장소에 두지 않는다.** 각자 `local.properties` 에 네 줄을 넣고,
+ * 파일은 저장소 밖에 둔다.
+ *
+ * ```
+ * RELEASE_STORE_FILE=C:/keys/runninggu.jks
+ * RELEASE_STORE_PASSWORD=...
+ * RELEASE_KEY_ALIAS=runninggu
+ * RELEASE_KEY_PASSWORD=...
+ * ```
+ *
+ * **없어도 빌드는 된다** — 카카오 키와 같은 규칙이다. CI 에는 keystore 가 없고, 서명 없는
+ * APK 로도 빌드가 깨지는지는 확인할 수 있어야 한다. 대신 스토어에 올릴 산출물은 아니다.
+ */
+val releaseStoreFile: File? = localProperties.getProperty("RELEASE_STORE_FILE")
+    ?.let(::File)
+    ?.takeIf { it.exists() }
 
 plugins {
     alias(libs.plugins.android.application)
@@ -45,14 +79,27 @@ android {
         manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey
     }
 
+    signingConfigs {
+        // `local.properties` 에 keystore 가 있을 때만 만든다.
+        releaseStoreFile?.let { keystore ->
+            create("release") {
+                storeFile = keystore
+                storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // 에뮬레이터에서 호스트의 localhost 는 10.0.2.2 다. 실기기 테스트는 각자 로컬 IP 로 바꾼다.
             buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/\"")
         }
         release {
-            // TODO(AP-07 배포): 배포 호스트가 정해지면 채운다.
-            buildConfigField("String", "BASE_URL", "\"https://api.runninggu.example/api/\"")
+            buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+            // keystore 가 없으면 서명 없이 만든다 — 빌드가 깨지지 않아야 CI 가 돈다.
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }
@@ -90,6 +137,36 @@ android {
             resources.srcDir("src/main/assets")
             // 약관도 같은 이유로 실제 파일을 읽게 한다.
             resources.srcDir(rootProject.file("../docs/agreements"))
+        }
+    }
+}
+
+/**
+ * 스토어에 못 올릴 산출물을 **만들 때 알려 준다.** (AP-07 배포 · 이슈 #195)
+ *
+ * 둘 다 조용히 지나가는 종류다 — 자리표시자 주소로 만든 APK 는 설치는 되지만 화면이 전부
+ * 네트워크 오류이고, 서명 없는 APK 는 스토어가 받지 않는다. **빌드가 성공했다는 것만 보고
+ * 올리면 그때 알게 된다.**
+ *
+ * 막지는 않는다 — CI 는 keystore 없이 릴리스가 컴파일되는지 확인해야 한다.
+ */
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    // **설정 시점에 값으로 읽어 둔다.** 람다가 스크립트 속성을 그대로 붙들면 구성 캐시가
+    // 직렬화하지 못한다(`cannot serialize Gradle script object references`).
+    val placeholderUrl = apiBaseUrl.contains("runninggu.example")
+    val unsigned = releaseStoreFile == null
+    doFirst {
+        if (placeholderUrl) {
+            logger.warn(
+                "[release] BASE_URL 이 자리표시자입니다 — local.properties 에 API_BASE_URL 을 " +
+                    "넣으세요. 이대로 만든 산출물은 서버를 못 찾습니다.",
+            )
+        }
+        if (unsigned) {
+            logger.warn(
+                "[release] 서명 keystore 가 없습니다 — 서명 없는 산출물이 나옵니다. 스토어 " +
+                    "업로드용이면 local.properties 에 RELEASE_STORE_FILE 등을 넣으세요.",
+            )
         }
     }
 }
