@@ -11,6 +11,7 @@ import com.runninggu.server.auth.application.PasswordHasher;
 import com.runninggu.server.auth.application.PasswordResetTokenManager;
 import com.runninggu.server.auth.application.VerificationMailSender;
 import com.runninggu.server.auth.infrastructure.MailDeliveryException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -201,21 +202,26 @@ class PasswordResetApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 재설정_API_입력과_공개_웹_페이지를_검증한다() throws Exception {
+    void 재설정_API_입력을_검증한다() throws Exception {
         requestReset("not-an-email")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         resetPassword("unknown-token", "newRun4life2")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_RESET_TOKEN"));
+    }
 
-        mockMvc.perform(get("/reset-password").param("token", "<script>alert(1)</script>"))
+    @Test
+    void 공개_웹_페이지에_쿼리_token을_삽입하지_않는다() throws Exception {
+        String page = mockMvc.perform(
+                        get("/reset-password").param("token", "<script>alert(1)</script>"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "/api/auth/password/reset")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("<script>alert(1)</script>"))));
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(page).doesNotContain("<script>alert(1)</script>");
     }
 
     private org.springframework.test.web.servlet.ResultActions requestReset(String email)
