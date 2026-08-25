@@ -177,12 +177,12 @@ object ServiceLocator {
      * `nickname/exists` 가 서면서 화면 기본값을 옮겼다 — 그전까지는 셋 다
      * `FakeAuthRepository` 를 보고 있었다.
      *
-     * **A3 비밀번호 재설정만 아직 가짜다.** `auth/password/reset-request` ·
-     * `auth/password/reset` 이 서버에 없다(AP-07). 서면 `ResetViewModel` 의
-     * 기본값 한 줄만 바꾸면 된다.
+     * **A3 비밀번호 재설정도 이제 서버를 본다.** `auth/password/reset-request` 가
+     * #174 · #182 로 섰다. 새 비밀번호 설정 화면은 앱이 아니라 서버가 서빙하는
+     * 웹 페이지라(§4.3 🔒), 앱은 `auth/password/reset` 을 부르지 않는다.
      *
-     * 카카오(`auth/kakao`·`auth/kakao/signup`)도 서버에 없는데, 부르는 화면이
-     * 아직 없어 지금은 드러나지 않는다.
+     * 카카오(`auth/kakao`·`auth/kakao/signup`)는 서버에 섰지만 **부르는 화면이
+     * 아직 없다** — 로그인 버튼이 "준비 중" 안내만 띄운다(AP-02 · 이슈 #108).
      */
     val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi, tokenApi) }
 

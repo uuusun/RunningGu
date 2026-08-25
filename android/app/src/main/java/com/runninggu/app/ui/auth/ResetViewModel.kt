@@ -1,7 +1,9 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.repository.AuthRepository
-import com.runninggu.app.data.repository.FakeAuthRepository
 import com.runninggu.app.data.repository.isNetworkFailure
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -38,42 +40,73 @@ data class ResetUiState(
 /** A3 비밀번호 찾기. (SPEC §4.3 · AP-08) */
 class ResetViewModel(
     /**
-     * **A1·A2 와 달리 아직 가짜 저장소다.** (AP-07 · AP-14)
+     * 서버 저장소. `POST /auth/password/reset-request` 를 부른다. (§1-11 · AP-14)
      *
-     * A3 은 `POST auth/password/reset-request` 를 부르는데 **서버에 그 엔드포인트가
-     * 없다** — 백엔드 `auth/api` 에 있는 것은 `signup`·`login`·`refresh`·`logout` 과
-     * `email/exists`·`email/send-code`·`email/verify`·`nickname/exists` 뿐이다.
-     * 여기를 서버 저장소로 바꾸면 A3 은 지금 되는 데모조차 못 하고 404 로 떨어진다.
-     *
-     * **서버에 서면 이 한 줄만 [ServiceLocator.authRepository] 로 바꾸면 된다.**
+     * #174 · #182 로 서버가 서서 A1·A2 와 같은 저장소를 본다. 그전에는
+     * `FakeAuthRepository` 였다 — 엔드포인트가 없어 붙이면 404 로 떨어졌다.
      */
-    private val repository: AuthRepository = FakeAuthRepository,
+    private val repository: AuthRepository = ServiceLocator.authRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ResetUiState())
     val uiState: StateFlow<ResetUiState> = _uiState.asStateFlow()
 
+    /**
+     * 발송 실패 문구. (§1-11 · §4.3)
+     *
+     * **쿨다운을 일반 실패로 덮지 않는다.** 서버는 60초 쿨다운을 `429 SEND_COOLDOWN` 으로
+     * 주는데(§1-11), 이때는 **직전 요청이 이미 나갔다는 뜻**이다. "보내지 못했어요" 로
+     * 뭉치면 사용자는 실패한 줄 알고 버튼을 계속 누르고, 그 요청이 또 쿨다운에 걸려
+     * 상황이 안 풀린다 — A1 의 `RATE_LIMITED` 를 가른 것과 같은 이유다(결정-55).
+     *
+     * 쿨다운은 **가입 여부와 무관하게** 걸린다(`PasswordResetService.request` 가 계정을
+     * 찾기 전에 `cooldown.acquire` 한다). 그래서 이 문구가 계정 존재를 노출하지 않는다 —
+     * §4.3-1 의 비노출은 여기서도 지켜진다.
+     */
+    private fun Throwable.resetFailureMessage(): String = when {
+        isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        apiErrorCode() == ApiErrorCode.SEND_COOLDOWN ->
+            "조금 전에 보냈어요. 메일함을 확인하고, 없으면 1분 뒤에 다시 시도해 주세요."
+        else -> "메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."
+    }
+
+    /**
+     * **보내는 중에는 무시한다.** (#187 리뷰)
+     *
+     * 발송 중에 이메일이 바뀌면 **요청한 주소와 화면에 보이는 주소가 엇갈린다** — 사용자는
+     * 새 주소로 메일이 갔다고 읽는다. 버튼도 잠겨 있어(`canSubmit`) 다시 보낼 수도 없다.
+     */
     fun onEmailChange(value: String) {
-        _uiState.update { it.copy(email = value, errorMessage = null) }
+        _uiState.update {
+            if (it.isSubmitting) it else it.copy(email = value, errorMessage = null)
+        }
     }
 
     fun onSubmit() {
         val state = _uiState.value
         if (!state.canSubmit) return
+        // **잠금은 여기서, 코루틴 밖에서 건다.** `launch` 안에서 걸면 코루틴이 실제로 돌기
+        // 전에 두 번째 탭이 [ResetUiState.canSubmit] 를 그대로 통과한다.
+        //
+        // 스텁일 때는 티가 안 났지만 서버는 **60초 쿨다운**이다(§1-11). 연타하면 두 번째
+        // 요청이 `429 SEND_COOLDOWN` 을 받고, **첫 요청이 성공해 메일이 갔는데도** 화면은
+        // 쿨다운 문구를 띄운다.
+        _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+            // **호출을 `update` 밖에서 한 번만 한다.** (#187 리뷰)
+            //
+            // `MutableStateFlow.update` 는 CAS 에 실패하면 **람다를 다시 평가한다.** 안에
+            // 네트워크 호출을 두면 그때 요청이 한 번 더 나간다 — 첫 요청이 성공해 메일이
+            // 갔는데도 두 번째가 `429 SEND_COOLDOWN` 을 받아 화면은 쿨다운 문구가 된다.
+            val outcome = repository.requestPasswordReset(state.email.trim())
             _uiState.update {
-                repository.requestPasswordReset(state.email.trim()).fold(
+                outcome.fold(
                     // 가입 여부는 서버가 항상 202 로 감춘다 — 앱이 응답을 더 가릴 것은 없다(§1-11).
                     onSuccess = { _ -> it.copy(isSubmitting = false, sent = true) },
                     onFailure = { cause ->
                         it.copy(
                             isSubmitting = false,
-                            errorMessage = if (cause.isNetworkFailure()) {
-                                "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
-                            } else {
-                                "메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."
-                            },
+                            errorMessage = cause.resetFailureMessage(),
                         )
                     },
                 )

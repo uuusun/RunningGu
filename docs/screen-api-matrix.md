@@ -111,9 +111,9 @@ Compose 화면
 | ID | 플로우 화면 | 목표 route | 최신 Android | 전달값 | 로그인 | 상태 |
 |---|---|---|---|---|---|---|
 | A0 | 앱 시작·세션 확인 | 별도 route 없음(Startup Gate) | 시작 화면 `home`, 인증 그래프 없음 | 세션 | 선택 | 시스템 Splash + `core-splashscreen`, 세션에 따라 로그인/홈. **`GET /api/me` 검증이 끝나야 시작 화면을 고른다**(#99) — 그동안은 로딩만 보인다(제한 3초). `Expired`는 홈을 열지 않고 곧장 로그인, `Unknown`(네트워크·5xx)은 세션을 지킨 채 홈을 열고 첫 `401`을 `TokenAuthenticator`가 정리 |
-| A1 | 로그인 | `login` | 미구현 | 복귀 목적 route | 불필요 | 플로우 확정 |
-| A2 | 회원가입 4단계 | `signup` 내부 step | 미구현 | 카카오 신규면 SDK token/profile | 불필요 | 플로우 확정 |
-| A3 | 비밀번호 찾기 | `reset` | 미구현 | 없음 | 불필요 | 플로우 확정 |
+| A1 | 로그인 | `login` | `login` | 복귀 목적 route | 불필요 | 현재 구현 · 서버 연결. **카카오 로그인만 미구현** — 버튼이 "준비 중" 안내만 띄운다(AP-02 · #108) |
+| A2 | 회원가입 4단계 | `signup` 내부 step | `signup` 내부 step | 카카오 신규면 SDK token/profile | 불필요 | 현재 구현 · 서버 연결(중복 확인 D-30 · 이메일 인증). 카카오 신규 가입 경로는 A1 과 함께 미구현 |
+| A3 | 비밀번호 찾기 | `reset` | `reset` | 없음 | 불필요 | 현재 구현 · 서버 연결. 새 비밀번호 설정은 앱이 아니라 웹(WEB-R1)이다 🔒 |
 | WEB-R1 | 새 비밀번호 설정 | 웹 `/reset-password?token=` | Android route 아님 | reset token | 불필요 | SPEC 확정 |
 | S1 | 홈 | `home` | `home` | 없음 | 선택 | 현재 구현 |
 | S2 | 캘린더 | `calendar?q={q}` | `calendar?q={q}` | 선택 `q` | 선택 | 현재 구현 |
