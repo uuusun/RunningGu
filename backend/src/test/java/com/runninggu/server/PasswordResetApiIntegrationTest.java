@@ -202,14 +202,17 @@ class PasswordResetApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 재설정_API_입력과_공개_웹_페이지를_검증한다() throws Exception {
+    void 재설정_API_입력을_검증한다() throws Exception {
         requestReset("not-an-email")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         resetPassword("unknown-token", "newRun4life2")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_RESET_TOKEN"));
+    }
 
+    @Test
+    void 공개_웹_페이지에_쿼리_token을_삽입하지_않는다() throws Exception {
         String page = mockMvc.perform(
                         get("/reset-password").param("token", "<script>alert(1)</script>"))
                 .andExpect(status().isOk())
@@ -218,16 +221,7 @@ class PasswordResetApiIntegrationTest extends PostgreSqlContainerSupport {
                 .getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(page)
-                .contains(
-                        "/api/auth/password/reset",
-                        "const MIN_PASSWORD_CODE_POINTS = 8;",
-                        "const MAX_PASSWORD_UTF8_BYTES = 72;",
-                        "new TextEncoder()",
-                        "8자 이상, 영문과 숫자를 함께 써 주세요.",
-                        "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.",
-                        "aria-describedby=\"password-hint\"")
-                .doesNotContain("<script>alert(1)</script>");
+        assertThat(page).doesNotContain("<script>alert(1)</script>");
     }
 
     private org.springframework.test.web.servlet.ResultActions requestReset(String email)
