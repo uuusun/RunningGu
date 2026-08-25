@@ -299,8 +299,8 @@ internal fun ItineraryList(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         state.itineraries.forEach { item ->
             Surface(
-                // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-3, D-14). 서버 조회가 붙는
-                //  연동에서 연결한다 — 지금 데모 데이터는 복원할 응답이 없다.
+                // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-5 `GET /api/itineraries/{id}`,
+                //  D-14). `ItineraryApi` 에 상세 조회가 아직 없어서 미룬다 — 이 PR 은 목록·삭제까지다(#181).
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 1.dp,
