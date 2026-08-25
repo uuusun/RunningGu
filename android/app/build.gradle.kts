@@ -67,11 +67,29 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // `docs/agreements/README.md` 는 **팀 내부 문서**다(미결 목록·논의 링크). 문안 파일과
+        // 같은 폴더에 있어 그대로 두면 APK 에 실려 나간다 — 앱을 뜯으면 읽힌다.
+        ignoreAssetsPatterns += "README.md"
+    }
+
     sourceSets {
+        getByName("main") {
+            // 약관 문안을 **원본 그대로** 번들한다. (이슈 #111 · D-32)
+            //
+            // 복사해 두지 않는 이유는 위 `races.json` 과 같다 — 사본은 반드시 드리프트한다.
+            // 여기서는 그 대가가 특히 크다. 앱이 보여준 글과 서버가 저장한 버전이 어긋나면
+            // **동의 이력이 무엇에 대한 동의인지 알 수 없다**(NFR-12).
+            //
+            // `docs/agreements/v1.0/tos.md` → assets 의 `v1.0/tos.md` 로 들어간다.
+            assets.srcDir(rootProject.file("../docs/agreements"))
+        }
         // 단위 테스트가 **실제 번들**(assets/races.json)을 읽게 한다. 복사본을 두면
         // 스크립트가 만드는 모양이 바뀌어도 테스트가 안 깨져 드리프트를 놓친다.
         getByName("test") {
             resources.srcDir("src/main/assets")
+            // 약관도 같은 이유로 실제 파일을 읽게 한다.
+            resources.srcDir(rootProject.file("../docs/agreements"))
         }
     }
 }
