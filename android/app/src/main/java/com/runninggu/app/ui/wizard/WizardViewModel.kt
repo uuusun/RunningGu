@@ -6,7 +6,12 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.createSavedStateHandle
 import com.runninggu.app.data.repository.ContestRepository
+import com.runninggu.app.ui.navigation.Routes
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.TripPattern
@@ -32,6 +37,11 @@ import com.runninggu.app.data.model.PoiItem
  */
 class WizardViewModel(
     private val repository: ContestRepository = ServiceLocator.contestRepository,
+    /**
+     * wizard 그래프 항목의 상태. **`raceId` 가 여기 들어 있다** — 그래프 route 가
+     * `wizard/{raceId}` 라 항목 인자가 그대로 담긴다.
+     */
+    savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WizardUiState())
@@ -39,6 +49,18 @@ class WizardViewModel(
 
     /** 지금 싣고 있는 대회. 회전·재구성으로 [start] 가 다시 불려도 재조회하지 않는다. */
     private var raceId: String? = null
+
+    init {
+        // **화면이 불러 주기를 기다리지 않는다.** (#192 리뷰)
+        //
+        // 예전에는 S4 의 `LaunchedEffect` 만 [start] 를 불렀다. 그래서 시스템이 프로세스를
+        // 되살리며 **S5·S6·S7 로 바로 복원**하면 S4 가 합성되지 않아 조회가 시작조차 안 됐다 —
+        // S5 는 영영 로딩, S6 는 숙소 조회 없이 CTA 만 살아 있고, S7 은 기본 상태로 만들어져
+        // "조건이 덜 정해졌어요" 가 됐다.
+        //
+        // 그래프 인자가 이미 답을 들고 있으므로 여기서 읽는다. 진입점이 하나가 된다.
+        savedState.get<String>(Routes.ARG_RACE_ID)?.let(::start)
+    }
 
     /**
      * 위저드 진입. `SELECT_RACE` 계약(SPEC §2.4)에 해당한다.
@@ -64,6 +86,20 @@ class WizardViewModel(
      * 문자열을 id 로 갖는데(`roadrun-41543`), 숫자로 못 바꾸면 서버에 물을 수 없고
      * 그건 "서버에 없다" 와 같다. `404` 와 같은 자리에 둔다(#139 · #140 리뷰).
      */
+    companion object {
+        /**
+         * 그래프 항목의 상태를 그대로 넘긴다 — `raceId` 가 거기 담겨 온다.
+         *
+         * 기본 팩토리로는 [SavedStateHandle] 을 넣을 수 없어서 따로 둔다. 이걸 안 쓰면
+         * 프로세스 복원 시 대회가 안 실린다(#192 리뷰).
+         */
+        fun factory(
+            repository: ContestRepository = ServiceLocator.contestRepository,
+        ) = viewModelFactory {
+            initializer { WizardViewModel(repository, createSavedStateHandle()) }
+        }
+    }
+
     fun load() {
         val id = raceId ?: return
         val serverId = id.toLongOrNull()

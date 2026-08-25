@@ -11,6 +11,8 @@ import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.domain.TripPattern
+import androidx.lifecycle.SavedStateHandle
+import com.runninggu.app.ui.navigation.Routes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -48,6 +50,48 @@ class WizardStartTest {
 
     @After
     fun tearDown() = Dispatchers.resetMain()
+
+    @Test
+    fun `프로세스가 복원돼도 대회를 스스로 싣는다`() = runTest(dispatcher) {
+        // 시스템이 S5·S6·S7 로 바로 복원하면 S4 가 합성되지 않아 `start()` 를 부르는 곳이
+        // 없다. 예전에는 그래서 S5 가 영영 로딩이고, S7 은 기본 상태로 생성을 걸어
+        // "조건이 덜 정해졌어요" 가 됐다(#192 리뷰).
+        //
+        // 그래프 인자가 이미 답을 들고 있으므로 ViewModel 이 직접 읽는다.
+        val repository = FakeContestRepository()
+        val restored = SavedStateHandle(mapOf(Routes.ARG_RACE_ID to "7"))
+
+        val viewModel = WizardViewModel(repository, restored)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(WizardUiState.Phase.LOADED, state.contestPhase)
+        assertEquals(7L, state.race?.serverId)
+    }
+
+    @Test
+    fun `복원 인자가 없으면 부르지 않는다`() = runTest(dispatcher) {
+        // 위저드 밖에서 만들어진 경우다. 없는 대회를 조회하면 안 된다.
+        val repository = FakeContestRepository()
+
+        WizardViewModel(repository, SavedStateHandle())
+        advanceUntilIdle()
+
+        assertEquals(0, repository.detailCalls)
+    }
+
+    @Test
+    fun `복원 뒤 화면을 다시 열어도 재조회하지 않는다`() = runTest(dispatcher) {
+        // 복원으로 이미 실은 뒤 S4 가 합성되면 `start()` 가 한 번 더 불린다.
+        val repository = FakeContestRepository()
+        val viewModel = WizardViewModel(repository, SavedStateHandle(mapOf(Routes.ARG_RACE_ID to "7")))
+        advanceUntilIdle()
+
+        viewModel.start("7")
+        advanceUntilIdle()
+
+        assertEquals(1, repository.detailCalls)
+    }
 
     @Test
     fun `서버 대회를 싣고 기본값을 채운다`() = runTest(dispatcher) {

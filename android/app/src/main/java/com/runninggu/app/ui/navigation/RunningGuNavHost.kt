@@ -230,7 +230,8 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
 
             PlanScreen(
                 raceId = graphEntry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
@@ -243,7 +244,8 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
 
             PrefsScreen(
                 onBack = { navController.popBackStack() },
@@ -255,7 +257,8 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
             val stayViewModel: StayViewModel = viewModel(entry)
 
             StayScreen(
@@ -269,7 +272,8 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
             // 결과 상태는 이 화면만 쓰므로 그래프에 묶지 않는다.
             val resultViewModel: ResultViewModel = viewModel(entry)
 
