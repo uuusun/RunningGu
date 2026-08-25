@@ -239,6 +239,9 @@ private class FakeMemberRepository(private val result: Result<SessionProfile>) :
         sentMarketing = agreed
         return result.getOrThrow()
     }
+
+    override suspend fun updatePassword(currentPassword: String, newPassword: String) =
+        throw UnsupportedOperationException("이 테스트는 비밀번호 변경을 부르지 않는다")
 }
 
 /** 응답을 붙들어 둔다. "보내는 중" 상태를 실제로 만들어 보려면 필요하다. */
@@ -258,6 +261,9 @@ private class BlockingMemberRepository(private val profile: SessionProfile) : Me
         gate.await()
         return profile
     }
+
+    override suspend fun updatePassword(currentPassword: String, newPassword: String) =
+        throw UnsupportedOperationException("이 테스트는 비밀번호 변경을 부르지 않는다")
 }
 
 /** 이 파일은 인증을 건드리지 않는다. 부르면 그 자체가 잘못이라 예외로 알린다. */
