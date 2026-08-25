@@ -28,7 +28,6 @@ import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.RemoteAuthRepository
 import com.runninggu.app.data.repository.CourseRepository
-import com.runninggu.app.data.repository.NearStubbedCourseRepository
 import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.data.repository.RemoteFestivalRepository
 import com.runninggu.app.data.repository.GeocodeRepository
@@ -191,13 +190,12 @@ object ServiceLocator {
     /**
      * S8 러닝코스. (API 명세 §6)
      *
-     * **[내 주변]만 아직 스텁이다** — `/courses/near` 가 AP-25 에 묶여 있다.
-     * 지역별·지역 칩은 #156 으로 서버가 섰다. 자세한 이유는
-     * [NearStubbedCourseRepository] KDoc 에 있다.
+     * **이제 셋 다 서버를 본다.** 지역별·지역 칩은 #156, [내 주변]은 `/courses/near` 가
+     * #174(AP-25 OSM 도시 경로 생성)로 서면서 붙었다. 그전까지는 `near` 만 스텁으로
+     * 보내는 한시적인 조합(`NearStubbedCourseRepository`)을 끼워 뒀고, 그 클래스는
+     * 예정대로 지웠다.
      */
-    val courseRepository: CourseRepository by lazy {
-        NearStubbedCourseRepository(remote = RemoteCourseRepository(courseApi))
-    }
+    val courseRepository: CourseRepository by lazy { RemoteCourseRepository(courseApi) }
 
     val savedCourseApi: SavedCourseApi by lazy { retrofit.create() }
 

@@ -93,36 +93,3 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
 
     override suspend fun regions(): List<CourseRegion> = apiCall { api.regions().toRegions() }
 }
-
-/**
- * [내 주변]만 스텁을 쓰고 나머지는 서버를 보는 조합. (AP-12 · AP-25)
- *
- * **서버가 반쪽만 서 있어서 생기는 한시적인 물건이다.** `GET /api/courses`(지역별)와
- * `/regions` 는 #156 으로 섰지만, `/courses/near` 는 AP-25(OSM 도시 경로 생성)에
- * 묶여 있어 아직 없다. 하나가 없다고 둘 다 스텁으로 두면 이미 선 계약을 놀리게 되고,
- * 반대로 통째로 서버를 보게 하면 [내 주변]이 열자마자 오류만 남는다.
- *
- * `near` 만 [stub] 으로 보내고 나머지는 [remote] 가 받는다.
- *
- * **AP-25 가 서면 이 클래스를 지우고** `ServiceLocator` 가 [RemoteCourseRepository] 를
- * 그대로 주면 된다. 화면은 [CourseRepository] 만 보므로 안 바뀐다(AGENTS 4장).
- */
-class NearStubbedCourseRepository(
-    private val remote: CourseRepository,
-    private val stub: CourseRepository = FakeCourseRepository,
-) : CourseRepository {
-
-    override suspend fun near(
-        lat: Double,
-        lng: Double,
-        targetKm: Double,
-        radiusKm: Double,
-        size: Int,
-    ): NearbyCourses = stub.near(lat, lng, targetKm, radiusKm, size)
-
-    override suspend fun byRegion(region: String?, page: Int, size: Int): CoursePage =
-        remote.byRegion(region, page, size)
-
-    override suspend fun regions(): List<CourseRegion> = remote.regions()
-}
-
