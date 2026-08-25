@@ -516,6 +516,14 @@ class MyViewModel(
         }
     }
 
+    /** 버려진 [더 보기] 가 켜 둔 잠금을 푼다. 목록은 건드리지 않는다. */
+    private fun unlockItineraryLoadMore() {
+        _uiState.update { state ->
+            val shown = state.itineraries as? SavedItinerariesState.Content ?: return@update state
+            state.copy(itineraries = shown.copy(loadingMore = false))
+        }
+    }
+
     /**
      * [동선] 카드의 [삭제]. (`DELETE /api/itineraries/{id}` · §5-6 · SPEC §4.13 🔧정책)
      *
@@ -569,6 +577,10 @@ class MyViewModel(
      *
      * 재조회가 실패하면 **지운 것만 반영된 목록을 그대로 두고** 알린다. 보이던 목록을
      * 오류로 덮으면 삭제 하나 때문에 화면이 통째로 사라진다.
+     *
+     * 이때 **[더 보기] 잠금은 반드시 푼다**(#181 리뷰). 버리는 load-more 가 켜 둔
+     * `loadingMore` 가 그대로 남으면 `canLoadMore` 가 false 라, 사용자는 화면을 나갔다
+     * 오기 전까지 다음 장을 다시 받을 수 없다.
      */
     private suspend fun reloadShownItineraries(epoch: Int) {
         val pages = itinerariesPage
@@ -585,6 +597,7 @@ class MyViewModel(
             }
         } catch (e: ApiException) {
             _message.value = "목록을 새로 고치지 못했어요."
+            if (epoch == sessionEpoch) unlockItineraryLoadMore()
             return
         }
         if (epoch != sessionEpoch) return

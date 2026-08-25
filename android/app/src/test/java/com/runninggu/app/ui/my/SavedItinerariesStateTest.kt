@@ -249,6 +249,30 @@ class SavedItinerariesStateTest {
     }
 
     @Test
+    fun `더 보기 중 삭제 후 재조회가 실패해도 버튼 잠금은 풀린다`() = runTest(dispatcher) {
+        // 버리는 load-more 가 켜 둔 `loadingMore` 가 그대로 남으면 `canLoadMore` 가 false 라,
+        // 사용자는 화면을 나갔다 오기 전까지 다음 장을 다시 받을 수 없다(#181 리뷰).
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        repository.gate = CompletableDeferred()
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        repository.failPageZeroOnce = true // 삭제 뒤 범위 재조회가 실패한다
+        viewModel.onDeleteItinerary("3")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
+        assertFalse("버튼이 잠긴 채 남았다", state.loadingMore)
+        assertTrue("다시 누를 수 없다", state.canLoadMore)
+        // 재조회는 실패했어도 지운 것은 빠진 채로 보이던 목록이 남아야 한다
+        assertFalse("지운 카드가 남았다", state.itineraries.any { it.id == "3" })
+        assertEquals(19, state.itineraries.size)
+    }
+
+    @Test
     fun `게스트는 서버를 부르지 않는다`() = runTest(dispatcher) {
         // 마이 진입 자체가 로그인 필요다(결정-4). 헛 왕복을 만들지 않는다
         val stub = StubItineraries(emptyList())
@@ -315,6 +339,9 @@ private class PagedItineraries(
     /** 다음 장 조회를 **한 번만** 실패시킨다. 재시도는 성공한다. */
     var failOnce = false
 
+    /** 첫 장 조회를 **한 번만** 실패시킨다. 삭제 뒤 범위 재조회가 깨지는 상황을 만든다. */
+    var failPageZeroOnce = false
+
     /** 요청이 두 번 가지 않았는지 보려고 순서대로 쌓는다. */
     val requestedPages = mutableListOf<Int>()
 
@@ -326,6 +353,10 @@ private class PagedItineraries(
                 failOnce = false
                 throw ApiException.Network(IOException("끊김"))
             }
+        }
+        if (page == 0 && failPageZeroOnce) {
+            failPageZeroOnce = false
+            throw ApiException.Network(IOException("끊김"))
         }
         val start = page * pageSize
         val ids = stored.drop(start).take(pageSize)
