@@ -863,7 +863,7 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | code | HTTP | 발생 |
 |---|---|---|
 | `VALIDATION_FAILED` | 400 | 공통 요청 값 오류 (필드별 상세는 `errors[]` 🔧) |
-| `INVALID_PASSWORD` | 400 | 8자 이상 영문+숫자 위반 |
+| `INVALID_PASSWORD` | 400 | 8자 이상 ASCII 영문+숫자 또는 UTF-8 72바이트 상한 위반 |
 | `CURRENT_PASSWORD_MISMATCH` | 400 | 비밀번호 변경의 현재 비밀번호 불일치 |
 | `INVALID_TRAVEL_PERIOD` | 400 | CUSTOM 기간이 7일 초과·역순·대회일 미포함 |
 | `AGREEMENT_REQUIRED` | 400 | 필수 약관 미동의 |
