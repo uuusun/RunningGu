@@ -38,6 +38,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("com.microsoft.playwright:playwright:1.61.0")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -47,6 +48,13 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+}
+
+tasks.register<JavaExec>("playwright") {
+    group = "verification"
+    description = "Playwright 브라우저 바이너리를 설치하거나 관리한다"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "com.microsoft.playwright.CLI"
 }
 
 val courseBundleFile = rootProject.projectDir.parentFile.resolve("data/courses.json")

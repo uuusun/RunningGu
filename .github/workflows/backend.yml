@@ -64,6 +64,9 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
+      - name: Install Playwright Chromium
+        run: ./gradlew playwright --args="install --with-deps chromium" --console=plain
+
       - name: Test and build
         run: ./gradlew clean test bootJar --console=plain
 

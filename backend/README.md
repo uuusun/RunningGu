@@ -147,6 +147,13 @@ cd backend
 ## 검증
 
 통합 테스트는 Testcontainers로 PostgreSQL 17을 실행하므로 Docker가 켜져 있어야 한다.
+비밀번호 재설정 공개 웹 페이지는 Playwright Chromium으로 실제 입력·제출 동작을 검증한다.
+최초 한 번 브라우저 바이너리를 설치한다.
+
+```powershell
+cd backend
+.\gradlew.bat playwright --args="install chromium"
+```
 
 ```powershell
 cd backend
