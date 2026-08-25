@@ -11,7 +11,11 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 백엔드 `/api/courses` 가 준비되기 전까지 쓰는 스텁. (AP-12 · 매핑표 §12)
+ * 데모용 코스 스텁. (AP-12 · 매핑표 §12)
+ *
+ * **운영 배선에서는 빠졌다** — `/api/courses` 세 갈래가 다 서서 [ServiceLocator] 는
+ * [RemoteCourseRepository] 를 준다. 지금 이걸 쓰는 곳은 테스트뿐이다. `FakeAuthRepository`
+ * 처럼 남겨 둔다 — 서버 없이 화면만 돌려 볼 때 쓸 데가 있다.
  *
  * `FakePoiRepository` 와 같은 방식이다 — 화면이 Repository 로 붙어 있으면 서버가 생겼을 때
  * [RemoteCourseRepository] 로 바꾸기만 하면 되고 화면은 그대로다(AGENTS 4장).
