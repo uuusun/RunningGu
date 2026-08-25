@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.runninggu.app.data.local.AgreementDoc
+import com.runninggu.app.data.local.AgreementMarkdown
 import com.runninggu.app.data.local.AgreementTexts
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -193,14 +194,17 @@ private fun AgreeRow(
  * **버전을 함께 보여준다.** 서버는 가입 시 활성 버전을 이력에 남기는데(§1-5), 사용자가
  * 무엇에 동의했는지 나중에 확인하려면 그때 본 글의 버전이 화면에도 있어야 한다.
  *
- * 마크다운을 렌더링하지 않고 **원문 그대로** 보여준다. 렌더러를 넣으면 새 의존성이고,
- * 무엇보다 **표시가 원문과 달라질 여지**가 생긴다 — 동의 대상이 되는 글이라 그게 낫다.
+ * 마크다운 **기호만** 걷어 낸다([AgreementMarkdown]). 렌더러를 넣지 않는 이유는 새
+ * 의존성이기도 하지만, 표가 접히거나 강조가 사라지는 식으로 **표시가 원문과 달라질 여지**를
+ * 만들고 싶지 않아서다 — 동의 대상이 되는 글이다. 문장은 한 글자도 바뀌지 않는다.
  */
 @Composable
 private fun AgreementDialog(doc: AgreementDoc, onDismiss: () -> Unit) {
     val context = LocalContext.current
     // 파일 하나를 읽는 것이라 여기서 기억해 둔다. 스크롤할 때마다 다시 읽지 않는다.
-    val text = remember(doc) { AgreementTexts.load(context, doc) }
+    val text = remember(doc) {
+        AgreementTexts.load(context, doc)?.let(AgreementMarkdown::toPlainText)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
