@@ -254,7 +254,7 @@ Compose 화면
 
 | 행동 | 처리 | 데이터 | 검증·상태 |
 |---|---|---|---|
-| 대회 복원 | 공유 WizardViewModel, 없으면 상세 재조회 | contestId, name, contestDate | 조회 실패 시 이전 화면 |
+| 대회 복원 | 공유 WizardViewModel 이 진입 시 `GET /contests/{id}` | contestId, name, contestDate, 좌표 | `WizardUiState.contestPhase` LOADING/LOADED/ERROR/NOT_FOUND (D-33) |
 | 패턴 선택 | 순수 도메인 규칙 | PRE/POST/AROUND/DAY/CUSTOM | SPEC §5.2 값 변경 금지 |
 | 직접 날짜 선택 | 로컬 | startDate, endDate | 역순 자동 정렬, 대회일 포함·최대 7일 |
 | 다음 | 로컬 검증 | 완성된 날짜 범위 | 미완성이면 비활성 |
@@ -486,6 +486,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
 | D-30 / SPEC 결정-50 | 이메일·닉네임 중복 확인은 모두 P0에서 호출한다. `Checking` 동안 인증 메일 발송을 막고 `Available`에서 허용하며, `Duplicate`만 확정 차단한다. `Unchecked`·네트워크/`RATE_LIMITED` `Error`는 발송·가입의 서버 유니크 방어를 믿고 진행을 막지 않는다. 입력 변경 시 결과를 즉시 무효화하고 늦은 응답은 버린다 |
 | D-31 / SPEC 결정-51 | Access 30분·Refresh 14일, 기기별 refresh family 회전·재사용 탐지를 적용한다. 로그아웃은 Access 없이 Authenticator가 붙지 않는 클라이언트로 호출하고 non-blank refresh 결과와 무관하게 204를 받으면 로컬 세션을 삭제한다 |
+| D-33 | 위저드 대회 조회 실패는 `WizardUiState.contestPhase`(LOADING/LOADED/ERROR/NOT_FOUND)로 담는다. S3 `RaceDetailUiState.Phase`와 같은 기준이며 ERROR만 [다시 시도], `404`와 canonical id 없는 대회는 NOT_FOUND로 [뒤로]. `race == null`을 로딩으로 읽던 규칙 폐기(이슈 #140) |
 | D-32 / SPEC 결정-52 | 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 계약 PR에서 함께 확인한다(이슈 #111) |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-01 / SPEC 결정-33(08-23 재개정) | 저장 코스 polyline은 2D Google Encoded Polyline precision 5(E5). 고정 `lat,lng` canonical geometry로 fingerprint를 계산하고, `elevationProfileM`은 최대 100개 정수·미보유 `[]`·PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장 |
