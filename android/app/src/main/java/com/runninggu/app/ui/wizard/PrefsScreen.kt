@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
-import com.runninggu.app.ui.common.LoadingState
 
 /**
  * S5 종목·취향. (SPEC §4.8 · AP-11)
@@ -67,15 +66,14 @@ fun PrefsScreen(
             )
         },
         bottomBar = {
-            if (state.race != null) {
+            // 대회를 못 실었으면 다음으로 갈 수 없다 (#189 후속).
+            if (state.contestPhase == WizardUiState.Phase.LOADED) {
                 NextBar(enabled = state.canProceedFromPrefs, onClick = onNext)
             }
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
-            if (state.race == null) {
-                LoadingState("불러오는 중…")
-            } else {
+            WizardContestGate(state = state, onRetry = viewModel::load) {
                 Column(
                     Modifier
                         .fillMaxWidth()

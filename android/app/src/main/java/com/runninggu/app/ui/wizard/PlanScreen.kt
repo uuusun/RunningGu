@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.domain.TripPattern
-import com.runninggu.app.ui.common.LoadingState
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
@@ -69,16 +68,15 @@ fun PlanScreen(
             )
         },
         bottomBar = {
-            if (state.race != null) {
+            // 대회를 못 실었으면 다음으로 갈 수 없다 — 실패·없음 화면에 [다음] 이 붙으면
+            // 눌러도 아무 일이 안 일어난다(#189 후속).
+            if (state.contestPhase == WizardUiState.Phase.LOADED) {
                 NextBar(enabled = state.canProceed, onClick = onNext)
             }
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
-            val race = state.race
-            if (race == null) {
-                LoadingState("불러오는 중…")
-            } else {
+            WizardContestGate(state = state, onRetry = viewModel::load) { race ->
                 Column(
                     Modifier
                         .fillMaxWidth()
