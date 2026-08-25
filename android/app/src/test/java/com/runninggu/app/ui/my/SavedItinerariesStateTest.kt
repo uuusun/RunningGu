@@ -7,6 +7,7 @@ import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.repository.FakeFavoriteRepository
 import com.runninggu.app.data.repository.GenerateItineraryRequest
 import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.data.repository.SavedItineraryPage
@@ -51,7 +52,7 @@ class SavedItinerariesStateTest {
         Dispatchers.setMain(dispatcher)
         SessionStore.resetForTest()
         // 찜 조회가 지연을 남기면 다음 테스트의 Main 이 깨진다 — 즉시 답하게 바꾼다
-        com.runninggu.app.ui.favorite.FavoriteStore.resetForTest(EmptyFavorites)
+        com.runninggu.app.ui.favorite.FavoriteStore.resetForTest(FakeFavoriteRepository)
     }
 
     @After
@@ -80,6 +81,8 @@ class SavedItinerariesStateTest {
         return MyViewModel(
             savedCourseRepository = EmptyCourses,
             itineraryRepository = repository,
+            // 기본값은 ServiceLocator 라 실제 서버를 부른다 — 이 테스트는 동선만 본다
+            favoriteRepository = FakeFavoriteRepository,
         )
     }
 
@@ -198,8 +201,8 @@ class SavedItinerariesStateTest {
 
     @Test
     fun `다음 장을 받는 사이에 지운 동선은 되살아나지 않는다`() = runTest(dispatcher) {
-        // 응답이 요청 전에 잡아 둔 목록을 통째 덮으면, 그사이 지운 카드가
-        // 사라졌다 다시 나타난다 (#181 리뷰)
+        // 요청 전에 잡아 둔 목록을 응답이 통째 덮으면 지운 카드가 사라졌다 다시 나타난다.
+        // 그 응답은 **삭제 전 offset 으로 뜬 것**이라 이어 붙여도 안 되므로 버린다(#181 리뷰).
         val repository = PagedItineraries()
         val viewModel = TestScopeViewModel(repository)
         advanceUntilIdle()
@@ -210,15 +213,39 @@ class SavedItinerariesStateTest {
 
         viewModel.onDeleteItinerary("3")
         advanceUntilIdle()
-        val afterDelete = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
-        assertEquals("삭제가 반영되지 않았다", 19, afterDelete.itineraries.size)
 
+        // 붙들려 있던 다음 장이 이제 도착한다 — 이미 버려진 요청이다
         repository.gate?.complete(Unit)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value.itineraries as SavedItinerariesState.Content
-        assertFalse("지운 카드가 되살아났다", state.itineraries.any { it.id == "3" })
-        assertEquals("받은 다음 장이 안 붙었거나 삭제가 되돌려졌다", 39, state.itineraries.size)
+        val shown = state.itineraries.map { it.id }
+        assertFalse("지운 카드가 되살아났다", "3" in shown)
+        // 보고 있던 범위(1장)를 다시 받아 서버와 맞춘 상태여야 한다
+        assertEquals(repository.storedIds.take(shown.size), shown)
+        assertEquals("버린 다음 장이 그대로 붙었다", 20, shown.size)
+        assertFalse("버튼이 잠긴 채 남았다", state.loadingMore)
+    }
+
+    @Test
+    fun `삭제 뒤 다음 장을 받아도 경계 항목이 빠지지 않는다`() = runTest(dispatcher) {
+        // **`GET /api/itineraries` 는 offset Pageable 이다**(§0-4). 앞 장에서 하나를 지우면
+        // 뒤 항목이 전부 한 칸씩 당겨지므로, 지우기 전 기준으로 다음 장을 받으면 경계에
+        // 있던 항목 하나가 **조용히 건너뛰어진다** — 전체 새로고침 전까지 안 보인다(#181 리뷰).
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onDeleteItinerary("3")
+        advanceUntilIdle()
+
+        viewModel.loadMoreItineraries()
+        advanceUntilIdle()
+
+        val shown = (viewModel.uiState.value.itineraries as SavedItinerariesState.Content)
+            .itineraries.map { it.id }
+        // 화면 목록은 서버 순서의 앞부분과 **정확히** 같아야 한다. 빠진 id 가 있으면 여기서 갈린다.
+        assertEquals(repository.storedIds.take(shown.size), shown)
     }
 
     @Test
@@ -228,6 +255,7 @@ class SavedItinerariesStateTest {
         MyViewModel(
             savedCourseRepository = EmptyCourses,
             itineraryRepository = stub,
+            favoriteRepository = FakeFavoriteRepository,
         )
         advanceUntilIdle()
 
@@ -267,8 +295,19 @@ private class StubItineraries(
  */
 private class PagedItineraries(
     private val pageSize: Int = 20,
-    private val total: Int = 47,
+    total: Int = 47,
 ) : ItineraryRepository {
+
+    /**
+     * 서버가 들고 있는 목록. **[delete] 가 실제로 줄인다.**
+     *
+     * no-op 으로 두면 offset 이 밀리는 것을 재현하지 못한다 — 삭제 뒤 다음 장을 받으면
+     * 경계 항목 하나가 조용히 빠지는데, 그게 안 보인다(#181 리뷰).
+     */
+    private val stored = (0 until total).map { it.toString() }.toMutableList()
+
+    /** 지금 서버에 남아 있는 순서. 화면 목록이 이 앞부분과 정확히 같아야 한다. */
+    val storedIds: List<String> get() = stored.toList()
 
     /** 완료시킬 때까지 다음 장을 붙들어 둔다. null 이면 곧바로 답한다. */
     var gate: CompletableDeferred<Unit>? = null
@@ -289,16 +328,16 @@ private class PagedItineraries(
             }
         }
         val start = page * pageSize
-        val items = (start until minOf(start + pageSize, total)).map { itinerary(it) }
+        val ids = stored.drop(start).take(pageSize)
         return SavedItineraryPage(
-            itineraries = items,
-            hasNext = start + items.size < total,
-            totalElements = total.toLong(),
+            itineraries = ids.map { itinerary(it) },
+            hasNext = start + ids.size < stored.size,
+            totalElements = stored.size.toLong(),
         )
     }
 
-    private fun itinerary(i: Int) = SavedItinerary(
-        id = i.toString(),
+    private fun itinerary(id: String) = SavedItinerary(
+        id = id,
         title = "부산 2박 3일",
         raceName = "부산 마라톤",
         event = "HALF",
@@ -309,7 +348,9 @@ private class PagedItineraries(
         active = true,
     )
 
-    override suspend fun delete(id: Long) = Unit
+    override suspend fun delete(id: Long) {
+        stored.remove(id.toString())
+    }
 
     override suspend fun generate(request: GenerateItineraryRequest): ItineraryResult =
         throw UnsupportedOperationException("이 테스트는 생성을 부르지 않는다")
@@ -323,11 +364,4 @@ private object EmptyCourses : com.runninggu.app.data.repository.SavedCourseRepos
     override suspend fun detail(id: Long): com.runninggu.app.data.model.SavedCourseDetail =
         throw UnsupportedOperationException("이 테스트는 상세를 부르지 않는다")
     override suspend fun delete(id: Long) = Unit
-}
-
-/** 즉시 빈 찜을 주는 스텁. */
-private object EmptyFavorites : com.runninggu.app.ui.favorite.FavoriteRepository {
-    override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(emptySet())
-    override suspend fun add(contestId: String): Result<Unit> = Result.success(Unit)
-    override suspend fun remove(contestId: String): Result<Unit> = Result.success(Unit)
 }

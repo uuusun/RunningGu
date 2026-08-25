@@ -522,6 +522,9 @@ class MyViewModel(
      * **서버가 지운 뒤에 목록에서 뺀다.** 먼저 빼고 실패하면 되돌려야 하는데, 그러면
      * 사라졌다 다시 나타나는 카드를 보게 된다. 삭제는 하트처럼 연타하는 조작이 아니라
      * 왕복을 기다려도 된다.
+     *
+     * 지운 다음에는 **보고 있던 범위를 서버에서 다시 받는다**(#181 리뷰). 목록에서 빼는
+     * 것만으로 끝내면 안 되는 이유는 [reloadShownItineraries] 에 적었다.
      */
     fun onDeleteItinerary(id: String) {
         val serverId = id.toLongOrNull() ?: return
@@ -534,6 +537,8 @@ class MyViewModel(
                 return@launch
             }
             if (epoch != sessionEpoch) return@launch
+            // 왕복을 기다린 뒤라 카드는 곧바로 뺀다 — 재조회를 기다리는 동안 지운 것이
+            // 남아 있으면 삭제가 안 먹은 것처럼 보인다.
             _uiState.update { state ->
                 val shown = state.itineraries as? SavedItinerariesState.Content
                     ?: return@update state
@@ -546,6 +551,55 @@ class MyViewModel(
                     },
                 )
             }
+            reloadShownItineraries(epoch)
+        }
+    }
+
+    /**
+     * 삭제 뒤 **보고 있던 범위(0장~[itinerariesPage])를 다시 받아** 목록을 서버와 맞춘다.
+     *
+     * `GET /api/itineraries` 는 `createdAt DESC, id DESC` 의 **offset Pageable** 이다(§0-4).
+     * 앞 장에서 하나가 빠지면 뒤 항목이 전부 한 칸씩 당겨지므로, 지우기 전 기준으로 다음
+     * 장을 받으면 **경계에 있던 항목 하나가 조용히 건너뛰어진다.** 화면에서 지운 것만
+     * 빼고 두면 그 누락이 전체 새로고침 전까지 남는다(#181 리뷰).
+     *
+     * 진행 중이던 [loadMoreItineraries] 는 **버린다.** 그 응답은 삭제 전 offset 으로 뜬
+     * 것이라 이어 붙이면 같은 누락이 생긴다 — 사용자는 [더 보기] 를 다시 누르면 되고,
+     * 그때는 일관된 범위 위에서 요청이 나간다.
+     *
+     * 재조회가 실패하면 **지운 것만 반영된 목록을 그대로 두고** 알린다. 보이던 목록을
+     * 오류로 덮으면 삭제 하나 때문에 화면이 통째로 사라진다.
+     */
+    private suspend fun reloadShownItineraries(epoch: Int) {
+        val pages = itinerariesPage
+        itinerariesJob?.cancel()
+        val collected = mutableListOf<SavedItinerary>()
+        var hasNext = false
+        var totalElements = 0L
+        try {
+            for (page in 0..pages) {
+                val received = itineraryRepository.list(page = page)
+                collected += received.itineraries
+                hasNext = received.hasNext
+                totalElements = received.totalElements
+            }
+        } catch (e: ApiException) {
+            _message.value = "목록을 새로 고치지 못했어요."
+            return
+        }
+        if (epoch != sessionEpoch) return
+        _uiState.update { state ->
+            state.copy(
+                itineraries = if (collected.isEmpty()) {
+                    SavedItinerariesState.Empty
+                } else {
+                    SavedItinerariesState.Content(
+                        itineraries = collected,
+                        hasNext = hasNext,
+                        totalElements = totalElements,
+                    )
+                },
+            )
         }
     }
 
