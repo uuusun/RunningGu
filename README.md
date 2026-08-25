@@ -140,6 +140,8 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 | [SPEC.md](./SPEC.md) | 서비스 최종 명세 (화면·기능·데이터 계약) — **작업 전 필독** |
 | [AGENTS.md](./AGENTS.md) | Codex·Claude Code 공통 작업 지침 |
 | [CONVENTION.md](./CONVENTION.md) | Git 브랜치·커밋·PR 규칙 |
+| [개발·배포·출시·공모전 제출 지침](./docs/development-release-contest-guide.md) | 운영 배포, Google Play 출시, 심사자료 제출 체크리스트 |
+| [P0·P1·출시·공모전 제출 WBS](./docs/contest-release-wbs.md) | 2026-08-21부터 공모전 마감까지 담당·선행조건·완료 정의·출시 핵심 경로 |
 
 ---
 
