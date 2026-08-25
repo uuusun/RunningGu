@@ -100,6 +100,15 @@ class WizardViewModel(
         }
     }
 
+    /**
+     * S4 의 [다음] 을 눌렀다. **이 뒤의 상태는 사용자가 고른 것**이다. (#192 리뷰)
+     *
+     * 프로세스가 죽고 S5~S7 로 복원되면 이 값이 false 라, 화면이 그걸 보고 S4 로 되돌린다.
+     */
+    fun onPlanConfirmed() {
+        _uiState.update { it.copy(planConfirmed = true) }
+    }
+
     fun load() {
         val id = raceId ?: return
         val serverId = id.toLongOrNull()

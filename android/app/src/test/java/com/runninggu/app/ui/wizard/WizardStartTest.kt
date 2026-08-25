@@ -21,6 +21,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -91,6 +93,53 @@ class WizardStartTest {
         advanceUntilIdle()
 
         assertEquals(1, repository.detailCalls)
+    }
+
+    @Test
+    fun `복원된 상태는 사용자가 고른 것이 아니다`() = runTest(dispatcher) {
+        // 프로세스가 죽으면 되살아나는 것은 그래프 인자의 대회뿐이다. 날짜·종목·취향·숙소는
+        // 기본값으로 돌아오는데 시스템은 S6·S7 로 복원한다 — 그대로 두면 **사용자가 고른 적
+        // 없는 조건으로 동선이 만들어진다**(#192 리뷰).
+        val viewModel = WizardViewModel(
+            FakeContestRepository(),
+            SavedStateHandle(mapOf(Routes.ARG_RACE_ID to "7")),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(WizardUiState.Phase.LOADED, state.contestPhase)
+        // 대회는 실렸지만 이 조건은 사용자의 것이 아니다
+        assertFalse("복원 상태를 사용자 선택으로 오인한다", state.planConfirmed)
+    }
+
+    @Test
+    fun `S4 를 지나오면 사용자가 고른 상태가 된다`() = runTest(dispatcher) {
+        val viewModel = WizardViewModel(
+            FakeContestRepository(),
+            SavedStateHandle(mapOf(Routes.ARG_RACE_ID to "7")),
+        )
+        advanceUntilIdle()
+
+        viewModel.onPlanConfirmed()
+
+        assertTrue(viewModel.uiState.value.planConfirmed)
+    }
+
+    @Test
+    fun `사용자가 고른 조건은 대회 재조회에도 살아남지 않는다`() = runTest(dispatcher) {
+        // load() 는 상태를 새로 만든다. [다시 시도] 로 다시 부르면 확정도 풀려야 한다 —
+        // 안 그러면 기본값이 사용자 선택으로 남는다.
+        val viewModel = WizardViewModel(
+            FakeContestRepository(),
+            SavedStateHandle(mapOf(Routes.ARG_RACE_ID to "7")),
+        )
+        advanceUntilIdle()
+        viewModel.onPlanConfirmed()
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.planConfirmed)
     }
 
     @Test
