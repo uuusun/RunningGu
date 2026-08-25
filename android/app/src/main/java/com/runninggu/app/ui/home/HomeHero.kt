@@ -1,5 +1,7 @@
 package com.runninggu.app.ui.home
 
+import android.app.Activity
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,26 +24,26 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.runninggu.app.ui.model.RaceSummary
+import androidx.core.view.WindowCompat
+import com.runninggu.app.R
 import com.runninggu.app.domain.RegistrationStatus
+import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.dDayLabel
 import com.runninggu.app.ui.model.registrationStatus
 import com.runninggu.app.ui.theme.Archivo
@@ -113,17 +115,11 @@ private fun BrandRow() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Box(
-            modifier = Modifier.size(34.dp).background(Lime, RoundedCornerShape(11.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Place,
-                contentDescription = null,
-                tint = Ink,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        Image(
+            painter = painterResource(R.drawable.app_icon),
+            contentDescription = null,
+            modifier = Modifier.size(34.dp),
+        )
         Text(
             text = "런닝구",
             fontSize = 20.sp,
