@@ -273,6 +273,36 @@ class SavedItinerariesStateTest {
     }
 
     @Test
+    fun `연속으로 지워도 먼저 뜬 재조회가 나중에 덮지 않는다`() = runTest(dispatcher) {
+        // 삭제마다 범위 재조회가 뜨는데, 먼저 뜬 조회는 **그 삭제가 반영되기 전 목록**을
+        // 들고 온다. 늦게 도착해 적용되면 이미 지운 카드가 다시 뜬다(#181 리뷰).
+        val repository = PagedItineraries()
+        val viewModel = TestScopeViewModel(repository)
+        advanceUntilIdle()
+
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        repository.pageZeroGates += first
+        repository.pageZeroGates += second
+
+        viewModel.onDeleteItinerary("3") // 재조회 A — 이 시점 목록에는 "5" 가 아직 있다
+        advanceUntilIdle()
+        viewModel.onDeleteItinerary("5") // 재조회 B
+        advanceUntilIdle()
+
+        // 나중 것부터 도착시킨다. A 가 뒤늦게 와도 화면을 덮으면 안 된다.
+        second.complete(Unit)
+        advanceUntilIdle()
+        first.complete(Unit)
+        advanceUntilIdle()
+
+        val shown = (viewModel.uiState.value.itineraries as SavedItinerariesState.Content)
+            .itineraries.map { it.id }
+        assertFalse("지운 카드가 되살아났다", "5" in shown)
+        assertEquals(repository.storedIds.take(shown.size), shown)
+    }
+
+    @Test
     fun `게스트는 서버를 부르지 않는다`() = runTest(dispatcher) {
         // 마이 진입 자체가 로그인 필요다(결정-4). 헛 왕복을 만들지 않는다
         val stub = StubItineraries(emptyList())
@@ -342,6 +372,14 @@ private class PagedItineraries(
     /** 첫 장 조회를 **한 번만** 실패시킨다. 삭제 뒤 범위 재조회가 깨지는 상황을 만든다. */
     var failPageZeroOnce = false
 
+    /**
+     * 첫 장 조회를 순서대로 붙들어 둔다. 재조회 둘을 **겹치게** 만들려고 쓴다.
+     *
+     * 응답은 **부를 때의 목록**으로 만든다 — 먼저 뜬 조회가 늦게 도착하면 그때는 이미
+     * 지운 항목이 들어 있어야 재현이 된다(#181 리뷰).
+     */
+    val pageZeroGates = ArrayDeque<CompletableDeferred<Unit>>()
+
     /** 요청이 두 번 가지 않았는지 보려고 순서대로 쌓는다. */
     val requestedPages = mutableListOf<Int>()
 
@@ -358,12 +396,16 @@ private class PagedItineraries(
             failPageZeroOnce = false
             throw ApiException.Network(IOException("끊김"))
         }
+        // **부르는 시점**의 목록을 찍어 둔다. 문에 걸린 사이 삭제가 지나가도 이 응답은
+        // 그때의 목록 그대로다 — 실제 서버 응답이 그렇다.
+        val snapshot = stored.toList()
+        if (page == 0) pageZeroGates.removeFirstOrNull()?.await()
         val start = page * pageSize
-        val ids = stored.drop(start).take(pageSize)
+        val ids = snapshot.drop(start).take(pageSize)
         return SavedItineraryPage(
             itineraries = ids.map { itinerary(it) },
-            hasNext = start + ids.size < stored.size,
-            totalElements = stored.size.toLong(),
+            hasNext = start + ids.size < snapshot.size,
+            totalElements = snapshot.size.toLong(),
         )
     }
 

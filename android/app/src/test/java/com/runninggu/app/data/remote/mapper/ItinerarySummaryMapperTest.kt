@@ -20,12 +20,13 @@ class ItinerarySummaryMapperTest {
         recovery: RecoveryDto? = null,
         active: Boolean = true,
         needsRegeneration: Boolean = false,
+        event: String = "HALF",
     ) = ItinerarySummaryDto(
         id = 42L,
         title = "부산 2박 3일",
         contestId = 7L,
         contestName = "부산 마라톤",
-        event = "HALF",
+        event = event,
         region = "부산",
         recovery = recovery,
         startDate = LocalDate.of(2026, 9, 5),
@@ -34,6 +35,20 @@ class ItinerarySummaryMapperTest {
         active = active,
         needsRegeneration = needsRegeneration,
     )
+
+    @Test
+    fun `종목은 서버 enum 이 아니라 사용자 라벨이다`() {
+        // 카드에 `HALF`·`K10` 이 그대로 뜨면 계약 값이 사용자에게 노출된다(#181 리뷰)
+        assertEquals("하프", dto(event = "HALF").toSavedItinerary().event)
+        assertEquals("10K", dto(event = "K10").toSavedItinerary().event)
+    }
+
+    @Test
+    fun `모르는 종목은 버리지 않고 그대로 둔다`() {
+        // 서버가 종목을 늘렸을 때 빈 칸이 되면 그 사실이 화면에서 사라진다.
+        // 낯선 글자가 보이는 편이 낫다 — `sourceTokensOf` 와 같은 판단이다.
+        assertEquals("K3", dto(event = "K3").toSavedItinerary().event)
+    }
 
     @Test
     fun `기간을 MM_DD 로 잇는다`() {

@@ -28,11 +28,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -217,14 +220,61 @@ private fun ProfileHeader(profile: SessionProfile, onOpenAccount: () -> Unit) {
 
 // ── [동선] (SPEC §4.13) ─────────────────────────────────────────
 
+/**
+ * 동선 삭제 확인. (매핑표 S10 `동선 삭제 — 확인 modal, 실패 시 유지`)
+ *
+ * 제목을 넣는 이유는 저장 코스 삭제와 같다 — 목록에서 여러 개를 보다 누른 사용자가
+ * **어느 것을 지우는지** 확인할 수 있어야 한다.
+ *
+ * 실패는 여기서 다루지 않는다. 서버가 지운 뒤에 목록에서 빼므로(`MyViewModel`),
+ * 실패하면 카드가 그대로 남고 스낵바만 뜬다 — 그게 "실패 시 유지" 다.
+ */
 @Composable
-private fun ItineraryList(
+private fun DeleteItineraryDialog(
+    title: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("저장한 동선을 지울까요?") },
+        text = { Text("‘$title’을 마이에서 지웁니다. 되돌릴 수 없어요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("삭제") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    )
+}
+
+/**
+ * **`internal` 인 이유** — 삭제 확인 모달이 서버 요청을 실제로 막는지는 화면을 그려야만
+ * 확인된다. `EditList` 를 계측 테스트가 직접 그리는 것과 같은 방식이다(#71).
+ */
+@Composable
+internal fun ItineraryList(
     state: SavedItinerariesState,
     onDelete: (String) -> Unit,
     onBrowseRaces: () -> Unit,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
 ) {
+    /**
+     * 지울 동선을 고른 상태. **확인 전에는 서버 요청이 나가지 않는다** (매핑표 S10 · #181 리뷰).
+     *
+     * 동선은 되돌릴 수 없는 사용자 데이터라 휴지통이 곧바로 `DELETE` 를 쏘면 안 된다.
+     * 저장 코스 상세가 이미 같은 규칙을 쓴다(`CourseDetailScreen` 의 삭제 확인).
+     */
+    var pendingDelete by remember { mutableStateOf<SavedItinerary?>(null) }
+
+    pendingDelete?.let { target ->
+        DeleteItineraryDialog(
+            title = target.title,
+            onConfirm = {
+                pendingDelete = null
+                onDelete(target.id)
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
+
     // 조회 중·실패를 빈 상태로 뭉뚱그리지 않는다 (§3-5). 저장 코스와 같은 규칙이다.
     when (state) {
         SavedItinerariesState.Loading -> {
@@ -306,7 +356,7 @@ private fun ItineraryList(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = { onDelete(item.id) }) {
+                    IconButton(onClick = { pendingDelete = item }) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제")
                     }
                 }

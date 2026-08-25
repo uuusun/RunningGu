@@ -275,6 +275,14 @@ class MyViewModel(
     private var itinerariesJob: Job? = null
     private var itinerariesPage = 0
 
+    /**
+     * 삭제 뒤 범위 재조회의 세대. **가장 나중에 뜬 것만 화면에 적용한다.** (#181 리뷰)
+     *
+     * 서로 다른 동선을 연속으로 지우면 재조회가 겹친다. 먼저 뜬 조회는 **그 삭제가 반영되기
+     * 전 목록**을 들고 오므로, 늦게 도착해 적용되면 이미 지운 카드가 다시 뜬다.
+     */
+    private var itineraryReloadGeneration = 0
+
     /** 진행 중인 찜 목록 조회. 세션이 바뀌거나 다시 부를 때 끊는다. */
     private var favoritesJob: Job? = null
     private var favoritesPage = 0
@@ -582,9 +590,17 @@ class MyViewModel(
      * `loadingMore` 가 그대로 남으면 `canLoadMore` 가 false 라, 사용자는 화면을 나갔다
      * 오기 전까지 다음 장을 다시 받을 수 없다.
      */
-    private suspend fun reloadShownItineraries(epoch: Int) {
+    private fun reloadShownItineraries(epoch: Int) {
         val pages = itinerariesPage
+        val generation = ++itineraryReloadGeneration
+        // 진행 중이던 [더 보기] 도, 앞선 재조회도 함께 끊는다.
         itinerariesJob?.cancel()
+        itinerariesJob = viewModelScope.launch {
+            reloadShownItineraries(epoch = epoch, pages = pages, generation = generation)
+        }
+    }
+
+    private suspend fun reloadShownItineraries(epoch: Int, pages: Int, generation: Int) {
         val collected = mutableListOf<SavedItinerary>()
         var hasNext = false
         var totalElements = 0L
@@ -597,10 +613,15 @@ class MyViewModel(
             }
         } catch (e: ApiException) {
             _message.value = "목록을 새로 고치지 못했어요."
-            if (epoch == sessionEpoch) unlockItineraryLoadMore()
+            if (epoch == sessionEpoch && generation == itineraryReloadGeneration) {
+                unlockItineraryLoadMore()
+            }
             return
         }
         if (epoch != sessionEpoch) return
+        // **가장 나중에 뜬 재조회만 적용한다.** `cancel()` 로는 부족하다 — 응답이 이미
+        // 도착한 뒤에는 중단점이 없어 취소가 닿지 않는다(#181 리뷰).
+        if (generation != itineraryReloadGeneration) return
         _uiState.update { state ->
             state.copy(
                 itineraries = if (collected.isEmpty()) {

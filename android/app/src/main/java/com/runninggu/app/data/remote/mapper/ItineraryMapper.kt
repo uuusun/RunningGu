@@ -82,7 +82,10 @@ fun ItinerarySummaryDto.toSavedItinerary(): SavedItinerary = SavedItinerary(
     id = id.toString(),
     title = title,
     raceName = contestName,
-    event = event,
+    // 서버 enum(`HALF`·`K10`)을 그대로 두면 카드에 계약 값이 그대로 보인다(#181 리뷰).
+    // 모르는 값은 **버리지 않고 그대로** 둔다 — 빈 칸보다 낯선 글자가 낫고, 서버가 종목을
+    // 늘렸다는 사실이 화면에 드러난다.
+    event = eventTypeOf(event)?.label ?: event,
     recoveryLabel = recovery?.label,
     period = "%s~%s".format(startDate.toPeriodLabel(), endDate.toPeriodLabel()),
     placeCount = placeCount,
