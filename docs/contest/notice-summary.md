@@ -1,5 +1,8 @@
 # 2026 관광데이터 활용 공모전 공고 요약
 
+> 이 문서는 최초 공고의 요약이다. 2026-08-21 공식 공지와 실제 개발·배포·출시·제출 절차는
+> [`../development-release-contest-guide.md`](../development-release-contest-guide.md)를 따른다.
+
 ## 원본 파일
 
 - 공고문: [../../assets/contest/2026-tour-data-contest-notice.pdf](../../assets/contest/2026-tour-data-contest-notice.pdf)
