@@ -79,28 +79,42 @@ val releaseStorePath: String? = localProperties.getProperty("RELEASE_STORE_FILE"
 
 val releaseStoreFile: File? = releaseStorePath?.let(::File)?.takeIf { it.exists() }
 
+/** 서명에 필요한 네 줄. **다 있거나 다 없어야 한다.** */
+val releaseSigningKeys = listOf(
+    "RELEASE_STORE_FILE",
+    "RELEASE_STORE_PASSWORD",
+    "RELEASE_KEY_ALIAS",
+    "RELEASE_KEY_PASSWORD",
+)
+
+/** 네 줄 중 실제로 채워진 것. 빈 값은 안 적은 것으로 본다. */
+val filledSigningKeys: List<String> =
+    releaseSigningKeys.filterNot { localProperties.getProperty(it).isNullOrBlank() }
+
 /**
- * 서명에 필요한 네 줄이 **다 있는가.** (#196 리뷰)
+ * 서명 설정이 쓸 수 있는 상태인가. (#196 리뷰)
  *
  * `API_BASE_URL` 과 같은 기준이다 — **안 적은 것은 경고, 적었는데 모자란 것은 실패다.**
  *
- * 예전에는 keystore 파일 존재만 봤다. 그래서 `RELEASE_STORE_FILE` 은 맞게 적고
- * `RELEASE_STORE_PASSWORD` 를 빠뜨리면 **`unsigned` 가 false 라 경고도 안 뜨고**, AGP 가
- * 저 아래 packaging 에서 자기 문구로 실패했다. 사용자는 무엇을 빠뜨렸는지 못 듣는다.
- * 경로를 틀린 경우도 "keystore 가 없습니다" 경고로 흘러갔는데, 사실은 오타에 가깝다.
+ * **네 줄을 한 덩어리로 본다.** 처음에는 `RELEASE_STORE_FILE` 부터 확인하고 없으면 그냥
+ * 돌아갔는데, 그러면 **경로만 빼고 비밀번호·별칭을 적은 경우가 "아무것도 안 적음" 으로**
+ * 처리돼 경고만 뜨고 빌드가 성공했다. README 는 "하나만 빠져도 멈춘다" 고 적어 두었으니
+ * 문서와 구현이 어긋난 자리였다(#196 재리뷰).
+ *
+ * 그래서 **하나라도 적혀 있으면 나머지 셋과 keystore 파일 존재를 전부 본다.**
+ * 서명 없이 만들려면 네 줄을 모두 비워야 한다 — 그때만 경고로 지나간다.
  *
  * **값은 찍지 않는다** — 비밀번호다(AGENTS 8장). 키 이름만으로 무엇을 채울지 알 수 있다.
  * 경로는 오타를 찾으려면 보여야 해서 예외다.
  */
 val releaseSigningProblems: List<String> = buildList {
-    // 아예 안 적은 것은 "아직 안 정함" 이다. 그건 경고가 맡는다
-    if (releaseStorePath == null) return@buildList
-    if (releaseStoreFile == null) {
+    // 넷 다 비었으면 "아직 안 정함" 이다. 그건 경고가 맡는다
+    if (filledSigningKeys.isEmpty()) return@buildList
+    releaseSigningKeys.filterNot { it in filledSigningKeys }
+        .forEach { add("$it 가 비어 있습니다") }
+    // 경로를 적었는데 그 자리에 파일이 없으면 오타에 가깝다. 경로는 찍어야 찾을 수 있다
+    if (releaseStorePath != null && releaseStoreFile == null) {
         add("keystore 를 찾을 수 없습니다: $releaseStorePath")
-        return@buildList
-    }
-    listOf("RELEASE_STORE_PASSWORD", "RELEASE_KEY_ALIAS", "RELEASE_KEY_PASSWORD").forEach { key ->
-        if (localProperties.getProperty(key).isNullOrBlank()) add("$key 가 비어 있습니다")
     }
 }
 
@@ -218,8 +232,8 @@ tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.co
     val placeholderUrl = currentBaseUrl.contains("runninggu.example")
     val baseUrlProblems = if (placeholderUrl) emptyList() else apiBaseUrlProblems(currentBaseUrl)
     val signingProblems = releaseSigningProblems
-    // 아예 안 적었을 때만 경고다. 적었는데 모자란 것은 아래에서 실패시킨다
-    val unsigned = releaseStorePath == null
+    // **넷 다 비었을 때만** 경고다. 하나라도 적혔는데 모자라면 아래에서 실패시킨다
+    val unsigned = filledSigningKeys.isEmpty()
     doFirst {
         if (baseUrlProblems.isNotEmpty()) {
             throw GradleException(
