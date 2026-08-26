@@ -174,7 +174,8 @@ develop → main PR → 리뷰·릴리스 검증 → merge → vX.Y.Z tag
 cd android
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --console=plain
 
-# 릴리스 서명 설정이 완료된 뒤 릴리스 산출물
+# 릴리스 산출물 (서명키·배포 주소는 local.properties 에서 읽는다 — README 「릴리스 빌드」)
+# 둘 다 없어도 빌드는 되고 경고만 뜬다. 그 산출물은 스토어에 올릴 수 없다.
 .\gradlew.bat :app:assembleRelease :app:bundleRelease --console=plain
 
 # Backend 단위·PostgreSQL 통합 테스트·실행 JAR
@@ -378,12 +379,12 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 
 ## 8. 현재 저장소의 출시 차단 항목
 
-아래는 2026-08-21 `develop` 기준이다. 완료될 때마다 근거 PR·검증 명령을 붙여 갱신한다.
+아래는 2026-08-26 `develop` 기준이다. 완료될 때마다 근거 PR·검증 명령을 붙여 갱신한다.
 
 | 상태 | 차단 항목 | 현재 근거 | 완료 조건 |
 |---|---|---|---|
-| **BLOCKER** | 운영 API 호스트 미정 | release `BASE_URL`이 `api.runninggu.example` | 실제 HTTPS 도메인·인증서·운영 연결 |
-| **BLOCKER** | Android 릴리스 서명 미설정 | `signingConfig` 없음 | upload key 안전 보관, Play App Signing, CI/로컬 서명 절차 |
+| **BLOCKER** | 운영 API 호스트 미정 | 호스트가 아직 없다. release `BASE_URL`은 `local.properties` 의 `API_BASE_URL`을 쓰고, 없으면 `api.runninggu.example` 자리표시자 + 빌드 경고 (#196) | 실제 HTTPS 도메인·인증서·운영 연결 후 `API_BASE_URL` 확정 |
+| **BLOCKER** | Android 릴리스 서명 미완료 | `local.properties` 에 keystore가 있을 때만 붙는 조건부 release `signingConfig` 추가 (#196). 실제 upload key는 아직 없어 산출물은 서명 없이 나온다 | upload key 안전 보관, Play App Signing, CI/로컬 서명 절차 |
 | **BLOCKER** | R8 비활성 | release optimization `enable = false`, NFR-14와 충돌 | R8 활성 후 회귀 테스트·필요 keep rule |
 | **BLOCKER** | 카카오 릴리스 설정 미완료 | build 설정에 네이티브 키 주입·릴리스 키 해시 설정 없음 | 패키지명+debug/release 키 해시 등록, 스토어 설치본 로그인/지도 확인 |
 | **BLOCKER** | 위치 기능·신고 미완료 | Manifest에 위치 권한·서비스 없음, 서버 좌표 전송 설계 | 기능 구현, 정책 신고, 위치정보 사전 검토·필요 신고 |
