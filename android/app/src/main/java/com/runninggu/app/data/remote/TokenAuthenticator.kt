@@ -82,6 +82,9 @@ class TokenAuthenticator(
         // 재발급한 토큰으로도 401 이면 서버 문제다 — 무한 재시도를 막는다
         if (response.priorResponseCount() >= MAX_RETRY) return null
 
+        // 401 이라고 다 만료는 아니다. 업무 오류면 손대지 않는다
+        if (!response.meansAccessTokenExpired()) return null
+
         // 이 요청을 만들 때의 세션과 지금 세션이 다르면 남의 요청이다 — 손대지 않는다.
         // 로그아웃했거나 다른 계정으로 갈아탄 뒤라 재시도하면 계정이 섞인다
         val epoch = sessionEpoch()
@@ -118,6 +121,34 @@ class TokenAuthenticator(
         }
     }
 
+    /**
+     * 이 `401` 이 **액세스 토큰 만료**인지 본다. (#198 리뷰 · 명세 §2-2 · 부록 D)
+     *
+     * 상태 코드만 보면 안 된다. 탈퇴 재인증은 비밀번호가 틀리면 `401 REAUTH_FAILED`,
+     * 5분 토큰이 지나면 `401 INVALID_REAUTH_TOKEN` 을 준다 — **사용자가 고쳐야 넘어가는
+     * 업무 오류**이지 토큰이 만료된 것이 아니다. 그런데도 재발급을 부르면 비밀번호를 틀릴
+     * 때마다 리프레시가 회전하고, 그 재발급이 한 번 실패하는 순간 [onGiveUp] 이 불려
+     * **멀쩡한 세션까지 로그아웃된다.**
+     *
+     * 그래서 본문 `code` 로 가른다.
+     *
+     * | 본문 `code` | 어떻게 |
+     * |---|---|
+     * | `UNAUTHORIZED` | 명세가 "토큰 없음·만료" 로 못박은 코드다 — **재발급한다** |
+     * | 못 읽음([ApiErrorCode.UNKNOWN]) | 프록시·게이트웨이가 낸 401 이다. 업무 오류일 수 없으니 지금까지처럼 재발급한다 ([httpErrorOf] 와 같은 이유) |
+     * | 그 밖의 아는 코드 | 업무 오류다 — 손대지 않고 원 응답을 화면까지 올린다 |
+     *
+     * 본문은 [Response.peekBody] 로 **엿본다.** `body` 를 읽어 버리면 정작 화면까지
+     * 올라가야 할 원 응답이 빈 껍데기가 된다.
+     */
+    private fun Response.meansAccessTokenExpired(): Boolean {
+        val body = runCatching { peekBody(MAX_PROBLEM_BYTES).string() }.getOrNull()
+        return when (httpErrorOf(code, body).code) {
+            ApiErrorCode.UNAUTHORIZED, ApiErrorCode.UNKNOWN -> true
+            else -> false
+        }
+    }
+
     private fun Request.retryWith(accessToken: String): Request =
         newBuilder().header(AUTHORIZATION, "$BEARER$accessToken").build()
 
@@ -137,5 +168,8 @@ class TokenAuthenticator(
 
         /** 한 번만 재발급해 본다. */
         const val MAX_RETRY = 1
+
+        /** problem+json 을 엿볼 때 읽을 최대 크기. 오류 본문이 이보다 클 일은 없다. */
+        const val MAX_PROBLEM_BYTES = 64L * 1024
     }
 }
