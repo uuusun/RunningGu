@@ -1,8 +1,10 @@
 package com.runninggu.app.data.remote
 
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,10 +23,21 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class TokenAuthenticatorTest {
 
+    /**
+     * `401` 응답. [code] 는 problem+json 본문의 오류 코드다. (§0-3)
+     *
+     * 인증자가 **본문까지 봐야** 만료와 업무 오류를 가를 수 있다. 기본값은 `UNAUTHORIZED`
+     * — 액세스 토큰이 만료된 평범한 401 이고, 아래 대부분의 테스트가 보는 상황이다.
+     *
+     * `code = null` 로 부르면 **본문 없는 401** 이 된다. `priorResponse` 로 쓸 응답은
+     * OkHttp 가 본문 있는 것을 안 받으므로 그렇게 만든다.
+     */
     private fun unauthorized(
         sentToken: String? = "access-1",
         prior: Response? = null,
         epoch: Int? = 1,
+        code: String? = "UNAUTHORIZED",
+        rawBody: String? = null,
     ): Response {
         val request = Request.Builder()
             .url("https://api.test/me/courses")
@@ -38,7 +51,12 @@ class TokenAuthenticatorTest {
             .protocol(Protocol.HTTP_1_1)
             .code(401)
             .message("Unauthorized")
-            .apply { prior?.let(::priorResponse) }
+            .apply {
+                // 본문은 준 경우에만 붙인다. OkHttp 는 **본문 있는 응답을 priorResponse 로 못 받는다**
+                val problem = rawBody ?: code?.let { """{"status":401,"code":"$it"}""" }
+                problem?.let { body(it.toResponseBody("application/problem+json".toMediaType())) }
+                prior?.let(::priorResponse)
+            }
             .build()
     }
 
@@ -231,10 +249,123 @@ class TokenAuthenticatorTest {
             onGiveUp = { _ -> },
         )
 
-        val retry = authenticator.authenticate(null, unauthorized(prior = unauthorized()))
+        val retry = authenticator.authenticate(null, unauthorized(prior = unauthorized(code = null)))
 
         assertNull(retry)
         assertEquals(0, calls)
+    }
+
+    /**
+     * 업무 401 을 만료로 처리하지 않는다. (#198 리뷰 · 명세 §2-2 · 부록 D)
+     *
+     * 탈퇴 재인증은 `MeApi` 를 통해 **공통 클라이언트**로 나가고, 여기에 이 인증자가 붙어
+     * 있다. 그런데 재인증은 비밀번호가 틀리면 `401 REAUTH_FAILED`, 5분 토큰이 지나면
+     * `401 INVALID_REAUTH_TOKEN` 을 **정상 업무 오류로** 준다.
+     *
+     * 상태 코드만 보고 재발급하면 두 가지가 한꺼번에 무너진다. 하나는 **비밀번호를 틀릴
+     * 때마다 리프레시가 회전**하는 것이고, 다른 하나는 그 재발급이 한 번 실패했을 때
+     * **아직 멀쩡한 세션이 로그아웃**되는 것이다.
+     */
+    @Test
+    fun `재인증 실패 401 은 재발급하지 않고 그대로 올린다`() {
+        var refreshCalls = 0
+        var signedOut = false
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> signedOut = true },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(code = "REAUTH_FAILED"))
+
+        // null 을 돌려주면 OkHttp 가 원 401 을 그대로 호출부까지 올린다
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
+        assertFalse("현재 비밀번호를 틀렸다고 로그아웃시키면 안 된다", signedOut)
+    }
+
+    @Test
+    fun `만료된 탈퇴 토큰 401 도 재발급하지 않는다`() {
+        var refreshCalls = 0
+        var signedOut = false
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> signedOut = true },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(code = "INVALID_REAUTH_TOKEN"))
+
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
+        // 5분이 지났으면 재인증부터 다시 할 일이지, 로그인부터 다시 할 일이 아니다
+        assertFalse(signedOut)
+    }
+
+    @Test
+    fun `UNAUTHORIZED 는 지금까지처럼 재발급한다`() {
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> error("여기 오면 안 된다") },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(code = "UNAUTHORIZED"))
+
+        assertEquals("Bearer access-2", retry?.header("Authorization"))
+    }
+
+    @Test
+    fun `코드를 못 읽는 401 도 재발급하지 않는다`() {
+        // `UNKNOWN` 은 프록시가 낸 본문 없는 401 만이 아니다. **서버가 새로 추가한 업무 401
+        // 코드를 앱이 아직 모를 때도** 여기로 떨어진다(`ApiErrorCode.from`). 살려 두면
+        // 앞으로 늘어날 업무 오류가 전부 재발급을 돌아, 이 관문이 막으려던 문제가 그대로
+        // 재발한다 — 그때는 원인을 찾기가 더 어렵다 (#198 리뷰)
+        var refreshCalls = 0
+        var signedOut = false
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> signedOut = true },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(rawBody = "<html>Gateway Timeout</html>"))
+
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
+        assertFalse(signedOut)
+    }
+
+    @Test
+    fun `본문 없는 401 도 재발급하지 않는다`() {
+        // 계약은 모든 오류에 code 를 준다(§0-3 · NFR-17). 본문이 없는 401 은 계약 밖의
+        // 응답이라, 거기에 맞춰 세션을 회전시킬 이유가 없다
+        var refreshCalls = 0
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(code = null))
+
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
     }
 }
 
