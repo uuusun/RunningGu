@@ -48,6 +48,3 @@ dist/
 
 # Local-only documentation
 /docs/local/
-
-# Local-only agent instructions
-/AGENTS.md
