@@ -9,6 +9,7 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.AuthSession
 import com.runninggu.app.data.repository.MemberRepository
+import com.runninggu.app.data.repository.ReauthCredential
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -231,6 +232,9 @@ private class FakePasswordRepository(private val result: Result<AuthTokens>) : M
 
     override suspend fun updateNickname(nickname: String): SessionProfile = unused()
     override suspend fun updateMarketing(agreed: Boolean): SessionProfile = unused()
+    // #198 이 MemberRepository 에 더한 것. 이 파일은 탈퇴를 부르지 않는다
+    override suspend fun reauth(credential: ReauthCredential): String = unused()
+    override suspend fun withdraw(reauthToken: String) = unused<Unit>()
 
     private fun <T> unused(): T =
         throw UnsupportedOperationException("이 테스트는 비밀번호 변경만 부른다")
@@ -250,6 +254,9 @@ private class BlockingPasswordRepository : MemberRepository {
 
     override suspend fun updateNickname(nickname: String): SessionProfile = unused()
     override suspend fun updateMarketing(agreed: Boolean): SessionProfile = unused()
+    // #198 이 MemberRepository 에 더한 것. 이 파일은 탈퇴를 부르지 않는다
+    override suspend fun reauth(credential: ReauthCredential): String = unused()
+    override suspend fun withdraw(reauthToken: String) = unused<Unit>()
 
     private fun <T> unused(): T =
         throw UnsupportedOperationException("이 테스트는 비밀번호 변경만 부른다")
