@@ -1,5 +1,6 @@
 package com.runninggu.app.data.model
 
+import com.runninggu.app.domain.LatLng
 import java.time.LocalDate
 
 /**
@@ -31,7 +32,21 @@ data class SavedCourse(
 data class SavedCourseDetail(
     val course: SavedCourse,
     val elevationProfileM: List<Int>,
-    val pathPolyline: String?,
+    /**
+     * 인코딩된 경로 **원문**. 서버에 되돌려 보낼 일이 있으면 이 값을 그대로 쓴다 —
+     * 풀었다 다시 묶으면 `routeFingerprint` 가 달라진다(§7-A · [NearbyItem.Route] 와 같은 이유).
+     *
+     * **상세에는 항상 온다**(§7-A). 없는 응답은 계약 위반이라 해석 단계에서 걸린다(#209 리뷰).
+     */
+    val pathPolyline: String,
+    /**
+     * 지도에 그릴 좌표열. `data/remote` 매퍼가 [pathPolyline] 을 풀어 채운다 (AGENTS 2장-4 · #129).
+     *
+     * **원문이 필수여도 이건 비어 있을 수 있다.** 디코더는 깨진 입력에 예외를 던지지 않고
+     * 읽은 만큼만 돌려준다 — 코스 상세가 통째로 안 열리는 것보다 낫기 때문이다(NFR-1·3).
+     * 그래서 화면은 "필드가 없다" 가 아니라 **"풀었더니 점이 2개가 안 된다"** 를 본다.
+     */
+    val path: List<LatLng> = emptyList(),
     val attributions: List<String>,
 )
 
