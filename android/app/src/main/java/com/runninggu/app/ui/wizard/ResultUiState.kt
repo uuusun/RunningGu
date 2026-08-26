@@ -8,6 +8,7 @@ import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
 import com.runninggu.app.data.model.PoiItem
+import com.runninggu.app.ui.map.MapMarker
 
 /**
  * S7 동선 결과의 UI 계약. (SPEC §4.10 · §3-5)
@@ -29,6 +30,13 @@ data class ResultUiState(
     val activeDayIndex: Int = 0,
     /** 편집 모드. [편집]↔[완료]로 오간다. (SPEC §4.10) */
     val isEditing: Boolean = false,
+    /**
+     * 핀을 탭해 활성화한 블록. (SPEC §3-8 — "핀 탭 → 해당 항목 활성화")
+     *
+     * null 이면 아무것도 안 고른 상태다. 처음 그릴 때 하나를 골라 두지 않는다 —
+     * 카메라가 전체 bounds 로 맞춰져야 하루 동선이 한눈에 들어온다.
+     */
+    val activeBlockId: String? = null,
     /** 후보 시트. null 이면 닫힌 상태다. (SPEC §4.10) */
     val sheet: CandidateSheetState? = null,
     val errorMessage: String? = null,
@@ -77,6 +85,50 @@ data class ResultUiState(
     /** 서버가 준 일자별 회복 플래그. */
     val recoveryFlags: List<Boolean>
         get() = result?.recoveryFlags.orEmpty()
+
+    /**
+     * 활성 일자의 지도 핀. (SPEC §3-8 · §4.10 · AP-03)
+     *
+     * **좌표가 있는 블록만** 선다. 서버가 외부 POI 조회에 실패하면 `placeName`·`lat`·`lng`
+     * 를 null 로 강등하되 생성은 성공시키므로(API 명세 §5-1 · NFR-3), 장소 없는 블록이
+     * 정상적으로 섞여 온다. 그 블록은 지도에 세울 자리가 없다.
+     *
+     * 번호는 [ItineraryEdits.dayPins] 가 매긴 값을 그대로 쓴다 — 그쪽이 SPEC §5.7 의
+     * 파생 규칙이다.
+     *
+     * ## ⚠️ 좌표 없는 블록이 섞이면 카드 번호와 어긋난다
+     *
+     * 타임라인 카드는 블록 **전체**를 `index + 1` 로 매기는데(`Timeline`), `dayPins` 는
+     * 좌표 있는 것만 1부터 다시 매긴다. `1 대회 · 2 (좌표없음) · 3 카페` 면 카드는
+     * `1 · 2 · 3`, 핀은 `1 · 2` 라 카페가 카드에서 3, 지도에서 2가 된다.
+     *
+     * S8 은 #158 리뷰에서 반대로 정했다 — 핀 번호를 목록 번호에 맞추고 중간을 비운다.
+     * 다만 `dayPins` 의 재번호는 SPEC §5.7 과 원본(`reference-web/edits.js`) 양쪽과
+     * 맞아서 여기서 임의로 바꾸지 않았다. **어느 쪽으로 맞출지 결정이 필요하다.**
+     */
+    val mapPins: List<MapMarker>
+        get() {
+            val recovery = isRecoveryDay(activeDayIndex)
+            return ItineraryEdits.dayPins(activeDay).map { pin ->
+                MapMarker(
+                    id = pin.blockId,
+                    order = pin.n,
+                    lat = pin.lat,
+                    lng = pin.lng,
+                    // 회복일은 액센트가 파랑 대신 주황이다 (SPEC §3-8 범례)
+                    recovery = recovery,
+                )
+            }
+        }
+
+    /**
+     * 지금 보고 있는 핀. 카메라가 여기로 따라간다. (SPEC §3-8)
+     *
+     * 핀 id 가 곧 블록 id 라 타임라인 카드와 짝을 맞출 수 있다. 일자를 옮기면 그 블록이
+     * 이 일자에 없으므로 **null 로 떨어진다** — 남겨 두면 카메라가 어제 자리로 간다.
+     */
+    val activePinId: String?
+        get() = activeBlockId?.takeIf { id -> mapPins.any { it.id == id } }
 }
 
 /**

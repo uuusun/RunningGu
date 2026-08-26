@@ -109,7 +109,21 @@ class ResultViewModel(
 
     /** 일자 탭 선택. 지도와 타임라인이 함께 따라간다. (SPEC §4.10) */
     fun onDaySelect(index: Int) {
-        _uiState.update { it.copy(activeDayIndex = index) }
+        // 일자를 옮기면 고른 핀도 푼다. 안 풀면 어제 고른 블록이 남아 카메라가 그리로
+        // 간다 — `activePinId` 가 걸러 주지만 상태에 남기지 않는 편이 읽기 쉽다.
+        _uiState.update { it.copy(activeDayIndex = index, activeBlockId = null) }
+    }
+
+    /**
+     * 지도 핀을 탭했다. (SPEC §3-8 — "핀 탭 → 해당 항목 활성화 콜백")
+     *
+     * 핀 id 가 곧 블록 id 다. 같은 핀을 다시 누르면 **푼다** — 눌러서 고른 것은 눌러서
+     * 놓을 수 있어야 하고, 그래야 카메라를 전체 bounds 로 되돌릴 방법이 생긴다.
+     */
+    fun onPinClick(blockId: String) {
+        _uiState.update {
+            it.copy(activeBlockId = if (it.activeBlockId == blockId) null else blockId)
+        }
     }
 
     // ── 저장 전 로컬 편집 (SPEC §4.10 · §5.7) ───────────────────

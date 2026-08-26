@@ -7,12 +7,14 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -77,6 +81,8 @@ import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
+import com.runninggu.app.ui.map.MapScene
+import com.runninggu.app.ui.map.RunningGuMap
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
@@ -167,6 +173,7 @@ fun ResultScreen(
                 ResultUiState.Phase.CONTENT -> Content(
                     state = state,
                     onDaySelect = viewModel::onDaySelect,
+                    onPinClick = viewModel::onPinClick,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
@@ -194,6 +201,7 @@ fun ResultScreen(
 private fun Content(
     state: ResultUiState,
     onDaySelect: (Int) -> Unit,
+    onPinClick: (String) -> Unit,
     onOpenCourses: () -> Unit,
     onToggleEdit: () -> Unit,
     onRemoveBlock: (String) -> Unit,
@@ -227,8 +235,7 @@ private fun Content(
     ) {
         // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
         item(key = "map") {
-            // TODO(AP-03): 상단 지도. 활성 일자의 번호 핀·폴리라인 (SPEC §3-8 · §4.10).
-            MapPlaceholder()
+            DayMap(state = state, onPinClick = onPinClick)
         }
 
         item(key = "summary") {
@@ -291,7 +298,11 @@ private fun Content(
                 // "지금 보이는 카드" 를 돌려준다 — §4.10 의 중앙 밴드 자동 활성이 서는 조건이다.
                 itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
                     Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                        TimelineRow(number = index + 1, block = block)
+                        TimelineRow(
+                            number = index + 1,
+                            block = block,
+                            active = block.id == state.activeBlockId,
+                        )
                         // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
                         // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
                         if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
@@ -932,14 +943,21 @@ private fun DayNote(note: String) {
 
 /** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
-private fun TimelineRow(number: Int, block: ItineraryBlock) {
-    Row(Modifier.fillMaxWidth()) {
+private fun TimelineRow(number: Int, block: ItineraryBlock, active: Boolean = false) {
+    val requester = remember { BringIntoViewRequester() }
+    // 고른 순간에만 끌어온다. 매 컴포지션마다 부르면 사용자가 스크롤한 것을 되돌린다.
+    LaunchedEffect(active) {
+        if (active) requester.bringIntoView()
+    }
+    Row(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
         NumberRail(number)
         Spacer(Modifier.width(12.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.medium,
-            tonalElevation = 1.dp,
+            // 색이 아니라 테두리로 표시한다. 카드 배경을 바꾸면 회복 배지·태그 색과 겹친다
+            border = if (active) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+            tonalElevation = if (active) 3.dp else 1.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(14.dp)) {
@@ -1049,20 +1067,48 @@ private fun CourseLinkCard(targetKm: Double, onClick: () -> Unit) {
     }
 }
 
-/** 지도 자리. AP-03 에서 카카오맵으로 바뀐다. (SPEC §3-8) */
+/**
+ * 활성 일자의 지도. (SPEC §3-8 · §4.10 · AP-03)
+ *
+ * **핀을 잇는다** — 하루 동선은 방문 순서가 있어서 폴리라인이 의미를 갖는다.
+ * S8 러닝코스가 흩어진 장소를 안 잇는 것과 반대다(§4.11-4).
+ *
+ * 카메라는 [MapScene] 규칙이 정한다 — 일자를 바꾸면 전체 bounds, 핀만 골랐으면 그 좌표로
+ * 이동이다. 핀을 탭하면 [onPinClick] 이 그 블록을 활성으로 만들고 카드가 따라 강조된다.
+ *
+ * ## 좌표가 하나도 없으면 안내만 남긴다
+ *
+ * 서버가 외부 POI 조회에 실패하면 장소를 null 로 강등하되 생성은 성공시킨다(§5-1 ·
+ * NFR-3). 그날 블록이 전부 그러면 세울 핀이 없다. **그래도 타임라인은 정상이다** —
+ * 지도 영역에만 안내를 띄우고 나머지는 그대로 둔다(§3-8 실패 격리 · NFR-1·3).
+ */
 @Composable
-private fun MapPlaceholder() {
+private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
+    val pins = state.mapPins
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = "지도는 준비 중이에요",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (pins.isEmpty()) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    // 조회 중에 단정하지 않는다 — 내용이 있는데 좌표만 없는 경우다
+                    text = "이 날은 지도에 표시할 장소가 없어요",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            RunningGuMap(
+                scene = MapScene(
+                    pins = pins,
+                    connectPins = true,
+                    activePinId = state.activePinId,
+                ),
+                modifier = Modifier.fillMaxSize(),
+                onPinClick = onPinClick,
             )
         }
     }
