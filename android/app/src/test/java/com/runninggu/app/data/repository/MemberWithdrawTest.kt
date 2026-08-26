@@ -56,7 +56,7 @@ class MemberWithdrawTest {
     fun `재인증은 5분 토큰을 돌려준다`() = runTest {
         val api = RecordingWithdrawApi(reauth = ReauthResponseDto(reauthToken = "R-5MIN", expiresInSec = 300))
 
-        val token = RemoteMemberRepository(api).reauth(LoginProvider.EMAIL, password = "run4life1")
+        val token = RemoteMemberRepository(api).reauth(ReauthCredential.Password("run4life1"))
 
         assertEquals("R-5MIN", token)
         assertEquals("EMAIL", api.sentReauth?.provider)
@@ -95,7 +95,7 @@ class MemberWithdrawTest {
         )
 
         val thrown = runCatching {
-            RemoteMemberRepository(api).reauth(LoginProvider.KAKAO, kakaoAccessToken = "t")
+            RemoteMemberRepository(api).reauth(ReauthCredential.Kakao("t"))
         }.exceptionOrNull()
 
         assertEquals(ApiErrorCode.REAUTH_PROVIDER_MISMATCH, (thrown as? ApiException.Http)?.code)
@@ -106,7 +106,7 @@ class MemberWithdrawTest {
         val api = RecordingWithdrawApi(error = ApiException.Http(401, ApiErrorCode.REAUTH_FAILED, null))
 
         val result = runCatching {
-            RemoteMemberRepository(api).reauth(LoginProvider.EMAIL, password = "wrong")
+            RemoteMemberRepository(api).reauth(ReauthCredential.Password("wrong"))
         }
 
         assertTrue(result.isFailure)

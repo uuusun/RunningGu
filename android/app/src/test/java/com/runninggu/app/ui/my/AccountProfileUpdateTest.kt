@@ -9,6 +9,7 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.AuthSession
 import com.runninggu.app.data.repository.MemberRepository
+import com.runninggu.app.data.repository.ReauthCredential
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -243,11 +244,8 @@ private class FakeMemberRepository(private val result: Result<SessionProfile>) :
     override suspend fun updatePassword(currentPassword: String, newPassword: String) =
         throw UnsupportedOperationException("이 테스트는 비밀번호 변경을 부르지 않는다")
 
-    override suspend fun reauth(
-        provider: com.runninggu.app.data.local.LoginProvider,
-        password: String?,
-        kakaoAccessToken: String?,
-    ) = throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
+    override suspend fun reauth(credential: ReauthCredential) =
+        throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
 
     override suspend fun withdraw(reauthToken: String) =
         throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
@@ -274,11 +272,8 @@ private class BlockingMemberRepository(private val profile: SessionProfile) : Me
     override suspend fun updatePassword(currentPassword: String, newPassword: String) =
         throw UnsupportedOperationException("이 테스트는 비밀번호 변경을 부르지 않는다")
 
-    override suspend fun reauth(
-        provider: com.runninggu.app.data.local.LoginProvider,
-        password: String?,
-        kakaoAccessToken: String?,
-    ) = throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
+    override suspend fun reauth(credential: ReauthCredential) =
+        throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
 
     override suspend fun withdraw(reauthToken: String) =
         throw UnsupportedOperationException("이 테스트는 탈퇴를 부르지 않는다")
