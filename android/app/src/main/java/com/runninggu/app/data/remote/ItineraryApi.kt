@@ -2,8 +2,11 @@ package com.runninggu.app.data.remote
 
 import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
+import com.runninggu.app.data.remote.dto.ItineraryDetailDto
 import com.runninggu.app.data.remote.dto.ItinerarySummaryDto
 import com.runninggu.app.data.remote.dto.PageDto
+import com.runninggu.app.data.remote.dto.SaveItineraryRequestDto
+import com.runninggu.app.data.remote.dto.SaveItineraryResponseDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -27,6 +30,26 @@ interface ItineraryApi {
      */
     @POST("itineraries/generate")
     suspend fun generate(@Body body: GenerateItineraryRequestDto): GenerateItineraryResponse
+
+    /**
+     * 동선 저장. **인증 필요**. (§5-2 🔒)
+     *
+     * 요청은 [generate] 응답 구조 그대로에 클라이언트 편집을 반영한 것이다.
+     * 같은 `(user, contestId, startDate, endDate)` 가 이미 있으면 새로 만들지 않고
+     * **교체**하며 `replaced=true` 로 알린다 — trip id 가 `{대회id}-{시작일}-{종료일}` 인
+     * SPEC §4.10 의 "동일 id 교체" 계약을 잇는다.
+     */
+    @POST("itineraries")
+    suspend fun save(@Body body: SaveItineraryRequestDto): SaveItineraryResponseDto
+
+    /**
+     * 저장 동선 상세. **인증·소유자**. (§5-5)
+     *
+     * S7 복원·편집 모드 진입용이다. 트리는 저장 시점 snapshot 이고, 최신 대회는 `contest`
+     * 로 따로 온다 — 서버가 둘을 섞지 않으므로 앱도 섞지 않는다.
+     */
+    @GET("itineraries/{id}")
+    suspend fun detail(@Path("id") id: Long): ItineraryDetailDto
 
     /** 내 동선 목록. Pageable 이다 (§5-4 · §0-4). */
     @GET("itineraries")

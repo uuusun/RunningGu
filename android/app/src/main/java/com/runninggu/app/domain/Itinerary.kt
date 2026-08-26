@@ -63,6 +63,16 @@ data class ItineraryDay(
     val dateLabel: String,
     val note: String,
     val blocks: List<ItineraryBlock>,
+    /**
+     * 서버가 붙인 일자 id. **저장 동선을 복원했을 때만 있다.** (API 명세 §5-5 · #202 리뷰)
+     *
+     * 생성 응답(§5-1)은 DB 저장이 없어 id 가 없으므로 `null` 이다.
+     *
+     * 저장 후 편집 API 가 전부 `/itineraries/{id}/days/{dayId}/blocks/...` 라, 이 값을
+     * 버리면 화면이 **응답을 다시 조회하거나 평행 맵을 만들지 않고는 그 API 를 못 부른다.**
+     * [ItineraryBlock.id] 가 서버 블록 id 를 이미 들고 있는 것과 같은 이유다.
+     */
+    val serverId: Long? = null,
 )
 
 /**

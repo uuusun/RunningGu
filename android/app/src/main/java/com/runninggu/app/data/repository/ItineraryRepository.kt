@@ -3,6 +3,9 @@ package com.runninggu.app.data.repository
 import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.model.SavedItinerary
+import com.runninggu.app.data.model.SavedItineraryDetail
+import com.runninggu.app.data.remote.mapper.toDetail
+import com.runninggu.app.data.remote.mapper.toSaveRequest
 import com.runninggu.app.data.remote.mapper.toSavedItinerary
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.ItineraryApi
@@ -58,6 +61,27 @@ interface ItineraryRepository {
         SavedItineraryPage()
 
     /**
+     * 편집을 마친 동선을 저장한다. (`POST /api/itineraries` · §5-2 🔒)
+     *
+     * **같은 대회·같은 기간이면 새로 쌓이지 않고 교체된다.** 그래서 결과가 [SaveOutcome]
+     * 이다 — 화면이 "저장했어요" 와 "이전 것을 덮어썼어요" 를 가를 수 있어야 한다.
+     *
+     * 기본 구현은 [list] 와 달리 **예외를 던진다.** 생성만 쓰는 구현이 여럿이라 기본
+     * 구현 자체는 두되, 조용히 성공한 척하면 저장 안 된 동선을 저장됐다고 그리게 된다.
+     */
+    suspend fun save(result: ItineraryResult): SaveOutcome =
+        throw UnsupportedOperationException("이 구현은 동선을 저장하지 않는다 (§5-2)")
+
+    /**
+     * 저장 동선 상세. (`GET /api/itineraries/{id}` · §5-5)
+     *
+     * 마이[동선] 카드 → S7 복원에 쓴다. [list] 와 같은 이유로 기본 구현을 둔다 — 생성만
+     * 쓰는 구현이 여럿이라, 없으면 빈 override 만 늘어난다.
+     */
+    suspend fun detail(id: Long): SavedItineraryDetail =
+        throw UnsupportedOperationException("이 구현은 저장 동선을 복원하지 않는다")
+
+    /**
      * 저장 동선 삭제. (`DELETE /api/itineraries/{id}` · §5-6)
      *
      * [list] 와 함께 **기본 구현을 둔다.** 생성만 쓰는 구현(S7 스텁·위저드 테스트)이
@@ -70,6 +94,14 @@ interface ItineraryRepository {
         const val DEFAULT_PAGE_SIZE = 20
     }
 }
+
+/**
+ * 저장 결과. (§5-2)
+ *
+ * [replaced] 는 같은 `(대회, 시작일, 종료일)` 동선이 이미 있어 **교체**됐다는 뜻이다.
+ * 사용자에게는 다른 일이라 문구를 가른다 — 새로 담은 것과 덮어쓴 것은 다르다.
+ */
+data class SaveOutcome(val id: Long, val replaced: Boolean)
 
 /** 저장 동선 목록 한 장. (§5-4) */
 data class SavedItineraryPage(
@@ -91,6 +123,14 @@ class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryReposi
             totalElements = dto.page.totalElements,
         )
     }
+
+    override suspend fun save(result: ItineraryResult): SaveOutcome = apiCall {
+        val dto = api.save(result.toSaveRequest())
+        SaveOutcome(id = dto.id, replaced = dto.replaced)
+    }
+
+    override suspend fun detail(id: Long): SavedItineraryDetail =
+        apiCall { api.detail(id).toDetail() }
 
     override suspend fun delete(id: Long) = apiCall { api.delete(id) }
 }

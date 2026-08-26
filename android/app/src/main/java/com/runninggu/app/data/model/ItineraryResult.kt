@@ -38,3 +38,37 @@ data class ItineraryRequestSnapshot(
 )
 
 data class HotelSnapshot(val name: String, val lat: Double, val lng: Double)
+
+/**
+ * 저장해 둔 동선 하나. (API 명세 §5-5 · SPEC §4.13 → §4.10)
+ *
+ * 마이[동선]에서 카드를 눌러 S7 로 되돌아갈 때 쓴다. [result] 는 **저장 시점 snapshot**
+ * 이고 [contest] 는 **지금** canonical 대회다. 둘을 섞지 않는 것이 이 모델의 요점이다 —
+ * 서버가 snapshot 을 덮어쓰지 않으므로 앱도 덮어쓰지 않는다.
+ */
+data class SavedItineraryDetail(
+    val id: Long,
+    val result: ItineraryResult,
+    /** 저장 시점 지역 snapshot. 최신 대회의 지역이 아니다. */
+    val region: String?,
+    /** 저장한 뒤 대회가 바뀌었다. 화면은 "대회 변경" 안내와 재생성 경로를 준다 (§5-3). */
+    val needsRegeneration: Boolean,
+    /**
+     * 최신 canonical 대회. 안내 문구에만 쓰고 일정 표시에는 쓰지 않는다.
+     *
+     * **상세에는 항상 온다**(§5-5). 없는 응답은 계약 위반이라 해석 단계에서 걸린다(#202 리뷰).
+     */
+    val contest: ContestSnapshot,
+)
+
+/** 상세가 함께 주는 최신 대회 정보. (§5-5) */
+data class ContestSnapshot(
+    val name: String,
+    val region: String?,
+    val place: String?,
+    val contestDate: String?,
+    val startTime: String?,
+    val lat: Double?,
+    val lng: Double?,
+    val active: Boolean,
+)
