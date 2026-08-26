@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app_icon.png 바깥 여백과 같은 색. 적응형 마스크가 어떤 모양이든 타일이 이어져 보인다. -->
+    <color name="ic_launcher_background">#100F0F</color>
+</resources>
