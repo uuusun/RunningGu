@@ -87,11 +87,20 @@ fun StayScreen(
                 },
             )
         },
-        bottomBar = { StayCta(hasStay = wizard.stay != null, onClick = onNext) },
+        // 대회를 못 실었으면 건너뛰기 CTA 도 없다 — 눌러도 갈 곳이 없다(#192 리뷰).
+        bottomBar = {
+            if (wizard.contestPhase == WizardUiState.Phase.LOADED) {
+                StayCta(hasStay = wizard.stay != null, onClick = onNext)
+            }
+        },
     ) { innerPadding ->
+        WizardContestGate(
+            state = wizard,
+            onRetry = wizardViewModel::load,
+            modifier = Modifier.padding(innerPadding),
+        ) {
         Column(
             Modifier
-                .padding(innerPadding)
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
         ) {
@@ -150,6 +159,7 @@ fun StayScreen(
                     }
                 }
             }
+        }
         }
     }
 }

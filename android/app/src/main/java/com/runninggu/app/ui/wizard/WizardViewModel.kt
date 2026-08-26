@@ -1,16 +1,29 @@
 package com.runninggu.app.ui.wizard
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.remote.apiErrorCode
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.createSavedStateHandle
+import com.runninggu.app.data.repository.ContestRepository
+import com.runninggu.app.ui.navigation.Routes
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.TripPattern
 import com.runninggu.app.domain.stdEvents
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.sample.SampleData
+import com.runninggu.app.ui.model.toRaceSummary
+import com.runninggu.app.ui.userMessageOrDefault
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import com.runninggu.app.data.model.PoiItem
 
@@ -20,24 +33,111 @@ import com.runninggu.app.data.model.PoiItem
  * wizard 그래프 스코프로 만들어 S4~S7이 같은 인스턴스를 본다 —
  * 생성 위치는 [com.runninggu.app.ui.navigation.RunningGuNavHost] 참고.
  *
- * TODO(AP-14): [start]의 대회 조회를 `GET /api/contests/{id}`로 교체한다.
  * TODO(AP-11): S5~S7 진행에 따라 event·themes·stay·days 액션을 이 클래스에 이어 붙인다.
  */
-class WizardViewModel : ViewModel() {
+class WizardViewModel(
+    private val repository: ContestRepository = ServiceLocator.contestRepository,
+    /**
+     * wizard 그래프 항목의 상태. **`raceId` 가 여기 들어 있다** — 그래프 route 가
+     * `wizard/{raceId}` 라 항목 인자가 그대로 담긴다.
+     */
+    savedState: SavedStateHandle = SavedStateHandle(),
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WizardUiState())
     val uiState: StateFlow<WizardUiState> = _uiState.asStateFlow()
 
+    /** 지금 싣고 있는 대회. 회전·재구성으로 [start] 가 다시 불려도 재조회하지 않는다. */
+    private var raceId: String? = null
+
+    init {
+        // **화면이 불러 주기를 기다리지 않는다.** (#192 리뷰)
+        //
+        // 예전에는 S4 의 `LaunchedEffect` 만 [start] 를 불렀다. 그래서 시스템이 프로세스를
+        // 되살리며 **S5·S6·S7 로 바로 복원**하면 S4 가 합성되지 않아 조회가 시작조차 안 됐다 —
+        // S5 는 영영 로딩, S6 는 숙소 조회 없이 CTA 만 살아 있고, S7 은 기본 상태로 만들어져
+        // "조건이 덜 정해졌어요" 가 됐다.
+        //
+        // 그래프 인자가 이미 답을 들고 있으므로 여기서 읽는다. 진입점이 하나가 된다.
+        savedState.get<String>(Routes.ARG_RACE_ID)?.let(::start)
+    }
+
     /**
-     * 위저드 진입. 대회를 싣고 기본 패턴(전후로)·기본 종목으로 채운다.
+     * 위저드 진입. `SELECT_RACE` 계약(SPEC §2.4)에 해당한다.
      *
-     * `SELECT_RACE` 계약(SPEC §2.4)에 해당한다.
+     * **예전에는 [com.runninggu.app.ui.sample.SampleData] 를 봤다.** 홈·캘린더가 서버로
+     * 넘어간 뒤로는 넘어오는 id 가 숫자 canonical id 인데 샘플의 id 는 `chungbuk-past`
+     * 같은 슬러그라 절대 안 맞았다 — `?: return` 이라 **조용히 나가서** S4 가 "불러오는
+     * 중…" 에서 영영 멈췄다(이슈 #140).
      */
     fun start(raceId: String) {
-        if (_uiState.value.race?.id == raceId) return
-        val race = SampleData.raceById(raceId) ?: return
-        _uiState.value = WizardUiState(race = race, event = defaultEventOf(race))
-            .withPattern(TripPattern.DEFAULT)
+        if (this.raceId == raceId) return
+        this.raceId = raceId
+        load()
+    }
+
+    /**
+     * 대회 조회. (`GET /api/contests/{id}` · API 명세 §3-4)
+     *
+     * [WizardUiState.Phase.ERROR] 의 [다시 시도] 가 이 함수를 다시 부른다 — S3
+     * [com.runninggu.app.ui.racedetail.RaceDetailViewModel.load] 와 같은 모양이다.
+     *
+     * **canonical id 가 없는 대회는 부르지 않는다.** 번들·오프라인 항목은 크롤 원천
+     * 문자열을 id 로 갖는데(`roadrun-41543`), 숫자로 못 바꾸면 서버에 물을 수 없고
+     * 그건 "서버에 없다" 와 같다. `404` 와 같은 자리에 둔다(#139 · #140 리뷰).
+     */
+    companion object {
+        /**
+         * 그래프 항목의 상태를 그대로 넘긴다 — `raceId` 가 거기 담겨 온다.
+         *
+         * 기본 팩토리로는 [SavedStateHandle] 을 넣을 수 없어서 따로 둔다. 이걸 안 쓰면
+         * 프로세스 복원 시 대회가 안 실린다(#192 리뷰).
+         */
+        fun factory(
+            repository: ContestRepository = ServiceLocator.contestRepository,
+        ) = viewModelFactory {
+            initializer { WizardViewModel(repository, createSavedStateHandle()) }
+        }
+    }
+
+    /**
+     * S4 의 [다음] 을 눌렀다. **이 뒤의 상태는 사용자가 고른 것**이다. (#192 리뷰)
+     *
+     * 프로세스가 죽고 S5~S7 로 복원되면 이 값이 false 라, 화면이 그걸 보고 S4 로 되돌린다.
+     */
+    fun onPlanConfirmed() {
+        _uiState.update { it.copy(planConfirmed = true) }
+    }
+
+    fun load() {
+        val id = raceId ?: return
+        val serverId = id.toLongOrNull()
+        if (serverId == null) {
+            _uiState.value = WizardUiState(contestPhase = WizardUiState.Phase.NOT_FOUND)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = WizardUiState(contestPhase = WizardUiState.Phase.LOADING)
+            val race = try {
+                repository.detail(serverId).toRaceSummary()
+            } catch (e: ApiException) {
+                _uiState.value = if (e.apiErrorCode() == ApiErrorCode.NOT_FOUND) {
+                    // 404 CONTEST_NOT_FOUND — 다시 눌러도 생기지 않는다 (§3-4)
+                    WizardUiState(contestPhase = WizardUiState.Phase.NOT_FOUND)
+                } else {
+                    WizardUiState(
+                        contestPhase = WizardUiState.Phase.ERROR,
+                        errorMessage = e.userMessageOrDefault(),
+                    )
+                }
+                return@launch
+            }
+            _uiState.value = WizardUiState(
+                contestPhase = WizardUiState.Phase.LOADED,
+                race = race,
+                event = defaultEventOf(race),
+            ).withPattern(TripPattern.DEFAULT)
+        }
     }
 
     /** 종목 세그먼트 선택. 대회에 없는 종목도 고를 수 있다. (SPEC §4.8) */

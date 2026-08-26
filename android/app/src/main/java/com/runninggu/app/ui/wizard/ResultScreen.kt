@@ -107,7 +107,18 @@ fun ResultScreen(
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(wizard) { viewModel.generate(wizard) }
+    LaunchedEffect(wizard) {
+        // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
+        //
+        // 시스템이 프로세스를 되살리며 S7 로 바로 복원하면 `wizard` 가 기본값이라, 그대로
+        // 부르면 "여행 조건이 덜 정해졌어요" 가 뜬다 — 사용자가 잘못한 게 없는데 조건을
+        // 다시 고르라고 한다. 조회가 끝나면 `wizard` 가 바뀌어 여기가 다시 돈다.
+        // **복원된 기본값으로는 만들지 않는다.** (#192 리뷰) 사용자가 S4 를 지나온 상태여야
+        // 날짜·종목·취향이 그의 선택이다. 아니면 내비게이션이 S4 로 되돌린다.
+        if (wizard.contestPhase == WizardUiState.Phase.LOADED && wizard.planConfirmed) {
+            viewModel.generate(wizard)
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -127,7 +138,12 @@ fun ResultScreen(
             }
         },
     ) { innerPadding ->
-        Box(Modifier.padding(innerPadding)) {
+        WizardContestGate(
+            state = wizard,
+            onRetry = wizardViewModel::load,
+            modifier = Modifier.padding(innerPadding),
+        ) {
+        Box {
             when (state.phase) {
                 ResultUiState.Phase.LOADING -> LoadingState("동선 짜는 중…")
 
@@ -166,6 +182,7 @@ fun ResultScreen(
                     onRetry = viewModel::onSheetRetry,
                 )
             }
+        }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.runninggu.app.ui.navigation
 
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -235,12 +236,17 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
 
             PlanScreen(
                 raceId = graphEntry.arguments?.getString(Routes.ARG_RACE_ID).orEmpty(),
                 onBack = { navController.popBackStack() },
-                onNext = { navController.navigate(Routes.PREFS) },
+                onNext = {
+                    // 이 뒤의 상태는 사용자가 고른 것이다 — 복원 판정의 기준이 된다(#192 리뷰).
+                    wizardViewModel.onPlanConfirmed()
+                    navController.navigate(Routes.PREFS)
+                },
                 viewModel = wizardViewModel,
             )
         }
@@ -248,7 +254,15 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
+
+            // **프로세스가 죽었다 되살아난 경우다.** (#192 리뷰)
+            //
+            // 되살아난 것은 대회 하나뿐이고 날짜·종목·취향·숙소는 기본값이다. 그대로 두면
+            // S7 이 사용자가 고른 적 없는 조건으로 동선을 만든다 — 조용히 틀린 결과를
+            // 주느니 다시 고르게 한다.
+            RestartWizardIfUnconfirmed(wizardViewModel, navController)
 
             PrefsScreen(
                 onBack = { navController.popBackStack() },
@@ -260,8 +274,16 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
             val stayViewModel: StayViewModel = viewModel(entry)
+
+            // **프로세스가 죽었다 되살아난 경우다.** (#192 리뷰)
+            //
+            // 되살아난 것은 대회 하나뿐이고 날짜·종목·취향·숙소는 기본값이다. 그대로 두면
+            // S7 이 사용자가 고른 적 없는 조건으로 동선을 만든다 — 조용히 틀린 결과를
+            // 주느니 다시 고르게 한다.
+            RestartWizardIfUnconfirmed(wizardViewModel, navController)
 
             StayScreen(
                 onBack = { navController.popBackStack() },
@@ -274,9 +296,17 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
             val graphEntry = remember(entry) {
                 navController.getBackStackEntry(Routes.WIZARD_GRAPH_PATTERN)
             }
-            val wizardViewModel: WizardViewModel = viewModel(graphEntry)
+            val wizardViewModel: WizardViewModel =
+                viewModel(graphEntry, factory = WizardViewModel.factory())
             // 결과 상태는 이 화면만 쓰므로 그래프에 묶지 않는다.
             val resultViewModel: ResultViewModel = viewModel(entry)
+
+            // **프로세스가 죽었다 되살아난 경우다.** (#192 리뷰)
+            //
+            // 되살아난 것은 대회 하나뿐이고 날짜·종목·취향·숙소는 기본값이다. 그대로 두면
+            // S7 이 사용자가 고른 적 없는 조건으로 동선을 만든다 — 조용히 틀린 결과를
+            // 주느니 다시 고르게 한다.
+            RestartWizardIfUnconfirmed(wizardViewModel, navController)
 
             ResultScreen(
                 onBack = { navController.popBackStack() },
@@ -300,5 +330,31 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 viewModel = resultViewModel,
             )
         }
+    }
+}
+
+/**
+ * 복원으로 열린 위저드 후반 단계를 S4 로 되돌린다. (#192 리뷰)
+ *
+ * 프로세스가 죽으면 `WizardViewModel` 도 사라지고, 되살아난 것은 그래프 인자에 담긴
+ * **대회 하나뿐**이다. 날짜·종목·취향·숙소는 기본값으로 돌아오는데 시스템은 사용자가 있던
+ * S6·S7 로 복원한다 — 그대로 두면 **사용자가 고른 적 없는 조건으로 동선이 만들어진다.**
+ *
+ * 화면에는 정상으로 보이므로 사용자는 틀린 것을 모른다. 조용히 틀리느니 다시 고르게 한다.
+ *
+ * > 입력 전체를 저장해 되살리는 쪽이 사용자에게 낫다. 다만 `PoiItem` 까지 담아야 해서
+ * > 범위가 커지므로 별도 작업으로 둔다.
+ */
+@Composable
+private fun RestartWizardIfUnconfirmed(
+    wizardViewModel: WizardViewModel,
+    navController: NavHostController,
+) {
+    // **첫 합성 시점의 값만 본다.** 이 화면이 열릴 때 확정돼 있었는지가 전부다 —
+    // 정상 진입은 S4 의 [다음] 이 `navigate` 보다 먼저 이 값을 세우므로 항상 true 다.
+    val confirmedOnEntry = remember { wizardViewModel.uiState.value.planConfirmed }
+
+    LaunchedEffect(Unit) {
+        if (!confirmedOnEntry) navController.popBackStack(Routes.PLAN, inclusive = false)
     }
 }

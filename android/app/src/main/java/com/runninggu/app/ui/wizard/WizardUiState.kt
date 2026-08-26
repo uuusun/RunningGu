@@ -20,6 +20,19 @@ import com.runninggu.app.data.model.PoiItem
  * 이 클래스에 이어 붙인다 (SPEC §2.4 위저드 공유 상태 목록).
  */
 data class WizardUiState(
+    /**
+     * 대회 조회 상태. **위저드 전체의 상태다.** (API 명세 §3-4 · SPEC §3-5 · 이슈 #140)
+     *
+     * S4~S7 이 전부 이 대회 위에 서므로, 못 불러오면 위저드는 통째로 못 쓴다. 그래서
+     * 섹션 단위 `SectionState` 가 아니라 화면 전체 `phase` 자리다.
+     *
+     * 이름에 `contest` 를 붙인 이유 — 이 클래스는 S4~S7 공유 상태라 그냥 `phase` 면
+     * "위저드가 몇 단계인가" 로 읽힌다(#140 리뷰). 실제로는 대회 조회 상태 하나다.
+     *
+     * **예전에는 `race == null` 이 곧 로딩이었다.** 동기 조회라 스쳐 지나갔지만 서버로
+     * 바꾸면 조회 실패도 `race == null` 이라 "불러오는 중…" 이 영영 돈다.
+     */
+    val contestPhase: Phase = Phase.LOADING,
     val race: RaceSummary? = null,
     val pattern: TripPattern = TripPattern.DEFAULT, // 기본 "전후로" (SPEC §4.7 · §5.2)
     val start: LocalDate? = null,
@@ -39,7 +52,33 @@ data class WizardUiState(
      * 슬롯을 채운다. (SPEC §4.9)
      */
     val stay: PoiItem? = null,
+    /** [Phase.ERROR] 일 때 보여줄 문구. 서버가 준 말이 있으면 그걸 쓴다. */
+    val errorMessage: String? = null,
+    /**
+     * **사용자가 S4 를 지나왔는가.** (#192 리뷰)
+     *
+     * 프로세스가 죽으면 이 ViewModel 도 사라지고, 되살아난 것은 **대회 하나뿐**이다 —
+     * 날짜·종목·취향·숙소는 전부 기본값으로 돌아온다. 그런데 시스템은 사용자가 있던
+     * **S6·S7 로 복원**하므로, 그대로 두면 S7 이 **사용자가 고른 적 없는 조건으로 동선을
+     * 만든다.** 화면에는 정상으로 보이고 사용자는 자기가 고른 것과 다른 결과를 받는다.
+     *
+     * 조용히 틀린 결과를 주느니 **다시 고르게 한다.** 이 값이 false 인 채 S5~S7 이
+     * 열렸다면 그 상태는 사용자의 것이 아니므로 S4 로 되돌린다.
+     *
+     * 입력 전체를 저장해 되살리는 쪽이 더 낫지만(사용자가 다시 안 골라도 된다) 지금 구조로는
+     * `PoiItem` 까지 담아야 해서 범위가 커진다. 그건 별도 작업으로 둔다.
+     */
+    val planConfirmed: Boolean = false,
 ) {
+    /**
+     * [NOT_FOUND] 는 `404 CONTEST_NOT_FOUND` 와 **canonical id 가 없는 대회** 전용이다.
+     * (API 명세 §3-4 · S3 [com.runninggu.app.ui.racedetail.RaceDetailUiState.Phase] 와 같은 기준)
+     *
+     * 가르는 기준은 **재시도가 소용있는가** 하나다 — 없는 대회는 다시 눌러도 생기지
+     * 않으므로 [ERROR] 와 달리 [다시 시도] 를 주지 않는다.
+     */
+    enum class Phase { LOADING, LOADED, ERROR, NOT_FOUND }
+
     /** 기간 일수. 당일치기는 1. */
     val dayCount: Int
         get() = if (start != null && end != null) {
