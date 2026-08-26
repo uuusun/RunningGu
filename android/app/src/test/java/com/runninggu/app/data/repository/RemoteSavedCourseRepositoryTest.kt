@@ -51,6 +51,8 @@ class RemoteSavedCourseRepositoryTest {
             distanceKm = 5.0,
             durationMin = 45,
             gainM = 10,
+            // 상세에는 항상 온다 (§7-A). 여의도 근처 3점 — 지도가 그릴 수 있는 최소 형태다
+            pathPolyline = "{b`dFgeueW{DgG{DiG",
             savedAt = Instant.parse("2026-08-19T15:30:00Z"),
         )
 

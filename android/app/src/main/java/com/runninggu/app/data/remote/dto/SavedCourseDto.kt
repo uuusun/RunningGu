@@ -92,7 +92,14 @@ data class SavedCourseDetailDto(
     val region: String? = null,
     /** 고도가 없으면 `[]`. 최대 100개로 축약돼 있다. */
     val elevationProfileM: List<Int> = emptyList(),
-    val pathPolyline: String? = null,
+    /**
+     * 인코딩된 경로 원문. **필수다.** (§7-A · #209 리뷰)
+     *
+     * 명세가 상세에 `pathPolyline` 을 포함한다고 못박았고 저장 요청·DB 컬럼도 NOT NULL 이다.
+     * 기본값을 두면 서버가 빠뜨렸을 때 **정상적인 "경로 없음" 으로 조용히 통과**한다 —
+     * 지도만 안 나오고 아무도 이유를 모른다. 누락은 해석 단계에서 걸려야 한다.
+     */
+    val pathPolyline: String,
     /** 저장 시점 snapshot. 출처가 없으면 `[]` (결정-44). */
     val attributions: List<String> = emptyList(),
 )

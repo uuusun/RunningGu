@@ -65,6 +65,7 @@ fun SavedCourseDetailDto.toDomain(): SavedCourseDetail = SavedCourseDetail(
     elevationProfileM = elevationProfileM,
     pathPolyline = pathPolyline,
     // 와이어 형식을 푸는 것은 매퍼의 일이다 (AGENTS 2장-4 · #129).
-    path = pathPolyline?.let { Polyline.decode(it) }.orEmpty(),
+    // 원문은 필수지만 결과는 빌 수 있다 — 디코더가 깨진 입력에 읽은 만큼만 돌려준다
+    path = Polyline.decode(pathPolyline),
     attributions = attributions,
 )

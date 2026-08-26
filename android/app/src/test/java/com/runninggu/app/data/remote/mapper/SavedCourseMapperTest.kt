@@ -142,8 +142,10 @@ class SavedCourseMapperTest {
     }
 
     @Test
-    fun `폴리라인이 없으면 좌표열이 비어 있다`() {
-        // 화면은 "경로를 그리지 못했어요" 로 떨어지고 거리·시간·출처는 그대로 보인다
+    fun `폴리라인이 빠진 상세는 거부한다`() {
+        // §7-A 는 상세에 pathPolyline 을 포함한다고 못박았고 DB 컬럼도 NOT NULL 이다.
+        // 기본값을 두면 서버가 빠뜨렸을 때 **정상적인 "경로 없음" 으로 조용히 통과**한다 —
+        // 지도만 안 나오고 아무도 이유를 모른다 (#209 리뷰)
         val raw = """
             {"id":42,"courseName":"해파랑길 1코스","distanceKm":17.8,"durationMin":162,
              "gainM":312,"dataSource":"API_GPX",
@@ -151,10 +153,28 @@ class SavedCourseMapperTest {
              "savedAt":"2026-08-19T15:30:00Z"}
         """.trimIndent()
 
+        assertThrows(SerializationException::class.java) {
+            ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw)
+        }
+    }
+
+    @Test
+    fun `풀었더니 선이 안 되면 좌표열이 비어 있다`() {
+        // 지도가 보는 것은 "필드가 없다" 가 아니라 **"풀었더니 점이 2개가 안 된다"** 다.
+        // 디코더는 깨진 입력에 예외를 던지지 않고 읽은 만큼만 돌려준다(#129) — 코스 상세가
+        // 통째로 안 열리는 것보다 낫기 때문이다. 화면은 이때 안내로 떨어진다
+        val raw = """
+            {"id":42,"courseName":"해파랑길 1코스","distanceKm":17.8,"durationMin":162,
+             "gainM":312,"dataSource":"API_GPX",
+             "elevationProfileM":[],"attributions":[],"pathPolyline":"???",
+             "savedAt":"2026-08-19T15:30:00Z"}
+        """.trimIndent()
+
         val detail = ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw).toDomain()
 
-        assertTrue(detail.path.isEmpty())
-        assertNull(detail.pathPolyline)
+        // 원문은 그대로 남는다. 못 푼 것과 안 온 것은 다르다
+        assertEquals("???", detail.pathPolyline)
+        assertTrue(detail.path.size < 2)
     }
 
     @Test
@@ -207,11 +227,10 @@ class SavedCourseMapperTest {
     fun `출처가 없으면 빈 목록이다`() {
         // 서버가 [] 로 준다 — null 분기를 만들지 않는다 (결정-44)
         val raw = """{"id":1,"courseName":"c","distanceKm":5.0,"durationMin":45,"gainM":10,
-             "savedAt":"2026-08-19T15:30:00Z"}"""
+             "pathPolyline":"{b`dFgeueW{DgG{DiG","savedAt":"2026-08-19T15:30:00Z"}"""
 
         val detail = ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw).toDomain()
 
         assertTrue(detail.attributions.isEmpty())
-        assertNull(detail.pathPolyline)
     }
 }
