@@ -118,6 +118,49 @@ KAKAO_NATIVE_APP_KEY=    # 카카오 네이티브 앱 키 (지도·로그인) �
 > 키는 코드에 하드코딩하지 않고 `BuildConfig`로 주입한다.
 > **KTO·카카오 REST 키는 앱에 넣지 않는다** — 백엔드(Spring Boot) 환경변수로만 사용한다. (SPEC §9.4)
 
+### 릴리스 빌드 (스토어 제출용)
+
+디버그 빌드는 위 한 줄이면 되지만, **스토어에 올릴 산출물은 두 가지가 더 필요하다.**
+
+```
+API_BASE_URL=https://<배포 호스트>/api/   # 없으면 자리표시자가 들어가 서버를 못 찾는다
+
+RELEASE_STORE_FILE=C:/keys/runninggu.jks  # keystore 는 저장소 밖에 둔다
+RELEASE_STORE_PASSWORD=
+RELEASE_KEY_ALIAS=
+RELEASE_KEY_PASSWORD=
+```
+
+**둘 다 없어도 빌드는 된다** — CI 에는 keystore 가 없기 때문이다. 대신 `assembleRelease`·
+`bundleRelease` 가 경고를 띄운다.
+
+```
+[release] BASE_URL 이 자리표시자입니다 — … 이대로 만든 산출물은 서버를 못 찾습니다.
+[release] 서명 keystore 가 없습니다 — 서명 없는 산출물이 나옵니다.
+```
+
+**이 경고가 뜬 산출물은 스토어에 못 올린다.** 서명 없는 APK 는 스토어가 받지 않고,
+자리표시자 주소로 만든 APK 는 설치는 되지만 화면이 전부 네트워크 오류다.
+
+**`API_BASE_URL` 을 적었는데 모양이 틀리면 경고가 아니라 빌드가 멈춘다.** `https://` 로 시작하고
+`/` 로 끝나야 한다 — 끝 `/` 가 없으면 앱이 켜지자마자 Retrofit 초기화에서 죽는다. 값 없이
+`API_BASE_URL=` 만 적은 것은 안 적은 것과 같게 보고 위 자리표시자 경고를 띄운다.
+
+```
+[release] local.properties 의 API_BASE_URL 을 쓸 수 없습니다 — Retrofit baseUrl 은 / 로 끝나야 합니다. …
+```
+
+**서명 네 줄은 다 있거나 다 없어야 한다.** 하나만 빠지면 빌드가 멈춘다 — 예전에는
+`RELEASE_STORE_FILE` 만 맞으면 경고도 없이 넘어가 AGP 가 저 아래에서 알 수 없는 말로
+실패했다. 경로를 틀린 경우도 마찬가지다.
+
+```
+[release] local.properties 의 릴리스 서명 설정이 모자랍니다 — RELEASE_STORE_PASSWORD 가 비어 있습니다. …
+```
+
+> keystore 는 **잃어버리면 같은 앱을 다시 올릴 수 없다.** 팀에서 한 벌만 만들어
+> 안전한 곳에 보관하고, **저장소에는 절대 넣지 않는다**(AGENTS 8장).
+
 ---
 
 ## 🌱 협업 규칙 (요약)
