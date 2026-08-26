@@ -26,14 +26,17 @@ class TokenAuthenticatorTest {
     /**
      * `401` 응답. [code] 는 problem+json 본문의 오류 코드다. (§0-3)
      *
-     * 인증자가 **본문까지 봐야** 만료와 업무 오류를 가를 수 있다 — 기본값 `null` 은
-     * 본문 없는 401(프록시가 낸 것)이라 지금까지의 동작이 그대로 걸린다.
+     * 인증자가 **본문까지 봐야** 만료와 업무 오류를 가를 수 있다. 기본값은 `UNAUTHORIZED`
+     * — 액세스 토큰이 만료된 평범한 401 이고, 아래 대부분의 테스트가 보는 상황이다.
+     *
+     * `code = null` 로 부르면 **본문 없는 401** 이 된다. `priorResponse` 로 쓸 응답은
+     * OkHttp 가 본문 있는 것을 안 받으므로 그렇게 만든다.
      */
     private fun unauthorized(
         sentToken: String? = "access-1",
         prior: Response? = null,
         epoch: Int? = 1,
-        code: String? = null,
+        code: String? = "UNAUTHORIZED",
         rawBody: String? = null,
     ): Response {
         val request = Request.Builder()
@@ -246,7 +249,7 @@ class TokenAuthenticatorTest {
             onGiveUp = { _ -> },
         )
 
-        val retry = authenticator.authenticate(null, unauthorized(prior = unauthorized()))
+        val retry = authenticator.authenticate(null, unauthorized(prior = unauthorized(code = null)))
 
         assertNull(retry)
         assertEquals(0, calls)
@@ -322,21 +325,47 @@ class TokenAuthenticatorTest {
     }
 
     @Test
-    fun `코드를 못 읽는 401 은 재발급한다`() {
-        // 프록시·게이트웨이가 HTML 오류 페이지를 돌려주는 경우다. 업무 오류일 수 없으므로
-        // 여기서 막으면 **로그인 상태로 보이는데 아무것도 안 되는** 상태에 갇힌다
+    fun `코드를 못 읽는 401 도 재발급하지 않는다`() {
+        // `UNKNOWN` 은 프록시가 낸 본문 없는 401 만이 아니다. **서버가 새로 추가한 업무 401
+        // 코드를 앱이 아직 모를 때도** 여기로 떨어진다(`ApiErrorCode.from`). 살려 두면
+        // 앞으로 늘어날 업무 오류가 전부 재발급을 돌아, 이 관문이 막으려던 문제가 그대로
+        // 재발한다 — 그때는 원인을 찾기가 더 어렵다 (#198 리뷰)
+        var refreshCalls = 0
+        var signedOut = false
         val authenticator = TokenAuthenticator(
             sessionEpoch = { 1 },
             currentAccessToken = { "access-1" },
             currentRefreshToken = { "refresh-1" },
-            refresh = { RefreshOutcome.Renewed(RefreshResponseDto("access-2", "refresh-2")) },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
             onRefreshed = { _, _ -> true },
-            onGiveUp = { _ -> error("여기 오면 안 된다") },
+            onGiveUp = { _ -> signedOut = true },
         )
 
         val retry = authenticator.authenticate(null, unauthorized(rawBody = "<html>Gateway Timeout</html>"))
 
-        assertEquals("Bearer access-2", retry?.header("Authorization"))
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
+        assertFalse(signedOut)
+    }
+
+    @Test
+    fun `본문 없는 401 도 재발급하지 않는다`() {
+        // 계약은 모든 오류에 code 를 준다(§0-3 · NFR-17). 본문이 없는 401 은 계약 밖의
+        // 응답이라, 거기에 맞춰 세션을 회전시킬 이유가 없다
+        var refreshCalls = 0
+        val authenticator = TokenAuthenticator(
+            sessionEpoch = { 1 },
+            currentAccessToken = { "access-1" },
+            currentRefreshToken = { "refresh-1" },
+            refresh = { refreshCalls++; RefreshOutcome.Expired },
+            onRefreshed = { _, _ -> true },
+            onGiveUp = { _ -> },
+        )
+
+        val retry = authenticator.authenticate(null, unauthorized(code = null))
+
+        assertNull(retry)
+        assertEquals(0, refreshCalls)
     }
 }
 

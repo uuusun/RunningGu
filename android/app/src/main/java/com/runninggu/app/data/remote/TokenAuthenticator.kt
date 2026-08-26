@@ -130,23 +130,28 @@ class TokenAuthenticator(
      * 때마다 리프레시가 회전하고, 그 재발급이 한 번 실패하는 순간 [onGiveUp] 이 불려
      * **멀쩡한 세션까지 로그아웃된다.**
      *
-     * 그래서 본문 `code` 로 가른다.
+     * 그래서 본문 `code` 로 가른다. **재발급하는 것은 `UNAUTHORIZED` 하나뿐이다** — 명세가
+     * "토큰 없음·만료" 로 못박은 코드이고(부록 D), 나머지는 전부 그대로 화면까지 올린다.
      *
-     * | 본문 `code` | 어떻게 |
-     * |---|---|
-     * | `UNAUTHORIZED` | 명세가 "토큰 없음·만료" 로 못박은 코드다 — **재발급한다** |
-     * | 못 읽음([ApiErrorCode.UNKNOWN]) | 프록시·게이트웨이가 낸 401 이다. 업무 오류일 수 없으니 지금까지처럼 재발급한다 ([httpErrorOf] 와 같은 이유) |
-     * | 그 밖의 아는 코드 | 업무 오류다 — 손대지 않고 원 응답을 화면까지 올린다 |
+     * ## `UNKNOWN` 도 재발급하지 않는다
+     *
+     * 처음에는 살렸다. 프록시·게이트웨이가 본문 없는 401 을 낼 때 자동 재발급이 멈추면
+     * "로그인 상태로 보이는데 아무것도 안 되는" 상태에 갇힌다고 봤다.
+     *
+     * **그런데 [ApiErrorCode.UNKNOWN] 은 그 경우만이 아니다.** 서버가 새로 추가한 업무
+     * 401 코드를 앱이 아직 모를 때도 `UNKNOWN` 으로 떨어진다([ApiErrorCode.from]). 그러면
+     * 앞으로 늘어날 업무 오류가 전부 재발급을 돌게 되어, 이 관문이 막으려던 문제가 그대로
+     * 재발한다 — 게다가 그때는 원인을 찾기가 더 어렵다(#198 리뷰).
+     *
+     * 계약이 모든 오류에 `code` 를 준다고 못박았으므로(§0-3 · NFR-17), 못 읽는 401 은
+     * **계약 밖의 응답**이다. 거기에 맞춰 세션을 회전시킬 이유가 없다.
      *
      * 본문은 [Response.peekBody] 로 **엿본다.** `body` 를 읽어 버리면 정작 화면까지
      * 올라가야 할 원 응답이 빈 껍데기가 된다.
      */
     private fun Response.meansAccessTokenExpired(): Boolean {
         val body = runCatching { peekBody(MAX_PROBLEM_BYTES).string() }.getOrNull()
-        return when (httpErrorOf(code, body).code) {
-            ApiErrorCode.UNAUTHORIZED, ApiErrorCode.UNKNOWN -> true
-            else -> false
-        }
+        return httpErrorOf(code, body).code == ApiErrorCode.UNAUTHORIZED
     }
 
     private fun Request.retryWith(accessToken: String): Request =
