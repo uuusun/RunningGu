@@ -41,26 +41,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
-import com.runninggu.app.ui.theme.Ink5
-import com.runninggu.app.ui.theme.Orange
+import com.runninggu.app.ui.common.openInCustomTab
+import com.runninggu.app.ui.common.openableWebUrl
 import com.runninggu.app.ui.model.NearbyFestival
-import com.runninggu.app.ui.model.nearbyFestivalPeriod
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.dDayLabel
 import com.runninggu.app.ui.model.isDimmed
+import com.runninggu.app.ui.model.nearbyFestivalPeriod
 import com.runninggu.app.ui.model.registrationStatus
-import androidx.compose.ui.draw.alpha
+import com.runninggu.app.ui.theme.Ink5
+import com.runninggu.app.ui.theme.Orange
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -181,6 +183,7 @@ fun RaceDetailScreen(
                             festivals = state.festivals,
                             showFestivals = state.showFestivalSection,
                             onRetryFestivals = viewModel::loadFestivals,
+                            onCannotOpenOfficialPage = viewModel::onCannotOpenOfficialPage,
                         )
                     }
             }
@@ -195,6 +198,7 @@ private fun RaceDetailContent(
     festivals: List<NearbyFestival>,
     showFestivals: Boolean,
     onRetryFestivals: () -> Unit,
+    onCannotOpenOfficialPage: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -212,7 +216,7 @@ private fun RaceDetailContent(
             Spacer(Modifier.height(20.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
-            RaceInfo(race)
+            RaceInfo(race, onCannotOpen = onCannotOpenOfficialPage)
         }
         if (showFestivals) {
             Spacer(Modifier.height(24.dp))
@@ -341,8 +345,8 @@ private fun RegistrationBadge(race: RaceSummary, status: RegistrationStatus) {
 
 /** 정보 — 종목·접수 기간·주최·출처 + 공식 페이지. (SPEC §4.6) */
 @Composable
-private fun RaceInfo(race: RaceSummary) {
-    val uriHandler = LocalUriHandler.current
+private fun RaceInfo(race: RaceSummary, onCannotOpen: () -> Unit) {
+    val context = LocalContext.current
     Column {
         InfoRow("종목", race.eventTypes.joinToString(" · "))
         InfoRow("접수 기간", registrationPeriod(race))
@@ -356,11 +360,10 @@ private fun RaceInfo(race: RaceSummary) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        race.officialUrl?.let { url ->
-            // TODO(AP-11): Chrome Custom Tabs로 교체한다 (SPEC §4.6 📱전환).
-            //  androidx.browser 의존성이 필요해 지금은 기본 브라우저로 연다.
+        // 열 수 없는 주소면 버튼 자체를 내지 않는다. 눌렀는데 아무 일도 안 나는 것보다 낫다
+        openableWebUrl(race.officialUrl)?.let { url ->
             TextButton(
-                onClick = { uriHandler.openUri(url) },
+                onClick = { if (!openInCustomTab(context, url)) onCannotOpen() },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             ) {
                 Text("공식 페이지 ↗")

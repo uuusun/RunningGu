@@ -151,6 +151,16 @@ class RaceDetailViewModel(
         }
     }
 
+    /**
+     * 공식 페이지를 못 열었다. (SPEC §4.6 · AP-11)
+     *
+     * 브라우저가 하나도 없는 기기에서만 온다. 눌렀는데 아무 일도 안 일어나면 사용자는
+     * 앱이 멈춘 줄 알기 때문에, 아무 일도 안 하는 대신 그렇게 말한다.
+     */
+    fun onCannotOpenOfficialPage() {
+        _message.value = "브라우저를 열 수 없어요. 기본 브라우저를 확인해 주세요."
+    }
+
     fun onMessageShown() {
         _message.value = null
     }
