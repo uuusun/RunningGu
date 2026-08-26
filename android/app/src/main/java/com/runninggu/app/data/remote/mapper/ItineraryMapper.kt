@@ -53,6 +53,8 @@ private fun DayDto.toDomain(): ItineraryDay = ItineraryDay(
     dateLabel = LocalDate.parse(date).let { "%02d.%02d".format(it.monthValue, it.dayOfMonth) },
     note = note,
     blocks = blocks.mapIndexed { index, block -> block.toDomain(dayIndex, index) },
+    // 상세(§5-5)에만 온다. 저장 후 편집 API 가 `/days/{dayId}/...` 라 버리면 안 된다 (#202 리뷰)
+    serverId = id,
 )
 
 private fun BlockDto.toDomain(dayIndex: Int, blockIndex: Int): ItineraryBlock {
@@ -184,7 +186,7 @@ fun ItineraryDetailDto.toDetail(): SavedItineraryDetail = SavedItineraryDetail(
     ),
     region = region,
     needsRegeneration = needsRegeneration,
-    contest = contest?.toSnapshot(),
+    contest = contest.toSnapshot(),
 )
 
 private fun ContestSnapshotDto.toSnapshot(): ContestSnapshot = ContestSnapshot(

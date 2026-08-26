@@ -154,6 +154,10 @@ data class SaveItineraryResponseDto(val id: Long, val replaced: Boolean = false)
  *
  * **5-1 응답 구조 + 저장 부가 정보**다. S7 복원·편집 모드 진입에 쓴다.
  *
+ * **필수 필드에 기본값을 두지 않는다** (#202 리뷰). 서버가 항상 주는 값을 기본값으로
+ * 메우면 빠진 응답이 정상 상세처럼 통과한다 — 화면만 이상하고 아무도 이유를 모른다.
+ * 선택 필드는 `hotel`(숙소 없이 추천)과 `recovery`(하프·풀만)와 `region` 뿐이다.
+ *
  * `days` 와 모든 블록은 **저장 시점 snapshot** 이다. 서버는 RACE 날짜·시간·장소를 최신
  * canonical 로 자동 덮어쓰지 않는다 — 달라진 것은 [contest] 로 따로 오고, 앱이 그것을
  * "대회 변경" 안내에 쓴다. 둘을 섞으면 사용자가 저장한 일정이 말없이 바뀐다.
@@ -164,21 +168,28 @@ data class ItineraryDetailDto(
     val title: String,
     val contestId: Long,
     val event: String,
-    val themes: List<String> = emptyList(),
+    val themes: List<String>,
     val startDate: String,
     val endDate: String,
+    /** 숙소 없이 추천받은 동선은 없다. **선택 필드다** (§4.9). */
     val hotel: HotelDto? = null,
+    /** 하프·풀만 온다. **선택 필드다** (§5.6-6). */
     val recovery: RecoveryDto? = null,
-    val days: List<DayDto> = emptyList(),
+    val days: List<DayDto>,
     /** 저장 시점 snapshot 이다. 최신 대회의 지역이 아니다 (§5-5). */
     val region: String? = null,
     /** 저장 snapshot 과 현재 canonical 이 다르다. 화면은 "대회 변경" 배지를 띄운다 (§5-4). */
-    val needsRegeneration: Boolean = false,
+    val needsRegeneration: Boolean,
     /** **최신** canonical 대회. 위 snapshot 과 다를 수 있고, 그게 [needsRegeneration] 의 근거다. */
-    val contest: ContestSnapshotDto? = null,
+    val contest: ContestSnapshotDto,
 )
 
-/** 상세가 함께 주는 최신 canonical 대회. (§5-5) */
+/**
+ * 상세가 함께 주는 최신 canonical 대회. (§5-5)
+ *
+ * **[active] 에 기본값을 두지 않는다** (#202 리뷰). 서버가 항상 주는 값이라, `true` 로
+ * 메워지면 원천에서 사라진 대회(결정-53)가 살아 있는 것처럼 보인다.
+ */
 @Serializable
 data class ContestSnapshotDto(
     val name: String,
@@ -188,5 +199,5 @@ data class ContestSnapshotDto(
     val startTime: String? = null,
     val lat: Double? = null,
     val lng: Double? = null,
-    val active: Boolean = true,
+    val active: Boolean,
 )

@@ -19,6 +19,7 @@ import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.Poi
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -205,7 +206,7 @@ class ItinerarySaveRestoreTest {
         val race = detail.result.days.first().blocks.first()
 
         assertTrue(detail.needsRegeneration)
-        assertEquals("세종마라톤(변경)", detail.contest?.name)
+        assertEquals("세종마라톤(변경)", detail.contest.name)
         // 서버가 RACE 를 최신 canonical 로 덮어쓰지 않으므로 앱도 덮어쓰지 않는다 —
         // 저장 당시 제목·장소 그대로여야 한다
         assertEquals("🏁 스타트", race.title)
@@ -214,13 +215,29 @@ class ItinerarySaveRestoreTest {
     }
 
     @Test
-    fun `최신 대회가 없어도 복원은 된다`() = runBlocking {
+    fun `최신 대회가 빠진 상세는 거부한다`() {
+        // §5-5 는 `contest` 를 항상 준다. 기본값 null 을 두면 빠진 응답이 정상 상세처럼
+        // 통과하고, 화면은 "대회 변경" 안내를 못 그리면서 이유도 모른다 (#202 리뷰)
         val json = DETAIL_JSON.replace(CONTEST_FIELD, "")
 
-        val detail = RemoteItineraryRepository(FakeApi(detailJson = json)).detail(42)
+        assertThrows(SerializationException::class.java) {
+            ApiJson.decodeFromString(ItineraryDetailDto.serializer(), json)
+        }
+    }
 
-        assertNull(detail.contest)
-        assertEquals(1, detail.result.days.size)
+    @Test
+    fun `복원한 일자는 서버 id 를 들고 있다`() = runBlocking {
+        val detail = RemoteItineraryRepository(FakeApi()).detail(42)
+
+        // 저장 후 편집 API 가 전부 `/days/{dayId}/blocks/...` 다. 이 값을 버리면 화면이
+        // 응답을 다시 조회하거나 평행 맵을 만들지 않고는 그 API 를 못 부른다 (#202 리뷰)
+        assertEquals(71L, detail.result.days.first().serverId)
+    }
+
+    @Test
+    fun `생성 응답의 일자에는 서버 id 가 없다`() {
+        // 생성(§5-1)은 DB 저장이 없어 id 가 없다. 여기에 값이 생기면 만들어 낸 것이다
+        assertNull(generated().days.first().serverId)
     }
 
     // ── 도구 ──────────────────────────────────────────────────

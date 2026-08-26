@@ -53,8 +53,12 @@ data class SavedItineraryDetail(
     val region: String?,
     /** 저장한 뒤 대회가 바뀌었다. 화면은 "대회 변경" 안내와 재생성 경로를 준다 (§5-3). */
     val needsRegeneration: Boolean,
-    /** 최신 canonical 대회. 안내 문구에만 쓰고 일정 표시에는 쓰지 않는다. */
-    val contest: ContestSnapshot?,
+    /**
+     * 최신 canonical 대회. 안내 문구에만 쓰고 일정 표시에는 쓰지 않는다.
+     *
+     * **상세에는 항상 온다**(§5-5). 없는 응답은 계약 위반이라 해석 단계에서 걸린다(#202 리뷰).
+     */
+    val contest: ContestSnapshot,
 )
 
 /** 상세가 함께 주는 최신 대회 정보. (§5-5) */
