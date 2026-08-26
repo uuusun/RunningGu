@@ -36,6 +36,8 @@ data class AccountUiState(
     val savingMarketing: Boolean = false,
     /** 닉네임 다이얼로그. `null` 이면 닫혀 있다. */
     val nicknameEdit: NicknameEdit? = null,
+    /** 비밀번호 다이얼로그. `null` 이면 닫혀 있다. */
+    val passwordEdit: PasswordEdit? = null,
 ) {
     /** 비밀번호 변경 메뉴는 EMAIL 가입자에게만 보인다 (#59 · 결정-38). */
     val showsPasswordMenu: Boolean get() = profile?.loginProvider == LoginProvider.EMAIL
@@ -65,6 +67,17 @@ data class NicknameEdit(
 )
 
 /**
+ * 비밀번호 다이얼로그 상태. [NicknameEdit] 과 같은 모양이고 같은 이유다.
+ *
+ * `400 CURRENT_PASSWORD_MISMATCH` 는 **사용자가 고쳐야 넘어가는** 오류다. 닫고 스낵바로
+ * 알리면 다시 열어 두 칸을 처음부터 입력해야 한다.
+ */
+data class PasswordEdit(
+    val saving: Boolean = false,
+    val error: String? = null,
+)
+
+/**
  * 계정 관리. (SPEC §4.13 · AP-13 · AP-14)
  *
  * **닉네임·마케팅 동의·로그아웃이 서버를 본다.** 남은 것은 아직 Fake 다 —
@@ -88,6 +101,7 @@ class AccountViewModel(
     /** 마케팅 토글 연타. 스위치도 잠그지만 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
     private var marketingJob: Job? = null
     private var nicknameJob: Job? = null
+    private var passwordJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -213,30 +227,51 @@ class AccountViewModel(
         }
     }
 
+    /** 비밀번호 다이얼로그를 연다. */
+    fun onPasswordEditOpen() {
+        _uiState.update { it.copy(passwordEdit = PasswordEdit()) }
+    }
+
+    /** 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다. */
+    fun onPasswordEditDismiss() {
+        _uiState.update { if (it.passwordEdit?.saving == true) it else it.copy(passwordEdit = null) }
+    }
+
     /**
-     * 비밀번호 변경 (EMAIL만). 성공 시 서버가 전 기기 로그아웃 + 현재 기기 토큰 재발급(D-28).
+     * 비밀번호 변경 (EMAIL만). `PUT /me/password` (§2-1 · D-28)
      *
-     * TODO(AP-14): `PUT /me/password {currentPassword, newPassword}` 로 교체한다(§2-1).
-     *  응답이 **새 token pair** 라 `SessionStore` 토큰을 원자적으로 갈아끼워야 하고,
-     *  `400 CURRENT_PASSWORD_MISMATCH` 를 아래 분기에 연결해야 한다.
+     * 서버가 한 트랜잭션에서 비밀번호를 바꾸고 **기존 refresh 를 전부 revoke** 한 뒤 현재
+     * 기기용 token pair 를 다시 준다. 그래서 성공 처리가 프로필 갱신과 다르다 — 새 토큰을
+     * 넣지 않으면 **방금 비밀번호를 바꾼 사용자가 다음 재발급에서 로그아웃된다.**
+     *
+     * 형식은 서버에 묻기 전에 여기서 거른다. A2 와 같은 규칙이다(§4.2-2 🔒).
      */
     fun onChangePassword(current: String, new: String) {
+        if (_uiState.value.passwordEdit?.saving == true) return
         if (current.isBlank()) {
-            _uiState.update { it.copy(message = "현재 비밀번호를 입력해 주세요") }
+            _uiState.update { it.copy(passwordEdit = PasswordEdit(error = "현재 비밀번호를 입력해 주세요")) }
             return
         }
         // A2 와 같은 규칙이다. 너무 길 때는 할 일이 반대라 문구를 가른다(§4.2-2 🔒).
         when (AuthValidation.passwordIssue(new)) {
             PasswordIssue.FORMAT -> {
                 _uiState.update {
-                    it.copy(message = "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요")
+                    it.copy(
+                        passwordEdit = PasswordEdit(
+                            error = "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요",
+                        ),
+                    )
                 }
                 return
             }
 
             PasswordIssue.TOO_LONG -> {
                 _uiState.update {
-                    it.copy(message = "새 비밀번호가 너무 길어요. 영문·숫자는 72자, 한글은 24자까지예요")
+                    it.copy(
+                        passwordEdit = PasswordEdit(
+                            error = "새 비밀번호가 너무 길어요. 영문·숫자는 72자, 한글은 24자까지예요",
+                        ),
+                    )
                 }
                 return
             }
@@ -244,12 +279,41 @@ class AccountViewModel(
             null -> Unit
         }
         if (current == new) {
-            _uiState.update { it.copy(message = "지금 쓰는 비밀번호와 달라야 해요") }
+            _uiState.update {
+                it.copy(passwordEdit = PasswordEdit(error = "지금 쓰는 비밀번호와 달라야 해요"))
+            }
             return
         }
-        viewModelScope.launch {
-            delay(FAKE_DELAY_MS)
-            _uiState.update { it.copy(message = "비밀번호를 바꿨어요. 다른 기기는 로그아웃돼요.") }
+        val epoch = SessionStore.sessionEpoch
+        passwordJob?.cancel()
+        passwordJob = viewModelScope.launch {
+            _uiState.update { it.copy(passwordEdit = PasswordEdit(saving = true)) }
+            val result = runCatchingUnlessCancelled {
+                memberRepository.updatePassword(current, new)
+            }
+            result.fold(
+                onSuccess = { tokens ->
+                    // 닉네임과 같은 이유로 **확인과 적용을 한 임계구역에서** 한다(#170 리뷰).
+                    // 세대가 달라 못 넣었으면 남의 결과다 — 버리되 다이얼로그는 닫는다.
+                    val applied = SessionStore.updateTokens(epoch, tokens)
+                    _uiState.update {
+                        it.copy(
+                            passwordEdit = null,
+                            message = if (applied) PASSWORD_CHANGED_MESSAGE else null,
+                        )
+                    }
+                },
+                onFailure = { cause ->
+                    val stale = epoch != SessionStore.sessionEpoch
+                    _uiState.update {
+                        if (stale) {
+                            it.copy(passwordEdit = null)
+                        } else {
+                            it.copy(passwordEdit = PasswordEdit(error = cause.passwordMessage()))
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -312,6 +376,23 @@ class AccountViewModel(
      * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
      * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
      */
+    /**
+     * 두 오류는 **사용자가 할 일이 다르다.** 현재 비밀번호가 틀린 것은 위 칸을 고치는 일이고,
+     * 형식 위반은 아래 칸을 고치는 일이다. "다시 시도" 로 뭉뚱그리면 어느 칸인지 모른다(§2-1).
+     *
+     * `INVALID_PASSWORD` 는 앞의 형식 검사에서 대부분 걸러지지만, 서버 정책이 앞서 갈 수
+     * 있으니 그대로 둔다 — 계약이 이긴다(AGENTS 4장).
+     */
+    private fun Throwable.passwordMessage(): String = when (apiErrorCode()) {
+        ApiErrorCode.CURRENT_PASSWORD_MISMATCH -> "현재 비밀번호가 맞지 않아요"
+        ApiErrorCode.INVALID_PASSWORD -> "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요"
+        else -> if (this is ApiException.Network) {
+            "네트워크에 연결할 수 없어요"
+        } else {
+            "비밀번호를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
     private fun Throwable.nicknameMessage(): String = when {
         apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED -> "이미 쓰고 있는 닉네임이에요"
         this is ApiException.Network -> "네트워크에 연결할 수 없어요"
@@ -328,6 +409,9 @@ class AccountViewModel(
          * 여기서 기기만 비우면 서버 세션이 살아남는다 — 사용자는 로그아웃했다고 믿는다.
          */
         const val LOGOUT_REVOKE_FAILED_MESSAGE = "로그아웃하지 못했어요. 연결을 확인하고 다시 시도해 주세요."
+
+        /** D-28 — 성공하면 다른 기기 세션이 전부 끊긴다. 그 사실을 알린다. */
+        const val PASSWORD_CHANGED_MESSAGE = "비밀번호를 바꿨어요. 다른 기기는 로그아웃돼요."
 
         const val FAKE_DELAY_MS = 300L
     }
