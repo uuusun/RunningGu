@@ -96,6 +96,9 @@ data class ReauthRequest(
  * `DELETE /api/me` 의 `X-Reauth-Token` 헤더로만 쓴다. 다른 요청에 붙이지 않는다.
  *
  * **로그에 남기지 않는다**(명세 명시 · AGENTS 8장). 액세스 토큰과 같은 급으로 다룬다.
+ *
+ * **기본값을 주지 않는다.** 둘 다 명세의 필수 응답 필드라, 서버가 빠뜨리면 `0` 으로 조용히
+ * 메워지는 대신 해석 단계에서 걸려야 한다 — 같은 파일의 다른 필수 응답 DTO 와 같다 (#198 리뷰).
  */
 @Serializable
-data class ReauthResponseDto(val reauthToken: String, val expiresInSec: Int = 0)
+data class ReauthResponseDto(val reauthToken: String, val expiresInSec: Int)
