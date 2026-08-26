@@ -63,6 +63,13 @@ data class DayDto(
     val recovery: Boolean = false,
     val note: String = "",
     val blocks: List<BlockDto> = emptyList(),
+    /**
+     * 저장된 동선의 일자 id. **상세(§5-5)에만 온다.**
+     *
+     * 생성(§5-1)은 DB 저장이 없는 DTO 라 id 가 없다. 상세는 "5-1 응답 구조 + `id`" 이므로
+     * 트리 DTO 를 따로 만들지 않고 여기서 nullable 로 받는다 — 두 벌이면 필드가 갈라진다.
+     */
+    val id: Long? = null,
 )
 
 /**
@@ -83,6 +90,15 @@ data class BlockDto(
     val description: String = "",
     val blockType: String = "USER",
     val systemManaged: Boolean = false,
+    /**
+     * 저장된 블록 id. **상세(§5-5)에만 온다.** 없으면 매퍼가 응답 안에서만 쓰는 id 를 만든다.
+     *
+     * 복원한 동선을 편집할 때는 이 id 가 진짜다 — 만들어 낸 id 로 편집하면 서버가 어느
+     * 블록인지 못 찾는다(SPEC §6.3).
+     */
+    val id: Long? = null,
+    /** 저장 시 정렬 순서. 상세는 ASC 로 정렬해서 준다 (§5-5). */
+    val orderNo: Int? = null,
 )
 
 /**
@@ -112,3 +128,65 @@ data class ItinerarySummaryDto(
     val needsRegeneration: Boolean = false,
 )
 
+/**
+ * `POST /api/itineraries` 요청. **5-1 응답 구조 그대로**다. (API 명세 §5-2 🔒)
+ *
+ * 별도 DTO 를 만들지 않고 이름만 붙인다. 계약이 "요청 = 5-1 응답 구조(클라 편집 반영본)"
+ * 이라, 두 벌로 두면 서버가 필드를 늘렸을 때 **한쪽만 따라가서 저장이 조용히 깨진다.**
+ *
+ * 보낸 `RACE` 블록의 제목·시간·장소·순서는 **서버가 믿지 않는다** — 저장 시점 canonical
+ * 대회로 재구성해 강제 주입한다(§5-2). 그래도 구조상 함께 보낸다.
+ */
+typealias SaveItineraryRequestDto = GenerateItineraryResponse
+
+/**
+ * `POST /api/itineraries` 응답. (API 명세 §5-2 🔒)
+ *
+ * 같은 `(user, contestId, startDate, endDate)` 가 이미 있으면 **교체**하고
+ * `200 {"id": 42, "replaced": true}` 가 온다. 처음 저장이면 `201 {"id": 42}` 라
+ * [replaced] 가 없어서 `false` 로 떨어진다 — 화면이 "새로 저장" 과 "덮어썼다" 를 가른다.
+ */
+@Serializable
+data class SaveItineraryResponseDto(val id: Long, val replaced: Boolean = false)
+
+/**
+ * `GET /api/itineraries/{id}` 응답 — 저장 동선 상세. (API 명세 §5-5)
+ *
+ * **5-1 응답 구조 + 저장 부가 정보**다. S7 복원·편집 모드 진입에 쓴다.
+ *
+ * `days` 와 모든 블록은 **저장 시점 snapshot** 이다. 서버는 RACE 날짜·시간·장소를 최신
+ * canonical 로 자동 덮어쓰지 않는다 — 달라진 것은 [contest] 로 따로 오고, 앱이 그것을
+ * "대회 변경" 안내에 쓴다. 둘을 섞으면 사용자가 저장한 일정이 말없이 바뀐다.
+ */
+@Serializable
+data class ItineraryDetailDto(
+    val id: Long,
+    val title: String,
+    val contestId: Long,
+    val event: String,
+    val themes: List<String> = emptyList(),
+    val startDate: String,
+    val endDate: String,
+    val hotel: HotelDto? = null,
+    val recovery: RecoveryDto? = null,
+    val days: List<DayDto> = emptyList(),
+    /** 저장 시점 snapshot 이다. 최신 대회의 지역이 아니다 (§5-5). */
+    val region: String? = null,
+    /** 저장 snapshot 과 현재 canonical 이 다르다. 화면은 "대회 변경" 배지를 띄운다 (§5-4). */
+    val needsRegeneration: Boolean = false,
+    /** **최신** canonical 대회. 위 snapshot 과 다를 수 있고, 그게 [needsRegeneration] 의 근거다. */
+    val contest: ContestSnapshotDto? = null,
+)
+
+/** 상세가 함께 주는 최신 canonical 대회. (§5-5) */
+@Serializable
+data class ContestSnapshotDto(
+    val name: String,
+    val region: String? = null,
+    val place: String? = null,
+    val contestDate: String? = null,
+    val startTime: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val active: Boolean = true,
+)

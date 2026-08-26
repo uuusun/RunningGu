@@ -4,11 +4,18 @@ import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryRequestSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.model.RecoveryNote
+import com.runninggu.app.data.model.ContestSnapshot
 import com.runninggu.app.data.model.SavedItinerary
+import com.runninggu.app.data.model.SavedItineraryDetail
 import com.runninggu.app.data.remote.dto.BlockDto
+import com.runninggu.app.data.remote.dto.ContestSnapshotDto
 import com.runninggu.app.data.remote.dto.DayDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
+import com.runninggu.app.data.remote.dto.HotelDto
+import com.runninggu.app.data.remote.dto.ItineraryDetailDto
 import com.runninggu.app.data.remote.dto.ItinerarySummaryDto
+import com.runninggu.app.data.remote.dto.RecoveryDto
+import com.runninggu.app.data.remote.dto.SaveItineraryRequestDto
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
@@ -51,7 +58,9 @@ private fun DayDto.toDomain(): ItineraryDay = ItineraryDay(
 private fun BlockDto.toDomain(dayIndex: Int, blockIndex: Int): ItineraryBlock {
     val type = if (blockType == "RACE") BlockType.RACE else BlockType.USER
     return ItineraryBlock(
-        id = "blk_${dayIndex}_$blockIndex",
+        // 저장 동선을 복원한 것이면 서버 id 가 진짜다(§5-5). 만들어 낸 id 로 편집하면
+        // 서버가 어느 블록인지 못 찾는다. 생성 응답에는 id 가 없어 그때만 만든다.
+        id = id?.toString() ?: "blk_${dayIndex}_$blockIndex",
         time = startTime,
         title = title,
         catKey = categoryOf(category),
@@ -96,3 +105,95 @@ fun ItinerarySummaryDto.toSavedItinerary(): SavedItinerary = SavedItinerary(
 /** 카드의 기간 표기 `MM.DD`. (SPEC §4.13) */
 private fun LocalDate.toPeriodLabel(): String = "%02d.%02d".format(monthValue, dayOfMonth)
 
+// ── 화면 모델 → DTO ───────────────────────────────────────────
+
+/**
+ * 편집을 마친 동선 → `POST /api/itineraries` 요청. (API 명세 §5-2 🔒)
+ *
+ * **조건을 요청값으로 다시 조립하지 않는다.** 생성 응답이 준 [ItineraryResult.request]
+ * snapshot 을 그대로 되돌려 보낸다 — 서버가 정규화했을 수 있어서, 되비추는 쪽이 계약에
+ * 맞는다(#66 리뷰). 여기서 다시 만들면 저장본이 생성본과 미묘하게 달라진다.
+ *
+ * 회복일 플래그는 [ItineraryResult.recoveryFlags] 에 일자와 **같은 순서**로 들어 있다.
+ * 편집은 일자 안의 블록만 건드리고 일자를 더하거나 지우거나 섞지 않으므로(SPEC §6.3),
+ * 자리로 맞춰도 어긋나지 않는다.
+ */
+fun ItineraryResult.toSaveRequest(): SaveItineraryRequestDto = SaveItineraryRequestDto(
+    title = title,
+    event = request.event,
+    contestId = request.contestId,
+    themes = request.themes,
+    startDate = request.startDate,
+    endDate = request.endDate,
+    hotel = request.hotel?.let { HotelDto(it.name, it.lat, it.lng) },
+    recovery = recovery?.let { RecoveryDto(it.label, it.note) },
+    days = days.mapIndexed { index, day ->
+        day.toDto(recovery = recoveryFlags.getOrElse(index) { false })
+    },
+)
+
+private fun ItineraryDay.toDto(recovery: Boolean): DayDto = DayDto(
+    dayIndex = off,
+    date = date.toString(),
+    dayLabel = label,
+    recovery = recovery,
+    note = note,
+    blocks = blocks.map { it.toDto() },
+)
+
+/**
+ * 블록 → DTO.
+ *
+ * `id` 는 싣지 않는다. 새로 저장하면 서버가 자기 id 를 붙이고(§5-2), 앱이 만든
+ * `blk_0_1` 같은 문자열은 서버 계약에 없는 값이다.
+ */
+private fun ItineraryBlock.toDto(): BlockDto = BlockDto(
+    startTime = time,
+    title = title,
+    category = catKey.name,
+    placeName = place?.name,
+    address = place?.addr,
+    lat = place?.lat,
+    lng = place?.lng,
+    description = desc,
+    blockType = blockType.name,
+    systemManaged = systemManaged,
+)
+
+/**
+ * `GET /api/itineraries/{id}` → 복원 모델. (API 명세 §5-5)
+ *
+ * snapshot 트리와 최신 [ContestSnapshot] 을 **따로** 담는다. 서버가 RACE 를 최신 canonical
+ * 로 덮어쓰지 않으므로 앱도 덮어쓰지 않는다 — 사용자가 저장한 일정이 말없이 바뀌면 안 된다.
+ */
+fun ItineraryDetailDto.toDetail(): SavedItineraryDetail = SavedItineraryDetail(
+    id = id,
+    result = ItineraryResult(
+        title = title,
+        days = days.map { it.toDomain() },
+        recovery = recovery?.let { RecoveryNote(it.label, it.note) },
+        request = ItineraryRequestSnapshot(
+            contestId = contestId,
+            event = event,
+            themes = themes,
+            startDate = startDate,
+            endDate = endDate,
+            hotel = hotel?.let { HotelSnapshot(it.name, it.lat, it.lng) },
+        ),
+        recoveryFlags = days.map { it.recovery },
+    ),
+    region = region,
+    needsRegeneration = needsRegeneration,
+    contest = contest?.toSnapshot(),
+)
+
+private fun ContestSnapshotDto.toSnapshot(): ContestSnapshot = ContestSnapshot(
+    name = name,
+    region = region,
+    place = place,
+    contestDate = contestDate,
+    startTime = startTime,
+    lat = lat,
+    lng = lng,
+    active = active,
+)
