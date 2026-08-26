@@ -37,10 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.SavedCourse
 import com.runninggu.app.data.model.SavedCourseDetail
+import com.runninggu.app.domain.LatLng
 import com.runninggu.app.ui.common.Attributions
 import com.runninggu.app.ui.common.ElevationLine
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
+import com.runninggu.app.ui.map.MIN_ROUTE_POINTS
+import com.runninggu.app.ui.map.MapScene
+import com.runninggu.app.ui.map.RunningGuMap
 import java.time.format.DateTimeFormatter
 
 /**
@@ -132,7 +136,7 @@ private fun Content(detail: SavedCourseDetail) {
             .fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-        MapPlaceholder()
+        CourseMap(path = detail.path)
 
         Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Text(
@@ -227,13 +231,22 @@ private fun Stat(label: String, value: String) {
 }
 
 /**
- * 경로 점선이 들어올 자리. (matrix S8-D "코스 상세 **점선** 렌더링" 🔒)
+ * 저장 코스의 경로. (matrix S8-D "코스 상세 렌더링" 🔒 · SPEC §3-8 · AP-03)
  *
- * `ui/map` 이 develop 에 들어오면(AP-03) `RunningGuMap` 으로 바꾼다. `pathPolyline` 은
- * 이미 받아 두었으니 화면 쪽만 갈아끼우면 된다.
+ * **핀 없이 경로만 그린다.** §3-8 이 "`polyline` 은 핀과 독립적으로 그릴 수 있다
+ * (러닝코스 왕복 경로용)" 라고 둘을 갈라 뒀고, 코스는 방문 순서라는 개념이 없어 세울
+ * 번호가 없다. S8 목록 지도(`CourseScreen.CourseMap`)가 경로를 고른 경우와 같다.
+ *
+ * 카메라는 [MapScene] 규칙이 정한다 — 경로가 곧 bounds 다.
+ *
+ * ## 경로를 못 그릴 수 있다
+ *
+ * 저장할 때 경로가 있어야 저장되지만, 매퍼가 폴리라인을 못 푸는 경우가 남아 있다(#129).
+ * 그때는 **선이 안 되는 좌표열을 그리는 것보다** 못 그린다고 말하는 편이 낫다. 거리·시간·
+ * 고도와 출처 줄은 그대로 보인다 — 지도 실패가 화면 전체를 끌고 가지 않는다(§3-8 · NFR-1·3).
  */
 @Composable
-private fun MapPlaceholder() {
+private fun CourseMap(path: List<LatLng>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,11 +254,15 @@ private fun MapPlaceholder() {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "지도는 준비 중이에요",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (path.size >= MIN_ROUTE_POINTS) {
+            RunningGuMap(scene = MapScene(route = path), modifier = Modifier.fillMaxSize())
+        } else {
+            Text(
+                text = "경로를 그리지 못했어요",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

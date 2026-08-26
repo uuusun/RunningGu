@@ -1,5 +1,6 @@
 package com.runninggu.app.data.model
 
+import com.runninggu.app.domain.LatLng
 import java.time.LocalDate
 
 /**
@@ -31,7 +32,18 @@ data class SavedCourse(
 data class SavedCourseDetail(
     val course: SavedCourse,
     val elevationProfileM: List<Int>,
+    /**
+     * 인코딩된 경로 **원문**. 서버에 되돌려 보낼 일이 있으면 이 값을 그대로 쓴다 —
+     * 풀었다 다시 묶으면 `routeFingerprint` 가 달라진다(§7-A · [NearbyItem.Route] 와 같은 이유).
+     */
     val pathPolyline: String?,
+    /**
+     * 지도에 그릴 좌표열. `data/remote` 매퍼가 [pathPolyline] 을 풀어 채운다 (AGENTS 2장-4 · #129).
+     *
+     * 못 풀었거나 경로가 없으면 비어 있다 — 화면은 "경로 없음" 으로 다룬다. 저장 코스는
+     * 저장할 때 경로가 있어야 하지만, 매퍼가 폴리라인을 못 푸는 경우가 남아 있다(#129).
+     */
+    val path: List<LatLng> = emptyList(),
     val attributions: List<String>,
 )
 

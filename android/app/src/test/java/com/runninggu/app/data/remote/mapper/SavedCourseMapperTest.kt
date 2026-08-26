@@ -121,6 +121,43 @@ class SavedCourseMapperTest {
     }
 
     @Test
+    fun `상세 경로를 지도에 그릴 좌표열로 푼다`() {
+        // 코스 상세 지도가 이 좌표열을 그린다 (AP-03 · §3-8). 화면이 폴리라인을 직접
+        // 푸는 일이 없어야 한다 — 와이어 형식을 푸는 것은 매퍼의 일이다 (AGENTS 2장-4)
+        val raw = """
+            {"id":42,"courseName":"해파랑길 1코스","distanceKm":17.8,"durationMin":162,
+             "gainM":312,"difficulty":"NORMAL","dataSource":"API_GPX","region":"부산",
+             "elevationProfileM":[10,20],"pathPolyline":"{b`dFgeueW{DgG{DiG",
+             "attributions":["두루누비 걷기길(한국관광공사)"],
+             "savedAt":"2026-08-19T15:30:00Z"}
+        """.trimIndent()
+
+        val detail = ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw).toDomain()
+
+        assertEquals(3, detail.path.size)
+        assertEquals(37.52510, detail.path.first().lat, 1e-5)
+        assertEquals(126.92580, detail.path.first().lng, 1e-5)
+        // **원문도 그대로 남는다.** 풀었다 다시 묶으면 routeFingerprint 가 갈린다 (#62)
+        assertEquals("{b`dFgeueW{DgG{DiG", detail.pathPolyline)
+    }
+
+    @Test
+    fun `폴리라인이 없으면 좌표열이 비어 있다`() {
+        // 화면은 "경로를 그리지 못했어요" 로 떨어지고 거리·시간·출처는 그대로 보인다
+        val raw = """
+            {"id":42,"courseName":"해파랑길 1코스","distanceKm":17.8,"durationMin":162,
+             "gainM":312,"dataSource":"API_GPX",
+             "elevationProfileM":[],"attributions":[],
+             "savedAt":"2026-08-19T15:30:00Z"}
+        """.trimIndent()
+
+        val detail = ApiJson.decodeFromString(SavedCourseDetailDto.serializer(), raw).toDomain()
+
+        assertTrue(detail.path.isEmpty())
+        assertNull(detail.pathPolyline)
+    }
+
+    @Test
     fun `created 가 빠진 저장 응답은 거부한다`() {
         // 기본값을 두면 서버가 빠뜨렸을 때 "새로 저장했어요" 로 조용히 처리된다 (#76 리뷰).
         // 중복 저장을 신규로 오인하면 화면 문구가 틀린다
