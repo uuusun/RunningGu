@@ -73,9 +73,36 @@ fun apiBaseUrlProblems(url: String): List<String> = buildList {
  * **없어도 빌드는 된다** — 카카오 키와 같은 규칙이다. CI 에는 keystore 가 없고, 서명 없는
  * APK 로도 빌드가 깨지는지는 확인할 수 있어야 한다. 대신 스토어에 올릴 산출물은 아니다.
  */
-val releaseStoreFile: File? = localProperties.getProperty("RELEASE_STORE_FILE")
-    ?.let(::File)
-    ?.takeIf { it.exists() }
+val releaseStorePath: String? = localProperties.getProperty("RELEASE_STORE_FILE")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+
+val releaseStoreFile: File? = releaseStorePath?.let(::File)?.takeIf { it.exists() }
+
+/**
+ * 서명에 필요한 네 줄이 **다 있는가.** (#196 리뷰)
+ *
+ * `API_BASE_URL` 과 같은 기준이다 — **안 적은 것은 경고, 적었는데 모자란 것은 실패다.**
+ *
+ * 예전에는 keystore 파일 존재만 봤다. 그래서 `RELEASE_STORE_FILE` 은 맞게 적고
+ * `RELEASE_STORE_PASSWORD` 를 빠뜨리면 **`unsigned` 가 false 라 경고도 안 뜨고**, AGP 가
+ * 저 아래 packaging 에서 자기 문구로 실패했다. 사용자는 무엇을 빠뜨렸는지 못 듣는다.
+ * 경로를 틀린 경우도 "keystore 가 없습니다" 경고로 흘러갔는데, 사실은 오타에 가깝다.
+ *
+ * **값은 찍지 않는다** — 비밀번호다(AGENTS 8장). 키 이름만으로 무엇을 채울지 알 수 있다.
+ * 경로는 오타를 찾으려면 보여야 해서 예외다.
+ */
+val releaseSigningProblems: List<String> = buildList {
+    // 아예 안 적은 것은 "아직 안 정함" 이다. 그건 경고가 맡는다
+    if (releaseStorePath == null) return@buildList
+    if (releaseStoreFile == null) {
+        add("keystore 를 찾을 수 없습니다: $releaseStorePath")
+        return@buildList
+    }
+    listOf("RELEASE_STORE_PASSWORD", "RELEASE_KEY_ALIAS", "RELEASE_KEY_PASSWORD").forEach { key ->
+        if (localProperties.getProperty(key).isNullOrBlank()) add("$key 가 비어 있습니다")
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -106,8 +133,9 @@ android {
     }
 
     signingConfigs {
-        // `local.properties` 에 keystore 가 있을 때만 만든다.
-        releaseStoreFile?.let { keystore ->
+        // **네 줄이 다 있을 때만 만든다.** 반쯤 채워진 설정을 붙이면 AGP 가 packaging 단계에서
+        // 자기 문구로 먼저 실패해, 아래 릴리스 태스크가 내놓을 진짜 이유가 묻힌다 (#196 리뷰).
+        releaseStoreFile?.takeIf { releaseSigningProblems.isEmpty() }?.let { keystore ->
             create("release") {
                 storeFile = keystore
                 storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
@@ -189,13 +217,23 @@ tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.co
     val currentBaseUrl = apiBaseUrl
     val placeholderUrl = currentBaseUrl.contains("runninggu.example")
     val baseUrlProblems = if (placeholderUrl) emptyList() else apiBaseUrlProblems(currentBaseUrl)
-    val unsigned = releaseStoreFile == null
+    val signingProblems = releaseSigningProblems
+    // 아예 안 적었을 때만 경고다. 적었는데 모자란 것은 아래에서 실패시킨다
+    val unsigned = releaseStorePath == null
     doFirst {
         if (baseUrlProblems.isNotEmpty()) {
             throw GradleException(
                 "[release] local.properties 의 API_BASE_URL 을 쓸 수 없습니다 — " +
                     baseUrlProblems.joinToString(", ") +
                     ". 지금 값: \"$currentBaseUrl\" (예: https://api.example.com/api/)",
+            )
+        }
+        if (signingProblems.isNotEmpty()) {
+            throw GradleException(
+                "[release] local.properties 의 릴리스 서명 설정이 모자랍니다 — " +
+                    signingProblems.joinToString(", ") +
+                    ". 네 줄(RELEASE_STORE_FILE·STORE_PASSWORD·KEY_ALIAS·KEY_PASSWORD)이 " +
+                    "다 있어야 서명합니다. 서명 없이 만들려면 네 줄을 모두 빼세요.",
             )
         }
         if (placeholderUrl) {

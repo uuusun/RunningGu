@@ -150,6 +150,14 @@ RELEASE_KEY_PASSWORD=
 [release] local.properties 의 API_BASE_URL 을 쓸 수 없습니다 — Retrofit baseUrl 은 / 로 끝나야 합니다. …
 ```
 
+**서명 네 줄은 다 있거나 다 없어야 한다.** 하나만 빠지면 빌드가 멈춘다 — 예전에는
+`RELEASE_STORE_FILE` 만 맞으면 경고도 없이 넘어가 AGP 가 저 아래에서 알 수 없는 말로
+실패했다. 경로를 틀린 경우도 마찬가지다.
+
+```
+[release] local.properties 의 릴리스 서명 설정이 모자랍니다 — RELEASE_STORE_PASSWORD 가 비어 있습니다. …
+```
+
 > keystore 는 **잃어버리면 같은 앱을 다시 올릴 수 없다.** 팀에서 한 벌만 만들어
 > 안전한 곳에 보관하고, **저장소에는 절대 넣지 않는다**(AGENTS 8장).
 
