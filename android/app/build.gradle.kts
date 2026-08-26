@@ -19,17 +19,43 @@ val localProperties: Properties = Properties().apply {
 
 val kakaoNativeAppKey: String = localProperties.getProperty("KAKAO_NATIVE_APP_KEY").orEmpty()
 
+/** 배포 호스트가 정해지기 전까지 릴리스에 들어가는 자리표시자. */
+val placeholderApiBaseUrl = "https://api.runninggu.example/api/"
+
 /**
  * 릴리스가 볼 백엔드 주소. (AP-07 배포 · 이슈 #195)
  *
  * **배포 호스트가 정해지면 `local.properties` 에 `API_BASE_URL` 한 줄만 넣는다.** 그전에는
- * 아래 자리표시자가 들어가는데, 그 상태로 만든 APK 는 **서버를 못 찾는다** — 화면은 전부
+ * 자리표시자가 들어가는데, 그 상태로 만든 APK 는 **서버를 못 찾는다** — 화면은 전부
  * 네트워크 오류다. 스토어에 그대로 올리면 심사에서 바로 걸린다.
  *
  * 그래서 자리표시자면 빌드할 때 경고를 띄운다. 조용히 지나가면 알아채는 자리가 없다.
+ *
+ * **빈 값은 없는 것으로 본다.** `API_BASE_URL=` 처럼 키만 있으면 `getProperty` 가 빈 문자열을
+ * 돌려준다. 그대로 두면 자리표시자 경고조차 뜨지 않은 채 `baseUrl("")` 이 되어, 앱이 켜지자마자
+ * Retrofit 초기화에서 죽는 산출물이 나온다 (#196 리뷰).
  */
 val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
-    ?: "https://api.runninggu.example/api/"
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: placeholderApiBaseUrl
+
+/**
+ * `API_BASE_URL` 이 Retrofit 이 받는 모양인지 본다. (#196 리뷰)
+ *
+ * Retrofit 의 `baseUrl` 은 **`/` 로 끝나야** 한다 — 아니면 `IllegalArgumentException: baseUrl
+ * must end in /` 로 앱이 시작하자마자 죽는다. 평문 http 는 릴리스에서 cleartext 차단에 걸린다.
+ * 둘 다 **빌드는 성공하는데 설치본만 못 쓰는** 것이라, 이 PR 이 없애려던 바로 그 종류다.
+ *
+ * 자리표시자는 여기서 걸리지 않는다. 그건 잘못 적은 값이 아니라 "아직 안 정함" 이라 경고로 족하다.
+ */
+fun apiBaseUrlProblems(url: String): List<String> = buildList {
+    if (!url.startsWith("https://")) add("https:// 로 시작해야 합니다")
+    if (!url.endsWith("/")) add("Retrofit baseUrl 은 / 로 끝나야 합니다")
+    if (url.any { it.isWhitespace() }) add("공백이 들어 있습니다")
+    // 역슬래시는 코드값(92)으로 본다. 문자 리터럴로 적으면 이스케이프가 겹쳐 읽기 어렵다.
+    if (url.any { it == '"' || it.code == 92 }) add("따옴표와 역슬래시는 넣을 수 없습니다")
+}
 
 /**
  * 릴리스 서명. (AGENTS 8장 · 이슈 #108)
@@ -97,7 +123,10 @@ android {
             buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/\"")
         }
         release {
-            buildConfigField("String", "BASE_URL", "\"$apiBaseUrl\"")
+            // 따옴표·역슬래시는 이스케이프해서 넣는다. 잘못 적힌 값이 Kotlin 문법 오류로
+            // 먼저 터지면, 아래 릴리스 태스크가 내놓는 진짜 이유가 묻힌다 (#196 리뷰).
+            val escapedBaseUrl = apiBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")
+            buildConfigField("String", "BASE_URL", "\"$escapedBaseUrl\"")
             // keystore 가 없으면 서명 없이 만든다 — 빌드가 깨지지 않아야 CI 가 돈다.
             signingConfig = signingConfigs.findByName("release")
             optimization {
@@ -144,18 +173,31 @@ android {
 /**
  * 스토어에 못 올릴 산출물을 **만들 때 알려 준다.** (AP-07 배포 · 이슈 #195)
  *
- * 둘 다 조용히 지나가는 종류다 — 자리표시자 주소로 만든 APK 는 설치는 되지만 화면이 전부
+ * 조용히 지나가는 종류들이다 — 자리표시자 주소로 만든 APK 는 설치는 되지만 화면이 전부
  * 네트워크 오류이고, 서명 없는 APK 는 스토어가 받지 않는다. **빌드가 성공했다는 것만 보고
  * 올리면 그때 알게 된다.**
  *
- * 막지는 않는다 — CI 는 keystore 없이 릴리스가 컴파일되는지 확인해야 한다.
+ * **없는 것은 경고, 잘못 적은 것은 실패다** (#196 리뷰).
+ * 값이 아예 없는 것은 아직 안 정했다는 뜻이라 막지 않는다 — CI 에는 `local.properties` 자체가
+ * 없고, keystore 없이 릴리스가 컴파일되는지는 확인할 수 있어야 한다. 반면 `API_BASE_URL` 을
+ * 적었는데 모양이 틀린 것은 오타이고, 그렇게 나온 산출물은 켜자마자 죽는다. 경고로 흘리면
+ * 이 PR 이 없애려던 자리를 그대로 남기는 셈이라 태스크를 실패시킨다.
  */
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     // **설정 시점에 값으로 읽어 둔다.** 람다가 스크립트 속성을 그대로 붙들면 구성 캐시가
     // 직렬화하지 못한다(`cannot serialize Gradle script object references`).
-    val placeholderUrl = apiBaseUrl.contains("runninggu.example")
+    val currentBaseUrl = apiBaseUrl
+    val placeholderUrl = currentBaseUrl.contains("runninggu.example")
+    val baseUrlProblems = if (placeholderUrl) emptyList() else apiBaseUrlProblems(currentBaseUrl)
     val unsigned = releaseStoreFile == null
     doFirst {
+        if (baseUrlProblems.isNotEmpty()) {
+            throw GradleException(
+                "[release] local.properties 의 API_BASE_URL 을 쓸 수 없습니다 — " +
+                    baseUrlProblems.joinToString(", ") +
+                    ". 지금 값: \"$currentBaseUrl\" (예: https://api.example.com/api/)",
+            )
+        }
         if (placeholderUrl) {
             logger.warn(
                 "[release] BASE_URL 이 자리표시자입니다 — local.properties 에 API_BASE_URL 을 " +
