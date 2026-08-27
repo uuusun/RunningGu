@@ -2,6 +2,8 @@ package com.runninggu.app.ui.my
 
 import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.PersistedSession
+import com.runninggu.app.data.local.SessionPersistence
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiErrorCode
@@ -61,7 +63,9 @@ class AccountWithdrawTest {
 
     @After
     fun tearDown() {
-        SessionStore.signOut()
+        // `bind` 로 넣은 persistence 까지 비운다. SessionStore 는 싱글턴이라 안 지우면
+        // 다음 테스트가 이 테스트의 저장소를 물려받는다
+        SessionStore.resetForTest()
         Dispatchers.resetMain()
     }
 
@@ -184,6 +188,49 @@ class AccountWithdrawTest {
     }
 
     @Test
+    fun `기기 정리가 실패하면 재인증을 되풀이하지 않고 정리만 다시 한다`() = runTest(dispatcher) {
+        // 여기가 이 파일에서 제일 위험한 자리다. `DELETE /me` 는 이미 204 로 끝났으므로
+        // 계정이 없다. 이때 다시 `reauth` 를 부르면 401 이라 **기기에 남은 토큰을 영영
+        // 못 지운다** — 다음 실행에 되살아날 수도 있다 (#212 리뷰).
+        val persistence = FailingOncePersistence()
+        SessionStore.bind(persistence, backgroundScope)
+        advanceUntilIdle()
+        SessionStore.signIn(원래프로필, AuthTokens(accessToken = "A1", refreshToken = "R1"))
+
+        val member = FakeWithdrawRepository()
+        val viewModel = viewModel(member)
+
+        viewModel.onWithdrawOpen()
+        viewModel.onWithdraw("Runner123")
+        advanceUntilIdle()
+
+        // 첫 정리는 실패했다. 계정은 지워졌으니 그렇게 말하고 다이얼로그를 **열어 둔다**
+        val failed = viewModel.uiState.value.withdraw
+        assertNotNull(failed)
+        assertTrue(failed?.serverDone == true)
+        assertEquals(
+            "계정은 삭제됐어요. 기기에 남은 정보를 지우지 못했으니 다시 시도해 주세요.",
+            failed?.error,
+        )
+        assertFalse(viewModel.uiState.value.signedOut)
+
+        // 닫히지도 않는다 — 닫으면 다시 할 길이 없다
+        viewModel.onWithdrawDismiss()
+        assertNotNull(viewModel.uiState.value.withdraw)
+
+        // 다시 누른다. **서버는 건드리지 않는다**
+        viewModel.onWithdraw("Runner123")
+        advanceUntilIdle()
+
+        assertEquals("reauth 를 다시 불렀다", 1, member.reauthCalls)
+        assertEquals("DELETE /me 를 다시 불렀다", 1, member.withdrawCalls)
+        assertNull(viewModel.uiState.value.withdraw)
+        assertTrue(viewModel.uiState.value.signedOut)
+        assertNull(SessionStore.session.value)
+        assertEquals("디스크를 못 비웠다", 2, persistence.clearCalls)
+    }
+
+    @Test
     fun `보내는 중에는 닫지 못하고 두 번 나가지도 않는다`() = runTest(dispatcher) {
         val member = BlockingWithdrawRepository()
         val viewModel = viewModel(member)
@@ -204,6 +251,20 @@ class AccountWithdrawTest {
         member.gate.complete(Unit)
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.signedOut)
+    }
+}
+
+/** 첫 `clear()` 만 실패한다. 기기 정리 재시도를 실제로 만들어 보려면 필요하다. */
+private class FailingOncePersistence : SessionPersistence {
+    var clearCalls = 0
+        private set
+
+    override suspend fun load(): PersistedSession? = null
+    override suspend fun save(session: PersistedSession) = Unit
+
+    override suspend fun clear() {
+        clearCalls++
+        if (clearCalls == 1) throw java.io.IOException("디스크를 못 비웠다")
     }
 }
 

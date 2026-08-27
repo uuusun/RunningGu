@@ -174,6 +174,7 @@ fun AccountScreen(
             emailAccount = state.profile?.loginProvider == LoginProvider.EMAIL,
             saving = edit.saving,
             error = edit.error,
+            serverDone = edit.serverDone,
             onDismiss = viewModel::onWithdrawDismiss,
             onConfirm = viewModel::onWithdraw,
         )
@@ -359,20 +360,32 @@ private fun WithdrawDialog(
     emailAccount: Boolean,
     saving: Boolean,
     error: String?,
+    serverDone: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("정말 탈퇴하시겠어요?", fontWeight = FontWeight.Bold) },
+        // 서버가 이미 지웠으면 바깥을 눌러 닫을 수 없다 — 닫으면 기기 정리를 다시 할 길이
+        // 없어진다. [취소] 도 같은 이유로 감춘다 (#212 리뷰)
+        onDismissRequest = { if (!serverDone) onDismiss() },
+        title = {
+            Text(
+                text = if (serverDone) "기기 정리만 남았어요" else "정말 탈퇴하시겠어요?",
+                fontWeight = FontWeight.Bold,
+            )
+        },
         text = {
             Column {
                 Text(
-                    text = "저장한 동선·코스와 찜한 대회가 모두 삭제되고 되돌릴 수 없어요.",
+                    text = if (serverDone) {
+                        "계정은 이미 삭제됐어요. 이 기기에 남은 로그인 정보만 지우면 끝나요."
+                    } else {
+                        "저장한 동선·코스와 찜한 대회가 모두 삭제되고 되돌릴 수 없어요."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (emailAccount) {
+                if (emailAccount && !serverDone) {
                     Spacer(Modifier.height(12.dp))
                     // 탈퇴 전 재인증 (SPEC §4.13 · D-23 · §2-2).
                     PasswordField(
@@ -381,7 +394,7 @@ private fun WithdrawDialog(
                         label = "비밀번호 확인",
                         enabled = !saving,
                     )
-                } else {
+                } else if (!serverDone) {
                     // 카카오는 SDK 토큰으로 재인증한다(§2-2). SDK 가 아직 없다(AP-08 · #206).
                     // **누르게 두고 실패시키지 않는다** — 되돌릴 수 없는 조작이라 더 그렇다.
                     Spacer(Modifier.height(12.dp))
@@ -404,16 +417,29 @@ private fun WithdrawDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(password) },
-                enabled = emailAccount && !saving && password.isNotEmpty(),
+                enabled = when {
+                    saving -> false
+                    // 비밀번호는 이미 확인됐다. 다시 묻지 않는다
+                    serverDone -> true
+                    else -> emailAccount && password.isNotEmpty()
+                },
             ) {
                 Text(
-                    text = if (saving) "탈퇴하는 중…" else "탈퇴",
+                    text = when {
+                        saving && serverDone -> "지우는 중…"
+                        saving -> "탈퇴하는 중…"
+                        serverDone -> "다시 시도"
+                        else -> "탈퇴"
+                    },
                     color = MaterialTheme.colorScheme.error,
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("취소") }
+            // 서버가 지운 뒤에는 물러날 곳이 없다 — 기기 정리를 마쳐야 끝난다
+            if (!serverDone) {
+                TextButton(onClick = onDismiss, enabled = !saving) { Text("취소") }
+            }
         },
     )
 }

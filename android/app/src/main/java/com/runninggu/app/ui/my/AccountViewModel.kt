@@ -89,6 +89,14 @@ data class PasswordEdit(
 data class WithdrawEdit(
     val saving: Boolean = false,
     val error: String? = null,
+    /**
+     * **서버 탈퇴가 이미 끝났다.** 계정은 지워졌고 기기 정리만 남았다.
+     *
+     * 이 값이 켜지면 다시 눌러도 재인증·삭제를 되풀이하지 않는다 — 지워진 계정으로
+     * `reauth` 를 부르면 `401` 이라, 그대로 두면 **기기에 남은 토큰을 영영 못 지운다**
+     * (#212 리뷰).
+     */
+    val serverDone: Boolean = false,
 )
 
 /**
@@ -372,9 +380,17 @@ class AccountViewModel(
         _uiState.update { it.copy(withdraw = WithdrawEdit()) }
     }
 
-    /** 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다. */
+    /**
+     * 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다.
+     *
+     * 서버 탈퇴가 끝난 뒤에도 닫지 않는다. 닫으면 기기에 남은 토큰을 지울 길이 없어진다
+     * (#212 리뷰).
+     */
     fun onWithdrawDismiss() {
-        _uiState.update { if (it.withdraw?.saving == true) it else it.copy(withdraw = null) }
+        _uiState.update {
+            val edit = it.withdraw
+            if (edit?.saving == true || edit?.serverDone == true) it else it.copy(withdraw = null)
+        }
     }
 
     /**
@@ -400,7 +416,15 @@ class AccountViewModel(
      * 누르게 두고 실패시키는 것보다 낫다.
      */
     fun onWithdraw(reauthPassword: String) {
-        if (_uiState.value.withdraw?.saving == true) return
+        val current = _uiState.value.withdraw
+        if (current?.saving == true) return
+        // 서버는 이미 지웠다. 재인증·삭제를 되풀이하지 않고 **기기 정리만** 다시 한다.
+        // 지워진 계정으로 reauth 를 부르면 401 이라 여기서 갈라야 복구할 길이 생긴다(#212 리뷰)
+        if (current?.serverDone == true) {
+            withdrawJob?.cancel()
+            withdrawJob = viewModelScope.launch { finishLocally() }
+            return
+        }
         if (reauthPassword.isBlank()) {
             _uiState.update { it.copy(withdraw = WithdrawEdit(error = "비밀번호를 입력해 주세요")) }
             return
@@ -420,15 +444,7 @@ class AccountViewModel(
                         _uiState.update { it.copy(withdraw = null) }
                         return@fold
                     }
-                    // 서버가 지웠다. 이제 기기를 비운다 — 확인하기 전에는 완료가 아니다 (#89)
-                    if (!SessionStore.signOutAndAwait()) {
-                        _uiState.update {
-                            it.copy(withdraw = null, message = LOGOUT_FAILED_MESSAGE)
-                        }
-                        return@fold
-                    }
-                    FavoriteStore.clear()
-                    _uiState.update { it.copy(withdraw = null, signedOut = true) }
+                    finishLocally()
                 },
                 onFailure = { cause ->
                     val stale = epoch != SessionStore.sessionEpoch
@@ -442,6 +458,25 @@ class AccountViewModel(
                 },
             )
         }
+    }
+
+    /**
+     * 서버가 지운 뒤 **기기를 비운다.** 확인하기 전에는 완료가 아니다 (#89 리뷰).
+     *
+     * 실패하면 다이얼로그를 **열어 둔 채** 알린다. 닫아 버리면 다시 누를 때 재인증부터
+     * 시작하는데, 계정이 이미 없어서 `401` 로 막힌다 — **기기에 남은 토큰을 영영 못
+     * 지운다.** 그래서 [WithdrawEdit.serverDone] 을 켜서 다음 시도가 여기로 바로 오게 한다.
+     */
+    private suspend fun finishLocally() {
+        _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true, serverDone = true)) }
+        if (!SessionStore.signOutAndAwait()) {
+            _uiState.update {
+                it.copy(withdraw = WithdrawEdit(serverDone = true, error = LOCAL_CLEANUP_FAILED))
+            }
+            return
+        }
+        FavoriteStore.clear()
+        _uiState.update { it.copy(withdraw = null, signedOut = true) }
     }
 
     fun onMessageShown() {
@@ -509,6 +544,13 @@ class AccountViewModel(
          * 여기서 기기만 비우면 서버 세션이 살아남는다 — 사용자는 로그아웃했다고 믿는다.
          */
         const val LOGOUT_REVOKE_FAILED_MESSAGE = "로그아웃하지 못했어요. 연결을 확인하고 다시 시도해 주세요."
+
+        /**
+         * 서버는 지웠는데 기기를 못 비웠다. **계정이 사라진 것은 사실이라** 그렇게 말한다
+         * — "탈퇴하지 못했어요" 로 쓰면 사용자가 계정이 남은 줄 안다 (#212 리뷰).
+         */
+        const val LOCAL_CLEANUP_FAILED =
+            "계정은 삭제됐어요. 기기에 남은 정보를 지우지 못했으니 다시 시도해 주세요."
 
         /** D-28 — 성공하면 다른 기기 세션이 전부 끊긴다. 그 사실을 알린다. */
         const val PASSWORD_CHANGED_MESSAGE = "비밀번호를 바꿨어요. 다른 기기는 로그아웃돼요."
