@@ -646,7 +646,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 ```
 - 공통 필드: `kind`, `name`, `distanceM`, `lat`, `lng`. `distanceM`은 입력 출발지에서 실제 경로 시작점 또는 장소까지의 거리다.
 - `ROUTE` 전용 공통: `routeId`, `dataSource`, `difficulty`, `routeKm`, `durationMin`, `gainM`, `elevationProfileM`, `shortfall`, `pathPolyline`. `pathPolyline`은 고도를 제외한 **2D Google Encoded Polyline precision 5(E5)** 다. `/courses/near`의 `difficulty`는 생성된 왕복 구간의 실제 `gainM/routeKm` 기준이다.
-- `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다.
+- `OSM_GENERATED.name`은 서버가 만든 한국어 완성 문구다. 앱은 이름을 다시 조합하지 않고 표시·저장 요청에 그대로 사용하며, 저장 코스 snapshot도 같은 `courseName`을 보존한다. 이름을 `출발지 주변 …`으로 바꾸기 전에 저장된 코스는 소급하지 않는다(§7-A).
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
 - `routeId`는 near snapshot 내부 식별용 불투명 문자열이다. 저장·중복 판정에는 사용하지 않고 서버가 경로 snapshot으로 `routeFingerprint`를 다시 계산한다.
@@ -723,6 +723,8 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 | DELETE | `/me/courses/{id}` | `204` |
 
 `difficulty`는 **선택**이다 🔧. `/courses/near`의 `difficulty`는 생성된 왕복 구간 기준이라 고도 정보가 없으면 값이 없고(§6-1 표시용), 저장 코스 목록·상세 응답에서도 `null`을 허용한다. 요청만 필수로 두면 난이도를 못 낸 경로는 저장 자체가 막힌다.
+
+`courseName`은 **저장 시점 snapshot이다 🔒**(결정-56 · 결정-44와 같은 원칙). 서버가 만드는 OSM 경로 이름을 `내 주변 …`에서 `출발지 주변 …`으로 바꾸는 시점 **이전에 저장된 코스는 기존 이름을 그대로 둔다** — 마이그레이션으로 소급하지 않는다. `출발지 주변 …`은 이름 변경 **이후 새로 생성·저장한 코스부터** 쓴다. 저장 당시 사용자가 본 이름을 보존하는 편이 일관되고, `attributions` snapshot을 소급하지 않는 것과 같은 이유다.
 
 **목록 응답** `GET /me/courses` — Pageable(§0-4), `savedAt DESC, id DESC`.
 
