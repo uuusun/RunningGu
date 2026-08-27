@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -110,12 +111,33 @@ fun ResultScreen(
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
     onOpenCourses: (targetKm: Double) -> Unit,
+    /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
+    onSaved: (message: String) -> Unit,
+    /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
+    onLoginRequest: () -> Unit,
     wizardViewModel: WizardViewModel,
     viewModel: ResultViewModel,
     modifier: Modifier = Modifier,
 ) {
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 저장됐다. **이 화면은 문구를 그리지 않는다** — §4.10 이 마이[동선]으로 옮기라고
+    // 하므로 곧바로 떠나고, 문구는 옮겨 간 자리에서 스낵바로 뜬다.
+    val saved = state.save as? SaveItineraryState.Saved
+    LaunchedEffect(saved) {
+        saved?.let { onSaved(it.message) }
+    }
+
+    if (state.save is SaveItineraryState.NeedsLogin) {
+        LoginPromptDialog(
+            onConfirm = {
+                viewModel.onLoginPromptDismiss()
+                onLoginRequest()
+            },
+            onDismiss = viewModel::onLoginPromptDismiss,
+        )
+    }
 
     LaunchedEffect(wizard) {
         // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
@@ -144,7 +166,7 @@ fun ResultScreen(
         },
         bottomBar = {
             if (state.phase == ResultUiState.Phase.CONTENT) {
-                SaveBar()
+                SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
             }
         },
     ) { innerPadding ->
@@ -1202,20 +1224,50 @@ private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
     }
 }
 
-/** 저장 CTA. (SPEC §4.10) */
+/**
+ * 저장 CTA. (SPEC §4.10 · API 명세 §5-2)
+ *
+ * **성공 문구는 여기 없다.** 저장되면 화면이 마이[동선]으로 옮겨 가므로 그릴 자리가
+ * 없다. 남는 것은 실패뿐이라 [SaveItineraryState.Failed] 만 버튼 아래 한 줄로 그린다.
+ */
 @Composable
-private fun SaveBar() {
+private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
     Surface(shadowElevation = 8.dp) {
-        Button(
-            // TODO(AP-14): `POST /api/itineraries` 저장 후 마이[동선]으로 이동한다 (API 명세 §5-2).
-            onClick = {},
-            enabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .height(52.dp),
+        Column(
+            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
-            Text("이 동선 저장하기", style = MaterialTheme.typography.titleMedium)
+            Button(
+                onClick = onSave,
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (save is SaveItineraryState.Failed) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = save.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
+}
+
+/** 게스트 저장 유도. (매핑표 S7 "새 동선 저장 … 게스트 modal" · D-27) */
+@Composable
+private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("로그인이 필요해요") },
+        text = { Text("동선을 저장하려면 로그인해 주세요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("로그인하기") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
 }

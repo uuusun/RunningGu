@@ -21,9 +21,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.PoiRepository
+import com.runninggu.app.ui.course.saveMessage
 
 /**
  * S7 동선 결과 ViewModel. (SPEC §4.10 · AP-11)
@@ -32,18 +34,20 @@ import com.runninggu.app.data.repository.PoiRepository
  * 서버에 맡기고(결정-41), 받은 응답을 화면 상태로 들고 있는다. 저장 전 USER 블록 편집만
  * 앱 몫이다(§5.7).
  *
- * **동선 저장소는 아직 가짜다** — 서버에 `/api/itineraries` 가 없다(AP-07). 서면
- * [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다. 교체·추가
- * 시트가 쓰는 POI 는 `GET /api/pois` 가 서 있어 먼저 옮겼다. 화면은 그대로다(AGENTS 4장).
+ * **저장소는 서버다** — 생성(`POST /api/itineraries/generate`)과 저장
+ * (`POST /api/itineraries`) 둘 다 서 있다(AP-07). 예전에는
+ * [com.runninggu.app.data.repository.FakeItineraryRepository] 를 들고 있었는데,
+ * 가짜에는 `save()` 가 없어 저장 CTA 를 붙일 수 없었다 — 위저드가 서버 대회를 싣게
+ * 되면서(#140 · `contestPhase`) 옮길 조건이 갖춰졌다.
  */
 class ResultViewModel(
     /**
-     * **아직 가짜다.** 서버에 `/api/itineraries` 가 없다(AP-07 · SPEC 결정-41).
+     * 생성·저장 둘 다 서버가 한다. (SPEC 결정-41 · API 명세 §5-1 · §5-2)
      *
-     * 동선 생성은 서버 단일 주체라 앱 엔진을 대신 붙일 수도 없다 — 서면 이 한 줄을
-     * `ServiceLocator` 것으로 바꾼다.
+     * 테스트는 [FakeItineraryRepository] 나 자체 스텁을 넣는다. 가짜를 넣으면
+     * [demoContestId] 가 살아나 `serverId` 없는 샘플 대회로도 화면이 돈다.
      */
-    private val repository: ItineraryRepository = FakeItineraryRepository,
+    private val repository: ItineraryRepository = ServiceLocator.itineraryRepository,
     /** 교체·추가 시트의 후보. 이쪽은 서버에 `GET /api/pois` 가 있어 옮겼다. */
     private val poiRepository: PoiRepository = ServiceLocator.poiRepository,
 ) : ViewModel() {
@@ -105,6 +109,53 @@ class ResultViewModel(
     /** 오류 상태의 [다시 시도]. 같은 입력으로 재요청한다. (SPEC §4.10) */
     fun retry() {
         lastRequest?.let(::send)
+    }
+
+    // ── 저장 (SPEC §4.10 · API 명세 §5-2) ──────────────────────
+
+    /**
+     * [이 동선 저장하기]. 편집을 마친 결과를 통째로 보낸다. (§5-2)
+     *
+     * **RACE 블록도 그대로 실어 보낸다.** 서버가 `blockType=RACE` 를 확인한 뒤 저장 시점
+     * canonical 대회로 다시 채우므로 앱이 걸러 낼 이유가 없다(이슈 #204 · 선경 님 확정).
+     *
+     * 성공하면 화면이 마이[동선]으로 옮겨 간다 — 그래서 문구를 상태에 실어 보낸다.
+     */
+    fun onSave() {
+        val state = _uiState.value
+        val result = state.result ?: return
+        // 연타로 같은 동선이 두 번 나가는 것을 막는다. 교체 규칙이 있어 두 벌이 쌓이지는
+        // 않지만, 두 번째 응답이 늦게 와서 이미 옮겨 간 화면을 다시 건드린다.
+        if (state.save is SaveItineraryState.Saving) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(save = SaveItineraryState.Saving) }
+            val next = try {
+                val outcome = repository.save(result)
+                SaveItineraryState.Saved(
+                    id = outcome.id,
+                    replaced = outcome.replaced,
+                    // 새로 담은 것과 덮어쓴 것은 사용자에게 다른 일이다 (§5-2)
+                    message = if (outcome.replaced) {
+                        "이전에 저장한 동선을 새로 바꿨어요."
+                    } else {
+                        "마이에 저장했어요."
+                    },
+                )
+            } catch (e: ApiException) {
+                // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
+                if (e is ApiException.Http && e.needsLogin) SaveItineraryState.NeedsLogin
+                else SaveItineraryState.Failed(e.saveMessage())
+            }
+            _uiState.update { it.copy(save = next) }
+        }
+    }
+
+    /** 로그인 유도 모달을 닫았다. 돌아와서 다시 누르면 된다 (D-27). */
+    fun onLoginPromptDismiss() {
+        _uiState.update {
+            if (it.save is SaveItineraryState.NeedsLogin) it.copy(save = SaveItineraryState.Idle) else it
+        }
     }
 
     /**
@@ -210,7 +261,12 @@ class ResultViewModel(
     ) {
         _uiState.update { state ->
             val result = state.result ?: return@update state
-            state.copy(result = result.copy(days = transform(result.days, state.activeDayIndex)))
+            state.copy(
+                result = result.copy(days = transform(result.days, state.activeDayIndex)),
+                // 내용이 바뀌면 이전 저장 결과 문구는 거짓말이 된다. "저장하지 못했어요" 가
+                // 남은 채 장소를 바꾸면, 방금 바꾼 것이 실패한 줄로 읽힌다.
+                save = SaveItineraryState.Idle,
+            )
         }
     }
 

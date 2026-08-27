@@ -119,7 +119,7 @@ Compose 화면
 | S4 | 일정 선택 | `wizard/{raceId}` 그래프의 `plan` | 동일 | `raceId` | 불필요 | 현재 구현 |
 | S5 | 종목·취향 | wizard 그래프의 `taste` | 미구현 | 공유 WizardUiState | 불필요 | 플로우 확정 |
 | S6 | 숙소 선택 | wizard 그래프의 `stay` | 미구현 | 공유 WizardUiState | 불필요 | 플로우 확정 |
-| S7 | 새 동선 결과 | wizard 그래프의 `result` | 미구현 | 생성 DTO | 저장 시 필요 | 플로우 확정 |
+| S7 | 새 동선 결과 | wizard 그래프의 `result` | 동일 | 생성 DTO | 저장 시 필요 | 현재 구현 · 생성·저장 서버 연결(§5-1 · §5-2). 게스트는 저장에서 modal |
 | S7-R | 저장 동선 상세 | `itinerary/{itineraryId}` 또는 result 재사용 | 미구현 | `itineraryId` | 필요 | **결정 필요** |
 | S8 | 러닝코스 | `courses` | `courses` | 선택 출발지·목표 거리 | 선택 | 현재 구현 placeholder |
 | S8-D | 코스 상세 | `courseDetail/near`, `courseDetail/saved/{savedCourseId}` | 미구현 | sealed `CourseDetailKey` | 조회별 상이 | near snapshot은 SavedStateHandle/그래프 상태. `ran` route 는 없다(결정-56) |

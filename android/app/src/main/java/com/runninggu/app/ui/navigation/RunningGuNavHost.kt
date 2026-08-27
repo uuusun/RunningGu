@@ -24,7 +24,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.navigation
 import com.runninggu.app.ui.my.AccountScreen
+import com.runninggu.app.ui.my.ItinerarySavedNotice
 import com.runninggu.app.ui.my.MyScreen
+import com.runninggu.app.ui.my.MyViewModel
 import com.runninggu.app.ui.racedetail.RaceDetailScreen
 import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
@@ -97,7 +99,14 @@ fun RunningGuNavHost(
         }
 
         // S10 마이 — 로그인 필요(결정-4). 게스트는 화면 안에서 로그인 유도만 본다.
-        composable(Routes.MY) {
+        composable(Routes.MY) { entry ->
+            // S7 저장 성공으로 들어온 경우다. 문구는 저장한 화면이 아니라 여기서 뜬다
+            // (SPEC §4.10 — "마이[동선] → 마이에 저장했어요").
+            val myViewModel: MyViewModel = viewModel()
+            LaunchedEffect(entry) {
+                ItinerarySavedNotice.consume(entry.savedStateHandle)?.let(myViewModel::showMessage)
+            }
+
             MyScreen(
                 // 로그인 후 홈이 아니라 마이로 돌아온다 (D-27 "원래 화면 복귀").
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.MY)) },
@@ -107,6 +116,7 @@ fun RunningGuNavHost(
                 onBrowseRaces = { navController.navigate(Routes.CALENDAR) },
                 onBrowseCourses = { navController.navigate(Routes.COURSES) },
                 modifier = Modifier.statusBarsPadding(),
+                viewModel = myViewModel,
             )
         }
 
@@ -326,6 +336,16 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                         targetKm = targetKm,
                     )
                 },
+                // 저장하면 마이[동선]으로 옮긴다 (SPEC §4.10). 문구는 방금 쌓인 마이
+                // 항목에 담아 넘긴다 — 위 [onOpenCourses] 와 같은 방식이다(D-15 · #178).
+                onSaved = { message ->
+                    navController.navigate(Routes.MY) { launchSingleTop = true }
+                    ItinerarySavedNotice.set(
+                        handle = navController.getBackStackEntry(Routes.MY).savedStateHandle,
+                        message = message,
+                    )
+                },
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.MY)) },
                 wizardViewModel = wizardViewModel,
                 viewModel = resultViewModel,
             )
