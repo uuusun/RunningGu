@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -70,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
@@ -81,7 +85,6 @@ import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.NumberRail
 import com.runninggu.app.ui.common.SourceBadge
-import com.runninggu.app.data.model.PoiItem
 import kotlinx.coroutines.launch
 
 /**
@@ -201,10 +204,16 @@ private fun Content(
     // 스와이프로 삭제 버튼을 연 행. 화면에 하나만 열려 있고, 바깥을 건드리면 닫힌다.
     var openedBlockId by remember(state.isEditing) { mutableStateOf<String?>(null) }
 
-    Column(
-        Modifier
+    // **밖에서 만든다.** §4.10 의 지도↔타임라인 동기화가 이 상태의 `layoutInfo` 를 읽어야
+    // "지금 보이는 카드" 를 알 수 있다 (AP-03 후속 · #208).
+    val listState = rememberLazyListState()
+
+    val day = state.activeDay
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
             .pointerInput(openedBlockId) {
                 if (openedBlockId == null) return@pointerInput
                 awaitPointerEventScope {
@@ -216,53 +225,90 @@ private fun Content(
                 }
             },
     ) {
-        // TODO(AP-03): 상단 지도. 활성 일자의 번호 핀·폴리라인 (SPEC §3-8 · §4.10).
-        MapPlaceholder()
+        // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
+        item(key = "map") {
+            // TODO(AP-03): 상단 지도. 활성 일자의 번호 핀·폴리라인 (SPEC §3-8 · §4.10).
+            MapPlaceholder()
+        }
 
-        Column(Modifier.padding(horizontal = 20.dp)) {
-            state.result?.recovery?.let {
+        item(key = "summary") {
+            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                state.result?.recovery?.let {
+                    Spacer(Modifier.height(16.dp))
+                    RecoveryBadge(label = it.label, text = it.note)
+                }
+
                 Spacer(Modifier.height(16.dp))
-                RecoveryBadge(label = it.label, text = it.note)
+                SummaryRow(title = state.title, placeCount = state.placeCount)
+
+                Spacer(Modifier.height(14.dp))
+                DayTabs(state = state, onSelect = onDaySelect)
             }
+        }
 
-            Spacer(Modifier.height(16.dp))
-            SummaryRow(title = state.title, placeCount = state.placeCount)
-
-            Spacer(Modifier.height(14.dp))
-            DayTabs(state = state, onSelect = onDaySelect)
-
-            state.activeDay?.let { day ->
-                Spacer(Modifier.height(18.dp))
-                DayHeader(label = day.label, isEditing = state.isEditing, onToggleEdit = onToggleEdit)
-
-                Spacer(Modifier.height(10.dp))
-                if (state.isEditing) {
-                    EditNotice()
-                    Spacer(Modifier.height(10.dp))
-                    EditList(
-                        day = day,
-                        openedId = openedBlockId,
-                        onOpenedChange = { openedBlockId = it },
-                        onRemove = onRemoveBlock,
-                        onMove = onMoveBlock,
-                        onReplace = onReplaceBlock,
+        if (day != null) {
+            item(key = "dayHeader") {
+                Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                    Spacer(Modifier.height(18.dp))
+                    DayHeader(
+                        label = day.label,
+                        isEditing = state.isEditing,
+                        onToggleEdit = onToggleEdit,
                     )
                     Spacer(Modifier.height(10.dp))
-                    AddPlaceButton(onClick = onAddPlace)
-                } else {
-                    DayNote(day.note)
-                    Spacer(Modifier.height(12.dp))
-                    Timeline(day)
                 }
             }
 
-            // 연계 카드는 조회 모드에만 둔다 (SPEC §4.10 — "조회 모드 하단 연계 카드").
-            if (!state.isEditing) {
-                Spacer(Modifier.height(20.dp))
-                CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
-            }
+            if (state.isEditing) {
+                // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
+                // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
+                // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
+                item(key = "editList") {
+                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                        EditNotice()
+                        Spacer(Modifier.height(10.dp))
+                        EditList(
+                            day = day,
+                            openedId = openedBlockId,
+                            onOpenedChange = { openedBlockId = it },
+                            onRemove = onRemoveBlock,
+                            onMove = onMoveBlock,
+                            onReplace = onReplaceBlock,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        AddPlaceButton(onClick = onAddPlace)
+                    }
+                }
+            } else {
+                item(key = "dayNote") {
+                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                        DayNote(day.note)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
 
-            Spacer(Modifier.height(24.dp))
+                // **조회 타임라인만 행 단위 item 이다.** 이래야 `layoutInfo.visibleItemsInfo` 가
+                // "지금 보이는 카드" 를 돌려준다 — §4.10 의 중앙 밴드 자동 활성이 서는 조건이다.
+                itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
+                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                        TimelineRow(number = index + 1, block = block)
+                        // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
+                        // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
+                        if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
+                    }
+                }
+            }
+        }
+
+        item(key = "footer") {
+            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                // 연계 카드는 조회 모드에만 둔다 (SPEC §4.10 — "조회 모드 하단 연계 카드").
+                if (!state.isEditing) {
+                    Spacer(Modifier.height(20.dp))
+                    CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
+                }
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -686,6 +732,12 @@ internal fun EditList(
 private fun canMoveTo(blocks: List<ItineraryBlock>, index: Int): Boolean =
     index in blocks.indices && ItineraryEdits.canEdit(blocks[index])
 
+/** 본문 가로 여백. 지도만 이 여백 없이 화면 폭을 다 쓴다. */
+private val HORIZONTAL_PADDING = 20.dp
+
+/** 조회 타임라인 카드 사이 간격. 예전 `Arrangement.spacedBy(10.dp)` 를 대신한다. */
+private val TIMELINE_ROW_GAP = 10.dp
+
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
 
@@ -878,16 +930,7 @@ private fun DayNote(note: String) {
     }
 }
 
-/** 시간순 카드 목록. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
-@Composable
-private fun Timeline(day: ItineraryDay) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        day.blocks.forEachIndexed { index, block ->
-            TimelineRow(number = index + 1, block = block)
-        }
-    }
-}
-
+/** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
 private fun TimelineRow(number: Int, block: ItineraryBlock) {
     Row(Modifier.fillMaxWidth()) {
