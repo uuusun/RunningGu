@@ -62,9 +62,18 @@ fun SignupScreen(
     onBack: () -> Unit,
     onCompleted: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 카카오에서 넘어왔으면 토큰과 프로필이 들어 있다. `null` 이면 이메일 가입. (§1-7) */
+    kakaoSignup: KakaoSignupHandoff? = null,
     viewModel: SignupViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // ViewModel 이 한 번만 받는다 — 다시 불려도 사용자가 고쳐 둔 닉네임을 되돌리지 않는다
+    LaunchedEffect(kakaoSignup) {
+        kakaoSignup?.let {
+            viewModel.startKakaoSignup(it.kakaoAccessToken, it.nickname, it.email)
+        }
+    }
 
     LaunchedEffect(state.completed) {
         if (state.completed) onCompleted()
@@ -234,7 +243,38 @@ private fun AgreementDialog(doc: AgreementDoc, onDismiss: () -> Unit) {
 // ── 2단계: 정보 입력 (SPEC §4.2-2) ──────────────────────────────
 
 @Composable
+private fun NicknameField(state: SignupUiState, viewModel: SignupViewModel) {
+    val nicknameFormatError = state.nickname.isNotEmpty() && !state.isNicknameValid
+    OutlinedTextField(
+        value = state.nickname,
+        onValueChange = viewModel::onNicknameChange,
+        label = { Text("닉네임 (2~12자)") },
+        singleLine = true,
+        isError = nicknameFormatError || state.nicknameCheck == DuplicateCheck.Duplicate,
+        supportingText = inlineHint(nicknameFormatError, "2~12자로 지어 주세요")
+            ?: duplicateHint(state.nicknameCheck, NICKNAME_HINTS),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusLost(viewModel::onNicknameFocusLost),
+    )
+}
+
+@Composable
 private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
+    // 카카오는 이메일·비밀번호를 받지 않고 인증 단계도 없다(§1-8). 닉네임만 받는다
+    if (state.isKakao) {
+        StepTitle("닉네임을 정해 주세요", "카카오 계정으로 가입해요. 인증 절차는 없어요.")
+        NicknameField(state, viewModel)
+        Spacer(Modifier.height(24.dp))
+        CtaButton(
+            text = "가입 완료",
+            enabled = state.canProceedInfo,
+            isLoading = state.isSubmitting,
+            onClick = viewModel::onInfoNext,
+        )
+        return
+    }
+
     StepTitle("가입 정보를 입력해 주세요", "이메일로 인증 코드를 보내드려요.")
 
     val emailFormatError = state.email.isNotEmpty() && !state.isEmailValid
@@ -285,19 +325,7 @@ private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(8.dp))
-    val nicknameFormatError = state.nickname.isNotEmpty() && !state.isNicknameValid
-    OutlinedTextField(
-        value = state.nickname,
-        onValueChange = viewModel::onNicknameChange,
-        label = { Text("닉네임 (2~12자)") },
-        singleLine = true,
-        isError = nicknameFormatError || state.nicknameCheck == DuplicateCheck.Duplicate,
-        supportingText = inlineHint(nicknameFormatError, "2~12자로 지어 주세요")
-            ?: duplicateHint(state.nicknameCheck, NICKNAME_HINTS),
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusLost(viewModel::onNicknameFocusLost),
-    )
+    NicknameField(state, viewModel)
 
     state.errorMessage?.let { message ->
         Spacer(Modifier.height(8.dp))

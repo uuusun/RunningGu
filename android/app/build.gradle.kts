@@ -269,6 +269,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.play.services.location)
     implementation(libs.kakao.maps)
+    // A1 카카오 로그인 (AP-08 · §4.1 · §1-7). 로그인만 쓰므로 v2-user 하나면 된다
+    implementation(libs.kakao.user)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

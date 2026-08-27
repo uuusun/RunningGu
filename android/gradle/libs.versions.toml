@@ -3,6 +3,7 @@ datastore = "1.1.7"
 kotlinxCoroutines = "1.9.0"
 playServicesLocation = "21.3.0"
 kakaoMaps = "2.12.8"
+kakaoSdk = "2.21.1"
 agp = "9.3.1"
 browser = "1.8.0"
 coreKtx = "1.10.1"
@@ -49,6 +50,7 @@ retrofit-converter-kotlinx-serialization = { group = "com.squareup.retrofit2", n
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 kakao-maps = { group = "com.kakao.maps.open", name = "android", version.ref = "kakaoMaps" }
+kakao-user = { group = "com.kakao.sdk", name = "v2-user", version.ref = "kakaoSdk" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -60,6 +60,14 @@ val DuplicateCheck.allowsSubmit: Boolean
 data class SignupUiState(
     val step: SignupStep = SignupStep.AGREE,
 
+    /**
+     * 카카오 가입이면 SDK 토큰이 들어 있다. `null` 이면 이메일 가입이다. (§1-7 → §1-8)
+     *
+     * 카카오는 **이메일·비밀번호를 받지 않고 인증 단계도 없다** — 카카오가 이미 확인한
+     * 계정이라 `VERIFY` 를 건너뛴다(§1-8).
+     */
+    val kakaoAccessToken: String? = null,
+
     // 1단계 — 약관·개인정보 동의 (필수 2종 + 선택 마케팅)
     val tosAgreed: Boolean = false,
     val privacyAgreed: Boolean = false,
@@ -92,6 +100,9 @@ data class SignupUiState(
     /** 가입 완료 + 자동 로그인(명세 §1-5). 화면이 이걸 보고 `home` 으로 나간다. */
     val completed: Boolean = false,
 ) {
+    /** 카카오 가입인가. 화면이 이메일·비밀번호 칸과 인증 단계를 이걸로 가린다. */
+    val isKakao: Boolean get() = kakaoAccessToken != null
+
     val allAgreed: Boolean get() = tosAgreed && privacyAgreed && marketingAgreed
 
     /** 필수 2종 동의. 미동의면 진행 불가(SPEC §4.2-1). */
@@ -112,9 +123,19 @@ data class SignupUiState(
      * 와 `Error`(조회 실패)는 서버 유니크 방어를 믿고 통과시킨다 — 여기서 막으면 확인 API 가
      * 죽었을 때 아무도 가입할 수 없다.
      */
+    /**
+     * [다음] 활성 조건.
+     *
+     * **카카오는 닉네임만 본다.** 이메일·비밀번호를 받지 않으므로(§1-8) 그 조건을 그대로
+     * 두면 영영 false 다 — 사용자가 아무리 채워도 버튼이 안 열린다.
+     */
     val canProceedInfo: Boolean
-        get() = !isSubmitting && isEmailValid && isPasswordValid && isPasswordConfirmed &&
-            isNicknameValid && emailCheck.allowsSubmit && nicknameCheck.allowsSubmit
+        get() = when {
+            isSubmitting -> false
+            isKakao -> isNicknameValid && nicknameCheck.allowsSubmit
+            else -> isEmailValid && isPasswordValid && isPasswordConfirmed &&
+                isNicknameValid && emailCheck.allowsSubmit && nicknameCheck.allowsSubmit
+        }
 
     val canVerify: Boolean
         get() = !isSubmitting && !mustResend && AuthValidation.isCodeValid(code)
@@ -230,10 +251,19 @@ class SignupViewModel(
         }
     }
 
-    /** 정보 입력 완료 → 인증 코드 발송 후 3단계로. (SPEC §4.2-3) */
+    /**
+     * 정보 입력 완료 → 인증 코드 발송 후 3단계로. (SPEC §4.2-3)
+     *
+     * **카카오는 여기서 끝난다.** 이메일 인증이 필요 없어(카카오가 이미 확인한 계정) 곧바로
+     * 가입을 부르고 `DONE` 으로 간다(§1-8).
+     */
     fun onInfoNext() {
         val state = _uiState.value
         if (!state.canProceedInfo) return
+        state.kakaoAccessToken?.let { token ->
+            submitKakaoSignup(token, state)
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
             repository.sendSignupCode(state.email.trim()).fold(
@@ -313,6 +343,57 @@ class SignupViewModel(
                         it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
                     }
                 },
+            )
+        }
+    }
+
+    /**
+     * 카카오 가입. (`POST /auth/kakao/signup` · §1-8)
+     *
+     * 이메일 가입과 다른 점은 둘이다 — **인증 단계가 없고**(카카오가 확인한 계정),
+     * **비밀번호가 없다.** 응답은 §1-5 와 같아서 가입이 곧 로그인이다.
+     *
+     * 닉네임은 카카오가 준 것을 그대로 쓰지 않고 **사용자가 A2 에서 확정한 값**을 보낸다 —
+     * 없을 수도 있고(동의 항목) 중복일 수도 있어서 화면이 한 번 받는다(#211 계약).
+     */
+    private fun submitKakaoSignup(token: String, state: SignupUiState) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+            repository.kakaoSignup(
+                kakaoAccessToken = token,
+                nickname = state.nickname.trim(),
+                marketingAgreed = state.marketingAgreed,
+            ).fold(
+                onSuccess = { session ->
+                    SessionStore.signIn(
+                        session.profile.copy(marketingAgreed = state.marketingAgreed),
+                        tokens = session.tokens,
+                    )
+                    _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
+                },
+                onFailure = {
+                    _uiState.update {
+                        it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * 카카오에서 넘어온 값으로 시작한다. (§1-7 → §1-8)
+     *
+     * **한 번만 채운다.** 화면 회전 등으로 다시 불리면 사용자가 고쳐 둔 닉네임을 카카오가
+     * 준 값으로 되돌리게 된다.
+     */
+    fun startKakaoSignup(kakaoAccessToken: String, nickname: String?, email: String?) {
+        if (_uiState.value.kakaoAccessToken != null) return
+        _uiState.update {
+            it.copy(
+                kakaoAccessToken = kakaoAccessToken,
+                // 카카오가 안 줬으면(동의 항목) 빈 칸으로 둔다 — 사용자가 직접 넣는다
+                nickname = nickname.orEmpty(),
+                email = email.orEmpty(),
             )
         }
     }

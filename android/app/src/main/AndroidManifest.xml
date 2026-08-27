@@ -36,6 +36,28 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          카카오 로그인이 끝나고 앱으로 돌아오는 자리. (AP-08 · §4.1 · §1-7)
+
+          카카오톡이 깔려 있으면 톡으로, 없으면 카카오 계정 웹으로 로그인하고
+          `kakao{네이티브키}://oauth` 로 되돌아온다. 스킴에 키가 들어가므로
+          `manifestPlaceholders` 로 주입한다 — 저장소에 키를 두지 않는다(AGENTS 8장).
+
+          `exported="true"` 여야 카카오톡·브라우저가 이 액티비티를 열 수 있다.
+        -->
+        <activity
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="kakao${kakaoNativeAppKey}" android:host="oauth" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
