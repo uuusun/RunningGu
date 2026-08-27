@@ -303,13 +303,31 @@ class ItineraryEditsTest {
     // ── §5.7 파생값 ─────────────────────────────────────────────
 
     @Test
-    fun `지도 핀은 좌표가 있는 블록만 순서대로 번호를 받는다`() {
+    fun `지도 핀은 좌표가 있는 블록만 세운다`() {
         val days = itinerary()
         val pins = ItineraryEdits.dayPins(days.dday())
 
-        assertEquals((1..pins.size).toList(), pins.map { it.n })
         val withPlace = days.dday().blocks.count { it.place != null }
         assertEquals(withPlace, pins.size)
+    }
+
+    @Test
+    fun `핀 번호는 카드 순번 그대로라 중간이 빈다`() {
+        // 좌표 없는 블록이 섞여도 좌표 있는 것만 1부터 다시 매기지 않는다. 그러면 같은
+        // 장소가 카드에서 3, 지도에서 2로 보인다 (SPEC §5.7 🔒 · #208 리뷰 합의)
+        val day = ItineraryDay(
+            raceDate, 0, "D-day", "10.25 일", "",
+            listOf(
+                ItineraryBlock("blk_1", "09:00", "대회", BlockCategory.RACE, Poi("대회장", 37.52, 126.93), ""),
+                ItineraryBlock("blk_2", "12:00", "장소 미정", BlockCategory.FOOD, null, ""),
+                ItineraryBlock("blk_3", "15:00", "카페", BlockCategory.CAFE, Poi("로스터리", 37.53, 126.94), ""),
+            ),
+        )
+
+        val pins = ItineraryEdits.dayPins(day)
+
+        assertEquals(listOf(1, 3), pins.map { it.n })
+        assertEquals(listOf("blk_1", "blk_3"), pins.map { it.blockId })
     }
 
     @Test

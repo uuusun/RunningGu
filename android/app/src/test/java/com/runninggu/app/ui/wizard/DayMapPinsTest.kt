@@ -41,7 +41,7 @@ class DayMapPinsTest {
     }
 
     @Test
-    fun `번호는 방문 순서다`() {
+    fun `좌표가 다 있으면 번호가 이어진다`() {
         val state = stateOf(
             block("blk_1", place = poi(37.52, 126.93)),
             block("blk_2", place = poi(37.53, 126.94)),
@@ -93,11 +93,16 @@ class DayMapPinsTest {
     // ── 활성 핀 (§3-8) ─────────────────────────────────────────
 
     @Test
-    fun `처음에는 고른 핀이 없다`() {
-        // 하나를 골라 두면 카메라가 그 좌표로 가서 하루 동선이 한눈에 안 들어온다
-        val state = stateOf(block("blk_1", place = poi(37.52, 126.93)))
+    fun `번호는 카드 순번 그대로라 중간이 빈다`() {
+        // 좌표 있는 것만 1부터 다시 매기면 같은 장소가 카드에서 3, 지도에서 2로 보인다
+        // (SPEC §5.7 🔒 · §4.11-4 와 같은 규칙 · #208 리뷰 합의)
+        val state = stateOf(
+            block("blk_1", place = poi(37.52, 126.93)),
+            block("blk_2", place = null),
+            block("blk_3", place = poi(37.54, 126.95)),
+        )
 
-        assertNull(state.activePinId)
+        assertEquals(listOf(1, 3), state.mapPins.map { it.order })
     }
 
     @Test

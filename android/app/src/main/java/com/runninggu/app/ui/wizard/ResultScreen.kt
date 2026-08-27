@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,6 +175,7 @@ fun ResultScreen(
                     state = state,
                     onDaySelect = viewModel::onDaySelect,
                     onPinClick = viewModel::onPinClick,
+                    onCardClick = viewModel::onCardClick,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
@@ -202,6 +204,7 @@ private fun Content(
     state: ResultUiState,
     onDaySelect: (Int) -> Unit,
     onPinClick: (String) -> Unit,
+    onCardClick: (String) -> Unit,
     onOpenCourses: () -> Unit,
     onToggleEdit: () -> Unit,
     onRemoveBlock: (String) -> Unit,
@@ -235,7 +238,12 @@ private fun Content(
     ) {
         // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
         item(key = "map") {
-            DayMap(state = state, onPinClick = onPinClick)
+            // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
+            // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
+            DayMap(
+                state = state,
+                onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
+            )
         }
 
         item(key = "summary") {
@@ -302,6 +310,7 @@ private fun Content(
                             number = index + 1,
                             block = block,
                             active = block.id == state.activeBlockId,
+                            onClick = { onCardClick(block.id) },
                         )
                         // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
                         // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
@@ -943,13 +952,26 @@ private fun DayNote(note: String) {
 
 /** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
-private fun TimelineRow(number: Int, block: ItineraryBlock, active: Boolean = false) {
+private fun TimelineRow(
+    number: Int,
+    block: ItineraryBlock,
+    active: Boolean = false,
+    syncEnabled: Boolean = true,
+    onClick: () -> Unit = {},
+) {
     val requester = remember { BringIntoViewRequester() }
-    // 고른 순간에만 끌어온다. 매 컴포지션마다 부르면 사용자가 스크롤한 것을 되돌린다.
+
+    // **활성이 바뀔 때만** 끌어온다. 매 컴포지션마다 부르면 사용자가 스크롤한 것을 되돌린다.
     LaunchedEffect(active) {
         if (active) requester.bringIntoView()
     }
-    Row(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(requester)
+            .then(if (syncEnabled) Modifier.clickable(onClick = onClick) else Modifier),
+    ) {
         NumberRail(number)
         Spacer(Modifier.width(12.dp))
         Surface(
