@@ -75,8 +75,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(
                                 "/api/me/**",
-                                "/api/itineraries/**",
-                                "/api/runs/**")
+                                "/api/itineraries/**")
                         .authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
