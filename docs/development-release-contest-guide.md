@@ -147,7 +147,7 @@
 ### 4.1 범위와 완료 기준
 
 1. 제출 버전은 `SPEC.md` §11의 **P0 전체**를 기준으로 한다.
-2. P1 GPS 기록·카카오 공유·이동시간 등은 실제 릴리스에 포함되고 검증된 경우에만 기능설명서에 쓴다.
+2. 카카오 공유·이동시간 등 P1 항목은 실제 릴리스에 포함되고 검증된 경우에만 기능설명서에 쓴다. GPS 러닝 기록은 제품에 없다(결정-56).
 3. 범위 제외인 커뮤니티·인기 대회·동선 산책 블록은 되살리지 않는다.
 4. API·DTO·enum·DB·외부 API 계약이 없으면 구현을 멈추고 계약을 먼저 확정한다.
 5. `docs/screen-api-matrix.md` §11의 springdoc 상세화 항목은 해당 API 출시 전에 모두 닫는다.
@@ -200,8 +200,8 @@ cd ..\backend
 - [ ] 이메일 가입·인증·로그인·비밀번호 재설정
 - [ ] 카카오 로그인 — 릴리스 키 해시로 실제 스토어 설치본에서 확인
 - [ ] 찜·동선·저장 코스가 마이에 저장되고 재설치/재로그인 뒤 서버에서 복원
-- [ ] 위치 권한 허용·거부·대략적 위치 각각에서 러닝코스 화면 동작
-- [ ] 위치 권한 없이 검색·프리셋으로 코스 탐색
+- [ ] 검색·프리셋·S7 숙소 프리필로 코스 탐색이 동작
+- [ ] merged Manifest 에 위치 권한 0건
 - [ ] KTO 관광지·축제·두루누비가 실제 운영 API에서 표시되고 출처 문구 노출
 - [ ] 지도 SDK 실패, KTO 부분 실패, 서버 오류, 정상 0건을 서로 다른 UI로 처리
 - [ ] 계정 탈퇴와 관련 데이터 삭제, 외부 계정 삭제 요청 URL 동작
@@ -296,15 +296,14 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 
 삭제는 단순 비활성화가 아니라 관련 사용자 데이터 삭제가 원칙이다. 법적·보안상 보존할 데이터가 있으면 대상과 기간을 개인정보처리방침에 명시한다.
 
-### 6.4 위치 권한과 포그라운드 서비스
+### 6.4 위치 — **권한을 선언하지 않는다** 🔒확정(SPEC 결정-56)
 
-- 기능 사용 시점에만 위치 권한을 요청하고 홈 진입 시 선요청하지 않는다.
-- Android 12+에서는 정밀·대략적 위치 선택을 모두 처리한다.
-- `ACCESS_FINE_LOCATION`이 필요하면 `ACCESS_COARSE_LOCATION`과 함께 요청한다.
-- 코스 탐색은 권한 거부 시에도 검색·프리셋으로 동작해야 한다.
-- P1 GPS 기록을 출시하면 사용자가 시작한 동작을 이어가는 위치 포그라운드 서비스를 사용하고, 완료 즉시 종료한다.
-- GPS 기록 출시 시 `FOREGROUND_SERVICE_LOCATION` 등 현재 target SDK의 선언, Play Console FGS/위치 정책 신고, 상시 알림을 별도 검증한다.
-- 필요하지 않은 `ACCESS_BACKGROUND_LOCATION`은 요청하지 않는다.
+- Manifest 에 `ACCESS_FINE_LOCATION` · `ACCESS_COARSE_LOCATION` · `ACCESS_BACKGROUND_LOCATION` ·
+  `FOREGROUND_SERVICE_LOCATION` 이 **하나도 없어야 한다.** merged debug/release Manifest 로 확인한다.
+- `play-services-location` 의존성이 그래프에 없어야 한다.
+- 코스 탐색 출발지는 검색·프리셋·S7 숙소뿐이다. 위치 권한이 없어도 **폴백이 아니라 정상 경로**다.
+- 위치 포그라운드 서비스를 쓰지 않으므로 Play Console FGS 신고 대상이 아니다.
+- Wi-Fi AP·기지국 Cell-ID·BLE·IP GeoIP 로 위치를 추정하지 않는다 — Data safety 답변도 이 기준으로 적는다.
 
 ---
 
@@ -387,7 +386,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 | **BLOCKER** | Android 릴리스 서명 미완료 | `local.properties` 에 keystore가 있을 때만 붙는 조건부 release `signingConfig` 추가 (#196). 실제 upload key는 아직 없어 산출물은 서명 없이 나온다 | upload key 안전 보관, Play App Signing, CI/로컬 서명 절차 |
 | **BLOCKER** | R8 비활성 | release optimization `enable = false`, NFR-14와 충돌 | R8 활성 후 회귀 테스트·필요 keep rule |
 | **BLOCKER** | 카카오 릴리스 설정 미완료 | build 설정에 네이티브 키 주입·릴리스 키 해시 설정 없음 | 패키지명+debug/release 키 해시 등록, 스토어 설치본 로그인/지도 확인 |
-| **BLOCKER** | 위치 기능·신고 미완료 | Manifest에 위치 권한·서비스 없음, 서버 좌표 전송 설계 | 기능 구현, 정책 신고, 위치정보 사전 검토·필요 신고 |
+| 해소됨 | ~~위치 기능·신고 미완료~~ | Manifest 에 위치 권한·서비스가 **없는 것이 맞다**(결정-56) | 자동 위치 추정을 제품에서 뺐다. #195 공식 검토는 실제 APK·네트워크 흐름 기준으로 다시 확인 |
 | **BLOCKER** | 백엔드 P0 미완료 | 현재 `common`·`contest` 중심, 인증·동선·외부 프록시·마이·코스 미완료 | AP-07·23·25와 계약 테스트·E2E 완료 |
 | **BLOCKER** | 운영 배포 방식 미정 | Dockerfile·배포 workflow·IaC 없음 | 호스팅·DB·GraphHopper·백업·배포/롤백 절차 확정 |
 | **BLOCKER** | 개인정보 공개 문서 없음 | 공개 URL·앱 내부 링크·외부 탈퇴 URL 없음 | 개인정보처리방침·Data safety·계정 삭제 양 경로 |
@@ -453,7 +452,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 - [ ] 앱 액세스 — 심사 전용 계정과 제한 기능 진입 방법
 - [ ] 대상 연령·타깃 사용자
 - [ ] 콘텐츠 등급 설문
-- [ ] 위치 권한·포그라운드 서비스 등 민감 권한 신고
+- [ ] 민감 권한 신고 — 위치 권한·포그라운드 서비스는 **선언하지 않으므로 해당 없음**(결정-56)
 - [ ] 계정 삭제 URL
 - [ ] 국가/지역 배포 범위·가격(무료 여부)
 

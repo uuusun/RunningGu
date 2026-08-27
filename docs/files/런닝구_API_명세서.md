@@ -28,7 +28,7 @@
 
 | 공개 (게스트 허용) | 인증 필요 |
 |---|---|
-| 인증(`/auth/**`) · 대회(`/contests/**`) · 축제(`/festivals`) · POI(`/pois`, `/geocode`) · 러닝코스(`/courses/**`) · **동선 생성**(`/itineraries/generate` — 무상태) | 회원(`/me`) · 동선 저장/조회/편집(`/itineraries/**`) · 저장 코스(`/me/courses/**`) · 러닝 기록(`/runs/**`, P1) · 찜(`/me/favorites/**`) |
+| 인증(`/auth/**`) · 대회(`/contests/**`) · 축제(`/festivals`) · POI(`/pois`, `/geocode`) · 러닝코스(`/courses/**`) · **동선 생성**(`/itineraries/generate` — 무상태) | 회원(`/me`) · 동선 저장/조회/편집(`/itineraries/**`) · 저장 코스(`/me/courses/**`) · 찜(`/me/favorites/**`) |
 
 ### 0-3. 에러 응답 — RFC 9457 Problem Details 확장
 
@@ -306,7 +306,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 
 `200 {"reauthToken":"...","expiresInSec":300}`. `reauthToken`은 현재 사용자와 `DELETE_ACCOUNT` 목적에만 유효한 5분 토큰이며 로그에 남기지 않는다.
 
-`DELETE /api/me`는 `X-Reauth-Token: {reauthToken}` 헤더를 요구한다. 성공 시 `204`, 사용자의 모든 refresh token을 revoke하고 USER에 종속된 동의·찜·동선·저장 코스·러닝 기록을 삭제한다. 앱은 성공 후 Access/Refresh Token과 사용자 Room 캐시를 삭제한다.
+`DELETE /api/me`는 `X-Reauth-Token: {reauthToken}` 헤더를 요구한다. 성공 시 `204`, 사용자의 모든 refresh token을 revoke하고 USER에 종속된 동의·찜·동선·저장 코스를 삭제한다. 앱은 성공 후 Access/Refresh Token과 사용자 Room 캐시를 삭제한다.
 
 오류: `401 REAUTH_FAILED` · `401 INVALID_REAUTH_TOKEN` · `409 REAUTH_PROVIDER_MISMATCH`.
 
@@ -761,31 +761,17 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 
 저장 시 서버는 `sourceCourseId`와 원천 메타데이터 또는 서버가 생성한 OSM 원천 정보를 기준으로 attribution 완성 문구를 확정한다. 요청에 attribution을 받지 않으며 클라이언트가 보내더라도 무시한다. `SAVED_COURSE.attributions`는 PostgreSQL `JSONB NOT NULL DEFAULT '[]'` snapshot이고, 외부 라이선스 문구가 바뀌어도 기존 값을 소급 변경하지 않는다. 상세 응답의 `attributions`는 `List<String>`이며 출처가 없으면 `[]`이다. 목록 응답에는 이 필드를 포함하지 않고, 상세에서 앱이 배열 순서대로 `" · "`로 연결한다. attribution은 `routeFingerprint` 입력에서 제외한다(결정-44, 이슈 #54).
 
-### 7-B 러닝 기록 `/api/runs` — P1 예약
+### 7-B 러닝 기록 — **두지 않는다** 🔒확정(SPEC 결정-56)
 
-GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함은 7-A 저장 코스만 조회하며 saved/ran 통합 정렬·페이징 API는 두지 않는다. 아래 계약은 P1 구현 시 재검토할 예약 초안이다.
+`/api/runs/**` 를 만들지 않는다. GPS 러닝 기록을 제품에서 뺐다(이슈 #215 · 2026-08-27 팀 결정).
 
-**`POST /api/runs`** — GPS 기록 저장
+**예약 초안도 남기지 않는다.** 여기에 계약이 적혀 있으면 다음 사람이 "곧 붙는 것" 으로 읽고
+DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코스 하나이며, saved/ran 통합
+정렬·페이징이라는 문제 자체가 사라졌다.
 
-```json
-{
-  "courseName": "남파랑길 2코스",
-  "ranAt": "2026-07-27T22:12:00Z",
-  "distanceKm": 5.21,
-  "durationSec": 1930,
-  "points": [[35.11454, 129.04076], [35.11347, 129.04087]]
-}
-```
-`201 {"id": 7, "avgPaceSec": 371}`
-- `courseName`은 스냅샷 — **자유 러닝은 null** 🔒(§4.11-c).
-- 5m 이동 필터는 **기록 중 클라가 수행** 🔒, 서버는 방어적 재필터 후 polyline 인코딩(`RUN_TRACK` 1:1 저장) + `avgPaceSec = durationSec ÷ distanceKm` 계산.
-- 검증 🔒(NFR-13): 좌표 2개 이상 · **한국 영역**(위도 33~39, 경도 124~132 🔧) 벗어나면 `400 INVALID_TRACK` · 본인 기록만 접근.
-
-| 메서드 | 경로 | 설명 |
-|---|---|---|
-| GET | `/runs` | 목록(Pageable) — 요약만, RUN_TRACK 미조회(분리 설계 이유) — 마이 "07.28 (화) · 실제 5.21km · 32:10 · 6'11"/km" |
-| GET | `/runs/{id}` | 상세 — `encodedPolyline, pointCount` 포함 (코스 상세 **실선** 렌더링 🔒) |
-| DELETE | `/runs/{id}` | `204` |
+**`/api/courses/near` 의 `lat/lng` 에는 기기 유래 좌표가 오지 않는다.** 앱은 사용자가 직접
+고른 출발지(검색·프리셋·S7 숙소)만 보낸다 — 위치 권한·`FusedLocationProvider`·Wi-Fi/기지국/IP
+추정 경로가 앱에 없다.
 
 ### 7-C 찜 `/api/me/favorites` 🔒(결정-16)
 
@@ -814,12 +800,11 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | 6 동선 결과 | 저장 / 빈 상태 재추천 | 5-2 / 5-1 |
 | 6 편집(저장 후) | 순서·교체·삭제·추가 / 후보 시트 | 5-10·5-8·5-9·5-7 / 4-2 |
 | 6 연계 카드 | 숙소 주변에서 뛰기 | →S8 진입(6-1, 출발지=숙소·목표 min(walk,5)km — walk는 5-5의 `event`로 파생) |
-| 7 러닝코스 내 주변 | 내 위치/출발지 검색/프리셋 / 경로·장소 통합 목록 | (GPS 클라)·4-4·(클라 상수) / 6-1 |
+| 7 러닝코스 출발지 주변 | 출발지 검색/프리셋 / 경로·장소 통합 목록 | 4-4·(클라 상수) / 6-1 |
 | 7 러닝코스 지역별 | 지역 칩 / 목록 | 6-3 / 6-2 |
-| 7 코스 저장·뛰기 | 저장(P0) / 뛰기(P1) | 7-A POST / (GPS 기록 클라 → 종료 시 7-B) |
-| 8 GPS 기록/요약(P1) | 저장 / 삭제 | 7-B POST / 7-B DELETE |
+| 7 코스 저장 | 저장 | 7-A POST |
 | 9 마이 동선 | 목록 / 열기 / 재생성 교체 / 삭제 | 5-4 / 5-5 / 5-3 / 5-6 |
-| 9 마이 코스 | P0 saved / P1 ran | 7-A GET / 7-B GET(P1) |
+| 9 마이 코스 | saved | 7-A GET |
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
 | 9 마이 계정 | 가입 로그인 방식 표시 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-GET `/me` / 1-10 / 2-2 POST·DELETE |
@@ -916,7 +901,6 @@ GPS 기록·`ran` 목록은 AP-22와 함께 P1에서 구현한다. P0 보관함�
 | API | 용도 |
 |---|---|
 | `GET /api/directions?points=` | 블록 간 이동시간 라벨(A5, 카카오모빌리티 — waypoints ≤5 · **자동차 전용, 도보 없음**) |
-| `/api/runs/**` | GPS 기록·ran 목록(AP-22). saved/ran 통합 정렬·페이징은 P1 착수 시 결정 |
 | (서버 불필요) 카톡 공유 A4 · 카카오내비 A6 | Android SDK 직접 — 백엔드 무관 |
 
 ## 부록 G. 구현 노트 (Java · Spring)
