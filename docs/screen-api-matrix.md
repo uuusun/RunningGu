@@ -72,7 +72,7 @@ Compose 화면
 | 대회 목록 | 커서 페이징 `items`, `nextCursor`, `hasNext` |
 | 개인 목록 | 페이지 페이징 `content`, `page{number,size,totalElements,hasNext}` |
 | 공개 범위 | 대회·축제·POI·코스 조회, 무상태 동선 생성 |
-| 로그인 필요 | 프로필·찜·동선/코스/러닝 기록 저장 및 보관함 조회 |
+| 로그인 필요 | 프로필·찜·동선/코스 저장 및 보관함 조회 |
 | 화면 상태 | Loading / Content / Empty / Error 구분, 부분 실패는 영역별 분리 |
 
 ---
@@ -315,7 +315,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 지역 칩 | `GET /api/courses/regions` | 없음 | `count DESC, region ASC`의 region,count | KTO 동기화 실패는 번들/마지막 정상 snapshot으로 200 유지. catalog 자체가 없을 때만 Error |
 | 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
-| 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved/Ran` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
+| 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 
 ### S8-D 코스 상세
 

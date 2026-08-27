@@ -121,7 +121,7 @@ GET /courses/near?lat=&lng=&targetKm=&radiusKm=
   degradedSources[] · attributions[]
 ```
 
-앱은 받은 순서대로 그리고 응답 `difficulty`를 표시만 한다. 내 주변 값은 생성된 왕복 구간의 상승 기준이고 지역별 값은 전체 원본 코스 등급이므로 달라도 정상이다. P0 내 주변에는 난이도 칩과
+앱은 받은 순서대로 그리고 응답 `difficulty`를 표시만 한다. 출발지 주변 값은 생성된 왕복 구간의 상승 기준이고 지역별 값은 전체 원본 코스 등급이므로 달라도 정상이다. P0 출발지 주변에는 난이도 칩과
 `CourseLaunchContext.difficulty`가 없다. 항목이 있으면 호출 실패 `degradedSources`를 비차단 안내로,
 항목 없이 원천 실패면 Error로 매핑한다. 품질 상한 통과 후보 0건은 degraded가 아닌 정상 결과다.
 

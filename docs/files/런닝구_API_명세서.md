@@ -24,7 +24,7 @@
 ### 0-2. 인증 · 게스트 🔒(결정-4)
 
 - 인증 방식: Spring Security Resource Server의 `BearerTokenAuthenticationFilter`가 `Authorization: Bearer {accessToken}`을 검증한다. Access JWT와 Refresh JWT는 **HS256**으로 서명하고 claim은 `sub=String(userId)`, `iss=runninggu`, `aud=runninggu-api`, `type=ACCESS|REFRESH`, `jti=UUID`, `iat`, `exp`로 고정한다. `JWT_SECRET`은 Base64로 디코딩한 32바이트 이상 키이며 누락·형식 오류·길이 미달이면 서버 기동을 실패시킨다. **액세스 30분 · 리프레시 14일**이며, 리프레시는 family 회전 + 서버 저장(SHA-256 lowercase hex) + 재사용 탐지를 적용한다(NFR-11). 🔒
-- 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스/기록 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
+- 게스트: 공개 콘텐츠 탐색과 무상태 동선 생성은 허용한다. 프로필·마이·찜·동선/코스 저장은 인증 필요. 인증 API `401`은 "로그인이 필요해요" 모달로 매핑한다.
 
 | 공개 (게스트 허용) | 인증 필요 |
 |---|---|
@@ -244,7 +244,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 | PATCH | `/me/agreements` | 선택 약관 변경 `{"marketing": true}`. 필수 약관 철회는 탈퇴 절차로 안내 |
 | PUT | `/me/password` | EMAIL 로그인 수단의 비밀번호 변경. 성공 시 기존 refresh token 전부 revoke 후 현재 기기용 token pair 재발급 |
 | POST | `/me/reauth` | 탈퇴용 재인증 토큰 발급 |
-| DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스·기록 연쇄 삭제, `204` |
+| DELETE | `/me` | `X-Reauth-Token` 필수. 탈퇴 후 동의·찜·동선·코스 연쇄 삭제, `204` |
 
 `GET /api/me`, `PATCH /api/me`, `PATCH /api/me/agreements`는 모두 성공 시 현재 프로필을
 같은 형태로 `200` 반환한다. `agreements`는 각 약관의 최신 이력 기준이며, `createdAt`은 UTC `Z`다.
@@ -598,20 +598,20 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 
 ## 6. 러닝코스 API `/api/courses` (공개)
 
-> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 내 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
+> 원천: 두루누비 API `courseList` 최신 메타데이터+GPX 파싱본 261코스와 라이선스 검증 완료 큐레이션 GPX를 우선한다. 한국등산·트레킹지원센터가 제공한 국가숲길·100대명산 GPX는 이용허락범위 제한 없음·`derivable=true`이고 통합 출처 문구는 `등산로·숲길(한국등산·트레킹지원센터)`다. P0 운영 빌드는 `derivable=false`·출처 미확인 소스를 제외하고 `--include-nonderivable`을 사용하지 않는다. 출발지 주변에서 목표 거리에 맞고 상승 `50m/km` 미만인 큐레이션 경로가 0건이면 서버 내부 GraphHopper가 대한민국 OSM 그래프와 SRTM 고도로 품질 상한을 통과한 순환 경로를 최대 1건 생성한다(결정-42 개정). OSM 생성 경로는 지역 목록·코스 마스터에 적재하지 않는다.
 >
 > 두루누비 번들 파일·시작 후/24시간 동기화·`courseId` 결합·원자적 fail-open의 내부 계약은
 > [`docs/course-bundle-contract.md`](../course-bundle-contract.md)가 기준이다. 이 catalog는
 > PostgreSQL에 복제하지 않고 검증된 번들에서 시작한 불변 메모리 snapshot으로 제공한다.
 
-### 6-1 `GET /api/courses/near` — 내 주변 경로·장소 통합 목록
+### 6-1 `GET /api/courses/near` — 출발지 주변 경로·장소 통합 목록
 
 `?lat=&lng=&targetKm=5&radiusKm=8&size=12`
 
 - `targetKm`: 1~21, 0.5 단위.
 - `radiusKm`: 기본 8. 큐레이션 진입점 조회 반경이며 GraphHopper는 입력 출발점에서 순환 경로를 만든다.
 - `size`: 큐레이션/OSM 경로와 PLACE를 합친 최대 항목 수, 기본·최대 12.
-- P0 내 주변 요청에는 난이도 파라미터가 없다. 서버가 `HARD(≥50m/km)`를 자동 추천에서 제외하며 응답 `difficulty`는 표시용이다.
+- P0 출발지 주변 요청에는 난이도 파라미터가 없다. 서버가 `HARD(≥50m/km)`를 자동 추천에서 제외하며 응답 `difficulty`는 표시용이다.
 
 ```json
 {
@@ -620,7 +620,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
       "kind": "ROUTE",
       "routeId": "osm:2e808bd75c4a",
       "dataSource": "OSM_GENERATED",
-      "name": "내 주변 5km 평지 러닝코스",
+      "name": "출발지 주변 5km 평지 러닝코스",
       "distanceM": 12,
       "lat": 37.52461, "lng": 126.92028,
       "difficulty": "EASY",
@@ -650,10 +650,10 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - 큐레이션 `ROUTE`만 `sourceCourseId`, `sido`, `sigun`, `fullDistanceKm`를 추가한다. OSM 생성 경로는 원본 코스가 없으므로 이 필드를 `null`로 채우지 않고 생략한다.
 - `PLACE` 전용: `category`, `address`, `placeUrl`. 종류별 전용 필드는 다른 종류의 항목에서 `null`로 채우지 않고 생략한다.
 - `routeId`는 near snapshot 내부 식별용 불투명 문자열이다. 저장·중복 판정에는 사용하지 않고 서버가 경로 snapshot으로 `routeFingerprint`를 다시 계산한다.
-- 큐레이션 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로. 조각의 `cumGainM`으로 계산한 상승이 `<50m/km`인 큐레이션 경로가 1건 이상이면 GraphHopper를 호출하지 않는다. 고도를 계산할 수 없는 조각은 내 주변 자동 추천에서 제외한다.
+- 큐레이션 규칙 🔒(SPEC §5.8): 반경 내 코스별 최근접 진입점 → `targetKm/2` 편도(더 길게 뻗는 방향) → 왕복 경로. 조각의 `cumGainM`으로 계산한 상승이 `<50m/km`인 큐레이션 경로가 1건 이상이면 GraphHopper를 호출하지 않는다. 고도를 계산할 수 없는 조각은 출발지 주변 자동 추천에서 제외한다.
 - OSM 규칙 🔒(SPEC §5.8): 적격 큐레이션 경로가 0건일 때 `run` 프로파일·보정 거리 0.78·seed 16개로 후보를 만든다. 목표 75~125%·상승 `<50m/km`·차도 실제 거리 비율 `≤10%`·실제 방향 전환 `≤6회/km`를 모두 통과한 후보만 남기고, 차도 `≤5%` 그룹 우선 → 거리 오차 → 방향 전환/km → 차도 비율 순으로 최대 1건을 고른다. 통과 후보가 없으면 상한을 완화하지 않고 OSM 경로 0건으로 처리한다.
 - 차도 비율은 `PRIMARY|SECONDARY|TRUNK|TERTIARY|MOTORWAY` path detail 각 구간의 폴리라인 실거리 합으로 계산한다. `toRef-fromRef` 포인트 인덱스 개수를 거리로 사용하지 않는다. 방향 전환은 instruction sign `-98|-8|-3|-2|2|3|6|8`만 세고 직진·출발·도착·길 이름 변경은 제외한다.
-- 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 내 주변 `ROUTE`는 `EASY|NORMAL`만 나오며, 지역별 큐레이션 목록은 `HARD`도 표시와 함께 제공한다. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
+- 난이도는 `gainM/routeKm`: `EASY <15m/km`, `NORMAL 15~50m/km 미만`, `HARD ≥50m/km`. 출발지 주변 `ROUTE`는 `EASY|NORMAL`만 나오며, 지역별 큐레이션 목록은 `HARD`도 표시와 함께 제공한다. `elevationProfileM`은 SRTM/GPX 고도를 최대 100개로 균등 축약한 배열이며 고도가 없으면 빈 배열이다.
 - 경로 공통 계산은 분당 110m로 `durationMin = max(1, Math.round(km × 1000 / 110))`,
   `shortfall = routeKm < targetKm-0.3`이다. 여기서 `km`는 근처 경로의 `routeKm` 또는 지역별
   코스의 `distanceKm`이며 두 API가 같은 반올림 규칙을 쓴다.
@@ -808,7 +808,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
 | 9 마이 계정 | 가입 로그인 방식 표시 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-GET `/me` / 1-10 / 2-2 POST·DELETE |
-| 10 코스 상세 | 점선(예정, P0) / 실선(뛴 기록, P1) | 7-A GET {id} / 7-B GET {id} |
+| 10 코스 상세 | 저장 코스 경로 점선 | 7-A GET {id} |
 | 공통 | 앱 시작 세션 확인 / 재발급 / 로그아웃 | 2-GET / 1-9 / 1-10 |
 
 > 정리본의 모든 "액션" 항목이 매핑됨 — 누락 없음 확인(2026-07-30).
@@ -837,7 +837,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | Region | 서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주 | 17개 시도 🔒(§6.2 — 비표준 값은 배치에서 주소로 보정) |
 | Provider | `EMAIL, KAKAO` | (구글·네이버 P2) |
 | ContestSource | `MARATHON_ONLINE, MARATHON_GO` | 마라톤 온라인 · 마라톤GO |
-| Difficulty | `EASY, NORMAL, HARD` | 평지·완만·언덕. 생성/조각 경로는 `<15`, `15~50 미만`, `≥50m/km`; 내 주변 자동 추천은 EASY/NORMAL만, 지역별 큐레이션 목록은 HARD도 제공 |
+| Difficulty | `EASY, NORMAL, HARD` | 평지·완만·언덕. 생성/조각 경로는 `<15`, `15~50 미만`, `≥50m/km`; 출발지 주변 자동 추천은 EASY/NORMAL만, 지역별 큐레이션 목록은 HARD도 제공 |
 | PoiSource | `LIVE, SAMPLE, SYNTH` | 서버 라이브 · 데모/캐시 샘플 · 합성 |
 | CourseDataSource | `API_GPX, GPX_ONLY, OSM_GENERATED` | API 메타+GPX 경로 · GPX fallback · 요청 시점 OSM 생성 경로 |
 | CourseDegradedSource | `DURUNUBI, OSM, KAKAO` | `/courses/near` 부분 실패 원천 |
@@ -861,7 +861,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | `INVALID_KAKAO_TOKEN` / `INVALID_REFRESH_TOKEN` | 401 | 카카오 토큰 검증 실패 / 리프레시 무효 |
 | `REAUTH_FAILED` / `INVALID_REAUTH_TOKEN` | 401 | 탈퇴 재인증 실패 / 탈퇴 전용 토큰 만료·불일치 |
 | `EMAIL_NOT_VERIFIED` | 403 | 인증 미완료 상태로 가입 시도 |
-| `FORBIDDEN` | 403 | 남의 동선·코스·기록 접근 |
+| `FORBIDDEN` | 403 | 남의 동선·코스 접근 |
 | `CONTEST_NOT_FOUND` 등 `*_NOT_FOUND` | 404 | 리소스 없음 |
 | `NO_RESULT` | 404 | 지오코딩 검색 결과 없음 |
 | `EMAIL_DUPLICATED` / `NICKNAME_DUPLICATED` | 409 | 이메일·닉네임 유니크 충돌 |
