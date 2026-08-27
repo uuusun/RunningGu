@@ -60,7 +60,6 @@ fun AccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
     }
@@ -176,6 +175,7 @@ fun AccountScreen(
             error = edit.error,
             serverDone = edit.serverDone,
             onDismiss = viewModel::onWithdrawDismiss,
+            onGiveUp = viewModel::onWithdrawGiveUp,
             onConfirm = viewModel::onWithdraw,
         )
     }
@@ -362,12 +362,13 @@ private fun WithdrawDialog(
     error: String?,
     serverDone: Boolean,
     onDismiss: () -> Unit,
+    onGiveUp: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
-        // 서버가 이미 지웠으면 바깥을 눌러 닫을 수 없다 — 닫으면 기기 정리를 다시 할 길이
-        // 없어진다. [취소] 도 같은 이유로 감춘다 (#212 리뷰)
+        // 서버가 이미 지웠으면 **바깥 탭으로는** 닫히지 않는다 — 되돌릴 수 없는 조작 뒤라
+        // 실수로 스치는 것과 그만두겠다는 것을 가른다. 나가려면 [나중에] 를 누른다 (#212 리뷰)
         onDismissRequest = { if (!serverDone) onDismiss() },
         title = {
             Text(
@@ -436,9 +437,14 @@ private fun WithdrawDialog(
             }
         },
         dismissButton = {
-            // 서버가 지운 뒤에는 물러날 곳이 없다 — 기기 정리를 마쳐야 끝난다
-            if (!serverDone) {
-                TextButton(onClick = onDismiss, enabled = !saving) { Text("취소") }
+            // 서버가 지운 뒤에도 나갈 길은 둔다 (#212 리뷰). 재시도가 계속 실패하는 것은
+            // 보통 저장소 쓰기 실패라 같은 자리에서 또 눌러도 같은 결과다. 계정은 이미
+            // 없으므로 [나중에] 는 취소가 아니라 **로그아웃**이다 — 남는 것은 죽은 토큰이다
+            TextButton(
+                onClick = if (serverDone) onGiveUp else onDismiss,
+                enabled = !saving,
+            ) {
+                Text(if (serverDone) "나중에" else "취소")
             }
         },
     )

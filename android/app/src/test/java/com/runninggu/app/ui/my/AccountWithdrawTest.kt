@@ -214,7 +214,7 @@ class AccountWithdrawTest {
         )
         assertFalse(viewModel.uiState.value.signedOut)
 
-        // 닫히지도 않는다 — 닫으면 다시 할 길이 없다
+        // 바깥을 눌러도 닫히지 않는다. 나가려면 [나중에] 를 눌러야 한다(아래 테스트)
         viewModel.onWithdrawDismiss()
         assertNotNull(viewModel.uiState.value.withdraw)
 
@@ -228,6 +228,71 @@ class AccountWithdrawTest {
         assertTrue(viewModel.uiState.value.signedOut)
         assertNull(SessionStore.session.value)
         assertEquals("디스크를 못 비웠다", 2, persistence.clearCalls)
+    }
+
+    /**
+     * [나중에] 를 눌렀을 때. (#212 리뷰 — @M1nnnji)
+     *
+     * 리뷰 전에는 `serverDone` 이면 **아무 데로도 못 나갔다.** 근거를 "닫으면 기기 정리를
+     * 다시 할 길이 없다" 로 적었는데, 실제로는 다음 실행에 `401` → `onGiveUp` →
+     * `SessionStore.signOut` 이 정리한다. **가둘 만큼의 근거가 아니었다.**
+     *
+     * 게다가 정리가 계속 실패하는 것은 보통 저장소 쓰기 실패라, 같은 자리에서 다시 눌러도
+     * 같은 결과다. 모달에 붙잡아 두고 얻는 것이 없다.
+     *
+     * **여기서 중요한 것은 [나중에] 가 "취소" 가 아니라는 점이다.** 서버 계정은 이미 없다.
+     * 로그인 상태로 남겨 두면 어느 화면을 열어도 `401` 만 본다 — 그래서 메모리를 비우고
+     * 게스트로 내보낸다. 디스크에 남는 것은 **죽은 토큰**이라 되살아날 계정이 없다.
+     */
+    @Test
+    fun `나중에를 누르면 게스트로 나가고 디스크 삭제는 예약으로 남는다`() = runTest(dispatcher) {
+        // 계속 실패하는 저장소다. 다시 눌러도 소용없는 상황을 만든다
+        val persistence = AlwaysFailingPersistence()
+        SessionStore.bind(persistence, backgroundScope)
+        advanceUntilIdle()
+        SessionStore.signIn(원래프로필, AuthTokens(accessToken = "A1", refreshToken = "R1"))
+
+        val member = FakeWithdrawRepository()
+        val viewModel = viewModel(member)
+
+        viewModel.onWithdrawOpen()
+        viewModel.onWithdraw("Runner123")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.withdraw?.serverDone == true)
+
+        // 한 번 더 눌러도 같은 자리다 — 여기가 [나중에] 가 필요한 이유다
+        viewModel.onWithdraw("Runner123")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.withdraw?.serverDone == true)
+        assertFalse(viewModel.uiState.value.signedOut)
+
+        viewModel.onWithdrawGiveUp()
+        advanceUntilIdle()
+
+        // 다이얼로그가 닫히고 **게스트로 나간다**
+        assertNull(viewModel.uiState.value.withdraw)
+        assertTrue(viewModel.uiState.value.signedOut)
+        assertNull(SessionStore.session.value)
+        assertNull(SessionStore.tokens)
+        // 서버는 끝까지 한 번씩만 불렀다
+        assertEquals(1, member.reauthCalls)
+        assertEquals(1, member.withdrawCalls)
+    }
+
+    @Test
+    fun `서버 탈퇴 전에는 나중에가 없다`() = runTest(dispatcher) {
+        // `serverDone` 이 아닌데 나가 버리면 **계정이 남은 채 로그아웃된다** — 사용자는
+        // 지웠다고 믿는다. 이 갈래가 없으면 [취소] 와 구별이 사라진다
+        val member = FakeWithdrawRepository()
+        val viewModel = viewModel(member)
+
+        viewModel.onWithdrawOpen()
+        viewModel.onWithdrawGiveUp()
+        advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.withdraw)
+        assertFalse(viewModel.uiState.value.signedOut)
+        assertNotNull(SessionStore.session.value)
     }
 
     @Test
@@ -266,6 +331,13 @@ private class FailingOncePersistence : SessionPersistence {
         clearCalls++
         if (clearCalls == 1) throw java.io.IOException("디스크를 못 비웠다")
     }
+}
+
+/** 몇 번을 눌러도 안 지워진다. [나중에] 가 필요한 상황을 만든다. */
+private class AlwaysFailingPersistence : SessionPersistence {
+    override suspend fun load(): PersistedSession? = null
+    override suspend fun save(session: PersistedSession) = Unit
+    override suspend fun clear(): Unit = throw java.io.IOException("디스크를 못 비웠다")
 }
 
 private class FakeWithdrawRepository(

@@ -17,7 +17,6 @@ import com.runninggu.app.ui.auth.PasswordIssue
 import com.runninggu.app.ui.favorite.FavoriteStore
 import com.runninggu.app.ui.runCatchingUnlessCancelled
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -463,9 +462,13 @@ class AccountViewModel(
     /**
      * 서버가 지운 뒤 **기기를 비운다.** 확인하기 전에는 완료가 아니다 (#89 리뷰).
      *
-     * 실패하면 다이얼로그를 **열어 둔 채** 알린다. 닫아 버리면 다시 누를 때 재인증부터
-     * 시작하는데, 계정이 이미 없어서 `401` 로 막힌다 — **기기에 남은 토큰을 영영 못
-     * 지운다.** 그래서 [WithdrawEdit.serverDone] 을 켜서 다음 시도가 여기로 바로 오게 한다.
+     * 실패하면 다이얼로그를 **열어 둔 채** 알린다. 닫고 다시 누르면 재인증부터 시작하는데,
+     * 계정이 이미 없어서 `401` 로 막힌다. 그래서 [WithdrawEdit.serverDone] 을 켜서 다음
+     * 시도가 여기로 바로 오게 한다.
+     *
+     * **다만 여기 가두지는 않는다** (#212 리뷰). [onWithdrawGiveUp] 이 나갈 길이다 —
+     * 재시도가 계속 실패하는 것은 보통 저장소 쓰기 실패라, 같은 자리에서 또 눌러도 같은
+     * 결과가 나온다. 모달에 붙잡아 두고 얻는 것이 없다.
      */
     private suspend fun finishLocally() {
         _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true, serverDone = true)) }
@@ -479,23 +482,33 @@ class AccountViewModel(
         _uiState.update { it.copy(withdraw = null, signedOut = true) }
     }
 
+    /**
+     * 기기 정리를 **나중으로 미룬다.** 서버 탈퇴가 끝난 뒤에만 쓴다 (#212 리뷰).
+     *
+     * ## 왜 로그아웃과 다르게 메모리를 비우는가
+     *
+     * [SessionStore.signOutAndAwait] 는 디스크를 못 지우면 **메모리를 그대로 둔다** —
+     * 로그아웃은 서버 세션이 아직 살아 있어서, 지운 척하면 다음 실행에 계정이 되살아난다.
+     *
+     * **탈퇴는 그 자리가 다르다. 서버 계정이 이미 없다.** 디스크에 남는 것은 **죽은
+     * 토큰**이라, 다음 실행에 복원돼도 첫 요청이 `401` 을 받고 그때 정리된다
+     * (`ServiceLocator` 의 `onGiveUp` → [SessionStore.signOut]). 되살아날 계정이 없다.
+     *
+     * 그래서 [SessionStore.signOut] 으로 **메모리를 비우고 디스크 삭제는 예약**한다.
+     * 계정이 없는데 로그인 화면 뒤에 남겨 두면, 어느 화면을 열어도 `401` 만 본다.
+     */
+    fun onWithdrawGiveUp() {
+        if (_uiState.value.withdraw?.serverDone != true) return
+        withdrawJob?.cancel()
+        SessionStore.signOut()
+        FavoriteStore.clear()
+        _uiState.update { it.copy(withdraw = null, signedOut = true) }
+    }
+
     fun onMessageShown() {
         _uiState.update { it.copy(message = null) }
     }
 
-    /**
-     * 닉네임 변경 실패 문구. 다이얼로그 안에 그린다.
-     *
-     * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
-     * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
-     */
-    /**
-     * 두 오류는 **사용자가 할 일이 다르다.** 현재 비밀번호가 틀린 것은 위 칸을 고치는 일이고,
-     * 형식 위반은 아래 칸을 고치는 일이다. "다시 시도" 로 뭉뚱그리면 어느 칸인지 모른다(§2-1).
-     *
-     * `INVALID_PASSWORD` 는 앞의 형식 검사에서 대부분 걸러지지만, 서버 정책이 앞서 갈 수
-     * 있으니 그대로 둔다 — 계약이 이긴다(AGENTS 4장).
-     */
     /**
      * 탈퇴 실패 문구. **셋이 서로 다른 일을 시킨다** (§2-2).
      *
@@ -518,6 +531,13 @@ class AccountViewModel(
         }
     }
 
+    /**
+     * 두 오류는 **사용자가 할 일이 다르다.** 현재 비밀번호가 틀린 것은 위 칸을 고치는 일이고,
+     * 형식 위반은 아래 칸을 고치는 일이다. "다시 시도" 로 뭉뚱그리면 어느 칸인지 모른다(§2-1).
+     *
+     * `INVALID_PASSWORD` 는 앞의 형식 검사에서 대부분 걸러지지만, 서버 정책이 앞서 갈 수
+     * 있으니 그대로 둔다 — 계약이 이긴다(AGENTS 4장).
+     */
     private fun Throwable.passwordMessage(): String = when (apiErrorCode()) {
         ApiErrorCode.CURRENT_PASSWORD_MISMATCH -> "현재 비밀번호가 맞지 않아요"
         ApiErrorCode.INVALID_PASSWORD -> "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요"
@@ -528,6 +548,12 @@ class AccountViewModel(
         }
     }
 
+    /**
+     * 닉네임 변경 실패 문구. 다이얼로그 안에 그린다.
+     *
+     * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
+     * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
+     */
     private fun Throwable.nicknameMessage(): String = when {
         apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED -> "이미 쓰고 있는 닉네임이에요"
         this is ApiException.Network -> "네트워크에 연결할 수 없어요"
