@@ -26,8 +26,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -220,6 +218,23 @@ private fun Content(
     val listState = rememberLazyListState()
 
     val day = state.activeDay
+
+    // 핀을 눌러 고른 카드를 보이는 곳으로 끌어온다 (SPEC §3-8 · §4.10).
+    //
+    // `BringIntoViewRequester` 는 못 쓴다 — `LazyColumn` 은 화면 밖 item 을 컴포즈하지
+    // 않아서 requester 가 아예 없고, 그 카드의 핀을 누르면 아무 일도 일어나지 않는다.
+    // 목록 상태로 직접 스크롤한다 (#208 리뷰).
+    LaunchedEffect(state.activeBlockId, state.activeDayIndex, state.isEditing) {
+        val blockId = state.activeBlockId ?: return@LaunchedEffect
+        // 편집 중에는 동기화를 멈춘다(§4.10). 조회 카드가 컴포즈되지도 않는다
+        if (day == null || state.isEditing) return@LaunchedEffect
+        val index = day.blocks.indexOfFirst { it.id == blockId }
+        if (index < 0) return@LaunchedEffect
+        // **이미 보이면 건드리지 않는다.** 카드를 탭해서 고른 것까지 끌어오면 화면이 튄다
+        if (listState.layoutInfo.visibleItemsInfo.none { it.key == blockId }) {
+            listState.animateScrollToItem(TIMELINE_FIRST_ITEM_INDEX + index)
+        }
+    }
 
     LazyColumn(
         state = listState,
@@ -758,6 +773,17 @@ private val HORIZONTAL_PADDING = 20.dp
 /** 조회 타임라인 카드 사이 간격. 예전 `Arrangement.spacedBy(10.dp)` 를 대신한다. */
 private val TIMELINE_ROW_GAP = 10.dp
 
+/**
+ * 조회 모드 타임라인 **첫 카드의 item 인덱스**. (SPEC §4.10 · #208 리뷰)
+ *
+ * 카드 위에 `map` · `summary` · `dayHeader` · `dayNote` 넷이 있다. 뒤 셋은 `day != null`
+ * 안에 있지만 **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 넷이 항상 선다.
+ *
+ * [Content] 의 item 을 늘리거나 줄이면 **여기도 같이 고쳐야 한다.** 어긋나도 조용하다 —
+ * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다.
+ */
+private const val TIMELINE_FIRST_ITEM_INDEX = 4
+
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
 
@@ -956,21 +982,12 @@ private fun TimelineRow(
     number: Int,
     block: ItineraryBlock,
     active: Boolean = false,
-    syncEnabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
-    val requester = remember { BringIntoViewRequester() }
-
-    // **활성이 바뀔 때만** 끌어온다. 매 컴포지션마다 부르면 사용자가 스크롤한 것을 되돌린다.
-    LaunchedEffect(active) {
-        if (active) requester.bringIntoView()
-    }
-
     Row(
         Modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(requester)
-            .then(if (syncEnabled) Modifier.clickable(onClick = onClick) else Modifier),
+            .clickable(onClick = onClick),
     ) {
         NumberRail(number)
         Spacer(Modifier.width(12.dp))
