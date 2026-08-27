@@ -643,8 +643,6 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 - [Google Play 사용자 데이터 정책](https://support.google.com/googleplay/android-developer/answer/10144311)
 - [Data safety 작성 안내](https://support.google.com/googleplay/android-developer/answer/10787469)
 - [스토어 미리보기 자료 규격](https://support.google.com/googleplay/android-developer/answer/9866151)
-- [위치 권한 런타임 요청](https://developer.android.com/develop/sensors-and-location/location/permissions/runtime)
-- [Google Play 백그라운드 위치 정책](https://support.google.com/googleplay/android-developer/answer/9799150)
 
 ### 문의
 
