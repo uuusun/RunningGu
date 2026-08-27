@@ -68,15 +68,16 @@ class AgreementTextsTest {
 
     @Test
     fun `아직 켜지 않은 버전은 읽지 않는다`() {
-        // v1.1 privacy 도 저장소에 있어 함께 번들되지만, A2 연결과 서버 전환을 같은 계약으로
-        // 맞추기 전에는 쓰지 않는다(#111 운영 규칙 1). 지금 경로가 v1.0 을 가리키는지 본다.
+        // v1.1 · v1.2 privacy 도 저장소에 있어 함께 번들되지만, A2 연결과 서버 전환을 같은
+        // 계약으로 맞추기 전에는 쓰지 않는다(#111 운영 규칙 1). 지금 경로가 v1.0 인지 본다.
+        // v1.1 은 켜지 못한 채 v1.2 로 대체됐다 — 기기 위치 기능이 없어져서다(#215).
         assertEquals("v1.0/privacy.md", AgreementTexts.assetPath(AgreementDoc.PRIVACY))
     }
 
     @Test
     fun `버전은 약관마다 따로 든다`() {
         // 서버가 tos-version · privacy-version · marketing-version 을 각각 관리한다.
-        // 하나로 묶으면 PRIVACY 만 1.1 로 올릴 때 있지도 않은 v1.1/tos.md 를 읽어
+        // 하나로 묶으면 PRIVACY 만 1.2 로 올릴 때 있지도 않은 v1.2/tos.md 를 읽어
         // **두 문안이 안 열리고 버전 표시까지 틀린다**(#191 리뷰).
         AgreementDoc.entries.forEach { doc ->
             assertEquals("v${doc.version}/${doc.fileName}", AgreementTexts.assetPath(doc))
