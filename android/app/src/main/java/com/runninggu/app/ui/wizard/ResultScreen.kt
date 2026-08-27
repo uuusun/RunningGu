@@ -262,7 +262,7 @@ private fun Content(
             if (state.isEditing) {
                 // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
                 // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
-                // 알아야 한다. 계측 테스트(`EditListAccessibilityTest` · #71)도 이 모양을 본다.
+                // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
                 item(key = "editList") {
                     Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                         EditNotice()
@@ -292,7 +292,9 @@ private fun Content(
                 itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
                     Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                         TimelineRow(number = index + 1, block = block)
-                        Spacer(Modifier.height(TIMELINE_ROW_GAP))
+                        // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
+                        // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
+                        if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
                     }
                 }
             }
