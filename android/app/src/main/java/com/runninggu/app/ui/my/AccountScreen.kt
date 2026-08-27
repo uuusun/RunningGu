@@ -60,7 +60,6 @@ fun AccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var withdrawing by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
@@ -139,7 +138,7 @@ fun AccountScreen(
                 label = "회원 탈퇴",
                 value = "",
                 destructive = true,
-                onClick = { withdrawing = true },
+                onClick = viewModel::onWithdrawOpen,
             )
             Spacer(Modifier.height(24.dp))
         }
@@ -166,15 +165,17 @@ fun AccountScreen(
         )
     }
 
-    if (withdrawing) {
+    // 비밀번호 변경과 같다 — 성공해야 닫힌다. `401 REAUTH_FAILED` 를 스낵바로 알리면
+    // 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다 (§2-2)
+    state.withdraw?.let { edit ->
         WithdrawDialog(
-            // 카카오 가입자는 비밀번호가 없어 SDK 재인증이다 — AP-02 연결 후 붙는다.
-            requiresPassword = state.profile?.loginProvider == LoginProvider.EMAIL,
-            onDismiss = { withdrawing = false },
-            onConfirm = { password ->
-                viewModel.onWithdraw(password)
-                withdrawing = false
-            },
+            // 카카오 가입자는 SDK 가 방금 발급한 토큰으로 재인증해야 한다(§2-2). 그 SDK 가
+            // 아직 없어(AP-08 · #206) 지금은 막고 안내한다 — 누르게 두고 실패시키는 것보다 낫다.
+            emailAccount = state.profile?.loginProvider == LoginProvider.EMAIL,
+            saving = edit.saving,
+            error = edit.error,
+            onDismiss = viewModel::onWithdrawDismiss,
+            onConfirm = viewModel::onWithdraw,
         )
     }
 }
@@ -355,7 +356,9 @@ private fun PasswordDialog(
 
 @Composable
 private fun WithdrawDialog(
-    requiresPassword: Boolean,
+    emailAccount: Boolean,
+    saving: Boolean,
+    error: String?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -369,13 +372,31 @@ private fun WithdrawDialog(
                     text = "저장한 동선·코스와 찜한 대회가 모두 삭제되고 되돌릴 수 없어요.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (requiresPassword) {
+                if (emailAccount) {
                     Spacer(Modifier.height(12.dp))
-                    // 탈퇴 전 재인증 (SPEC §4.13 · D-23).
+                    // 탈퇴 전 재인증 (SPEC §4.13 · D-23 · §2-2).
                     PasswordField(
                         value = password,
                         onValueChange = { password = it },
                         label = "비밀번호 확인",
+                        enabled = !saving,
+                    )
+                } else {
+                    // 카카오는 SDK 토큰으로 재인증한다(§2-2). SDK 가 아직 없다(AP-08 · #206).
+                    // **누르게 두고 실패시키지 않는다** — 되돌릴 수 없는 조작이라 더 그렇다.
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "카카오로 가입한 계정은 아직 앱에서 탈퇴할 수 없어요. 준비 중이에요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                error?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -383,12 +404,17 @@ private fun WithdrawDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(password) },
-                enabled = !requiresPassword || password.isNotEmpty(),
+                enabled = emailAccount && !saving && password.isNotEmpty(),
             ) {
-                Text("탈퇴", color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = if (saving) "탈퇴하는 중…" else "탈퇴",
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("취소") }
+        },
     )
 }
 

@@ -1,20 +1,21 @@
 package com.runninggu.app.ui.my
 
-import com.runninggu.app.ui.runCatchingUnlessCancelled
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
-import com.runninggu.app.ui.auth.AuthValidation
-import com.runninggu.app.ui.auth.PasswordIssue
-import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.remote.apiErrorCode
-import com.runninggu.app.data.local.SessionProfile
-import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.MemberRepository
-import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.repository.ReauthCredential
+import com.runninggu.app.ui.auth.AuthValidation
+import com.runninggu.app.ui.auth.PasswordIssue
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.runCatchingUnlessCancelled
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,8 @@ data class AccountUiState(
     val nicknameEdit: NicknameEdit? = null,
     /** 비밀번호 다이얼로그. `null` 이면 닫혀 있다. */
     val passwordEdit: PasswordEdit? = null,
+    /** 탈퇴 다이얼로그. `null` 이면 닫혀 있다. */
+    val withdraw: WithdrawEdit? = null,
 ) {
     /** 비밀번호 변경 메뉴는 EMAIL 가입자에게만 보인다 (#59 · 결정-38). */
     val showsPasswordMenu: Boolean get() = profile?.loginProvider == LoginProvider.EMAIL
@@ -78,6 +81,17 @@ data class PasswordEdit(
 )
 
 /**
+ * 탈퇴 다이얼로그 상태. [PasswordEdit] 과 같은 모양이고 같은 이유다.
+ *
+ * `401 REAUTH_FAILED` 는 **사용자가 고쳐야 넘어가는** 오류다. 닫고 스낵바로 알리면
+ * 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다.
+ */
+data class WithdrawEdit(
+    val saving: Boolean = false,
+    val error: String? = null,
+)
+
+/**
  * 계정 관리. (SPEC §4.13 · AP-13 · AP-14)
  *
  * **닉네임·마케팅 동의·로그아웃이 서버를 본다.** 남은 것은 아직 Fake 다 —
@@ -102,6 +116,7 @@ class AccountViewModel(
     private var marketingJob: Job? = null
     private var nicknameJob: Job? = null
     private var passwordJob: Job? = null
+    private var withdrawJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -352,17 +367,80 @@ class AccountViewModel(
         }
     }
 
-    /** 회원 탈퇴 — 재인증(D-23) 후 삭제. Fake 는 입력만 받고 통과시킨다. */
+    /** 탈퇴 다이얼로그를 연다. */
+    fun onWithdrawOpen() {
+        _uiState.update { it.copy(withdraw = WithdrawEdit()) }
+    }
+
+    /** 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다. */
+    fun onWithdrawDismiss() {
+        _uiState.update { if (it.withdraw?.saving == true) it else it.copy(withdraw = null) }
+    }
+
+    /**
+     * 회원 탈퇴. **재인증하고, 서버가 지운 뒤에, 기기를 정리한다.** (§2-2 · D-23 · SPEC §4.13)
+     *
+     * 예전에는 `delay(300)` 뒤 곧바로 로그아웃했다. **비밀번호를 받아만 놓고 쓰지 않아서
+     * 틀려도 탈퇴됐고**, 실제로는 서버에 계정이 그대로 남았다.
+     *
+     * ## 순서가 규칙이다
+     *
+     * ```
+     * reauth → withdraw(성공) → 세션 정리 → 찜 캐시 정리
+     * ```
+     *
+     * **먼저 로그아웃하면 탈퇴가 안 된 채 세션만 사라진다** — 사용자는 지웠다고 믿는데
+     * 계정이 남는다(#198 KDoc). 로그아웃이 #89 에서 `signOutAndAwait` 를 쓰게 된 것과
+     * 같은 자리다: 지워진 것을 **확인하기 전에는** 완료가 아니다.
+     *
+     * ## 지금은 EMAIL 만이다
+     *
+     * KAKAO 는 SDK 가 방금 발급한 액세스 토큰으로 재인증해야 하는데(§2-2), 그 SDK 가 아직
+     * 없다(AP-08 · 이슈 #206). 화면이 카카오 가입자에게 탈퇴를 **막고** 안내한다 —
+     * 누르게 두고 실패시키는 것보다 낫다.
+     */
     fun onWithdraw(reauthPassword: String) {
-        viewModelScope.launch {
-            delay(FAKE_DELAY_MS)
-            // 탈퇴도 같다 — 지워진 것을 확인하기 전에는 완료가 아니다 (#89 리뷰)
-            if (!SessionStore.signOutAndAwait()) {
-                _uiState.update { it.copy(message = LOGOUT_FAILED_MESSAGE) }
-                return@launch
+        if (_uiState.value.withdraw?.saving == true) return
+        if (reauthPassword.isBlank()) {
+            _uiState.update { it.copy(withdraw = WithdrawEdit(error = "비밀번호를 입력해 주세요")) }
+            return
+        }
+        val epoch = SessionStore.sessionEpoch
+        withdrawJob?.cancel()
+        withdrawJob = viewModelScope.launch {
+            _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true)) }
+            val result = runCatchingUnlessCancelled {
+                val token = memberRepository.reauth(ReauthCredential.Password(reauthPassword))
+                memberRepository.withdraw(token)
             }
-            FavoriteStore.clear()
-            _uiState.update { it.copy(signedOut = true) }
+            result.fold(
+                onSuccess = {
+                    // 세션이 바뀐 뒤라면 남의 결과다. 지운 것은 서버뿐이니 화면만 닫는다
+                    if (epoch != SessionStore.sessionEpoch) {
+                        _uiState.update { it.copy(withdraw = null) }
+                        return@fold
+                    }
+                    // 서버가 지웠다. 이제 기기를 비운다 — 확인하기 전에는 완료가 아니다 (#89)
+                    if (!SessionStore.signOutAndAwait()) {
+                        _uiState.update {
+                            it.copy(withdraw = null, message = LOGOUT_FAILED_MESSAGE)
+                        }
+                        return@fold
+                    }
+                    FavoriteStore.clear()
+                    _uiState.update { it.copy(withdraw = null, signedOut = true) }
+                },
+                onFailure = { cause ->
+                    val stale = epoch != SessionStore.sessionEpoch
+                    _uiState.update {
+                        if (stale) {
+                            it.copy(withdraw = null)
+                        } else {
+                            it.copy(withdraw = WithdrawEdit(error = cause.withdrawMessage()))
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -383,6 +461,28 @@ class AccountViewModel(
      * `INVALID_PASSWORD` 는 앞의 형식 검사에서 대부분 걸러지지만, 서버 정책이 앞서 갈 수
      * 있으니 그대로 둔다 — 계약이 이긴다(AGENTS 4장).
      */
+    /**
+     * 탈퇴 실패 문구. **셋이 서로 다른 일을 시킨다** (§2-2).
+     *
+     * | 코드 | 사용자가 할 일 |
+     * |---|---|
+     * | `REAUTH_FAILED` | 비밀번호를 다시 입력한다 |
+     * | `INVALID_REAUTH_TOKEN` | 5분이 지났다 — **처음부터** 다시 한다 |
+     * | `REAUTH_PROVIDER_MISMATCH` | 가입한 수단으로 한다 — 재시도가 아니라 **다른 수단**이다 |
+     *
+     * 하나로 뭉뚱그리면 5분이 지난 사용자가 같은 비밀번호를 계속 다시 넣는다.
+     */
+    private fun Throwable.withdrawMessage(): String = when (apiErrorCode()) {
+        ApiErrorCode.REAUTH_FAILED -> "비밀번호가 맞지 않아요"
+        ApiErrorCode.INVALID_REAUTH_TOKEN -> "시간이 지났어요. 다시 시도해 주세요."
+        ApiErrorCode.REAUTH_PROVIDER_MISMATCH -> "가입할 때 쓴 방법으로 확인해 주세요"
+        else -> if (this is ApiException.Network) {
+            "네트워크에 연결할 수 없어요"
+        } else {
+            "탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
     private fun Throwable.passwordMessage(): String = when (apiErrorCode()) {
         ApiErrorCode.CURRENT_PASSWORD_MISMATCH -> "현재 비밀번호가 맞지 않아요"
         ApiErrorCode.INVALID_PASSWORD -> "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요"
@@ -412,7 +512,5 @@ class AccountViewModel(
 
         /** D-28 — 성공하면 다른 기기 세션이 전부 끊긴다. 그 사실을 알린다. */
         const val PASSWORD_CHANGED_MESSAGE = "비밀번호를 바꿨어요. 다른 기기는 로그아웃돼요."
-
-        const val FAKE_DELAY_MS = 300L
     }
 }
