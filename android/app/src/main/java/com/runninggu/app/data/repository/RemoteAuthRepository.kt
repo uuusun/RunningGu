@@ -9,6 +9,9 @@ import com.runninggu.app.data.remote.TokenApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.dto.AgreementsRequestDto
 import com.runninggu.app.data.remote.dto.AuthTokenResponseDto
+import com.runninggu.app.data.remote.dto.KakaoLoginRequestDto
+import com.runninggu.app.data.remote.dto.KakaoLoginResponseDto
+import com.runninggu.app.data.remote.dto.KakaoSignupRequestDto
 import com.runninggu.app.data.remote.dto.LoginRequestDto
 import com.runninggu.app.data.remote.dto.LogoutRequestDto
 import com.runninggu.app.data.remote.dto.ResetRequestDto
@@ -79,6 +82,45 @@ class RemoteAuthRepository(
         ).toSession()
     }
 
+    /**
+     * 두 모양을 [KakaoLoginOutcome] 으로 가른다. (§1-7)
+     *
+     * **`isNewUser` 만 믿지 않는다.** 기존 가입자라는데 토큰이 없으면 계약 위반이라,
+     * 화면에 "로그인됐다" 를 그리는 대신 실패로 올린다 — 세션 없이 홈으로 보내면
+     * 다음 요청마다 401 이 나고 사용자는 이유를 모른다.
+     */
+    override suspend fun kakaoLogin(kakaoAccessToken: String): Result<KakaoLoginOutcome> = call {
+        val dto = api.kakaoLogin(KakaoLoginRequestDto(kakaoAccessToken = kakaoAccessToken))
+        if (dto.isNewUser) {
+            KakaoLoginOutcome.NewUser(
+                kakaoAccessToken = kakaoAccessToken,
+                nickname = dto.kakaoProfile?.nickname,
+                email = dto.kakaoProfile?.email,
+            )
+        } else {
+            KakaoLoginOutcome.Session(dto.toSession())
+        }
+    }
+
+    override suspend fun kakaoSignup(
+        kakaoAccessToken: String,
+        nickname: String,
+        marketingAgreed: Boolean,
+    ): Result<AuthSession> = call {
+        api.kakaoSignup(
+            KakaoSignupRequestDto(
+                kakaoAccessToken = kakaoAccessToken,
+                nickname = nickname.normalized(),
+                // 필수 2종은 화면이 이미 막았다. 서버도 `400 AGREEMENT_REQUIRED` 로 다시 본다
+                agreements = AgreementsRequestDto(
+                    tos = true,
+                    privacy = true,
+                    marketing = marketingAgreed,
+                ),
+            ),
+        ).toSession()
+    }
+
     override suspend fun requestPasswordReset(email: String): Result<Unit> = call {
         api.requestPasswordReset(ResetRequestDto(email.normalized()))
     }
@@ -105,6 +147,37 @@ class RemoteAuthRepository(
 
     /** 앞뒤 공백만 없앤다. 소문자화는 서버가 한다(이슈 #97). */
     private fun String.normalized(): String = trim()
+}
+
+/**
+ * 카카오 로그인 응답을 세션으로. **기존 가입자일 때만 부른다.** (§1-7)
+ *
+ * 토큰과 사용자가 nullable 인 것은 미가입 응답을 같은 DTO 로 받기 때문이다. 여기까지
+ * 왔다는 건 `isNewUser=false` 라는 뜻이라 셋 다 있어야 한다.
+ *
+ * **없으면 실패로 올린다.** 세션 없이 홈으로 보내면 다음 요청마다 401 이 나고 사용자는
+ * 이유를 모른다 — "로그인은 됐는데 아무것도 안 되는" 상태가 제일 나쁘다.
+ */
+private fun KakaoLoginResponseDto.toSession(): AuthSession {
+    val access = accessToken
+    val refresh = refreshToken
+    val member = user
+    if (access == null || refresh == null || member == null) {
+        throw ApiException.Malformed(
+            IllegalStateException("isNewUser=false 인데 토큰·사용자가 없다 (§1-7)"),
+        )
+    }
+    return AuthSession(
+        tokens = AuthTokens(accessToken = access, refreshToken = refresh),
+        profile = SessionProfile(
+            nickname = member.nickname,
+            email = member.email,
+            loginProvider = LoginProvider.entries.firstOrNull { it.name == member.loginProvider }
+                ?: throw ApiException.Malformed(
+                    IllegalArgumentException("모르는 loginProvider: ${member.loginProvider}"),
+                ),
+        ),
+    )
 }
 
 /** 로그인·가입 응답을 세션으로. 셋이 같은 모양이라 하나로 받는다(§1-5 · §1-6 · §1-8). */

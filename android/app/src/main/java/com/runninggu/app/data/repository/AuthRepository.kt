@@ -21,6 +21,39 @@ import kotlinx.coroutines.delay
  * 던진다. 규칙이 섞여 있는 게 맞고, 맞추려면 화면 세 곳의 분기를 다시 써야 해서 이 PR 에서
  * 하지 않았다 — 별도로 정리한다(#97 · 앱 UI 담당과 함께).
  */
+/**
+ * `POST /auth/kakao` 의 두 결말. (API 명세 §1-7 · SPEC 결정-22 개정 · 이슈 #206)
+ *
+ * 서버가 **한 `200` 으로 두 가지를 돌려준다.** 기존 KAKAO 가입자면 토큰이, 미가입이면
+ * 프로필이 온다. `Result<AuthSession>` 으로는 담을 수 없어서 타입으로 가른다.
+ *
+ * **화면이 `isNewUser` 를 직접 보지 않게 하는 것이 요점이다.** 불리언을 넘기면 "true 인데
+ * 토큰을 읽는" 조합이 만들어지고, 그건 컴파일이 잡아 주지 않는다. `when` 이 두 갈래를
+ * 강제하면 그 실수가 성립하지 않는다([ReauthCredential] 과 같은 이유 · #198 리뷰).
+ *
+ * DTO 를 그대로 올리지 않는 이유는 AGENTS 2장이다 — `ui` 는 `data/remote` 를 모른다.
+ */
+sealed interface KakaoLoginOutcome {
+
+    /** 기존 KAKAO 계정. 바로 홈으로 간다. */
+    data class Session(val session: AuthSession) : KakaoLoginOutcome
+
+    /**
+     * 미가입. A2 약관·닉네임 화면으로 보낸다.
+     *
+     * **둘 다 null 일 수 있다.** 카카오 동의 항목에 따라 닉네임도 이메일도 안 올 수 있다
+     * (§1-7 · §4.1). 가입 화면의 **초기값으로만** 쓰고, 없으면 사용자가 직접 넣는다.
+     *
+     * [kakaoAccessToken] 을 함께 들고 간다 — [AuthRepository.kakaoSignup] 이 같은 토큰을
+     * 다시 요구하는데, 화면이 따로 보관하면 어디에 뒀는지가 화면마다 달라진다.
+     */
+    data class NewUser(
+        val kakaoAccessToken: String,
+        val nickname: String?,
+        val email: String?,
+    ) : KakaoLoginOutcome
+}
+
 interface AuthRepository {
 
     /**
@@ -55,6 +88,34 @@ interface AuthRepository {
         nickname: String,
         marketingAgreed: Boolean,
     ): Result<AuthSession>
+
+    /**
+     * `POST /auth/kakao`. 카카오 액세스 토큰으로 로그인하거나 가입 화면으로 보낸다. (§1-7)
+     *
+     * **한 `200` 이 두 가지를 뜻한다.** 기존 KAKAO 가입자면 토큰이 오고, 미가입이면
+     * `isNewUser=true` 와 프로필이 온다 — 상태 코드로는 구분되지 않는다. 그래서
+     * [KakaoLoginOutcome] 으로 갈라서 돌려준다.
+     *
+     * 기본 구현이 예외를 던진다 — 조용히 실패하면 화면이 "로그인됐다" 로 그린다.
+     */
+    suspend fun kakaoLogin(kakaoAccessToken: String): Result<KakaoLoginOutcome> =
+        throw UnsupportedOperationException("이 구현은 카카오 로그인을 하지 않는다 (§1-7)")
+
+    /**
+     * `POST /auth/kakao/signup`. 카카오 신규 가입. (§1-8)
+     *
+     * **이메일 인증을 거치지 않는다** — 카카오가 이미 확인한 계정이다. 응답은 §1-5 와
+     * 같아서 가입이 곧 로그인이다.
+     *
+     * @param nickname 사용자가 A2 에서 확정한 값. 카카오가 준 것을 그대로 보내지 않는다 —
+     *  없을 수도 있고(동의 항목), 중복일 수도 있어서 화면이 한 번 받는다
+     */
+    suspend fun kakaoSignup(
+        kakaoAccessToken: String,
+        nickname: String,
+        marketingAgreed: Boolean,
+    ): Result<AuthSession> =
+        throw UnsupportedOperationException("이 구현은 카카오 가입을 하지 않는다 (§1-8)")
 
     /** `POST /auth/password/reset-request`. 가입 여부와 무관하게 `202`(§4.3 계정 존재 비노출). */
     suspend fun requestPasswordReset(email: String): Result<Unit>
