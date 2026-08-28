@@ -225,18 +225,6 @@ android {
  * 적었는데 모양이 틀린 것은 오타이고, 그렇게 나온 산출물은 켜자마자 죽는다. 경고로 흘리면
  * 이 PR 이 없애려던 자리를 그대로 남기는 셈이라 태스크를 실패시킨다.
  */
-/**
- * 단위 테스트가 **병합된 매니페스트**를 볼 수 있게 물려 둔다. (SPEC 결정-56 · #215 · #222 리뷰)
- *
- * `LocationRemovedTest` 가 debug·release 두 결과물에 위치 권한이 없는지 확인한다 —
- * 라이브러리가 자기 매니페스트로 권한을 밀어 넣을 수 있어서 소스만 봐서는 모른다.
- * 여기서 안 물리면 산출물이 없거나 **옛 빌드의 것**을 보게 되고, 그러면 검증이 조용히
- * 헛돈다. 두 태스크는 매니페스트만 병합하므로 테스트 시간에 거의 얹히지 않는다.
- */
-tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
-    dependsOn("processDebugManifest", "processReleaseManifest")
-}
-
 tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     // **설정 시점에 값으로 읽어 둔다.** 람다가 스크립트 속성을 그대로 붙들면 구성 캐시가
     // 직렬화하지 못한다(`cannot serialize Gradle script object references`).
@@ -275,6 +263,18 @@ tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.co
             )
         }
     }
+}
+
+/**
+ * 단위 테스트가 **병합된 매니페스트**를 볼 수 있게 물려 둔다. (SPEC 결정-56 · #215 · #222 리뷰)
+ *
+ * `LocationRemovedTest` 가 debug·release 두 결과물에 위치 권한이 없는지 확인한다 —
+ * 라이브러리가 자기 매니페스트로 권한을 밀어 넣을 수 있어서 소스만 봐서는 모른다.
+ * 여기서 안 물리면 산출물이 없거나 **옛 빌드의 것**을 보게 되고, 그러면 검증이 조용히
+ * 헛돈다. 두 태스크는 매니페스트만 병합하므로 테스트 시간에 거의 얹히지 않는다.
+ */
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
+    dependsOn("processDebugManifest", "processReleaseManifest")
 }
 
 dependencies {
