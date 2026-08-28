@@ -107,10 +107,80 @@ class ResultViewModel(
         lastRequest?.let(::send)
     }
 
-    /** 일자 탭 선택. 지도와 타임라인이 함께 따라간다. (SPEC §4.10) */
+    /**
+     * 일자 탭. **활성화 + 지도 재계산 + 첫 핀 활성**이다. (SPEC §4.10)
+     *
+     * 첫 핀을 골라 두는 것이 계약이다 — 일자를 바꿨는데 아무것도 안 골라져 있으면
+     * 타임라인에 강조된 카드가 없어 어디부터 보는지 알 수 없다.
+     *
+     * 좌표 있는 블록이 하나도 없는 날이면 `null` 이다. 그때는 지도 자리에 안내만 뜬다.
+     */
     fun onDaySelect(index: Int) {
-        _uiState.update { it.copy(activeDayIndex = index) }
+        _uiState.update { state ->
+            val moved = state.copy(activeDayIndex = index, activeBlockId = null)
+            moved.copy(activeBlockId = moved.mapPins.firstOrNull()?.id)
+        }
     }
+
+    /**
+     * 지도 핀을 탭했다. (SPEC §3-8 · §4.10 — "핀 탭 → 카드로 스크롤")
+     *
+     * **편집 모드에서는 아무것도 하지 않는다.** §4.10 이 "편집 모드 중 동기화 중단" 을
+     * 요구한다 — 편집 중에는 사용자가 행을 옮기고 지우는 중이라, 그때 카드가 저절로
+     * 스크롤되면 누르려던 버튼이 발밑에서 움직인다.
+     *
+     * **같은 핀을 다시 눌러도 풀지 않는다.** 계약은 "핀 탭 → 해당 항목 활성" 뿐이고,
+     * 일자를 고르면 항상 첫 핀이 활성이므로 "아무것도 안 골라진 상태" 는 이 화면에 없다.
+     *
+     * 처음에는 눌러서 놓을 수 있게 두면 카메라가 전체 bounds 로 돌아간다고 적었는데
+     * **사실이 아니었다.** [com.runninggu.app.ui.map.cameraCommandFor] 는 다음 활성이
+     * null 이면 `None` 을 돌려주므로, 강조만 사라지고 카메라는 확대된 채 남는다(#208 리뷰).
+     */
+    fun onPinClick(blockId: String) {
+        _uiState.update { if (it.isEditing) it else it.copy(activeBlockId = blockId) }
+    }
+
+    /**
+     * 타임라인 카드를 탭했다. (SPEC §4.10 — "카드 탭 → 핀 카메라 이동")
+     *
+     * 핀 탭의 반대 방향이다. 활성이 바뀌면 [com.runninggu.app.ui.map.MapScene] 규칙이
+     * 카메라를 그 좌표로 옮긴다.
+     *
+     * 좌표 없는 블록을 눌러도 **활성으로 두지 않는다** — 카메라가 갈 곳이 없어서
+     * 지도는 그대로인데 카드만 강조되면 왜 안 움직이는지 알 수 없다.
+     */
+    fun onCardClick(blockId: String) {
+        _uiState.update { state ->
+            if (state.isEditing) return@update state
+            if (state.mapPins.none { it.id == blockId }) return@update state
+            state.copy(activeBlockId = blockId)
+        }
+    }
+
+    /**
+     * 사용자가 타임라인을 스크롤해 이 카드가 **중앙 밴드**에 들어왔다.
+     * (SPEC §4.10 — "LazyList 스크롤 중앙 밴드(상하 45% 제외)에 든 카드 자동 활성")
+     *
+     * 탭과 결과는 같지만 **부르는 쪽이 다르다.** 탭은 한 번이고 이쪽은 스크롤이 굴러가는
+     * 동안 계속 들어온다 — 그래서 [onCardClick] 와 나눠 두고, 화면 쪽에서도 값이 바뀔
+     * 때만 부른다.
+     *
+     * 좌표 없는 카드를 지나쳐도 활성을 옮기지 않는 것은 [onCardClick] 와 같은 이유다.
+     * 카메라가 갈 곳이 없어 지도는 그대로인데 강조만 옮겨 다니면 지도가 고장 난 것처럼
+     * 보인다. **가운데 있는 것과 다른 카드가 강조된 채로 지나가는 편이 낫다.**
+     *
+     * 편집 중에는 화면이 아예 부르지 않지만(§4.10 동기화 중단) 여기서도 한 번 막는다 —
+     * 부르는 자리가 여럿이면 한 곳이 빠졌을 때 조용히 뚫린다.
+     */
+    fun onCardCentered(blockId: String) {
+        _uiState.update { state ->
+            if (state.isEditing) return@update state
+            if (state.activeBlockId == blockId) return@update state
+            if (state.mapPins.none { it.id == blockId }) return@update state
+            state.copy(activeBlockId = blockId)
+        }
+    }
+
 
     // ── 저장 전 로컬 편집 (SPEC §4.10 · §5.7) ───────────────────
     //
@@ -272,7 +342,7 @@ class ResultViewModel(
             val outcome = runCatchingUnlessCancelled { repository.generate(request) }
             _uiState.value = outcome.fold(
                 onSuccess = { result ->
-                    ResultUiState(
+                    val loaded = ResultUiState(
                         // 200 인데 days=[] 면 오류가 아니라 빈 상태다 (API 명세 §5-1 · SPEC §4.10).
                         phase = if (result.days.isEmpty()) {
                             ResultUiState.Phase.EMPTY
@@ -283,6 +353,9 @@ class ResultViewModel(
                         event = request.event,
                         region = lastRegion,
                     )
+                    // 첫 일자도 "고른 일자" 다 — 탭을 눌렀을 때와 같이 첫 핀을 활성으로 둔다
+                    // (SPEC §4.10). 안 그러면 처음 화면만 강조된 카드가 없다
+                    loaded.copy(activeBlockId = loaded.mapPins.firstOrNull()?.id)
                 },
                 onFailure = { cause ->
                     // 네트워크·timeout·4xx/5xx 는 Error 이며 Empty 로 강등하지 않는다 (API 명세 §5-1).
