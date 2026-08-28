@@ -18,8 +18,8 @@ import kotlinx.coroutines.launch
 /**
  * 저장 코스 상세. (screen-api-matrix S8-D `saved` · §7-A)
  *
- * `near` · `ran` 변형은 여기서 다루지 않는다 — `near` 는 S8 목록이 snapshot 을 넘기는
- * 흐름(AP-12)이고 `ran` 은 P1 이다(결정-14).
+ * `near` 변형은 여기서 다루지 않는다 — S8 목록이 snapshot 을 넘기는 흐름이다(AP-12).
+ * `ran` 변형은 GPS 러닝 기록과 함께 제품에서 빠졌다(결정-56 · #215).
  */
 class CourseDetailViewModel(
     private val savedCourseId: Long,
