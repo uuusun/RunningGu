@@ -74,7 +74,7 @@ private val RunningGuColorScheme = lightColorScheme(
  * 덮어써서, 기기마다 다른 색이 나오고 목업의 브랜드 파랑이 사라진다.
  *
  * 다크 테마도 두지 않는다 — 목업 v2가 라이트 단일 레지스터이고 SPEC에도 요구가 없다.
- * (지도·GPS 기록의 '몰입 다크'는 화면 단위 처리이지 앱 테마가 아니다.)
+ * (지도의 '몰입 다크'는 화면 단위 처리이지 앱 테마가 아니다.)
  */
 @Composable
 fun RunningGuTheme(

@@ -37,7 +37,7 @@ val Line = Color(0xFFE4E4E6)        // --line
 val Line2 = Color(0xFFECECEE)       // --line2
 val Line3 = Color(0xFFF0F0F0)       // --line3
 
-// 몰입(다크) 레지스터 — 홈 히어로·지도·GPS 기록.
+// 몰입(다크) 레지스터 — 홈 히어로·지도.
 val Deep = Color(0xFF0C1024)        // --deep
 val Deep2 = Color(0xFF131A38)       // --deep-2
 val Deep3 = Color(0xFF1B2450)       // --deep-3
