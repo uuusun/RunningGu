@@ -24,7 +24,6 @@ captures/
 *.exe
 *.msi
 *.dmg
-*.zip
 
 # ── Python (scripts/) ──
 __pycache__/
