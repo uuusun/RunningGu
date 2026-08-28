@@ -22,7 +22,7 @@ fun formatKm(km: Double): String =
     if (km % 1.0 == 0.0) km.toInt().toString() else km.toString()
 
 /**
- * 내 주변 카드 부제.
+ * 출발지 주변 카드 부제.
  *
  * - 경로 있음 — "{왕복 km}·약 {분}분·난이도·상승 {m}m"
  * - 경로 없음 — "{카테고리} · {거리}"

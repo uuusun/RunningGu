@@ -111,7 +111,7 @@ fun RunningGuNavHost(
         }
 
         // S8-D 저장 코스 상세 — 마이 [러닝코스] 에서만 들어온다 (matrix D-20).
-        // near·ran 변형은 각각 AP-12 · P1 이라 route 를 두지 않는다.
+        // near 변형은 AP-12 라 route 를 두지 않는다. ran 은 제품에서 빠졌다(결정-56).
         composable(
             route = Routes.COURSE_DETAIL_SAVED_PATTERN,
             arguments = listOf(

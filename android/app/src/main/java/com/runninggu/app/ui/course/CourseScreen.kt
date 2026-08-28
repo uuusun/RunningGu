@@ -2,12 +2,6 @@ package com.runninggu.app.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -114,7 +108,7 @@ fun CourseScreen(
     }
 }
 
-// ── 내 주변 ────────────────────────────────────────────────
+// ── 출발지 주변 ────────────────────────────────────────────
 
 @Composable
 private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
@@ -125,7 +119,10 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
 
         when (val near = state.nearby) {
             NearbyState.Idle -> item {
-                EmptyState(title = "출발지를 정해주세요.", description = "내 위치를 켜거나 아래에서 고르세요.")
+                EmptyState(
+                    title = "출발지를 정해주세요.",
+                    description = "장소를 검색하거나 아래 추천 지역에서 골라 주세요.",
+                )
             }
 
             NearbyState.Loading -> item { LoadingState(message = "이 근처를 찾는 중…") }
@@ -175,26 +172,14 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
 @Composable
 private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        // **`else` 를 쓰지 않는다** (#220 리뷰). 기기 위치를 안 쓰기로 했으니 `Locating` 은
+        // 곧 사라질 상태인데, `else` 로 덮으면 그때 이 자리가 아무 신호도 안 낸다. 갈래를
+        // 다 적어 두면 `Locating` 이 지워지는 순간 **컴파일러가 여기를 짚어 준다** (결정-56).
         val label = when (val origin = state.origin) {
-            OriginState.Undecided -> "출발지를 정해주세요."
-            OriginState.Locating -> "위치를 확인하는 중…"
+            OriginState.Undecided, OriginState.Locating -> "출발지를 정해주세요."
             is OriginState.Fixed -> origin.name
         }
         Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-
-        Spacer(Modifier.height(8.dp))
-
-        MyLocationButton(state = state, viewModel = viewModel)
-
-        // 못 잡아도 화면을 막지 않는다. 아래 검색·프리셋으로 계속 갈 수 있다 (NFR-15)
-        state.locationMessage?.let { message ->
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -217,54 +202,6 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
         }
     }
 }
-
-/**
- * [내 위치]. (SPEC §4.11-1 ① · NFR-15)
- *
- * **권한을 물어보는 자리는 여기뿐이다.** 화면에 있어야 시스템 대화상자를 띄울 수 있어서
- * ViewModel 이 못 한다. 허용되면 조회를 맡기고, 거부되면 그 사실만 넘긴다.
- *
- * 정밀·대략 둘 다 요청하되 **하나만 허용해도 진행한다** — 코스 추천은 반경 8km 기준이라
- * 대략 위치로 충분하다.
- */
-@Composable
-private fun MyLocationButton(state: CourseUiState, viewModel: CourseViewModel) {
-    val context = LocalContext.current
-    val locating = state.origin == OriginState.Locating
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { granted ->
-        if (granted.values.any { it }) {
-            viewModel.onUseMyLocation()
-        } else {
-            viewModel.onLocationPermissionDenied()
-        }
-    }
-
-    OutlinedButton(
-        onClick = {
-            val alreadyGranted = LOCATION_PERMISSIONS.any { permission ->
-                ContextCompat.checkSelfPermission(context, permission) ==
-                    PackageManager.PERMISSION_GRANTED
-            }
-            // 이미 있으면 다시 묻지 않는다 — 물어봐도 대화상자가 안 뜨고 콜백만 온다
-            if (alreadyGranted) {
-                viewModel.onUseMyLocation()
-            } else {
-                permissionLauncher.launch(LOCATION_PERMISSIONS)
-            }
-        },
-        enabled = !locating,
-    ) {
-        Text(if (locating) "위치를 확인하는 중…" else "내 위치")
-    }
-}
-
-private val LOCATION_PERMISSIONS = arrayOf(
-    Manifest.permission.ACCESS_FINE_LOCATION,
-    Manifest.permission.ACCESS_COARSE_LOCATION,
-)
 
 /**
  * 출발지 검색. (SPEC §4.11-1 ② · API 명세 §4-4)
@@ -352,7 +289,7 @@ private fun TargetSlider(state: CourseUiState, viewModel: CourseViewModel) {
  * ## ⚠️ [LazyColumn] 안이라 스크롤로 벗어나면 다시 만들어진다
  *
  * [RunningGuMap] 이 `MapView` 를 `remember` 로 붙드는데, 그 기억은 **이 item 의
- * 컴포지션에 묶인다.** 목록을 내렸다 올리면 SDK 초기화와 카메라가 다시 돈다. 내 주변
+ * 컴포지션에 묶인다.** 목록을 내렸다 올리면 SDK 초기화와 카메라가 다시 돈다. 출발지 주변
  * 목록이 최대 12건이라 화면 밖으로 밀려나는 것은 드문 일이 아니다.
  *
  * 고치는 방법이 여럿이라(고정 영역으로 빼기 등) **실기기에서 보고 정한다** — #104 확인
@@ -523,7 +460,7 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 }
 
 /**
- * [저장] · [뛰기]. (SPEC §4.11-6 · API 명세 §7-A)
+ * [저장]. (SPEC §4.11-6 · API 명세 §7-A)
  *
  * **[저장]은 고른 경로가 있어야 눌린다.** 아무것도 안 골랐는데 눌리면 무엇이 저장되는지
  * 알 수 없고, 걷기 스팟만 있는 목록(수도권의 기본 경험)에서는 저장할 대상 자체가 없다.
@@ -534,14 +471,12 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRoute: Boolean) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = viewModel::onSaveCourse,
-                enabled = state.canSave,
-            ) {
-                Text(if (state.save is SaveCourseState.Saving) "저장 중…" else "저장")
-            }
-            OutlinedButton(onClick = { /* TODO(AP-22 · P1): GPS 기록 */ }) { Text("뛰기") }
+        // 버튼은 [저장] 하나다 🔒확정(결정-56). [뛰기] 는 GPS 기록과 함께 제품에서 빠졌다
+        OutlinedButton(
+            onClick = viewModel::onSaveCourse,
+            enabled = state.canSave,
+        ) {
+            Text(if (state.save is SaveCourseState.Saving) "저장 중…" else "저장")
         }
         val save = state.save
         if (save is SaveCourseState.Done) {
@@ -560,7 +495,8 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
         if (hasNoRoute) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "이 근처엔 따라갈 경로가 없어요. 자유롭게 뛰어도 기록은 그대로 남습니다.",
+                // 뒷문장("자유롭게 뛰어도 기록은 남습니다")은 GPS 기록을 전제한 말이라 뺐다
+                text = "이 근처엔 따라갈 경로가 없어요.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
