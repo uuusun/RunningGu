@@ -52,6 +52,8 @@ data class ResultUiState(
      * 모른 채 계속 누른다.
      */
     val canRetry: Boolean = true,
+    /** 저장 CTA 의 진행·결과. (SPEC §4.10 · §5-2) */
+    val save: SaveItineraryState = SaveItineraryState.Idle,
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 
@@ -128,6 +130,53 @@ data class ResultUiState(
      */
     val activePinId: String?
         get() = activeBlockId?.takeIf { id -> mapPins.any { it.id == id } }
+
+    /**
+     * 저장 CTA 를 누를 수 있는가. (SPEC §4.10 · §5-2)
+     *
+     * **편집 중에도 누를 수 있다.** §4.10 이 편집을 마치라고 요구하지 않고, [편집] 은
+     * 목록 모양만 바꾼다 — 저장되는 내용은 어느 모드에서나 같다.
+     */
+    val canSave: Boolean
+        get() = phase == Phase.CONTENT && save !is SaveItineraryState.Saving
+}
+
+/**
+ * 저장 CTA 의 상태. (SPEC §4.10 · §5-2 · 매핑표 "새 동선 저장")
+ *
+ * **S8 의 `SaveCourseState` 와 성공 쪽이 다르다.** 코스 저장은 그 자리에 머무르며 문구
+ * 한 줄로 끝나지만, 동선 저장은 §4.10 이 **마이[동선]으로 옮기라**고 못 박고 있다. 화면을
+ * 떠나므로 성공 문구를 이 화면에 그릴 자리가 없다 — 그래서 [Saved] 가 문구를 들고 나가고
+ * 마이가 스낵바로 띄운다.
+ *
+ * 실패는 반대다. 화면에 남아 다시 누를 수 있어야 하므로 [Failed] 문구를 버튼 아래 둔다.
+ */
+sealed interface SaveItineraryState {
+
+    /** 아직 안 눌렀거나, 저장한 뒤 내용을 고쳐 이전 결과를 지웠다. */
+    data object Idle : SaveItineraryState
+
+    /** 보내는 중. 버튼을 막아 연타로 같은 동선이 두 번 나가지 않게 한다. */
+    data object Saving : SaveItineraryState
+
+    /**
+     * 게스트가 눌렀다 — 로그인 유도 **모달**을 띄운다.
+     * (`docs/screen-api-matrix.md` S7 "새 동선 저장 … 게스트 modal")
+     *
+     * 로그인하고 돌아와도 **저장이 저절로 일어나지 않는다**(D-27). S8 과 같은 규칙이다.
+     */
+    data object NeedsLogin : SaveItineraryState
+
+    /**
+     * 저장됐다. 화면은 이 [message] 를 들고 마이[동선]으로 옮긴다. (SPEC §4.10)
+     *
+     * @param replaced 같은 `(대회, 시작일, 종료일)` 동선이 있어 **교체**됐는가(§5-2).
+     *  새로 담은 것과 덮어쓴 것은 사용자에게 다른 일이라 문구를 가른다
+     */
+    data class Saved(val id: Long, val replaced: Boolean, val message: String) : SaveItineraryState
+
+    /** 실패했다. [message] 를 버튼 아래 한 줄로 그리고 화면에 남는다. */
+    data class Failed(val message: String) : SaveItineraryState
 }
 
 /**

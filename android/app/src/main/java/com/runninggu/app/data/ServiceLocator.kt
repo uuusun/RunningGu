@@ -215,12 +215,12 @@ object ServiceLocator {
     val itineraryApi: ItineraryApi by lazy { retrofit.create() }
 
     /**
-     * 저장 동선. (API 명세 §5-4 · §5-6)
+     * 동선. (API 명세 §5-1 · §5-2 · §5-4 · §5-6)
      *
-     * **S10 마이 목록이 이걸 쓴다.** S7 결과 화면(`ResultViewModel`)은 아직
-     * [com.runninggu.app.data.repository.FakeItineraryRepository] 를 직접 들고 있다 —
-     * 생성(`POST /itineraries/generate`)을 서버로 옮기는 것은 대회 데이터가 붙는
-     * 시점의 별도 작업이다.
+     * **S10 마이 목록과 S7 결과 화면이 함께 쓴다.** S7 은 예전에
+     * [com.runninggu.app.data.repository.FakeItineraryRepository] 를 직접 들고 있었는데,
+     * 가짜에는 `save()` 가 없어 저장 CTA 를 붙일 수 없었다. 위저드가 서버 대회를 싣게
+     * 되면서(#140 · `contestPhase`) 생성·저장을 함께 옮겼다.
      */
     val itineraryRepository: ItineraryRepository by lazy {
         RemoteItineraryRepository(itineraryApi)

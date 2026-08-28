@@ -9,6 +9,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import kotlinx.coroutines.flow.filterNotNull
 import com.runninggu.app.ui.auth.LoginScreen
 import com.runninggu.app.ui.auth.ResetScreen
 import com.runninggu.app.ui.auth.SignupScreen
@@ -24,7 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.navigation
 import com.runninggu.app.ui.my.AccountScreen
+import com.runninggu.app.ui.my.ItinerarySavedNotice
 import com.runninggu.app.ui.my.MyScreen
+import com.runninggu.app.ui.my.MyViewModel
 import com.runninggu.app.ui.racedetail.RaceDetailScreen
 import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
@@ -97,7 +100,19 @@ fun RunningGuNavHost(
         }
 
         // S10 마이 — 로그인 필요(결정-4). 게스트는 화면 안에서 로그인 유도만 본다.
-        composable(Routes.MY) {
+        composable(Routes.MY) { entry ->
+            // S7 저장 성공으로 들어온 경우다. 문구는 저장한 화면이 아니라 여기서 뜬다
+            // (SPEC §4.10 — "마이[동선] → 마이에 저장했어요").
+            val myViewModel: MyViewModel = viewModel()
+            // **읽고 마는 게 아니라 계속 본다.** 이 항목이 재사용되면(`launchSingleTop`)
+            // 항목을 키로 삼은 효과는 다시 돌지 않아 두 번째 문구가 사라진다 (#214 리뷰).
+            LaunchedEffect(entry) {
+                ItinerarySavedNotice.flow(entry.savedStateHandle).filterNotNull().collect { message ->
+                    myViewModel.showMessage(message)
+                    ItinerarySavedNotice.consume(entry.savedStateHandle)
+                }
+            }
+
             MyScreen(
                 // 로그인 후 홈이 아니라 마이로 돌아온다 (D-27 "원래 화면 복귀").
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.MY)) },
@@ -107,6 +122,7 @@ fun RunningGuNavHost(
                 onBrowseRaces = { navController.navigate(Routes.CALENDAR) },
                 onBrowseCourses = { navController.navigate(Routes.COURSES) },
                 modifier = Modifier.statusBarsPadding(),
+                viewModel = myViewModel,
             )
         }
 
@@ -175,7 +191,15 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
             .arguments?.getString(Routes.ARG_RETURN_TO) ?: Routes.HOME
 
     fun leaveAuthGraph() {
-        navController.navigate(returnTarget()) {
+        val target = returnTarget()
+        // **아래에 있는 화면으로 그냥 돌아간다.** 위저드처럼 상태를 들고 있는 그래프는
+        // route 로 되돌아가면 새로 만들어져 편집한 동선이 날아간다(D-27 · #214 리뷰).
+        // 로그인 그래프만 걷어내면 그 아래 entry 가 그대로 살아 있어 ViewModel 도 같다.
+        if (target == Routes.RETURN_BACK) {
+            navController.popBackStack(Routes.AUTH_GRAPH_PATTERN, inclusive = true)
+            return
+        }
+        navController.navigate(target) {
             popUpTo(Routes.AUTH_GRAPH_PATTERN) { inclusive = true }
             // 마이에서 들어왔다 돌아갈 때 같은 화면이 두 장 쌓이지 않게 한다.
             launchSingleTop = true
@@ -326,6 +350,26 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                         targetKm = targetKm,
                     )
                 },
+                // 저장하면 마이[동선]으로 옮긴다 (SPEC §4.10). 문구는 방금 쌓인 마이
+                // 항목에 담아 넘긴다 — 위 [onOpenCourses] 와 같은 방식이다(D-15 · #178).
+                onSaved = { message ->
+                    navController.navigate(Routes.MY) {
+                        // **저장이 끝난 위저드로는 돌아가지 않는다** (#214 리뷰). 남겨 두면
+                        // 뒤로가기로 이미 저장한 동선을 다시 편집하게 되고, 그 화면이
+                        // 성공 상태를 다시 들고 있으면 곧바로 마이로 튕긴다.
+                        // 중간 상태로 재진입하면 안 되는 화면이다(#192 `RestartWizardIfUnconfirmed`).
+                        popUpTo(Routes.WIZARD_GRAPH_PATTERN) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                    ItinerarySavedNotice.set(
+                        handle = navController.getBackStackEntry(Routes.MY).savedStateHandle,
+                        message = message,
+                    )
+                },
+                // **S7 으로 돌아온다** (매핑표 D-27 "원래 화면 복귀"). 위저드 route 를 주면
+                // 그래프가 새로 만들어져 로그인 전에 편집한 동선이 날아간다 (#214 리뷰).
+                // 돌아와도 저장은 저절로 일어나지 않는다 — 사용자가 다시 누른다.
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.RETURN_BACK)) },
                 wizardViewModel = wizardViewModel,
                 viewModel = resultViewModel,
             )
