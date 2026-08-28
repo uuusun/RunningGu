@@ -129,7 +129,7 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 내_주변_큐레이션_경로와_카카오_장소를_거리순으로_통합한다() throws Exception {
+    void 출발지_주변_큐레이션_경로와_카카오_장소를_거리순으로_통합한다() throws Exception {
         given(kakaoPoiSource.search(any(PoiSearchCriteria.class), eq(15)))
                 .willReturn(List.of(walkingPoi("종로공원", 100)));
 
@@ -177,7 +177,7 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items", hasSize(1)))
                 .andExpect(jsonPath("$.items[0].kind").value("ROUTE"))
                 .andExpect(jsonPath("$.items[0].routeId").value("osm:123456789abc"))
-                .andExpect(jsonPath("$.items[0].name").value("내 주변 5km 평지 러닝코스"))
+                .andExpect(jsonPath("$.items[0].name").value("출발지 주변 5km 평지 러닝코스"))
                 .andExpect(jsonPath("$.items[0].dataSource").value("OSM_GENERATED"))
                 .andExpect(jsonPath("$.items[0].sourceCourseId").doesNotExist())
                 .andExpect(jsonPath("$.items[0].sido").doesNotExist())
@@ -254,7 +254,7 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 내_주변_요청값_범위를_검증한다() throws Exception {
+    void 출발지_주변_요청값_범위를_검증한다() throws Exception {
         assertNearValidationFailed("targetKm", "1.25");
         assertNearValidationFailed("targetKm", "21.5");
         assertNearValidationFailed("radiusKm", "0");
@@ -302,7 +302,7 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
         return new OsmGeneratedRoute(
                 "osm:123456789abc",
                 CourseDataSource.OSM_GENERATED,
-                "내 주변 5km 평지 러닝코스",
+                "출발지 주변 5km 평지 러닝코스",
                 0,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,

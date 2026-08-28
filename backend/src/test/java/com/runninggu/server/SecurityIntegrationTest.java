@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.runninggu.server.auth.application.TokenIssuer;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +26,9 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
     @Test
     void 명시하지_않은_API는_기본_거부한다() throws Exception {
         mockMvc.perform(get("/api/not-yet-implemented"))
@@ -31,6 +37,18 @@ class SecurityIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.traceId").isString())
                 .andExpect(jsonPath("$.instance").value("/api/not-yet-implemented"));
+    }
+
+    @Test
+    void 러닝_기록_API는_인증_예약을_두지_않고_기본_거부한다() throws Exception {
+        String accessToken = tokenIssuer.issue(1L, UUID.randomUUID(), Instant.now()).accessToken();
+
+        mockMvc.perform(get("/api/runs/42")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.instance").value("/api/runs/42"));
     }
 
     @Test

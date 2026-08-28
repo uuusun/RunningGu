@@ -36,7 +36,7 @@ class GraphHopperOsmRouteGeneratorTest {
         assertThat(result.degraded()).isFalse();
         assertThat(result.route()).hasValueSatisfying(route -> {
             assertThat(route.dataSource().name()).isEqualTo("OSM_GENERATED");
-            assertThat(route.name()).isEqualTo("내 주변 5km 완만 러닝코스");
+            assertThat(route.name()).isEqualTo("출발지 주변 5km 완만 러닝코스");
             assertThat(route.routeKm()).isEqualByComparingTo("5.40");
             assertThat(route.routeId()).startsWith("osm:").hasSize(16);
             assertThat(route.elevationProfileM()).containsExactly(10, 20, 15);

@@ -185,10 +185,11 @@ public class GraphHopperOsmRouteGenerator implements OsmRouteGenerator {
         return List.copyOf(samples);
     }
 
+    /** 사용자 선택 출발지 기준 이름이며 기존 저장 snapshot은 소급 변경하지 않는다. (SPEC §4.11, 결정-56) */
     private String name(BigDecimal targetKm, CourseDifficulty difficulty) {
         String target = targetKm.stripTrailingZeros().toPlainString();
         String label = difficulty == CourseDifficulty.EASY ? "평지" : "완만";
-        return "내 주변 " + target + "km " + label + " 러닝코스";
+        return "출발지 주변 " + target + "km " + label + " 러닝코스";
     }
 
     private String routeId(String pathPolyline) {
