@@ -28,7 +28,7 @@ class CourseFormatTest {
         elevation: List<Int> = listOf(1, 2, 3),
     ) = NearbyItem.Route(
         routeId = "r1",
-        name = "내 주변 5km 평지 러닝코스",
+        name = "출발지 주변 5km 평지 러닝코스",
         distanceM = 12,
         lat = 37.5,
         lng = 126.9,

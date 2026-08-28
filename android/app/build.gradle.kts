@@ -267,7 +267,6 @@ tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.co
 
 dependencies {
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.play.services.location)
     implementation(libs.kakao.maps)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

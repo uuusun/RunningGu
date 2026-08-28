@@ -21,7 +21,7 @@ data class SaveCourseRequestDto(
     val durationMin: Int,
     val gainM: Int,
     val elevationProfileM: List<Int> = emptyList(),
-    /** 진입점 좌표 — 목록에서 "내 위치로부터" 를 재는 기준이다. */
+    /** 진입점 좌표 — 목록에서 출발지로부터의 거리를 재는 기준이다. */
     val entryLat: Double,
     val entryLng: Double,
     /** 서버가 준 문자열을 **그대로** 되돌려보낸다. 앱이 다시 인코딩하지 않는다(이슈 #62). */

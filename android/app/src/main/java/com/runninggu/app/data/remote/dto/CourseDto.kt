@@ -33,7 +33,7 @@ sealed interface NearItemDto {
         override val lng: Double,
         /** `API_GPX|GPX_ONLY|OSM_GENERATED` */
         val dataSource: String? = null,
-        /** 내 주변은 `EASY|NORMAL` 만 나온다 — 서버가 `HARD` 를 자동 추천에서 제외한다 */
+        /** 출발지 주변은 `EASY|NORMAL` 만 나온다 — 서버가 `HARD` 를 자동 추천에서 제외한다 */
         val difficulty: String? = null,
         val routeKm: Double = 0.0,
         val durationMin: Int = 0,
@@ -62,7 +62,7 @@ sealed interface NearItemDto {
 }
 
 /**
- * 내 주변 응답. (§6-1)
+ * 출발지 주변 응답. (§6-1)
  *
  * 앱은 [items] 순서를 **다시 정렬하지 않는다** — 서버가 경로와 장소를 `distanceM` 순으로
  * 이미 섞어 준다.

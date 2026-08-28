@@ -1,7 +1,5 @@
 package com.runninggu.app.ui.course
 
-import com.runninggu.app.data.local.LocationProvider
-import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
@@ -93,7 +91,6 @@ class SaveCourseTest {
     ) = CourseViewModel(
         repository = StubCourseRepository(items),
         geocodeRepository = FakeGeocodeRepository,
-        locationProvider = DeniedLocationProvider,
         savedCourseRepository = saved,
     )
 
@@ -394,10 +391,6 @@ class SaveCourseTest {
     }
 }
 
-/** 이 테스트는 [내 위치] 를 안 쓴다 — 출발지는 프리셋으로 정한다. */
-private object DeniedLocationProvider : LocationProvider {
-    override suspend fun current(): LocationResult = LocationResult.PermissionDenied
-}
 
 /** 정해 둔 목록만 돌려주는 가짜. 지역별은 이 테스트가 안 본다. */
 private class StubCourseRepository(private val items: List<NearbyItem>) : CourseRepository {

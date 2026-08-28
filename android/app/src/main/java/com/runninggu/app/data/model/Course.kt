@@ -7,7 +7,7 @@ import com.runninggu.app.domain.LatLng
  *
  * **서버가 계산한 값을 표시만 한다** — 앱은 다시 계산하지 않는다.
  * 기준이 화면마다 다르다는 점에 주의: 지역별 목록은 원본 코스 전체 등급이고,
- * 내 주변은 잘라 만든 왕복 구간의 실제 `gainM/routeKm` 다. **달라도 정상이다.**
+ * 출발지 주변은 잘라 만든 왕복 구간의 실제 `gainM/routeKm` 다. **달라도 정상이다.**
  */
 enum class Difficulty(val label: String) {
     EASY("평지"),
@@ -28,7 +28,7 @@ enum class CourseDataSource {
 }
 
 /**
- * 내 주변 목록의 한 항목. (§6-1)
+ * 출발지 주변 목록의 한 항목. (§6-1)
  *
  * **경로와 장소를 한 목록에 거리순으로 섞어** 보여준다(SPEC §4.11-5). 사용자에게는
  * 출처를 노출하지 않고 "따라갈 경로가 있는가" 만 구분한다 — 그게 [Route] 와 [Place] 다.
@@ -96,7 +96,7 @@ sealed interface NearbyItem {
 enum class CourseSource { DURUNUBI, OSM, KAKAO }
 
 /**
- * 내 주변 조회 결과. (§6-1)
+ * 출발지 주변 조회 결과. (§6-1)
  *
  * [degradedSources] 가 비어 있지 않아도 [items] 가 있으면 **정상 표시 + 비차단 안내**다.
  * 품질 상한을 통과한 경로가 없는 것은 정상 0건이지 실패가 아니다.
