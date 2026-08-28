@@ -176,6 +176,38 @@ class ResultSaveTest {
     }
 
     @Test
+    fun `보내는 사이 내용을 고치면 그 응답을 버린다`() = runTest(dispatcher) {
+        // 편집이 `save` 를 Idle 로 돌려놨는데 낡은 응답이 그 위에 Saved 를 얹으면,
+        // **고치기 전 동선을 저장해 놓고** 화면이 마이로 옮겨 간다 — 사용자는 방금
+        // 고친 것이 저장된 줄 안다 (#214 리뷰)
+        val gate = CompletableDeferred<SaveOutcome>()
+        val repository = SavingRepository { gate.await() }
+        val viewModel = loaded(repository)
+        advanceUntilIdle()
+
+        viewModel.onSave()
+        advanceUntilIdle()
+        assertEquals(SaveItineraryState.Saving, viewModel.uiState.value.save)
+
+        val userBlock = viewModel.uiState.value.activeDay!!.blocks
+            .first { it.blockType == BlockType.USER }
+        viewModel.onRemoveBlock(userBlock.id)
+        assertEquals(SaveItineraryState.Idle, viewModel.uiState.value.save)
+
+        // 이제 아까 보낸 요청이 성공해서 돌아온다
+        gate.complete(SaveOutcome(id = 42L, replaced = false))
+        advanceUntilIdle()
+
+        assertEquals(
+            "고치기 전 동선의 응답이 화면을 옮겼다",
+            SaveItineraryState.Idle,
+            viewModel.uiState.value.save,
+        )
+        // 다시 누를 수 있어야 한다 — 고친 동선은 아직 저장되지 않았다
+        assertTrue(viewModel.uiState.value.canSave)
+    }
+
+    @Test
     fun `내용을 고치면 이전 저장 결과가 사라진다`() = runTest(dispatcher) {
         // "저장하지 못했어요" 가 남은 채 장소를 바꾸면, 방금 바꾼 것이 실패한 줄로 읽힌다.
         val viewModel = loaded(failing(ApiException.Network(java.io.IOException("끊김"))))

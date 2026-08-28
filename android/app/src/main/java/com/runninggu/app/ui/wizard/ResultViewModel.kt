@@ -71,6 +71,15 @@ class ResultViewModel(
 
     /** 저장 요청. 내용을 고치면 이전 결과가 [SaveItineraryState.Idle] 로 지워지므로 함께 끊는다. */
     private var saveJob: Job? = null
+
+    /**
+     * 저장 요청 세대. **내용이 바뀔 때마다 올라간다.** (#214 리뷰)
+     *
+     * 끊는 것만으로는 부족하다 — 취소가 닿기 전에 응답이 도착하면 그 코루틴은 마지막
+     * 줄까지 달린다. 그러면 **편집 전 동선**이 `Saved` 가 되어 화면이 마이로 옮겨 가고,
+     * 사용자는 방금 고친 것이 저장된 줄 안다. 세대가 다르면 결과를 버린다.
+     */
+    private var saveGeneration = 0
     private var lastRegion: String = ""
 
     /**
@@ -140,6 +149,7 @@ class ResultViewModel(
         // 보내는 중에 내용을 고치면 `save` 가 Idle 로 풀려 다시 누를 수 있다. 앞의 요청을
         // 안 끊으면 **고치기 전 동선**의 응답이 뒤늦게 화면을 옮긴다.
         saveJob?.cancel()
+        val generation = ++saveGeneration
         saveJob = viewModelScope.launch {
             _uiState.update { it.copy(save = SaveItineraryState.Saving) }
             val next = try {
@@ -173,6 +183,11 @@ class ResultViewModel(
             // 로그인하라는 말을 못 한다(#166 리뷰 · S8 과 같은 판단).
             //
             // **버리더라도 버튼은 푼다.** `Saving` 인 채로 두면 "저장 중…" 이 굳는다.
+            // **보내는 사이 동선이 바뀌었으면 버린다** (#214 리뷰). 편집이 `save` 를
+            // 이미 Idle 로 돌려놨는데 낡은 응답이 그 위에 Saved 를 얹으면, 고치기 전
+            // 동선을 저장해 놓고 마이로 옮겨 간다. 로그인 안내도 같이 버린다 — 그
+            // 요청은 사용자가 지금 보고 있는 동선의 것이 아니다
+            if (generation != saveGeneration) return@launch
             if (epoch != SessionStore.sessionEpoch && next !is SaveItineraryState.NeedsLogin) {
                 _uiState.update {
                     if (it.save is SaveItineraryState.Saving) it.copy(save = SaveItineraryState.Idle) else it
@@ -308,6 +323,10 @@ class ResultViewModel(
     private inline fun editActiveDay(
         transform: (days: List<ItineraryDay>, dayIndex: Int) -> List<ItineraryDay>,
     ) {
+        // 보내는 중인 저장은 **고치기 전 동선**의 것이다. 끊고, 이미 떠난 응답도 세대로
+        // 버린다 (#214 리뷰)
+        saveJob?.cancel()
+        saveGeneration++
         _uiState.update { state ->
             val result = state.result ?: return@update state
             state.copy(
