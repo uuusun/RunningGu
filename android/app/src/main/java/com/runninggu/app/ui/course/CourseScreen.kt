@@ -187,7 +187,7 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
 
         Spacer(Modifier.height(8.dp))
 
-        // 위치 권한을 거부해도 여기로 고를 수 있다 (NFR-15)
+        // 출발지를 정하는 두 길 중 하나다. 기기 위치는 쓰지 않는다 (결정-56 · NFR-15)
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -156,7 +156,7 @@ data class CourseUiState(
 }
 
 /**
- * 출발지. **권한을 거부해도 화면이 동작해야 한다**(NFR-15) — 검색과 프리셋이 그래서 있다.
+ * 출발지. **사용자가 고른 것뿐이다**(결정-56) — 검색·프리셋·S7 숙소 셋이 전부다.
  */
 sealed interface OriginState {
     /** 아직 못 정했다. "출발지를 정해주세요." */
@@ -318,7 +318,7 @@ sealed interface RegionCoursesState {
     data class Error(val message: String) : RegionCoursesState
 }
 
-/** 출발지 프리셋 5개. 위치 권한을 거부해도 쓸 수 있다. (SPEC §4.11-1) */
+/** 출발지 프리셋 5개. 검색과 함께 출발지를 정하는 길이다. (SPEC §4.11-1 · 결정-56) */
 val ORIGIN_PRESETS: List<OriginState.Fixed> = listOf(
     OriginState.Fixed("부산 해운대", 35.1587, 129.1604, OriginState.Fixed.Source.PRESET),
     OriginState.Fixed("여수", 34.7604, 127.6622, OriginState.Fixed.Source.PRESET),

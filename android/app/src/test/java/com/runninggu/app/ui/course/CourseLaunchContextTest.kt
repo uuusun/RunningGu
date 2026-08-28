@@ -147,4 +147,3 @@ class CourseLaunchContextTest {
         assertEquals(3.0, restored.targetKm, 0.0001)
     }
 }
-
