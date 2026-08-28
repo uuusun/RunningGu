@@ -259,12 +259,29 @@ private fun NicknameField(state: SignupUiState, viewModel: SignupViewModel) {
     )
 }
 
+/**
+ * 가입 단계의 실패 문구. **두 갈래가 같은 것을 쓴다.** (#216 리뷰)
+ *
+ * 카카오 갈래는 [InfoStep] 중간에서 `return` 하므로 아래 공통 표시에 닿지 않는다. 각자
+ * 그리게 두면 한쪽만 고쳐져 **오류가 조용히 사라지는** 자리가 생긴다 — 실제로 그랬다.
+ */
+@Composable
+private fun SignupError(message: String?) {
+    message ?: return
+    Spacer(Modifier.height(8.dp))
+    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+}
+
 @Composable
 private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
     // 카카오는 이메일·비밀번호를 받지 않고 인증 단계도 없다(§1-8). 닉네임만 받는다
     if (state.isKakao) {
         StepTitle("닉네임을 정해 주세요", "카카오 계정으로 가입해요. 인증 절차는 없어요.")
         NicknameField(state, viewModel)
+        // **여기서 return 하므로 아래 공통 오류 표시에 닿지 않는다** (#216 리뷰). 빼먹으면
+        // `409 KAKAO_ACCOUNT_DUPLICATED` 처럼 **어디로 가야 하는지 알려 주는 문구**가
+        // ViewModel 에만 있고 화면에는 안 뜬다 — 사용자는 버튼만 다시 누른다
+        SignupError(state.errorMessage)
         Spacer(Modifier.height(24.dp))
         CtaButton(
             text = "가입 완료",
@@ -327,10 +344,7 @@ private fun InfoStep(state: SignupUiState, viewModel: SignupViewModel) {
     Spacer(Modifier.height(8.dp))
     NicknameField(state, viewModel)
 
-    state.errorMessage?.let { message ->
-        Spacer(Modifier.height(8.dp))
-        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-    }
+    SignupError(state.errorMessage)
 
     Spacer(Modifier.height(24.dp))
     CtaButton(
