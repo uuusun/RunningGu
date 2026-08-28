@@ -60,8 +60,6 @@ fun AccountScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var withdrawing by remember { mutableStateOf(false) }
-
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
     }
@@ -139,7 +137,7 @@ fun AccountScreen(
                 label = "회원 탈퇴",
                 value = "",
                 destructive = true,
-                onClick = { withdrawing = true },
+                onClick = viewModel::onWithdrawOpen,
             )
             Spacer(Modifier.height(24.dp))
         }
@@ -166,15 +164,19 @@ fun AccountScreen(
         )
     }
 
-    if (withdrawing) {
+    // 비밀번호 변경과 같다 — 성공해야 닫힌다. `401 REAUTH_FAILED` 를 스낵바로 알리면
+    // 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다 (§2-2)
+    state.withdraw?.let { edit ->
         WithdrawDialog(
-            // 카카오 가입자는 비밀번호가 없어 SDK 재인증이다 — AP-02 연결 후 붙는다.
-            requiresPassword = state.profile?.loginProvider == LoginProvider.EMAIL,
-            onDismiss = { withdrawing = false },
-            onConfirm = { password ->
-                viewModel.onWithdraw(password)
-                withdrawing = false
-            },
+            // 카카오 가입자는 SDK 가 방금 발급한 토큰으로 재인증해야 한다(§2-2). 그 SDK 가
+            // 아직 없어(AP-08 · #206) 지금은 막고 안내한다 — 누르게 두고 실패시키는 것보다 낫다.
+            emailAccount = state.profile?.loginProvider == LoginProvider.EMAIL,
+            saving = edit.saving,
+            error = edit.error,
+            serverDone = edit.serverDone,
+            onDismiss = viewModel::onWithdrawDismiss,
+            onGiveUp = viewModel::onWithdrawGiveUp,
+            onConfirm = viewModel::onWithdraw,
         )
     }
 }
@@ -355,27 +357,60 @@ private fun PasswordDialog(
 
 @Composable
 private fun WithdrawDialog(
-    requiresPassword: Boolean,
+    emailAccount: Boolean,
+    saving: Boolean,
+    error: String?,
+    serverDone: Boolean,
     onDismiss: () -> Unit,
+    onGiveUp: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("정말 탈퇴하시겠어요?", fontWeight = FontWeight.Bold) },
+        // 서버가 이미 지웠으면 **바깥 탭으로는** 닫히지 않는다 — 되돌릴 수 없는 조작 뒤라
+        // 실수로 스치는 것과 그만두겠다는 것을 가른다. 나가려면 [나중에] 를 누른다 (#212 리뷰)
+        onDismissRequest = { if (!serverDone) onDismiss() },
+        title = {
+            Text(
+                text = if (serverDone) "기기 정리만 남았어요" else "정말 탈퇴하시겠어요?",
+                fontWeight = FontWeight.Bold,
+            )
+        },
         text = {
             Column {
                 Text(
-                    text = "저장한 동선·코스와 찜한 대회가 모두 삭제되고 되돌릴 수 없어요.",
+                    text = if (serverDone) {
+                        "계정은 이미 삭제됐어요. 이 기기에 남은 로그인 정보만 지우면 끝나요."
+                    } else {
+                        "저장한 동선·코스와 찜한 대회가 모두 삭제되고 되돌릴 수 없어요."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (requiresPassword) {
+                if (emailAccount && !serverDone) {
                     Spacer(Modifier.height(12.dp))
-                    // 탈퇴 전 재인증 (SPEC §4.13 · D-23).
+                    // 탈퇴 전 재인증 (SPEC §4.13 · D-23 · §2-2).
                     PasswordField(
                         value = password,
                         onValueChange = { password = it },
                         label = "비밀번호 확인",
+                        enabled = !saving,
+                    )
+                } else if (!serverDone) {
+                    // 카카오는 SDK 토큰으로 재인증한다(§2-2). SDK 가 아직 없다(AP-08 · #206).
+                    // **누르게 두고 실패시키지 않는다** — 되돌릴 수 없는 조작이라 더 그렇다.
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "카카오로 가입한 계정은 아직 앱에서 탈퇴할 수 없어요. 준비 중이에요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                error?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -383,12 +418,35 @@ private fun WithdrawDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(password) },
-                enabled = !requiresPassword || password.isNotEmpty(),
+                enabled = when {
+                    saving -> false
+                    // 비밀번호는 이미 확인됐다. 다시 묻지 않는다
+                    serverDone -> true
+                    else -> emailAccount && password.isNotEmpty()
+                },
             ) {
-                Text("탈퇴", color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = when {
+                        saving && serverDone -> "지우는 중…"
+                        saving -> "탈퇴하는 중…"
+                        serverDone -> "다시 시도"
+                        else -> "탈퇴"
+                    },
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+        dismissButton = {
+            // 서버가 지운 뒤에도 나갈 길은 둔다 (#212 리뷰). 재시도가 계속 실패하는 것은
+            // 보통 저장소 쓰기 실패라 같은 자리에서 또 눌러도 같은 결과다. 계정은 이미
+            // 없으므로 [나중에] 는 취소가 아니라 **로그아웃**이다 — 남는 것은 죽은 토큰이다
+            TextButton(
+                onClick = if (serverDone) onGiveUp else onDismiss,
+                enabled = !saving,
+            ) {
+                Text(if (serverDone) "나중에" else "취소")
+            }
+        },
     )
 }
 

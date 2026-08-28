@@ -1,22 +1,22 @@
 package com.runninggu.app.ui.my
 
-import com.runninggu.app.ui.runCatchingUnlessCancelled
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
-import com.runninggu.app.ui.auth.AuthValidation
-import com.runninggu.app.ui.auth.PasswordIssue
-import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.remote.apiErrorCode
-import com.runninggu.app.data.local.SessionProfile
-import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.MemberRepository
-import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.repository.ReauthCredential
+import com.runninggu.app.ui.auth.AuthValidation
+import com.runninggu.app.ui.auth.PasswordIssue
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.runCatchingUnlessCancelled
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +38,8 @@ data class AccountUiState(
     val nicknameEdit: NicknameEdit? = null,
     /** 비밀번호 다이얼로그. `null` 이면 닫혀 있다. */
     val passwordEdit: PasswordEdit? = null,
+    /** 탈퇴 다이얼로그. `null` 이면 닫혀 있다. */
+    val withdraw: WithdrawEdit? = null,
 ) {
     /** 비밀번호 변경 메뉴는 EMAIL 가입자에게만 보인다 (#59 · 결정-38). */
     val showsPasswordMenu: Boolean get() = profile?.loginProvider == LoginProvider.EMAIL
@@ -78,6 +80,25 @@ data class PasswordEdit(
 )
 
 /**
+ * 탈퇴 다이얼로그 상태. [PasswordEdit] 과 같은 모양이고 같은 이유다.
+ *
+ * `401 REAUTH_FAILED` 는 **사용자가 고쳐야 넘어가는** 오류다. 닫고 스낵바로 알리면
+ * 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다.
+ */
+data class WithdrawEdit(
+    val saving: Boolean = false,
+    val error: String? = null,
+    /**
+     * **서버 탈퇴가 이미 끝났다.** 계정은 지워졌고 기기 정리만 남았다.
+     *
+     * 이 값이 켜지면 다시 눌러도 재인증·삭제를 되풀이하지 않는다 — 지워진 계정으로
+     * `reauth` 를 부르면 `401` 이라, 그대로 두면 **기기에 남은 토큰을 영영 못 지운다**
+     * (#212 리뷰).
+     */
+    val serverDone: Boolean = false,
+)
+
+/**
  * 계정 관리. (SPEC §4.13 · AP-13 · AP-14)
  *
  * **닉네임·마케팅 동의·로그아웃이 서버를 본다.** 남은 것은 아직 Fake 다 —
@@ -102,6 +123,7 @@ class AccountViewModel(
     private var marketingJob: Job? = null
     private var nicknameJob: Job? = null
     private var passwordJob: Job? = null
+    private var withdrawJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -352,18 +374,135 @@ class AccountViewModel(
         }
     }
 
-    /** 회원 탈퇴 — 재인증(D-23) 후 삭제. Fake 는 입력만 받고 통과시킨다. */
-    fun onWithdraw(reauthPassword: String) {
-        viewModelScope.launch {
-            delay(FAKE_DELAY_MS)
-            // 탈퇴도 같다 — 지워진 것을 확인하기 전에는 완료가 아니다 (#89 리뷰)
-            if (!SessionStore.signOutAndAwait()) {
-                _uiState.update { it.copy(message = LOGOUT_FAILED_MESSAGE) }
-                return@launch
-            }
-            FavoriteStore.clear()
-            _uiState.update { it.copy(signedOut = true) }
+    /** 탈퇴 다이얼로그를 연다. */
+    fun onWithdrawOpen() {
+        _uiState.update { it.copy(withdraw = WithdrawEdit()) }
+    }
+
+    /**
+     * 닫는다. **보내는 중에는 닫지 않는다** — 결과를 받을 자리가 없어진다.
+     *
+     * 서버 탈퇴가 끝난 뒤에도 닫지 않는다. 닫으면 기기에 남은 토큰을 지울 길이 없어진다
+     * (#212 리뷰).
+     */
+    fun onWithdrawDismiss() {
+        _uiState.update {
+            val edit = it.withdraw
+            if (edit?.saving == true || edit?.serverDone == true) it else it.copy(withdraw = null)
         }
+    }
+
+    /**
+     * 회원 탈퇴. **재인증하고, 서버가 지운 뒤에, 기기를 정리한다.** (§2-2 · D-23 · SPEC §4.13)
+     *
+     * 예전에는 `delay(300)` 뒤 곧바로 로그아웃했다. **비밀번호를 받아만 놓고 쓰지 않아서
+     * 틀려도 탈퇴됐고**, 실제로는 서버에 계정이 그대로 남았다.
+     *
+     * ## 순서가 규칙이다
+     *
+     * ```
+     * reauth → withdraw(성공) → 세션 정리 → 찜 캐시 정리
+     * ```
+     *
+     * **먼저 로그아웃하면 탈퇴가 안 된 채 세션만 사라진다** — 사용자는 지웠다고 믿는데
+     * 계정이 남는다(#198 KDoc). 로그아웃이 #89 에서 `signOutAndAwait` 를 쓰게 된 것과
+     * 같은 자리다: 지워진 것을 **확인하기 전에는** 완료가 아니다.
+     *
+     * ## 지금은 EMAIL 만이다
+     *
+     * KAKAO 는 SDK 가 방금 발급한 액세스 토큰으로 재인증해야 하는데(§2-2), 그 SDK 가 아직
+     * 없다(AP-08 · 이슈 #206). 화면이 카카오 가입자에게 탈퇴를 **막고** 안내한다 —
+     * 누르게 두고 실패시키는 것보다 낫다.
+     */
+    fun onWithdraw(reauthPassword: String) {
+        val current = _uiState.value.withdraw
+        if (current?.saving == true) return
+        // 서버는 이미 지웠다. 재인증·삭제를 되풀이하지 않고 **기기 정리만** 다시 한다.
+        // 지워진 계정으로 reauth 를 부르면 401 이라 여기서 갈라야 복구할 길이 생긴다(#212 리뷰)
+        if (current?.serverDone == true) {
+            withdrawJob?.cancel()
+            withdrawJob = viewModelScope.launch { finishLocally() }
+            return
+        }
+        if (reauthPassword.isBlank()) {
+            _uiState.update { it.copy(withdraw = WithdrawEdit(error = "비밀번호를 입력해 주세요")) }
+            return
+        }
+        val epoch = SessionStore.sessionEpoch
+        withdrawJob?.cancel()
+        withdrawJob = viewModelScope.launch {
+            _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true)) }
+            val result = runCatchingUnlessCancelled {
+                val token = memberRepository.reauth(ReauthCredential.Password(reauthPassword))
+                memberRepository.withdraw(token)
+            }
+            result.fold(
+                onSuccess = {
+                    // 세션이 바뀐 뒤라면 남의 결과다. 지운 것은 서버뿐이니 화면만 닫는다
+                    if (epoch != SessionStore.sessionEpoch) {
+                        _uiState.update { it.copy(withdraw = null) }
+                        return@fold
+                    }
+                    finishLocally()
+                },
+                onFailure = { cause ->
+                    val stale = epoch != SessionStore.sessionEpoch
+                    _uiState.update {
+                        if (stale) {
+                            it.copy(withdraw = null)
+                        } else {
+                            it.copy(withdraw = WithdrawEdit(error = cause.withdrawMessage()))
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * 서버가 지운 뒤 **기기를 비운다.** 확인하기 전에는 완료가 아니다 (#89 리뷰).
+     *
+     * 실패하면 다이얼로그를 **열어 둔 채** 알린다. 닫고 다시 누르면 재인증부터 시작하는데,
+     * 계정이 이미 없어서 `401` 로 막힌다. 그래서 [WithdrawEdit.serverDone] 을 켜서 다음
+     * 시도가 여기로 바로 오게 한다.
+     *
+     * **다만 여기 가두지는 않는다** (#212 리뷰). [onWithdrawGiveUp] 이 나갈 길이다 —
+     * 재시도가 계속 실패하는 것은 보통 저장소 쓰기 실패라, 같은 자리에서 또 눌러도 같은
+     * 결과가 나온다. 모달에 붙잡아 두고 얻는 것이 없다.
+     */
+    private suspend fun finishLocally() {
+        _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true, serverDone = true)) }
+        if (!SessionStore.signOutAndAwait()) {
+            _uiState.update {
+                it.copy(withdraw = WithdrawEdit(serverDone = true, error = LOCAL_CLEANUP_FAILED))
+            }
+            return
+        }
+        FavoriteStore.clear()
+        _uiState.update { it.copy(withdraw = null, signedOut = true) }
+    }
+
+    /**
+     * 기기 정리를 **나중으로 미룬다.** 서버 탈퇴가 끝난 뒤에만 쓴다 (#212 리뷰).
+     *
+     * ## 왜 로그아웃과 다르게 메모리를 비우는가
+     *
+     * [SessionStore.signOutAndAwait] 는 디스크를 못 지우면 **메모리를 그대로 둔다** —
+     * 로그아웃은 서버 세션이 아직 살아 있어서, 지운 척하면 다음 실행에 계정이 되살아난다.
+     *
+     * **탈퇴는 그 자리가 다르다. 서버 계정이 이미 없다.** 디스크에 남는 것은 **죽은
+     * 토큰**이라, 다음 실행에 복원돼도 첫 요청이 `401` 을 받고 그때 정리된다
+     * (`ServiceLocator` 의 `onGiveUp` → [SessionStore.signOut]). 되살아날 계정이 없다.
+     *
+     * 그래서 [SessionStore.signOut] 으로 **메모리를 비우고 디스크 삭제는 예약**한다.
+     * 계정이 없는데 로그인 화면 뒤에 남겨 두면, 어느 화면을 열어도 `401` 만 본다.
+     */
+    fun onWithdrawGiveUp() {
+        if (_uiState.value.withdraw?.serverDone != true) return
+        withdrawJob?.cancel()
+        SessionStore.signOut()
+        FavoriteStore.clear()
+        _uiState.update { it.copy(withdraw = null, signedOut = true) }
     }
 
     fun onMessageShown() {
@@ -371,11 +510,27 @@ class AccountViewModel(
     }
 
     /**
-     * 닉네임 변경 실패 문구. 다이얼로그 안에 그린다.
+     * 탈퇴 실패 문구. **셋이 서로 다른 일을 시킨다** (§2-2).
      *
-     * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
-     * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
+     * | 코드 | 사용자가 할 일 |
+     * |---|---|
+     * | `REAUTH_FAILED` | 비밀번호를 다시 입력한다 |
+     * | `INVALID_REAUTH_TOKEN` | 5분이 지났다 — **처음부터** 다시 한다 |
+     * | `REAUTH_PROVIDER_MISMATCH` | 가입한 수단으로 한다 — 재시도가 아니라 **다른 수단**이다 |
+     *
+     * 하나로 뭉뚱그리면 5분이 지난 사용자가 같은 비밀번호를 계속 다시 넣는다.
      */
+    private fun Throwable.withdrawMessage(): String = when (apiErrorCode()) {
+        ApiErrorCode.REAUTH_FAILED -> "비밀번호가 맞지 않아요"
+        ApiErrorCode.INVALID_REAUTH_TOKEN -> "시간이 지났어요. 다시 시도해 주세요."
+        ApiErrorCode.REAUTH_PROVIDER_MISMATCH -> "가입할 때 쓴 방법으로 확인해 주세요"
+        else -> if (this is ApiException.Network) {
+            "네트워크에 연결할 수 없어요"
+        } else {
+            "탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
     /**
      * 두 오류는 **사용자가 할 일이 다르다.** 현재 비밀번호가 틀린 것은 위 칸을 고치는 일이고,
      * 형식 위반은 아래 칸을 고치는 일이다. "다시 시도" 로 뭉뚱그리면 어느 칸인지 모른다(§2-1).
@@ -393,6 +548,12 @@ class AccountViewModel(
         }
     }
 
+    /**
+     * 닉네임 변경 실패 문구. 다이얼로그 안에 그린다.
+     *
+     * **중복만 따로 가른다** — 사용자가 다른 이름을 고르면 풀리는 유일한 오류라, "잠시 후
+     * 다시 시도" 로 뭉뚱그리면 몇 번을 눌러도 같은 결과가 나온다.
+     */
     private fun Throwable.nicknameMessage(): String = when {
         apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED -> "이미 쓰고 있는 닉네임이에요"
         this is ApiException.Network -> "네트워크에 연결할 수 없어요"
@@ -410,9 +571,14 @@ class AccountViewModel(
          */
         const val LOGOUT_REVOKE_FAILED_MESSAGE = "로그아웃하지 못했어요. 연결을 확인하고 다시 시도해 주세요."
 
+        /**
+         * 서버는 지웠는데 기기를 못 비웠다. **계정이 사라진 것은 사실이라** 그렇게 말한다
+         * — "탈퇴하지 못했어요" 로 쓰면 사용자가 계정이 남은 줄 안다 (#212 리뷰).
+         */
+        const val LOCAL_CLEANUP_FAILED =
+            "계정은 삭제됐어요. 기기에 남은 정보를 지우지 못했으니 다시 시도해 주세요."
+
         /** D-28 — 성공하면 다른 기기 세션이 전부 끊긴다. 그 사실을 알린다. */
         const val PASSWORD_CHANGED_MESSAGE = "비밀번호를 바꿨어요. 다른 기기는 로그아웃돼요."
-
-        const val FAKE_DELAY_MS = 300L
     }
 }
