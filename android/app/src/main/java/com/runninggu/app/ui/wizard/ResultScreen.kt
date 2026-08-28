@@ -60,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,6 +91,7 @@ import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.NumberRail
 import com.runninggu.app.ui.common.SourceBadge
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -174,6 +176,7 @@ fun ResultScreen(
                     onDaySelect = viewModel::onDaySelect,
                     onPinClick = viewModel::onPinClick,
                     onCardClick = viewModel::onCardClick,
+                    onCardCentered = viewModel::onCardCentered,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
@@ -203,6 +206,7 @@ private fun Content(
     onDaySelect: (Int) -> Unit,
     onPinClick: (String) -> Unit,
     onCardClick: (String) -> Unit,
+    onCardCentered: (String) -> Unit,
     onOpenCourses: () -> Unit,
     onToggleEdit: () -> Unit,
     onRemoveBlock: (String) -> Unit,
@@ -224,6 +228,10 @@ private fun Content(
     // `BringIntoViewRequester` 는 못 쓴다 — `LazyColumn` 은 화면 밖 item 을 컴포즈하지
     // 않아서 requester 가 아예 없고, 그 카드의 핀을 누르면 아무 일도 일어나지 않는다.
     // 목록 상태로 직접 스크롤한다 (#208 리뷰).
+    // **핀 탭으로 시작한 스크롤인가.** 중앙 밴드가 이 사이에 판정하면 되먹임이 생긴다
+    // (아래 밴드 주석 · #208 리뷰).
+    var scrollingToPin by remember { mutableStateOf(false) }
+
     LaunchedEffect(state.activeBlockId, state.activeDayIndex, state.isEditing) {
         val blockId = state.activeBlockId ?: return@LaunchedEffect
         // 편집 중에는 동기화를 멈춘다(§4.10). 조회 카드가 컴포즈되지도 않는다
@@ -232,8 +240,49 @@ private fun Content(
         if (index < 0) return@LaunchedEffect
         // **이미 보이면 건드리지 않는다.** 카드를 탭해서 고른 것까지 끌어오면 화면이 튄다
         if (listState.layoutInfo.visibleItemsInfo.none { it.key == blockId }) {
-            listState.animateScrollToItem(TIMELINE_FIRST_ITEM_INDEX + index)
+            scrollingToPin = true
+            // 도중에 이 효과가 취소돼도(일자 이동 등) 반드시 내린다. 켜진 채로 남으면
+            // 밴드가 영영 멈춘다
+            try {
+                listState.animateScrollToItem(TIMELINE_FIRST_ITEM_INDEX + index)
+            } finally {
+                scrollingToPin = false
+            }
         }
+    }
+
+    // 스크롤 중앙 밴드에 든 카드를 활성으로 옮긴다. (SPEC §4.10)
+    //
+    // **판정 조건이 둘이다.**
+    //
+    // - `isScrollInProgress` — 손으로 굴리는 동안(관성 포함)만 본다. 멈춰 있을 때도
+    //   판정하면 일자를 고른 직후 "첫 핀 활성"(§4.10)을 가운데 카드가 곧바로 덮어쓴다
+    // - `!scrollingToPin` — **핀 탭이 굴린 스크롤은 셈에 넣지 않는다.** 넣으면
+    //   `핀 탭 → 스크롤 → 밴드가 다른 카드를 잡음 → 활성이 또 바뀜 → 카메라가 엉뚱한 곳`
+    //   으로 도는 되먹임이 생긴다. `isScrollInProgress` 만으로는 사용자 스크롤과 구분이
+    //   안 돼서 플래그를 따로 든다 (#208 리뷰 — 건모 님 지적)
+    val blockIds = remember(day) { day?.blocks?.map { it.id }?.toSet().orEmpty() }
+    LaunchedEffect(listState, state.isEditing, blockIds) {
+        // 편집 중에는 동기화를 멈춘다 (§4.10). 카드 탭·핀 탭과 같은 자리다
+        if (state.isEditing || blockIds.isEmpty()) return@LaunchedEffect
+        snapshotFlow {
+            if (scrollingToPin || !listState.isScrollInProgress) {
+                null
+            } else {
+                val info = listState.layoutInfo
+                centeredBlockId(
+                    viewportStart = info.viewportStartOffset,
+                    viewportEnd = info.viewportEndOffset,
+                    items = info.visibleItemsInfo.map {
+                        TimelineItemBounds(key = it.key, offset = it.offset, size = it.size)
+                    },
+                    blockIds = blockIds,
+                )
+            }
+        }
+            // 스크롤 한 번에 수십 번 도는 자리다. 값이 바뀔 때만 ViewModel 을 건드린다
+            .distinctUntilChanged()
+            .collect { blockId -> blockId?.let(onCardCentered) }
     }
 
     LazyColumn(

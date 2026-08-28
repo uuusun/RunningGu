@@ -26,16 +26,20 @@ import java.time.LocalDate
 /**
  * S7 지도 ↔ 타임라인 동기화. (SPEC §4.10 · §3-8 · AP-03)
  *
- * §4.10 이 네 가지를 요구한다.
+ * §4.10 이 다섯 가지를 요구한다.
  *
  * - 일자 탭 → 활성화 + 지도 재계산 + **첫 핀 활성**
  * - **카드 탭 → 핀 카메라 이동**
  * - **핀 탭 → 카드로 스크롤**
+ * - **스크롤 중앙 밴드에 든 카드 자동 활성**
  * - **편집 모드 중 동기화 중단**
  *
- * 넷째인 **스크롤 중앙 밴드는 이 PR 에 없다.** §4.10 이 `LazyList` 를 전제로 적었는데
- * S7 본문은 `Column(verticalScroll)` 이라, `LazyColumn` 전환 뒤 후속으로 붙이기로
- * 했다(#208 리뷰 합의). 밴드가 없어도 나머지 셋으로 지도와 타임라인은 이어진다.
+ * 밴드는 한 번 걷어냈다가 다시 넣었다. §4.10 이 `LazyList` 를 전제로 적었는데 그때
+ * S7 본문이 `Column(verticalScroll)` 이라 임시 구현이 됐기 때문이다(#208 리뷰 합의).
+ * #210 이 `LazyColumn` 으로 바꾼 뒤 `layoutInfo` 기준으로 다시 붙였다.
+ *
+ * 밴드가 "들었는가" 를 재는 것은 [centeredBlockId] 가 하고 화면이 좌표를 넘긴다 —
+ * 여기서는 들어온 뒤에 무엇이 되는지만 고정한다.
  */
 class MapTimelineSyncTest {
 
@@ -149,6 +153,48 @@ class MapTimelineSyncTest {
         viewModel.onPinClick("blk_3")
 
         assertEquals("blk_3", viewModel.uiState.value.activePinId)
+    }
+
+    // ── 스크롤 중앙 밴드 → 활성 (§4.10) ────────────────────────
+    //
+    // 밴드에 "들었는가" 를 재는 것은 [centeredBlockId] 가 하고 화면이 좌표를 넘긴다.
+    // 여기서는 **들어온 뒤에 무엇이 되는가**를 고정한다.
+
+    @Test
+    fun `중앙에 든 카드가 활성이 된다`() = runTest(dispatcher) {
+        val viewModel = loaded()
+        viewModel.generate(wizard())
+        advanceUntilIdle()
+
+        viewModel.onCardCentered("blk_3")
+
+        assertEquals("blk_3", viewModel.uiState.value.activePinId)
+    }
+
+    @Test
+    fun `좌표 없는 카드는 가운데 와도 활성이 되지 않는다`() = runTest(dispatcher) {
+        // 카메라가 갈 곳이 없다. 강조만 옮겨 다니면 지도가 고장 난 것처럼 보인다 —
+        // 가운데 것과 다른 카드가 강조된 채로 지나가는 편이 낫다
+        val viewModel = loaded()
+        viewModel.generate(wizard())
+        advanceUntilIdle()
+
+        viewModel.onCardCentered("blk_2")
+
+        assertEquals("blk_1", viewModel.uiState.value.activePinId)
+    }
+
+    @Test
+    fun `편집 중에는 가운데 와도 활성이 안 바뀐다`() = runTest(dispatcher) {
+        // 화면도 편집 중에는 부르지 않지만, 부르는 자리가 여럿이라 여기서도 막는다
+        val viewModel = loaded()
+        viewModel.generate(wizard())
+        advanceUntilIdle()
+        viewModel.onToggleEdit()
+
+        viewModel.onCardCentered("blk_3")
+
+        assertEquals("blk_1", viewModel.uiState.value.activePinId)
     }
 
     // ── 편집 중 동기화 중단 (§4.10) ────────────────────────────

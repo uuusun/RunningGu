@@ -107,7 +107,6 @@ class ResultViewModel(
         lastRequest?.let(::send)
     }
 
-    /** 일자 탭 선택. 지도와 타임라인이 함께 따라간다. (SPEC §4.10) */
     /**
      * 일자 탭. **활성화 + 지도 재계산 + 첫 핀 활성**이다. (SPEC §4.10)
      *
@@ -153,6 +152,30 @@ class ResultViewModel(
     fun onCardClick(blockId: String) {
         _uiState.update { state ->
             if (state.isEditing) return@update state
+            if (state.mapPins.none { it.id == blockId }) return@update state
+            state.copy(activeBlockId = blockId)
+        }
+    }
+
+    /**
+     * 사용자가 타임라인을 스크롤해 이 카드가 **중앙 밴드**에 들어왔다.
+     * (SPEC §4.10 — "LazyList 스크롤 중앙 밴드(상하 45% 제외)에 든 카드 자동 활성")
+     *
+     * 탭과 결과는 같지만 **부르는 쪽이 다르다.** 탭은 한 번이고 이쪽은 스크롤이 굴러가는
+     * 동안 계속 들어온다 — 그래서 [onCardClick] 와 나눠 두고, 화면 쪽에서도 값이 바뀔
+     * 때만 부른다.
+     *
+     * 좌표 없는 카드를 지나쳐도 활성을 옮기지 않는 것은 [onCardClick] 와 같은 이유다.
+     * 카메라가 갈 곳이 없어 지도는 그대로인데 강조만 옮겨 다니면 지도가 고장 난 것처럼
+     * 보인다. **가운데 있는 것과 다른 카드가 강조된 채로 지나가는 편이 낫다.**
+     *
+     * 편집 중에는 화면이 아예 부르지 않지만(§4.10 동기화 중단) 여기서도 한 번 막는다 —
+     * 부르는 자리가 여럿이면 한 곳이 빠졌을 때 조용히 뚫린다.
+     */
+    fun onCardCentered(blockId: String) {
+        _uiState.update { state ->
+            if (state.isEditing) return@update state
+            if (state.activeBlockId == blockId) return@update state
             if (state.mapPins.none { it.id == blockId }) return@update state
             state.copy(activeBlockId = blockId)
         }
