@@ -126,7 +126,12 @@ fun ResultScreen(
     // 하므로 곧바로 떠나고, 문구는 옮겨 간 자리에서 스낵바로 뜬다.
     val saved = state.save as? SaveItineraryState.Saved
     LaunchedEffect(saved) {
-        saved?.let { onSaved(it.message) }
+        saved?.let {
+            onSaved(it.message)
+            // **쓰고 나면 비운다.** 안 비우면 마이에서 뒤로 왔을 때 이 화면이 다시
+            // 합성되면서 같은 상태로 또 마이로 튕긴다 — 뒤로가기가 막힌다 (#214 리뷰)
+            viewModel.onSavedHandled()
+        }
     }
 
     if (state.save is SaveItineraryState.NeedsLogin) {

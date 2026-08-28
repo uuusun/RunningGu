@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.my
 
 import androidx.lifecycle.SavedStateHandle
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * S7 저장 → 마이[동선]으로 넘기는 안내 문구. (SPEC §4.10 · API 명세 §5-2)
@@ -24,6 +25,17 @@ object ItinerarySavedNotice {
     fun set(handle: SavedStateHandle, message: String) {
         handle[KEY_MESSAGE] = message
     }
+
+    /**
+     * 담긴 문구를 흐름으로 본다. **한 번 읽고 마는 것으로는 부족하다.** (#214 리뷰)
+     *
+     * `launchSingleTop` 으로 마이 항목이 **재사용되면** 그 항목을 키로 삼은 효과는 다시
+     * 돌지 않는다. 이미 한 번 돈 자리라 두 번째 저장의 문구가 조용히 사라진다 — 지금은
+     * 탭 이동이 `popUpTo(startDestination)` 이라 안 나지만, 마이[동선] → S7 길이 열리면
+     * (#213) `마이 → S7 → 저장 → 마이(재사용)` 가 된다.
+     */
+    fun flow(handle: SavedStateHandle): StateFlow<String?> =
+        handle.getStateFlow(KEY_MESSAGE, null)
 
     /** 한 번만 돌려준다. 없으면 null. */
     fun consume(handle: SavedStateHandle): String? = handle.remove<String>(KEY_MESSAGE)

@@ -9,6 +9,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import kotlinx.coroutines.flow.filterNotNull
 import com.runninggu.app.ui.auth.LoginScreen
 import com.runninggu.app.ui.auth.ResetScreen
 import com.runninggu.app.ui.auth.SignupScreen
@@ -103,8 +104,13 @@ fun RunningGuNavHost(
             // S7 저장 성공으로 들어온 경우다. 문구는 저장한 화면이 아니라 여기서 뜬다
             // (SPEC §4.10 — "마이[동선] → 마이에 저장했어요").
             val myViewModel: MyViewModel = viewModel()
+            // **읽고 마는 게 아니라 계속 본다.** 이 항목이 재사용되면(`launchSingleTop`)
+            // 항목을 키로 삼은 효과는 다시 돌지 않아 두 번째 문구가 사라진다 (#214 리뷰).
             LaunchedEffect(entry) {
-                ItinerarySavedNotice.consume(entry.savedStateHandle)?.let(myViewModel::showMessage)
+                ItinerarySavedNotice.flow(entry.savedStateHandle).filterNotNull().collect { message ->
+                    myViewModel.showMessage(message)
+                    ItinerarySavedNotice.consume(entry.savedStateHandle)
+                }
             }
 
             MyScreen(
@@ -339,7 +345,14 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 // 저장하면 마이[동선]으로 옮긴다 (SPEC §4.10). 문구는 방금 쌓인 마이
                 // 항목에 담아 넘긴다 — 위 [onOpenCourses] 와 같은 방식이다(D-15 · #178).
                 onSaved = { message ->
-                    navController.navigate(Routes.MY) { launchSingleTop = true }
+                    navController.navigate(Routes.MY) {
+                        // **저장이 끝난 위저드로는 돌아가지 않는다** (#214 리뷰). 남겨 두면
+                        // 뒤로가기로 이미 저장한 동선을 다시 편집하게 되고, 그 화면이
+                        // 성공 상태를 다시 들고 있으면 곧바로 마이로 튕긴다.
+                        // 중간 상태로 재진입하면 안 되는 화면이다(#192 `RestartWizardIfUnconfirmed`).
+                        popUpTo(Routes.WIZARD_GRAPH_PATTERN) { inclusive = true }
+                        launchSingleTop = true
+                    }
                     ItinerarySavedNotice.set(
                         handle = navController.getBackStackEntry(Routes.MY).savedStateHandle,
                         message = message,

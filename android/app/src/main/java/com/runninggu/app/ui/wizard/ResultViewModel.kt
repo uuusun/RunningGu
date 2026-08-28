@@ -14,6 +14,7 @@ import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.Poi
 import com.runninggu.app.domain.PoiCategory
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,7 @@ import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.PoiRepository
 import com.runninggu.app.ui.course.saveMessage
 
@@ -65,6 +67,9 @@ class ResultViewModel(
         if (repository === FakeItineraryRepository) DEMO_CONTEST_ID else null
 
     private var lastRequest: GenerateItineraryRequest? = null
+
+    /** 저장 요청. 내용을 고치면 이전 결과가 [SaveItineraryState.Idle] 로 지워지므로 함께 끊는다. */
+    private var saveJob: Job? = null
     private var lastRegion: String = ""
 
     /**
@@ -128,7 +133,13 @@ class ResultViewModel(
         // 않지만, 두 번째 응답이 늦게 와서 이미 옮겨 간 화면을 다시 건드린다.
         if (state.save is SaveItineraryState.Saving) return
 
-        viewModelScope.launch {
+        // 기다리는 사이 세션이 바뀌면 그 결과는 남의 것이다 (S8 `onSaveCourse` 와 같은
+        // 장치 · #166 리뷰). 저장은 계정에 쌓는 일이라 여기가 특히 중요하다.
+        val epoch = SessionStore.sessionEpoch
+        // 보내는 중에 내용을 고치면 `save` 가 Idle 로 풀려 다시 누를 수 있다. 앞의 요청을
+        // 안 끊으면 **고치기 전 동선**의 응답이 뒤늦게 화면을 옮긴다.
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
             _uiState.update { it.copy(save = SaveItineraryState.Saving) }
             val next = try {
                 val outcome = repository.save(result)
@@ -147,7 +158,36 @@ class ResultViewModel(
                 if (e is ApiException.Http && e.needsLogin) SaveItineraryState.NeedsLogin
                 else SaveItineraryState.Failed(e.saveMessage())
             }
+            // **`NeedsLogin` 은 통과시킨다.** 세대가 오르는 흔한 이유가 바로 "세션이
+            // 죽었다" 이다 — `401` 을 받은 `TokenAuthenticator` 가 재발급에 실패하면
+            // `signOut()` 이 응답보다 먼저 세대를 올린다. 그 결과까지 버리면 정작
+            // 로그인하라는 말을 못 한다(#166 리뷰 · S8 과 같은 판단).
+            //
+            // **버리더라도 버튼은 푼다.** `Saving` 인 채로 두면 "저장 중…" 이 굳는다.
+            if (epoch != SessionStore.sessionEpoch && next !is SaveItineraryState.NeedsLogin) {
+                _uiState.update {
+                    if (it.save is SaveItineraryState.Saving) it.copy(save = SaveItineraryState.Idle) else it
+                }
+                return@launch
+            }
             _uiState.update { it.copy(save = next) }
+        }
+    }
+
+    /**
+     * 성공을 화면이 **한 번 쓰고 나면 비운다.** (SPEC §4.10 · #214 리뷰)
+     *
+     * [SaveItineraryState.Saved] 를 그대로 두면 마이에서 뒤로 왔을 때 S7 이 다시
+     * 합성되면서 **같은 상태로 또 마이로 튕긴다** — 뒤로가기가 막힌다. 화면이 이미
+     * 떠났으므로 여기서는 지우기만 한다.
+     *
+     * 내비게이션 쪽에서 위저드 그래프를 백스택에서 걷는 것과 **둘 다 필요하다.** 상태만
+     * 비우면 백스택에 남은 위저드로 돌아가 이미 저장한 동선을 다시 편집하게 되고,
+     * 백스택만 걷으면 다른 경로로 재진입할 때 같은 일이 난다.
+     */
+    fun onSavedHandled() {
+        _uiState.update {
+            if (it.save is SaveItineraryState.Saved) it.copy(save = SaveItineraryState.Idle) else it
         }
     }
 

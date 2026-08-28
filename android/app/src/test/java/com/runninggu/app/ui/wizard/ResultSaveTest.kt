@@ -2,6 +2,7 @@ package com.runninggu.app.ui.wizard
 
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.FakeItineraryRepository
 import com.runninggu.app.data.repository.GenerateItineraryRequest
@@ -38,7 +39,11 @@ class ResultSaveTest {
     fun setUp() = Dispatchers.setMain(dispatcher)
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        Dispatchers.resetMain()
+        // 싱글턴이라 올려 둔 세대가 다음 케이스로 샌다
+        SessionStore.resetForTest()
+    }
 
     /**
      * 생성은 가짜 fixture 를 그대로 쓰고 저장만 바꿔 낀다.
@@ -184,6 +189,65 @@ class ResultSaveTest {
         viewModel.onRemoveBlock(userBlock.id)
 
         assertEquals(SaveItineraryState.Idle, viewModel.uiState.value.save)
+    }
+
+    // ── 화면을 떠난 뒤 (SPEC §4.10 · #214 리뷰) ──────────────────
+
+    @Test
+    fun `성공을 쓰고 나면 비운다`() = runTest(dispatcher) {
+        // 안 비우면 마이에서 뒤로 왔을 때 이 화면이 같은 상태로 다시 합성돼 곧바로
+        // 마이로 튕긴다 — 뒤로가기가 막힌다
+        val viewModel = loaded(SavingRepository { SaveOutcome(id = 42L, replaced = false) })
+        advanceUntilIdle()
+        viewModel.onSave()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.save is SaveItineraryState.Saved)
+
+        viewModel.onSavedHandled()
+
+        assertEquals(SaveItineraryState.Idle, viewModel.uiState.value.save)
+    }
+
+    // ── 기다리는 사이 세션이 바뀌면 (#166 리뷰 · S8 과 같은 장치) ──
+
+    @Test
+    fun `보내는 사이 세션이 바뀌면 그 결과를 버린다`() = runTest(dispatcher) {
+        // 남의 계정에 저장된 결과를 들고 "마이에 저장했어요" 로 옮겨 가면, 로그아웃된
+        // 사용자가 저장됐다고 믿는다
+        val viewModel = loaded(
+            SavingRepository {
+                SessionStore.signOut(expectedEpoch = SessionStore.sessionEpoch)
+                SaveOutcome(id = 42L, replaced = false)
+            },
+        )
+        advanceUntilIdle()
+
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        val save = viewModel.uiState.value.save
+        assertTrue("남의 결과를 그대로 들었다: $save", save !is SaveItineraryState.Saved)
+        // 버리더라도 버튼은 풀어 준다 — Saving 인 채로 두면 "저장 중…" 이 굳는다
+        assertEquals(SaveItineraryState.Idle, save)
+        assertTrue(viewModel.uiState.value.canSave)
+    }
+
+    @Test
+    fun `보내는 사이 세션이 죽어도 로그인 안내는 살린다`() = runTest(dispatcher) {
+        // 세대가 오르는 흔한 이유가 바로 "세션이 죽었다" 이다. 이것까지 버리면 정작
+        // 로그인하라는 말을 해야 할 때 아무 말도 못 한다
+        val viewModel = loaded(
+            SavingRepository {
+                SessionStore.signOut(expectedEpoch = SessionStore.sessionEpoch)
+                throw ApiException.Http(status = 401, code = ApiErrorCode.UNKNOWN, problem = null)
+            },
+        )
+        advanceUntilIdle()
+
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        assertEquals(SaveItineraryState.NeedsLogin, viewModel.uiState.value.save)
     }
 
     @Test
