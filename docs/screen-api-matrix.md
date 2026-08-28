@@ -24,7 +24,7 @@ Compose 화면
 기기 내부
   ├─ DataStore: 세션 토큰·게스트 여부·설정
   ├─ Room: 마지막 성공 응답의 읽기 캐시
-  └─ 임시 상태: 필터·위저드·저장 전 동선·GPS 전송 전 기록
+  └─ 임시 상태: 필터·위저드·저장 전 동선
 ```
 
 - KTO·카카오 REST 키는 서버에만 둔다. 앱에는 카카오 Android 네이티브 키만 둔다.
@@ -54,8 +54,8 @@ Compose 화면
 | `KTO_SYNC_GPX` | 두루누비 최신 메타 동기화 + GPX 경로 결합 | 버전 번들에서 시작한 서버 메모리 불변 snapshot. 성공한 전체 동기화만 원자 교체, PostgreSQL 복제 없음 |
 | `OSM_GRAPH` | 서버 내부 GraphHopper가 OSM+SRTM으로 순환 경로 생성 | 원천 그래프는 영속 캐시, 응답은 임시 DTO·사용자 저장 시 snapshot만 보관 |
 | `LOCAL_STATE` | 화면·ViewModel 메모리 상태 | 저장하지 않음 |
-| `LOCAL_CACHE` | Room·DataStore·임시 GPS | 제한적 로컬 보관 |
-| `ANDROID_SDK` | 위치·지도·카카오 로그인 등 Android SDK | 기능별 최소 상태만 보관 |
+| `LOCAL_CACHE` | Room·DataStore | 제한적 로컬 보관 |
+| `ANDROID_SDK` | 지도·카카오 로그인 등 Android SDK | 기능별 최소 상태만 보관 |. **위치 SDK 는 없다**(결정-56)
 
 ### 공통 API 규약
 
@@ -72,7 +72,7 @@ Compose 화면
 | 대회 목록 | 커서 페이징 `items`, `nextCursor`, `hasNext` |
 | 개인 목록 | 페이지 페이징 `content`, `page{number,size,totalElements,hasNext}` |
 | 공개 범위 | 대회·축제·POI·코스 조회, 무상태 동선 생성 |
-| 로그인 필요 | 프로필·찜·동선/코스/러닝 기록 저장 및 보관함 조회 |
+| 로그인 필요 | 프로필·찜·동선/코스 저장 및 보관함 조회 |
 | 화면 상태 | Loading / Content / Empty / Error 구분, 부분 실패는 영역별 분리 |
 
 ---
@@ -95,11 +95,9 @@ Compose 화면
 | S6 숙소 | 주변 숙소·검색 결과 | POI DTO | `KAKAO_LIVE`, KTO 숙박 폴백 | 영구 저장 없음 | 서버 5분 캐시 |
 | S7 새 동선 | recovery, days, blocks | 생성 DTO | 서버 규칙 엔진 + KTO/카카오 POI | 저장 전 없음 | Result ViewModel 임시 DTO |
 | S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | Room 읽기 캐시 |
-| S8 내 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 GraphHopper 그래프 캐시, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
+| S8 출발지 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 GraphHopper 그래프 캐시, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
 | S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 버전 번들에서 시작해 최신 전체 KTO 메타를 결합한 서버 메모리 snapshot | Room 읽기 캐시 |
-| R1 GPS 기록 | timestamp, lat, lng, distance | 위치 point stream | `ANDROID_SDK` | 저장 전 없음 | 전송 전 임시 기록 |
-| R2 러닝 요약 | 거리·시간·평균 페이스·경로 | local summary / run DTO | `LOCAL_STATE` + `SERVER_DB` | RUN·RUN_TRACK | 저장 전 임시 기록 |
-| S10 보관함 | 동선·저장 코스·러닝 기록·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | Room 읽기 캐시 |
+| S10 보관함 | 동선·저장 코스·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | Room 읽기 캐시 |
 | M1 계정 관리 | 프로필·약관·가입 로그인 방식 | JSON DTO | `SERVER_DB` | USER·IDENTITY(1:1)·AGREEMENT | 세션만 DataStore |
 
 ---
@@ -124,9 +122,7 @@ Compose 화면
 | S7 | 새 동선 결과 | wizard 그래프의 `result` | 미구현 | 생성 DTO | 저장 시 필요 | 플로우 확정 |
 | S7-R | 저장 동선 상세 | `itinerary/{itineraryId}` 또는 result 재사용 | 미구현 | `itineraryId` | 필요 | **결정 필요** |
 | S8 | 러닝코스 | `courses` | `courses` | 선택 출발지·목표 거리 | 선택 | 현재 구현 placeholder |
-| S8-D | 코스 상세 | `courseDetail/near`, `courseDetail/saved/{savedCourseId}`, `courseDetail/ran/{runId}` | 미구현 | sealed `CourseDetailKey` | 조회별 상이 | near snapshot은 SavedStateHandle/그래프 상태, ran은 P1 |
-| R1 | GPS 기록 | `run` | 미구현 | 코스 snapshot 또는 자유 러닝 | 저장 시 필요 | P1 |
-| R2 | 러닝 요약 | `runSummary` | 미구현 | 임시 GPS 기록 | 저장 시 필요 | P1 |
+| S8-D | 코스 상세 | `courseDetail/near`, `courseDetail/saved/{savedCourseId}` | 미구현 | sealed `CourseDetailKey` | 조회별 상이 | near snapshot은 SavedStateHandle/그래프 상태. `ran` route 는 없다(결정-56) |
 | S9 | 커뮤니티 | 만들지 않음 | 없음 | 해당 없음 | 해당 없음 | 범위 제외 |
 | S10 | 보관함 | 내부 `my`, UI 라벨 `보관함` | `my` placeholder | 선택 segment | 필요 | route 현재 구현 |
 | M1 | 내 정보·계정 관리 | `account` 제안 | 미구현 | 없음 | 필요 | 플로우 확정 |
@@ -148,9 +144,9 @@ Compose 화면
                                                         ├─ 저장 → 보관함[동선]
                                                         └─ 편집·POI 추가/교체 → 결과
 
-홈 → 러닝코스 → 코스 상세 ── P1 → GPS 기록 → 러닝 요약 → 보관함[러닝코스]
+홈 → 러닝코스 → 코스 상세 → [저장] → 보관함[러닝코스]
 보관함 ─┬─ 동선 카드 → 저장 동선 상세
-        ├─ saved 카드 → 코스 상세 (ran은 P1)
+        ├─ saved 카드 → 코스 상세
         ├─ 찜 카드 → 대회 상세
         └─ 설정 → 내 정보·계정 관리
 ```
@@ -302,17 +298,16 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 
 ---
 
-## 6. 러닝코스·GPS 매핑
+## 6. 러닝코스 매핑
 
-### S8 내 주변·지역별
+### S8 출발지 주변·지역별
 
 | 행동 | API/로컬 | 요청 | 응답·원천 | 상태 |
 |---|---|---|---|---|
-| 내 위치 | FusedLocationProvider | permission, 6초 timeout | lat/lng | locating/거부/timeout |
 | 출발지 검색 | `GET /api/geocode` | query | name,address,lat,lng / KAKAO_LIVE | `NO_RESULT` |
 | 프리셋 | 앱 상수 | 5개 좌표 | start point | API 없음 |
 | 거리 슬라이더 | 로컬 | 1~21km, 0.5 단위 | targetKm | 드래그 종료 후 조회 권장 |
-| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty`, `gainM`, 고도 스트립 (`difficultyBasis` 없음) | 내 주변 카드는 생성 왕복 구간 기준 `EASY\|NORMAL` 배지 옆에 **"이 구간 기준"** 표시. 지역별 목록은 전체 원본 코스 등급 배지만 기존대로 표시하고 보조 문구를 붙이지 않으며 `HARD` 허용. P0 내 주변 난이도 칩 없음 |
+| 난이도 표시 | 서버 응답 | 입력 없음 | ROUTE `difficulty`, `gainM`, 고도 스트립 (`difficultyBasis` 없음) | 출발지 주변 카드는 생성 왕복 구간 기준 `EASY\|NORMAL` 배지 옆에 **"이 구간 기준"** 표시. 지역별 목록은 전체 원본 코스 등급 배지만 기존대로 표시하고 보조 문구를 붙이지 않으며 `HARD` 허용. P0 출발지 주변 난이도 칩 없음 |
 | 근처 경로·장소 통합 목록 | `GET /api/courses/near` | lat,lng,targetKm,radiusKm=8,size=12 | ROUTE `routeId,dataSource,difficulty,routeKm,durationMin,gainM,elevationProfileM,pathPolyline` + PLACE + degradedSources + attributions | 목표 거리·상승 상한에 맞는 큐레이션 0건이면 거리·상승·차도·회전 상한을 통과한 OSM 최대 1건 생성 후 거리순 통합 |
 | OSM 품질 상한 | 서버 내부 | seed 0~15 | 거리 75~125%·상승 <50m/km·실거리 차도 ≤10%·실제 회전 ≤6회/km | 하나라도 초과하면 후보 제외, 상한 완화 금지; AP-25 전 차도 거리 가중 PoC 재검증 |
 | 부분 실패 | 같은 near 응답 | 없음 | items 비어 있지 않음 + degradedSources | 호출 실패만 Content+비차단 안내; 품질 상한 통과 후보 0건은 정상 결과 |
@@ -320,30 +315,25 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 지역 칩 | `GET /api/courses/regions` | 없음 | `count DESC, region ASC`의 region,count | KTO 동기화 실패는 번들/마지막 정상 snapshot으로 200 유지. catalog 자체가 없을 때만 Error |
 | 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
-| 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved/Ran` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
+| 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 
 ### S8-D 코스 상세
 
 | 종류 | 조회 | 필요한 필드 | 행동 |
 |---|---|---|---|
-| near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | routeId,dataSource,pathPolyline,routeKm,durationMin,difficulty,gainM,elevationProfileM,lat,lng | 저장(P0)·뛰기(P1) |
-| saved 저장 코스 | `courseDetail/saved/{savedCourseId}` + `GET /api/me/courses/{id}` | 목록 필드 + pathPolyline + attributions[] | 출처 완성 문구를 `" · "`로 연결, 삭제 확인(P0)·뛰기(P1) |
-| ran 러닝 기록(P1) | `courseDetail/ran/{runId}` + `GET /api/runs/{id}` | ranAt, distanceKm, durationSec, avgPaceSec, encodedPolyline, pointCount | 삭제 확인 |
+| near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | routeId,dataSource,pathPolyline,routeKm,durationMin,difficulty,gainM,elevationProfileM,lat,lng | 저장 |
+| saved 저장 코스 | `courseDetail/saved/{savedCourseId}` + `GET /api/me/courses/{id}` | 목록 필드 + pathPolyline + attributions[] | 출처 완성 문구를 `" · "`로 연결, 삭제 확인 |
 
-`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`, `Ran(runId)`의 sealed 타입이다. NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
+`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`의 sealed 타입이다. `Ran` 은 두지 않는다(결정-56). NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
 
-### R1 GPS·R2 요약
+### 러닝 기록 — **제품에 없다** 🔒확정(결정-56)
 
-| 행동 | 처리/API | 데이터 | 저장·상태 |
-|---|---|---|---|
-| 기록 시작 | Foreground Service + location | courseName?, start point | 로컬 임시 기록 |
-| 위치 누적 | 로컬 5m filter | timestamp,lat,lng | polyline·거리·시간 갱신 |
-| 종료 | 로컬 | points,duration,distance | R2 임시 요약 |
-| 저장 | `POST /api/runs` | courseName?,ranAt,distanceKm,durationSec,points | RUN·RUN_TRACK, id·avgPaceSec |
-| 저장 전 취소 | 확인 modal | 없음 | 임시 기록 삭제 |
-| 저장 기록 삭제 | `DELETE /api/runs/{id}` | id | 204, 확인 modal |
+R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화면·route·API·DB 어디에도
+예약을 남기지 않는다 — 자리만 남기면 곧 붙을 것처럼 읽힌다(이슈 #215).
 
-GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 포함하지 않는다(D-25).
+**출발지는 사용자가 직접 고른 장소뿐이다.** 기기 위치·Wi-Fi·기지국·IP 로 현재 위치를
+추정하는 경로를 두지 않으므로, `/api/courses/near` 의 `lat/lng` 에는 검색·프리셋·S7 숙소
+좌표만 들어간다.
 
 ---
 
@@ -357,10 +347,8 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 동선 목록 | `GET /api/itineraries` | id,title,region(snapshot),contestName(current),event,recovery,기간,placeCount,active,needsRegeneration,createdAt | 변경 시 "대회 변경" 배지, 비활성도 유지, Loading/Empty/Error/offline |
 | 동선 열기 | `GET /api/itineraries/{id}` | snapshot 트리 + current contest + needsRegeneration | S7-R, 변경 안내·재생성 CTA |
 | 동선 삭제 | `DELETE /api/itineraries/{id}` | 204 | 확인 modal, 실패 시 유지 |
-| 저장 코스(P0) | `GET /api/me/courses` | saved projection | Loading/Empty/Error |
-| 러닝 기록(P1) | `GET /api/runs` | ran summary | AP-22 착수 후 구현 |
-| saved/ran 통합(P1) | 결정 보류 | 정렬·페이징 계약 | GPS P1 착수 시 D-21 재논의 |
-| 코스/기록 삭제 | 각 DELETE | 204 | 종류별 확인 modal |
+| 저장 코스 | `GET /api/me/courses` | saved projection | Loading/Empty/Error |
+| 코스 삭제 | `DELETE /api/me/courses/{id}` | 204 | 확인 modal |
 | 찜 목록 | `GET /api/me/favorites` | 대회 카드 page, favorite=true, active | 비활성 흐림+"정보 제공 종료", Empty/Error |
 | 찜 해제 | DELETE `/api/me/favorites/{contestId}` | 204 | 실패 시 카드 유지 |
 | 설정 | account 이동 | 없음 | M1 |
@@ -392,7 +380,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 대회 탐색 | 10~15 | 4장 홈·캘린더·상세 |
 | 계정·저장 코스 상세 | 16~17 | 6장 saved 상세, 7장 계정 관리 |
 | 동선 위저드·결과 | 20~25 | 5장 위저드·생성·편집·저장 |
-| 러닝코스·GPS | 30~34 | 6장 코스·기록·요약 |
+| 러닝코스 | 30~34 | 6장 코스 (기록·요약 캡처는 제외 — 결정-56) |
 | 보관함 | 40~42 | 7장 동선·코스·찜 segment |
 | 디자인 시스템 | 50 | API·DB 없음, Compose theme/token 기준표 |
 
@@ -401,14 +389,14 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | 그룹 | 캡처 | 데이터·처리 매핑 |
 |---|---|---|
 | 게스트 로그인 유도 | 72,73,74,75 | 찜·동선·코스 저장을 API 전에 차단, 로그인 후 원래 route 복귀, 자동 재실행 없음 |
-| 삭제·탈퇴 확인 | 100~104 | modal은 로컬, 확인 시에만 DELETE 또는 임시 기록 폐기 |
+| 삭제·탈퇴 확인 | 100~104 | modal은 로컬, 확인 시에만 DELETE |
 | 회원가입·재설정 조작 | 80~83 | 로컬 폼 상태 + 인증/재설정 API 결과 |
 | 캘린더 조작 | 84~88 | 같은 contests/daily-counts API에 date/month/filter/q 적용 |
 | 위저드 조작 | 89~92 | WizardUiState + POI 조회 + generate 진행 상태 |
 | 동선 결과 변형 | 93~95 | 같은 generate DTO의 day 선택·회복일·로컬 편집 |
 | 코스 조작 | 96~97 | region API 또는 targetKm 변경 후 near 재조회 |
 | 대회 상태 | 98~99 | 서버 파생 regStatus에 따른 CTA·배지 변화 |
-| 기본 예외 상태 | 60~71 | 로그인 오류, 축제/숙소 로딩, 동선 Empty, POI 교체, 보관함 Empty, ran 상세, 코스 위치/Empty |
+| 기본 예외 상태 | 60~71 | 로그인 오류, 축제/숙소 로딩, 동선 Empty, POI 교체, 보관함 Empty, 코스 출발지 미선택/Empty |
 | 홈 영역별 상태 | 110~116 | closing-soon과 festivals를 독립 Loading/Empty/Error로 관리, offline은 Room |
 | 캘린더 부분 실패 | 120~125 | 목록 실패와 daily-counts 실패를 분리, 검색/day/month Empty 구분 |
 | 보관함 부분 실패 | 130~133 | 동선·코스·찜 segment 오류 분리, offline은 읽기 전용 |
@@ -416,11 +404,11 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 ### 확인된 플로우 연결
 
-- 보관함 동선→S7-R, P0 saved→코스 상세, 찜→S3가 연결돼 있다. ran 상세는 P1이다.
-- 코스 저장→보관함 saved가 연결돼 있다. 러닝 저장→보관함 ran 연결은 P1이다.
+- 보관함 동선→S7-R, saved→코스 상세, 찜→S3가 연결돼 있다.
+- 코스 저장→보관함 saved가 연결돼 있다.
 - 보관함 설정→계정 관리, 계정 관리→비밀번호 변경·로그아웃·탈퇴가 연결돼 있다.
 - 홈·캘린더·보관함은 로딩·빈·오류·부분 실패 상태를 가진다.
-- 삭제·탈퇴·저장 전 러닝 취소에는 확인 modal이 있다.
+- 삭제·탈퇴에는 확인 modal이 있다.
 - 게스트 로그인 후에는 원래 화면만 복원하고 사용자가 저장·찜을 다시 누른다.
 
 ---
@@ -456,7 +444,7 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 
 | 기존 ID | 결론 |
 |---|---|
-| F-01~03 | 보관함의 동선·P0 saved·찜 카드에서 각 상세로 이동. ran은 P1 |
+| F-01~03 | 보관함의 동선·saved·찜 카드에서 각 상세로 이동 |
 | F-04 | 코스 상세 저장 후 보관함 saved에서 확인 |
 | F-05 | 보관함 설정 아이콘에서 계정 관리 진입 |
 | D-27 / F-06 | 로그인 후 원래 화면 복귀, 저장·찜 자동 실행 없음 |
@@ -476,11 +464,11 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | D-15(개정) | S7→S8은 출발지·`min(RECOVERY.walk,5)` 목표거리만 `CourseLaunchContext`로 전달. 종목·난이도는 전달하지 않고 좌표를 route 문자열에 넣지 않음 |
 | D-16 | Empty는 입력 유지 후 위저드 복귀·조건 수정, Error는 같은 요청 재시도 |
 | D-18(08-23 개정) | `pathPolyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5). 서버가 연속 중복점을 제거하고 소수점 5자리 `lat,lng`를 `;`로 연결한 UTF-8 canonical geometry로 `v1:`+SHA-256 `routeFingerprint`를 계산해 사용자별 멱등 저장. 진행 반대는 별개, 신규 201·중복 200 기존 id |
-| D-20 | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved/ran 분리 route |
+| D-20(개정) | `courseDetail/{type}/{id}` 폐기. sealed CourseDetailKey + near/saved 분리 route. `ran` 은 결정-56 으로 없앴다 |
 | D-22 | 내 정보·계정 관리는 보관함 설정에서 여는 별도 화면 |
 | D-23 | 탈퇴 전 EMAIL/KAKAO 재인증으로 5분 token 발급, DELETE 성공 후 모든 세션·캐시 삭제 |
 | D-24 | 대회 imageUrl은 P0 nullable, null이면 placeholder |
-| D-25 | GPS 기록·ran은 P1, P0 보관함은 saved만 구현 |
+| ~~D-25~~ | ~~GPS 기록·ran은 P1~~ — **SPEC 결정-56 으로 대체**. 러닝 기록을 제품에서 뺐고 보관함은 saved 한 종류다 |
 | D-26 | 별도 splash route 없이 시스템 Splash + core-splashscreen + Startup Gate |
 | D-28 | EMAIL 수단에만 Android 비밀번호 변경 메뉴 노출, 변경 성공 시 전 refresh revoke 후 현재 기기 token pair 재발급 |
 | D-29(개정) | USER:LOGIN_IDENTITY는 1:1. 가입 시 EMAIL/KAKAO 중 하나만 선택하고 P0 연결·추가·해제·전환 API를 두지 않음. `GET /me.email`은 항상 포함하는 `string|null`이며 KAKAO 이메일 미제공 시 null, 별도 이메일 입력·인증 없음 |
@@ -497,14 +485,14 @@ GPS 기록·요약과 `ran` 상세는 P1(AP-22)이다. P0 구현 범위에는 �
 | SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
 | SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
 | SPEC 결정-55 | 이메일 로그인은 IP별 모든 요청 30회/고정 1분과 정규화 이메일별 실패 5회/고정 1분을 함께 제한한다. 초과는 `429 RATE_LIMITED`, 성공은 이메일 창만 초기화한다. 존재하지 않는 이메일도 dummy BCrypt 비교 후 동일한 `401 LOGIN_FAILED`를 반환한다 |
+| SPEC 결정-56 | 자동 위치 추정을 제품에서 전부 없앤다. 위치 권한·`FusedLocationProvider`·`play-services-location` 을 두지 않고 Wi-Fi AP·기지국 Cell-ID·BLE·IP GeoIP 로 위치를 추정하지 않는다. 출발지는 검색·프리셋·S7 숙소 좌표뿐이며 `/api/courses/near` 의 `lat/lng` 에 기기 유래 좌표를 넣는 경로를 두지 않는다. R1·R2·`ran`·`/api/runs/**` 는 구현하지 않는다. 서버 요청 IP 기반 횟수 제한은 위치 추정이 아니므로 유지하되 지역 변환·저장·추천 사용은 하지 않는다 (D-25 대체 · 이슈 #215) |
 
-### P1 착수 시 재논의
+### 미정 계약 — **없다**
 
-| ID | 결정할 내용 | 영향 | 주인 |
-|---|---|---|---|
-| D-21 | saved/ran 통합 정렬·페이징 | 보관함 목록 계약 | 앱+백엔드 |
+~~D-21(saved/ran 통합 정렬·페이징)~~ 은 SPEC 결정-56 으로 **사라졌다.** `ran` 이 없으므로
+통합할 대상 자체가 없고, 보관함 코스 목록은 `GET /api/me/courses` 하나다.
 
-P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01은 결정-33의 08-23 재개정으로 확정됐고, D-21만 GPS 기록(AP-22) P1 착수 시 실제 `ran` 목록 요구사항을 기준으로 결정한다.
+P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01은 결정-33의 08-23 재개정으로 확정됐다.
 
 ---
 
@@ -533,10 +521,9 @@ P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01�
 
 | API | 보완할 계약 |
 |---|---|
-| `GET /api/runs` | P1 ran 목록 요약의 정확한 필드와 page 예시 |
 
-현재 P0 API의 springdoc 상세화 미정 항목은 없다. GPS 기록 P1 착수 시 `GET /api/runs` 계약을
-확정하고 이 표를 다시 연다.
+현재 P0 API의 springdoc 상세화 미정 항목은 없다. `/api/runs/**` 는 **계약을 두지 않는다**
+(SPEC 결정-56) — 예약만 남겨도 다음 사람이 곧 붙는 것으로 읽는다.
 
 ---
 
@@ -546,7 +533,7 @@ P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01�
 
 1. S1 홈 → S2 캘린더 → S3 상세
 2. S3 상세 → S4~S7 위저드·결과·저장
-3. S8 코스 → S8-D 상세 → R1/R2 기록
+3. S8 코스 → S8-D 상세 → 코스 저장
 4. S10 보관함 → M1 계정 관리
 
 ### 화면 단위 완료 조건

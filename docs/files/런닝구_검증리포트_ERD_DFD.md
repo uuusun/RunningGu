@@ -2,7 +2,7 @@
 
 > **검증일**: 2026-08-23
 > **검증 기준**: SPEC v4(결정-33 08-23 재개정, 결정-44~53 포함) · API 명세 v3.1 · 화면–API 매핑표 v1.11 · 논리 ERD v4.5 · 수정 DFD
-> **판정**: P0+P1 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08·09·10 계약은 정렬됐다. P0 물리 DB 계약은 모두 닫혔고 `TBD-P1-01`만 P1 착수 전에 결정한다.
+> **판정**: 논리 모델과 확정된 DB-01·02·03·04·05·06·07·08·09·10 계약은 정렬됐다. 물리 DB 계약은 모두 닫혔다 — `TBD-P1-01`은 SPEC 결정-56 으로 사라졌다.
 
 ---
 
@@ -13,9 +13,8 @@
 | P0 | `USER`, `LOGIN_IDENTITY`, `USER_AGREEMENT`, `EMAIL_VERIFICATION`, `REFRESH_TOKEN` | 논리 계약 반영 |
 | P0 | `CONTEST`, `CONTEST_SOURCE`, `CONTEST_EVENT`, `CONTEST_SNAPSHOT_IMPORT`, `FAVORITE` | 논리 계약 반영 |
 | P0 | `ITINERARY`, `ITINERARY_DAY`, `ITINERARY_BLOCK`, `SAVED_COURSE` | 논리 계약 반영 |
-| P1 | `RUN_RECORD`, `RUN_TRACK` | 예약 초안. saved/ran 통합 계약은 P1 착수 시 재논의 |
 
-총 16개를 한 ERD에서 보되, **P0 확정 14개와 P1 계약 초안 2개를 같은 확정도로 취급하지 않는다**.
+총 14개다. **P1 러닝 기록 엔티티(`RUN_RECORD`·`RUN_TRACK`)는 없앴다** — GPS 기록을 제품에서 뺐다(SPEC 결정-56 · 이슈 #215).
 
 ---
 
@@ -55,7 +54,7 @@
 - `region`, `recovery`, 호텔, 일자·블록 트리와 RACE 날짜·시간·장소는 저장 snapshot이다. `contestName`과 현재 대회 메타·active는 `CONTEST`에서 파생한다.
 - `needsRegeneration`은 이름·active를 제외한 저장 RACE/region과 현재 날짜·시간·장소·지역·좌표 차이로 파생한다. 자동 재배치하지 않고 사용자 최종 저장 시 `PUT /itineraries/{id}`로 같은 id의 트리를 교체한다(확정-DB-04, 이슈 #55).
 
-### 2.4 저장 코스·P1 러닝 기록
+### 2.4 저장 코스
 
 - `SAVED_COURSE`에 `data_source`, `route_fingerprint`, `gain_m`, `elevation_profile_m`, `attributions`를 반영했다.
 - `CourseDataSource`는 `API_GPX`, `GPX_ONLY`, `OSM_GENERATED`다.
@@ -65,7 +64,6 @@
 - `path_polyline`은 고도 없는 2D Google Encoded Polyline precision 5(E5)다. fingerprint는 연속 중복점을 제거한 소수점 5자리 `lat,lng` 좌표를 `;`로 연결한 UTF-8 canonical geometry로 계산한다.
 - `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`, 최대 100개 정수 미터 배열이며 미보유 시 `[]`다(확정-DB-01, SPEC 결정-33 08-23 재개정, 이슈 #62).
 - `attributions`는 서버가 원천 메타데이터에서 만든 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'`로 snapshot 저장한다. 클라이언트 입력은 신뢰하지 않고 저장 코스 상세에만 반환하며, 문구 변경을 소급하지 않고 fingerprint에서도 제외한다(확정-DB-02, 이슈 #54).
-- P1은 `RUN_RECORD 1:1 RUN_TRACK`으로 목록 요약과 큰 경로 데이터를 분리한다. 정확한 목록 projection과 saved/ran 통합 페이징은 `TBD-P1-01`이다.
 
 ---
 
@@ -91,7 +89,7 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - Importer는 완전 snapshot의 2회 연속 누락만 source 비활성으로 반영하고 재등장을 복구한다.
 - 코스 조회는 큐레이션을 우선하고 적격 경로가 0건일 때만 내부 GraphHopper를 호출한다.
 - GraphHopper 장애는 큐레이션·카카오 장소 결과와 격리하고, 품질 상한 통과 후보 0건은 정상 Empty로 처리한다.
-- P0 마이 데이터와 P1 러닝 기록의 단계가 DFD에서 구분된다.
+- 마이 데이터 단계가 DFD에서 구분된다. 러닝 기록 API·저장소는 결정-56 으로 제거했다.
 - Redis 표기를 제거하고 단일 서버 MVP의 Caffeine 계약으로 통일했다.
 
 ---
@@ -108,12 +106,11 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - 대회 source 2회 연속 누락 비활성화·참조 보존
 - 시스템 관리 RACE 블록
 - 큐레이션 우선 + OSM/GraphHopper 도시 경로 생성
-- GPS 기록과 saved/ran 통합 계약의 P1 분리
+- 자동 위치 추정·GPS 기록 제거(SPEC 결정-56)
 
 다음은 충돌이 아니라 아직 상세화되지 않은 계약이다.
 
 - `GET /api/me/courses` 목록 projection
-- `GET /api/runs` P1 목록 projection과 통합 페이징
 - 회원 PATCH의 일부 성공 응답
 
 이 항목은 화면–API 매핑표 §11에 유지하며 ERD가 먼저 답을 만들지 않는다.
@@ -122,9 +119,8 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 
 ## 6. 물리 스키마 전 필수 결정
 
-| ID | 결정할 내용 |
-|---|---|
-| `TBD-P1-01` | saved/ran 통합 정렬·페이징과 RUN projection |
+**남은 것이 없다.** ~~`TBD-P1-01`(saved/ran 통합 정렬·페이징과 RUN projection)~~ 은
+SPEC 결정-56 으로 사라졌다 — `ran` 이 없으므로 통합할 대상이 없다.
 
 비활성 대회의 새 동선 생성 차단은 SPEC 결정-53의 `409 CONTEST_INACTIVE`로 확정됐다.
 
@@ -163,7 +159,6 @@ OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으
 - `elevation_profile_m`의 객체·문자열·101개 배열은 거부하고 빈 배열과 100개 정수 배열은 저장.
 - 같은 geometry의 attribution 문구가 달라져도 fingerprint는 같고, 기존 저장 행의 attribution snapshot은 소급 변경하지 않음.
 - OSM 생성 경로는 저장 전 PostgreSQL에 남지 않고 지역별 코스 목록에도 나타나지 않음.
-- P1 RUN_RECORD 생성·삭제 시 RUN_TRACK이 반드시 함께 생성·삭제됨.
 
 ---
 
