@@ -172,10 +172,12 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
 @Composable
 private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        // **`else` 를 쓰지 않는다** (#220 리뷰). 기기 위치를 안 쓰기로 했으니 `Locating` 은
+        // 곧 사라질 상태인데, `else` 로 덮으면 그때 이 자리가 아무 신호도 안 낸다. 갈래를
+        // 다 적어 두면 `Locating` 이 지워지는 순간 **컴파일러가 여기를 짚어 준다** (결정-56).
         val label = when (val origin = state.origin) {
-            // 기기 위치를 안 쓰므로 "확인하는 중" 이 없다. 고르기 전은 한 상태뿐이다 (결정-56)
+            OriginState.Undecided, OriginState.Locating -> "출발지를 정해주세요."
             is OriginState.Fixed -> origin.name
-            else -> "출발지를 정해주세요."
         }
         Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
 
