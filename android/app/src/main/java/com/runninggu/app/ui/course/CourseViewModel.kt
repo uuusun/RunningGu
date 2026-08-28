@@ -12,9 +12,7 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.ServiceLocator
-import com.runninggu.app.data.local.LocationProvider
 import com.runninggu.app.data.local.SessionStore
-import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.repository.GeocodeRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
 import kotlinx.coroutines.Job
@@ -33,7 +31,6 @@ import kotlin.math.roundToInt
 class CourseViewModel(
     private val repository: CourseRepository,
     private val geocodeRepository: GeocodeRepository,
-    private val locationProvider: LocationProvider = ServiceLocator.locationProvider,
     private val savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
     /**
      * 이 S8 **백스택 항목**의 상태. S7 연계로 열렸으면 여기에 출발지·목표 거리가 들어 있다
@@ -54,14 +51,11 @@ class CourseViewModel(
     /** 검색 버튼 연타도 마지막 것만 남긴다. */
     private var searchJob: Job? = null
 
-    /** [내 위치] 연타. 앞 조회를 끊고 마지막 것만 남긴다. */
-    private var locationJob: Job? = null
-
     /** [저장] 연타. 버튼도 막지만, 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
     private var saveJob: Job? = null
 
     /**
-     * 내 주변 목록 세대. **조회할 때마다 올라간다.**
+     * 출발지 주변 목록 세대. **조회할 때마다 올라간다.**
      *
      * 저장 결과가 어느 목록의 것인지 가리는 데 쓴다. `routeId` 만으로는 부족하다 —
      * §6-1 이 그걸 "near 응답 안에서만 유효한 불투명 식별자" 로 정의해서, 서로 다른
@@ -69,21 +63,12 @@ class CourseViewModel(
      */
     private var nearbyGeneration = 0
 
-    /**
-     * 위치 조회 세대. **출발지가 바뀔 때마다 올라간다.**
-     *
-     * GPS 는 최대 6초가 걸리는데 그동안 사용자가 프리셋이나 검색으로 출발지를 고를 수 있다.
-     * 그때 늦게 도착한 GPS 결과가 사용자의 선택을 덮으면, 화면에 보이는 출발지와 서버에
-     * 조회한 좌표가 어긋난다(#92 리뷰). 세대가 다르면 결과를 버린다.
-     */
-    private var locationRequestId = 0
-
     /** 지역별 목록에서 지금까지 받은 페이지 번호. 지역을 바꾸면 0 으로 돌아간다. */
     private var regionPage = 0
 
     init {
         loadRegions()
-        // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 내 주변이라 미리 부르면 헛 호출이다
+        // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 출발지 주변이라 미리 부르면 헛 호출이다
         applyLaunchContext(launchState)
     }
 
@@ -117,71 +102,11 @@ class CourseViewModel(
     }
 
     /**
-     * [내 위치]. (SPEC §4.11-1 ①)
-     *
-     * **실패해도 화면을 막지 않는다.** 출발지는 검색·프리셋으로도 정할 수 있어서(NFR-15),
-     * 여기서 못 잡으면 안내만 하고 원래 상태로 돌려놓는다.
-     *
-     * 실패 종류마다 할 말이 다르다 — 권한을 거부한 사람에게 "잠시 뒤 다시" 는 눌러도
-     * 계속 실패하고, 위치가 늦게 잡히는 사람에게 "권한을 허용해 주세요" 는 이미 허용한
-     * 걸 또 하라는 말이 된다.
-     */
-    fun onUseMyLocation() {
-        locationJob?.cancel()
-        val requestId = ++locationRequestId
-        locationJob = viewModelScope.launch {
-            val previous = _uiState.value.origin
-            _uiState.update { it.copy(origin = OriginState.Locating, locationMessage = null) }
-
-            val result = locationProvider.current()
-
-            // 조회하는 동안 사용자가 직접 출발지를 골랐으면 **그 선택이 이긴다** (#92 리뷰).
-            // 성공이든 실패든 손대지 않는다 — 실패 복구도 사용자의 선택을 되돌리는 셈이다
-            if (requestId != locationRequestId) return@launch
-
-            when (result) {
-                is LocationResult.Found -> onOriginChange(
-                    OriginState.Fixed(
-                        name = MY_LOCATION_LABEL,
-                        lat = result.point.lat,
-                        lng = result.point.lng,
-                        from = OriginState.Fixed.Source.GPS,
-                    ),
-                )
-
-                // 실패 종류별 문구는 순수 함수로 빼 두었다 — 기기 없이 고정할 수 있다
-                else -> restoreOrigin(previous, result.originFailureMessage())
-            }
-        }
-    }
-
-    /**
-     * 권한 요청 자체를 거부당했다. 화면이 시스템 대화상자 결과를 그대로 넘긴다.
-     *
-     * 조회를 시작하지 않았으므로 출발지는 건드리지 않는다.
-     */
-    fun onLocationPermissionDenied() {
-        _uiState.update {
-            it.copy(locationMessage = LocationResult.PermissionDenied.originFailureMessage())
-        }
-    }
-
-    /** 조회 전 출발지로 되돌린다. 이미 고른 프리셋이 [내 위치] 실패로 날아가면 안 된다. */
-    private fun restoreOrigin(previous: OriginState, message: String) {
-        _uiState.update { it.copy(origin = previous, locationMessage = message) }
-    }
-
-    /**
      * 출발지가 정해지면 바로 조회한다. (§4.11-1)
      *
-     * 프리셋·검색·S7 연계가 모두 여기로 온다. **진행 중이던 GPS 조회는 여기서 무효가 된다**
-     * — 사용자가 직접 고른 것이 늦게 온 GPS 결과보다 우선이다(#92 리뷰).
+     * 프리셋·검색·S7 연계가 모두 여기로 온다. 기기 위치는 쓰지 않는다(결정-56).
      */
     fun onOriginChange(origin: OriginState) {
-        locationRequestId++
-        // 출발지가 정해졌으면 "아래에서 골라 주세요" 안내는 할 일을 다 했다. 그대로 두면
-        // 사용자가 안내대로 골랐는데도 문구가 남아 뭔가 덜 된 것처럼 읽힌다 (#92 리뷰)
-        _uiState.update { it.copy(locationMessage = null) }
         _uiState.update { it.copy(origin = origin) }
         if (origin is OriginState.Fixed) refreshNearby()
     }
@@ -423,20 +348,16 @@ class CourseViewModel(
     }
 
     companion object {
-        /** 좌표를 그대로 보여줄 수는 없다. 목업도 "내 위치" 로 적는다. */
-        private const val MY_LOCATION_LABEL = "내 위치"
-
         /**
          * **세 갈래가 다 서버를 본다.** (AP-14 · AP-12)
          *
-         * 출발지 검색과 지역별 목록은 #156, [내 주변]은 `/courses/near` 가 #174
+         * 출발지 검색과 지역별 목록은 #156, 출발지 주변은 `/courses/near` 가 #174
          * (AP-25 OSM 경로 생성)로 서면서 붙었다. 그전까지 `near` 만 스텁으로 보내던
          * 한시적인 조합은 예정대로 지웠다(#190).
          */
         fun factory(
             repository: CourseRepository = ServiceLocator.courseRepository,
             geocodeRepository: GeocodeRepository = ServiceLocator.geocodeRepository,
-            locationProvider: LocationProvider = ServiceLocator.locationProvider,
             savedCourseRepository: SavedCourseRepository = ServiceLocator.savedCourseRepository,
             /**
              * S8 백스택 항목의 상태를 그대로 넘긴다 — S7 연계 값이 여기 담겨 온다
@@ -449,7 +370,6 @@ class CourseViewModel(
                 CourseViewModel(
                     repository,
                     geocodeRepository,
-                    locationProvider,
                     savedCourseRepository,
                     launchState,
                 )
@@ -526,7 +446,7 @@ internal fun snapTargetKm(raw: Double): Double {
 }
 
 /**
- * 내 주변 오류 문구. (§4.11-7)
+ * 출발지 주변 오류 문구. (§4.11-7)
  *
  * 원천이 다 죽어 표시할 게 없는 경우(`503`)와 그 밖의 실패를 구분한다 —
  * 전자는 "잠시 뒤 다시" 가 맞고, 후자는 네트워크 문제일 수 있다.
@@ -558,21 +478,4 @@ internal fun ApiException.searchMessage(): String = when {
     this is ApiException.Http && code == ApiErrorCode.NO_RESULT ->
         "그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요."
     else -> userMessageOrDefault()
-}
-/**
- * [내 위치] 실패 문구. (SPEC §4.11-1 ① · NFR-15)
- *
- * **종류마다 사용자가 할 일이 다르다.** 권한을 거부한 사람에게 "잠시 뒤 다시" 라고 하면
- * 눌러도 계속 실패하고, 위치가 늦게 잡히는 사람에게 "권한을 허용해 주세요" 라고 하면
- * 이미 허용한 걸 또 하라는 말이 된다.
- *
- * 어느 문구든 **아래에서 고르라고 함께 알린다** — 출발지는 검색·프리셋으로도 정할 수 있고,
- * 그게 이 화면이 권한 거부에도 동작하는 이유다.
- */
-internal fun LocationResult.originFailureMessage(): String = when (this) {
-    // 못 잡은 게 아니라 잡은 것이다. 호출부가 이 가지로 오면 안 된다
-    is LocationResult.Found -> ""
-    LocationResult.PermissionDenied -> "위치 권한이 없어요. 아래에서 출발지를 골라 주세요."
-    LocationResult.Timeout -> "위치를 확인하지 못했어요. 다시 시도하거나 아래에서 골라 주세요."
-    LocationResult.Unavailable -> "위치 서비스가 꺼져 있어요. 켜거나 아래에서 골라 주세요."
 }

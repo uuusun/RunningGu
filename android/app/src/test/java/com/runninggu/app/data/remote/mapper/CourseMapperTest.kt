@@ -29,7 +29,7 @@ class CourseMapperTest {
               "kind": "ROUTE",
               "routeId": "osm:2e808bd75c4a",
               "dataSource": "OSM_GENERATED",
-              "name": "내 주변 5km 평지 러닝코스",
+              "name": "출발지 주변 5km 평지 러닝코스",
               "distanceM": 12,
               "lat": 37.52461, "lng": 126.92028,
               "difficulty": "EASY",

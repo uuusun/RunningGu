@@ -18,7 +18,7 @@ import com.runninggu.app.data.remote.mapper.toSaveRequest
 interface SavedCourseRepository {
 
     /**
-     * 내 주변에서 고른 경로를 저장한다. (§7-A)
+     * 출발지 주변에서 고른 경로를 저장한다. (§7-A)
      *
      * 경로나 원천이 없는 항목은 저장할 수 없어 null 을 돌려준다 — 서버가 geometry 로
      * fingerprint 를 만들기 때문이다(이슈 #62).

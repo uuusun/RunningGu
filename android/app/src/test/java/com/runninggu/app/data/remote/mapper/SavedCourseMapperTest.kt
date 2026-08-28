@@ -31,7 +31,7 @@ class SavedCourseMapperTest {
         difficulty: Difficulty? = Difficulty.EASY,
     ) = NearbyItem.Route(
         routeId = "osm:2e808bd75c4a",
-        name = "내 주변 5km 평지 러닝코스",
+        name = "출발지 주변 5km 평지 러닝코스",
         distanceM = 12,
         lat = 37.52461,
         lng = 126.92028,
@@ -59,7 +59,7 @@ class SavedCourseMapperTest {
     fun `near 응답 값을 그대로 옮긴다`() {
         val body = checkNotNull(route().toSaveRequest())
 
-        assertEquals("내 주변 5km 평지 러닝코스", body.courseName)
+        assertEquals("출발지 주변 5km 평지 러닝코스", body.courseName)
         assertEquals(5.02, body.distanceKm, 1e-9)
         assertEquals(46, body.durationMin)
         assertEquals(38, body.gainM)

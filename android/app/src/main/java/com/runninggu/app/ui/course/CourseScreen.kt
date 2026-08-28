@@ -172,11 +172,11 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
 @Composable
 private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        // **`else` 를 쓰지 않는다** (#220 리뷰). 기기 위치를 안 쓰기로 했으니 `Locating` 은
-        // 곧 사라질 상태인데, `else` 로 덮으면 그때 이 자리가 아무 신호도 안 낸다. 갈래를
-        // 다 적어 두면 `Locating` 이 지워지는 순간 **컴파일러가 여기를 짚어 준다** (결정-56).
+        // **`else` 를 쓰지 않는다.** 갈래가 늘거나 줄면 컴파일러가 여기를 짚어야 한다 —
+        // 기기 위치를 걷을 때(`OriginState.Locating` 삭제) 실제로 그렇게 잡혔다
+        // (#220 · #222 리뷰 · 결정-56).
         val label = when (val origin = state.origin) {
-            OriginState.Undecided, OriginState.Locating -> "출발지를 정해주세요."
+            OriginState.Undecided -> "출발지를 정해주세요."
             is OriginState.Fixed -> origin.name
         }
         Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -187,7 +187,7 @@ private fun OriginRow(state: CourseUiState, viewModel: CourseViewModel) {
 
         Spacer(Modifier.height(8.dp))
 
-        // 위치 권한을 거부해도 여기로 고를 수 있다 (NFR-15)
+        // 출발지를 정하는 두 길 중 하나다. 기기 위치는 쓰지 않는다 (결정-56 · NFR-15)
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

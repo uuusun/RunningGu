@@ -86,7 +86,7 @@ class MappedRouteTest {
 
     private fun route(id: String) = NearbyItem.Route(
         routeId = id,
-        name = "내 주변 5km 평지 러닝코스",
+        name = "출발지 주변 5km 평지 러닝코스",
         distanceM = 12,
         lat = 37.5,
         lng = 126.9,

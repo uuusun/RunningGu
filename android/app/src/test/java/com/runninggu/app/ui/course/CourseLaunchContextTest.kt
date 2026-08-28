@@ -1,8 +1,6 @@
 package com.runninggu.app.ui.course
 
 import androidx.lifecycle.SavedStateHandle
-import com.runninggu.app.data.local.LocationProvider
-import com.runninggu.app.data.local.LocationResult
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.repository.FakeCourseRepository
@@ -62,7 +60,6 @@ class CourseLaunchContextTest {
     private fun viewModel(launchState: SavedStateHandle = SavedStateHandle()) = CourseViewModel(
         repository = FakeCourseRepository,
         geocodeRepository = FakeGeocodeRepository,
-        locationProvider = DeniedProvider,
         launchState = launchState,
     )
 
@@ -149,9 +146,4 @@ class CourseLaunchContextTest {
         assertEquals("부산 해운대 호텔", (restored.origin as OriginState.Fixed).name)
         assertEquals(3.0, restored.targetKm, 0.0001)
     }
-}
-
-/** 이 테스트는 GPS 를 안 쓴다. */
-private object DeniedProvider : LocationProvider {
-    override suspend fun current(): LocationResult = LocationResult.PermissionDenied
 }

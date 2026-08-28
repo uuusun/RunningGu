@@ -17,7 +17,7 @@ import retrofit2.http.Query
 interface CourseApi {
 
     /**
-     * 내 주변 경로·장소 통합 목록. (§6-1)
+     * 출발지 주변 경로·장소 통합 목록. (§6-1)
      *
      * @param targetKm 1~21, 0.5 단위
      * @param radiusKm 큐레이션 진입점 조회 반경. 기본 8
@@ -47,7 +47,7 @@ interface CourseApi {
     suspend fun regions(): CourseRegionsDto
 
     companion object {
-        /** 내 주변 기본·최대 항목 수 🔒(§6-1). */
+        /** 출발지 주변 기본·최대 항목 수 🔒(§6-1). */
         const val NEAR_SIZE = 12
 
         /** 큐레이션 진입점 조회 반경(km) 🔒(SPEC §5.8). */

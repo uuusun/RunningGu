@@ -265,9 +265,20 @@ tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.co
     }
 }
 
+/**
+ * 단위 테스트가 **병합된 매니페스트**를 볼 수 있게 물려 둔다. (SPEC 결정-56 · #215 · #222 리뷰)
+ *
+ * `LocationRemovedTest` 가 debug·release 두 결과물에 위치 권한이 없는지 확인한다 —
+ * 라이브러리가 자기 매니페스트로 권한을 밀어 넣을 수 있어서 소스만 봐서는 모른다.
+ * 여기서 안 물리면 산출물이 없거나 **옛 빌드의 것**을 보게 되고, 그러면 검증이 조용히
+ * 헛돈다. 두 태스크는 매니페스트만 병합하므로 테스트 시간에 거의 얹히지 않는다.
+ */
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
+    dependsOn("processDebugManifest", "processReleaseManifest")
+}
+
 dependencies {
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.play.services.location)
     implementation(libs.kakao.maps)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

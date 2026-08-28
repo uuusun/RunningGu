@@ -10,7 +10,7 @@ import com.runninggu.app.ui.map.MapMarker
 /**
  * S8 러닝코스의 UI 계약. (SPEC §4.11 · API 명세 §6)
  *
- * 탭 두 개가 서로 독립이다 — 내 주변이 실패해도 지역별은 보여야 한다.
+ * 탭 두 개가 서로 독립이다 — 출발지 주변이 실패해도 지역별은 보여야 한다.
  *
  * TODO(#49): 홈·캘린더에서 논의 중인 공용 `SectionState` 가 정해지면 여기도 옮긴다.
  *  지금은 S8 만의 상태로 두어 그 논의를 앞질러 정하지 않는다.
@@ -41,14 +41,6 @@ data class CourseUiState(
     val selectedItem: NearbyItem? = null,
     /** [저장] 버튼. (API 명세 §7-A · SPEC §4.11-6) */
     val save: SaveCourseState = SaveCourseState.Idle,
-    /**
-     * [내 위치] 가 실패한 이유. (SPEC §4.11-1 ① · NFR-15)
-     *
-     * 화면 전체를 막지 않는다 — 출발지는 검색·프리셋으로도 정할 수 있다. **출발지가 실제로
-     * 정해지면 사라진다**(GPS 성공·검색 성공·프리셋 선택) — 안내대로 골랐는데 "아래에서
-     * 골라 주세요" 가 남아 있으면 뭔가 덜 된 것처럼 읽힌다(#92 리뷰).
-     */
-    val locationMessage: String? = null,
 ) {
     /**
      * 지도에 그릴 경로. (SPEC §4.11-4 · §3-8)
@@ -131,7 +123,8 @@ data class CourseUiState(
     private fun pinId(index: Int): String = "nearby-$index"
 
     enum class Tab(val label: String) {
-        NEARBY("내 주변"),
+        /** 사용자가 고른 출발지 기준이다. "내 주변" 은 GPS 기능처럼 읽혀 바꿨다 (결정-56). */
+        NEARBY("출발지 주변"),
         BY_REGION("지역별"),
     }
 
@@ -163,14 +156,11 @@ data class CourseUiState(
 }
 
 /**
- * 출발지. **권한을 거부해도 화면이 동작해야 한다**(NFR-15) — 검색과 프리셋이 그래서 있다.
+ * 출발지. **사용자가 고른 것뿐이다**(결정-56) — 검색·프리셋·S7 숙소 셋이 전부다.
  */
 sealed interface OriginState {
     /** 아직 못 정했다. "출발지를 정해주세요." */
     data object Undecided : OriginState
-
-    /** GPS 조회 중. 6초 타임아웃. "위치를 확인하는 중…" */
-    data object Locating : OriginState
 
     data class Fixed(
         val name: String,
@@ -178,7 +168,8 @@ sealed interface OriginState {
         val lng: Double,
         val from: Source,
     ) : OriginState {
-        enum class Source { GPS, SEARCH, PRESET, ITINERARY }
+        /** 기기 위치는 없다 — 사용자가 고른 것뿐이다 (SPEC 결정-56). */
+        enum class Source { SEARCH, PRESET, ITINERARY }
     }
 }
 
@@ -199,7 +190,7 @@ data class OriginSearchState(
 }
 
 /**
- * 내 주변 조회 결과. (§4.11-7)
+ * 출발지 주변 조회 결과. (§4.11-7)
  *
  * **정상 0건과 오류를 구분한다.** 품질 상한을 통과한 경로가 없는 것은 정상 0건이지 실패가
  * 아니다 — 그걸 Error 로 그리면 사용자가 앱이 고장 났다고 생각한다.
@@ -327,7 +318,7 @@ sealed interface RegionCoursesState {
     data class Error(val message: String) : RegionCoursesState
 }
 
-/** 출발지 프리셋 5개. 위치 권한을 거부해도 쓸 수 있다. (SPEC §4.11-1) */
+/** 출발지 프리셋 5개. 검색과 함께 출발지를 정하는 길이다. (SPEC §4.11-1 · 결정-56) */
 val ORIGIN_PRESETS: List<OriginState.Fixed> = listOf(
     OriginState.Fixed("부산 해운대", 35.1587, 129.1604, OriginState.Fixed.Source.PRESET),
     OriginState.Fixed("여수", 34.7604, 127.6622, OriginState.Fixed.Source.PRESET),

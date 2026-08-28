@@ -13,12 +13,12 @@ import com.runninggu.app.data.remote.mapper.toSummary
 /**
  * 러닝코스 조회 창구. (API 명세 §6 · SPEC §4.11)
  *
- * 화면은 이 인터페이스만 본다. 내 주변은 **한 번의 호출**로 경로와 장소를 함께 받는다.
+ * 화면은 이 인터페이스만 본다. 출발지 주변은 **한 번의 호출**로 경로와 장소를 함께 받는다.
  */
 interface CourseRepository {
 
     /**
-     * 내 주변 경로·장소. (§6-1)
+     * 출발지 주변 경로·장소. (§6-1)
      *
      * 결과가 비어 있어도 실패가 아니다 — 화면은 Empty 로 그린다.
      * 원천 실패로 표시할 게 하나도 없으면 서버가 `503 COURSE_SOURCES_UNAVAILABLE` 을 주고

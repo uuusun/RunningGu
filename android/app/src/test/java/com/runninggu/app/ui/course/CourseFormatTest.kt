@@ -28,7 +28,7 @@ class CourseFormatTest {
         elevation: List<Int> = listOf(1, 2, 3),
     ) = NearbyItem.Route(
         routeId = "r1",
-        name = "내 주변 5km 평지 러닝코스",
+        name = "출발지 주변 5km 평지 러닝코스",
         distanceM = 12,
         lat = 37.5,
         lng = 126.9,
@@ -174,7 +174,7 @@ class CourseFormatTest {
 
     @Test
     fun `프리셋은 5개다`() {
-        // 위치 권한을 거부해도 이걸로 동작해야 한다 (NFR-15 · §4.11-1)
+        // 기기 위치가 없으므로 출발지는 이걸로만 정해진다 (결정-56 · §4.11-1)
         assertEquals(5, ORIGIN_PRESETS.size)
         assertEquals(
             listOf("부산 해운대", "여수", "강릉", "인천 강화", "서울시청"),

@@ -38,7 +38,7 @@ object FakeCourseRepository : CourseRepository {
             items = listOf(
                 NearbyItem.Route(
                     routeId = "osm:demo-1",
-                    name = "내 주변 ${targetKm.toInt()}km 평지 러닝코스",
+                    name = "출발지 주변 ${targetKm.toInt()}km 평지 러닝코스",
                     distanceM = 12,
                     lat = lat,
                     lng = lng,

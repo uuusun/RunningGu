@@ -4,15 +4,19 @@
 
     <!-- 대회·관광 API 호출용 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 연결 여부 확인용. **위치 추정에 쓰지 않는다** (SPEC 결정-56) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
-      S8 "내 위치" 출발지. (SPEC §4.11-1 ①)
-      둘 다 선언하되 **거부해도 화면은 동작한다** — 검색·프리셋으로 출발지를 정할 수 있다(NFR-15).
-      배경 위치는 요청하지 않는다. 앱이 보이는 동안 한 번 조회할 뿐이다.
+      위치 권한을 선언하지 않는다 🔒확정(SPEC 결정-56 · 이슈 #215).
+
+      FINE/COARSE/BACKGROUND 와 FOREGROUND_SERVICE_LOCATION 전부 해당한다. COARSE 도
+      Wi-Fi·기지국으로 동·구 단위 위치를 돌려주므로 "정밀만 빼는" 선으로는 목적을
+      달성하지 못한다. 출발지는 사용자가 고른 검색·프리셋·S7 숙소 좌표뿐이다.
+
+      **되살리자는 제안을 하지 않는다.** 사업자등록·위치기반서비스사업 신고 부담을
+      지지 않기 위한 결정이다.
     -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:name=".RunningGuApplication"

@@ -11,8 +11,6 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.CoursePage
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeGeocodeRepository
-import com.runninggu.app.data.local.LocationProvider
-import com.runninggu.app.data.local.LocationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -29,7 +27,7 @@ import org.junit.Test
 import java.io.IOException
 
 /**
- * S8 [내 주변]이 서버를 볼 때의 네 갈래. (SPEC §4.11-7 · §3-5 · API 명세 §6-1)
+ * S8 [출발지 주변]이 서버를 볼 때의 네 갈래. (SPEC §4.11-7 · §3-5 · API 명세 §6-1)
  *
  * **스텁일 때는 이 셋 중 하나만 났다.** `FakeCourseRepository` 는 늘 같은 목록을
  * 성공으로 돌려줘서 Empty·Error·부분 실패가 화면에 뜬 적이 없다. 서버로 바꾸는 순간
@@ -67,7 +65,6 @@ class NearbyStateTest {
         val viewModel = CourseViewModel(
             repository = repository,
             geocodeRepository = FakeGeocodeRepository,
-            locationProvider = NoLocation,
             savedCourseRepository = NoSavedCourses,
         )
         viewModel.onOriginChange(origin)
@@ -136,7 +133,6 @@ class NearbyStateTest {
         val viewModel = CourseViewModel(
             repository = StubCourses(NearbyCourses(items = listOf(place(), route()))),
             geocodeRepository = FakeGeocodeRepository,
-            locationProvider = NoLocation,
             savedCourseRepository = NoSavedCourses,
         )
 
@@ -158,7 +154,6 @@ class NearbyStateTest {
         val viewModel = CourseViewModel(
             repository = StubCourses(NearbyCourses(items = listOf(place()))),
             geocodeRepository = FakeGeocodeRepository,
-            locationProvider = NoLocation,
             savedCourseRepository = NoSavedCourses,
         )
 
@@ -198,10 +193,6 @@ class NearbyStateTest {
     )
 }
 
-/** 이 테스트는 [내 위치] 를 안 쓴다 — 출발지는 프리셋으로 정한다. */
-private object NoLocation : LocationProvider {
-    override suspend fun current(): LocationResult = LocationResult.PermissionDenied
-}
 
 /** 정해 둔 응답이나 오류만 돌려주는 가짜. */
 private class StubCourses(
