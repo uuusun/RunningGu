@@ -16,13 +16,21 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  *
  * ## 두 경로가 있다
  *
- * 카카오톡이 깔려 있으면 **톡으로**, 없으면 **카카오 계정 웹**으로 로그인한다. 톡 경로는
- * 사용자가 톡에서 취소하고 돌아올 수 있는데, 그때 SDK 가 [ClientErrorCause.Cancelled] 를
- * 준다. **그 경우 웹으로 다시 시도한다** — 카카오가 권하는 방식이고, 톡 계정과 다른 계정으로
- * 들어가려는 사용자가 여기서 막히지 않는다.
+ * 카카오톡이 깔려 있으면 **톡으로**, 없으면 **카카오 계정 웹**으로 로그인한다.
  *
- * 다만 **사용자가 웹에서도 취소하면 거기서 끝낸다.** 계속 되물으면 로그인 화면을 벗어날 수
- * 없다.
+ * 톡 경로는 두 가지로 끝날 수 있고 **둘을 반대로 다루면 안 된다**(#216 리뷰).
+ *
+ * | 톡에서 온 것 | 어떻게 |
+ * |---|---|
+ * | [ClientErrorCause.Cancelled] | **거기서 끝낸다.** 그만둔 사람에게 웹 창을 또 띄우지 않는다 |
+ * | 그 밖의 오류 | **웹으로 넘어간다.** 웹 폴백이 있는 이유가 여기다 |
+ *
+ * 두 번째가 핵심이다. 톡이 깔려 있어도 **톡에 카카오계정이 연결돼 있지 않으면** 취소가
+ * 아닌 오류가 난다 — `isKakaoTalkLoginAvailable` 이 true 라도 계정이 붙어 있다는 보장은
+ * 없다. 그때 실패로 끝내면 **로그인할 방법이 없다.**
+ *
+ * 톡 계정과 다른 계정으로 들어가려는 사용자는 취소를 되물어서 풀 일이 아니다.
+ * `loginWithKakaoAccount(prompts = listOf(Prompt.LOGIN))` 이 맡는 자리다.
  */
 sealed interface KakaoAuthResult {
     /** SDK 가 준 액세스 토큰. 서버에 그대로 넘긴다. */
@@ -48,10 +56,11 @@ suspend fun requestKakaoToken(context: Context): KakaoAuthResult {
     if (!talkAvailable) return loginWithAccount(context)
 
     return when (val talk = loginWithTalk(context)) {
-        // 톡에서 그만둔 것은 **웹으로 다시 물어본다.** 톡 계정과 다른 계정을 쓰려는
-        // 사용자가 여기서 막히면 로그인할 방법이 없다
-        is KakaoAuthResult.Cancelled -> loginWithAccount(context)
-        else -> talk
+        // 그만둔 것은 그만둔 것이다. 웹 창을 한 번 더 띄우면 뒤로 가기가 안 통한다
+        is KakaoAuthResult.Cancelled -> talk
+        // 톡은 깔렸는데 계정이 안 붙어 있으면 여기로 온다 — **웹 폴백이 있는 이유다**
+        is KakaoAuthResult.Failed -> loginWithAccount(context)
+        is KakaoAuthResult.Token -> talk
     }
 }
 

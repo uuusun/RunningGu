@@ -371,12 +371,37 @@ class SignupViewModel(
                     )
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
-                onFailure = {
+                onFailure = { cause ->
                     _uiState.update {
-                        it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
+                        it.copy(isSubmitting = false, errorMessage = cause.kakaoSignupMessage())
                     }
                 },
             )
+        }
+    }
+
+    /**
+     * 카카오 가입 실패 문구. **다시 눌러서 풀리는 것과 아닌 것을 가른다** (§1-8 · #216 리뷰).
+     *
+     * | 코드 | 사용자가 할 일 |
+     * |---|---|
+     * | `409 KAKAO_ACCOUNT_DUPLICATED` | **이미 가입돼 있다.** A1 로 돌아가 로그인한다 |
+     * | `401 INVALID_KAKAO_TOKEN` | 닉네임 고르는 사이 토큰이 만료됐다. **A1 부터 다시** 한다 |
+     *
+     * 둘 다 **같은 버튼으로는 영영 안 풀린다.** 서버가 중복 시 자동 로그인을 시켜 주지
+     * 않기로 했으므로(§1-8), 뭉뚱그리면 사용자가 A2 에 갇힌 채 같은 버튼만 누른다.
+     *
+     * 이메일 가입(`submit`)도 아직 한 줄이지만 이 PR 이 만든 자리가 아니라 두었다.
+     */
+    private fun Throwable.kakaoSignupMessage(): String = when (apiErrorCode()) {
+        ApiErrorCode.KAKAO_ACCOUNT_DUPLICATED ->
+            "이미 가입된 카카오 계정이에요. 로그인 화면에서 [카카오로 시작하기]를 눌러 주세요."
+        ApiErrorCode.INVALID_KAKAO_TOKEN ->
+            "카카오 인증이 만료됐어요. 로그인 화면에서 다시 시작해 주세요."
+        else -> if (isNetworkFailure()) {
+            "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        } else {
+            "가입에 실패했어요. 다시 시도해 주세요."
         }
     }
 
