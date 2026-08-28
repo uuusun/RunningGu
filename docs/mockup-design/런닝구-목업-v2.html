@@ -1638,7 +1638,7 @@ SCREENS.courses = () => {
       <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink5)"><span>1km</span><span>21km</span></div>
     </div>
     ${cd === 'locating' ? `<div style="padding:60px 22px;display:flex;justify-content:center">${spinnerLine('위치를 확인하는 중…')}</div>` : ''}
-    ${cd === 'nostart' ? `<div class="empty" style="padding:60px 34px"><div class="t">출발지를 정해주세요.</div><div class="d">내 위치를 켜거나 위 프리셋에서 골라주세요.</div></div>` : ''}
+    ${cd === 'nostart' ? `<div class="empty" style="padding:60px 34px"><div class="t">출발지를 정해주세요.</div><div class="d">장소를 검색하거나 아래 추천 지역에서 골라 주세요.</div></div>` : ''}
     ${cd === 'none' ? `<div class="empty" style="padding:60px 34px"><div class="t">이 근처엔 걸을 곳을 못 찾았어요.</div><div class="d">위 프리셋 지역으로 바꿔서 찾아보세요.</div></div>` : ''}
     ${hasMap ? coursesMapHtml() : ''}
     ${hasMap ? `<div id="course-card">${courseInfoHtml()}</div>` : ''}

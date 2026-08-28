@@ -92,7 +92,7 @@ private fun DrawScope.drawMeshGrid() {
 
 /**
  * 코스 루프. 원근으로 보면 앞·뒤 구간이 화면을 가로지르는 호 2개로 보인다.
- * 위쪽 호에는 현재 위치를 뜻하는 노드 점을 찍는다.
+ * 위쪽 호에는 경로 위의 지점을 뜻하는 노드 점을 찍는다.
  */
 private fun DrawScope.drawCourseRibbon() {
     val w = size.width

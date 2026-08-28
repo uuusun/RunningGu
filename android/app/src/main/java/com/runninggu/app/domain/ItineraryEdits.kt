@@ -130,17 +130,30 @@ object ItineraryEdits {
     }
 
     /**
-     * 하루치 지도 핀. 좌표가 있는 블록만 **순서대로 번호를 붙인다.** (SPEC §5.7 · §3-8)
+     * 하루치 지도 핀. 좌표가 있는 블록만 세우되 **번호는 그날 카드 순번 그대로다.**
+     * (SPEC §5.7 · §3-8 · §4.10)
      *
      * 대회 블록도 포함한다 — 편집은 막지만 지도에는 나와야 한다.
+     *
+     * ## 번호가 중간에 빈다. 그게 맞다
+     *
+     * 좌표 없는 블록이 섞이면 핀 번호는 `1 · 3` 처럼 건너뛴다. 서버가 외부 POI 조회에
+     * 실패하면 장소를 null 로 강등하되 생성은 성공시키므로(§5-1 · NFR-3) 실제로 생긴다.
+     *
+     * **좌표 있는 것만 1부터 다시 매기지 않는다.** 그러면 같은 장소가 카드에서 3, 지도에서
+     * 2로 보인다. 번호가 건너뛰는 것은 눈에 보이지만 **어긋나는 것은 안 보인다** — 지도의
+     * 2를 누르고 카드의 2를 봤는데 다른 곳인 걸 알아채기 어렵다.
+     *
+     * S8 러닝코스도 같은 규칙이다(§4.11-4 "리스트 번호 일치" · #158). 두 화면이 다르면
+     * 사용자가 "런닝구의 지도 번호" 를 하나로 배울 수 없다(#208 리뷰 합의).
      */
-    fun dayPins(day: ItineraryDay?): List<MapPin> {
-        val pins = mutableListOf<MapPin>()
-        day?.blocks?.forEach { block ->
-            val place = block.place ?: return@forEach
-            if (!place.lat.isFinite() || !place.lng.isFinite()) return@forEach
-            pins += MapPin(
-                n = pins.size + 1,
+    fun dayPins(day: ItineraryDay?): List<MapPin> =
+        day?.blocks.orEmpty().mapIndexedNotNull { index, block ->
+            val place = block.place ?: return@mapIndexedNotNull null
+            if (!place.lat.isFinite() || !place.lng.isFinite()) return@mapIndexedNotNull null
+            MapPin(
+                // 카드 번호와 같은 값이다. 좌표 있는 것만 다시 세지 않는다
+                n = index + 1,
                 blockId = block.id,
                 lat = place.lat,
                 lng = place.lng,
@@ -148,8 +161,6 @@ object ItineraryEdits {
                 catKey = block.catKey,
             )
         }
-        return pins
-    }
 
     /** 동선 전체 장소 수. 저장·요약에 쓴다. 대회 블록도 센다. (SPEC §5.7) */
     fun countPlaces(days: List<ItineraryDay>): Int =

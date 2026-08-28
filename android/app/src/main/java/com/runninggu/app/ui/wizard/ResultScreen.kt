@@ -7,12 +7,15 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -57,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,6 +82,8 @@ import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
+import com.runninggu.app.ui.map.MapScene
+import com.runninggu.app.ui.map.RunningGuMap
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
@@ -85,6 +92,7 @@ import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.NumberRail
 import com.runninggu.app.ui.common.SourceBadge
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -103,12 +111,38 @@ fun ResultScreen(
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
     onOpenCourses: (targetKm: Double) -> Unit,
+    /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
+    onSaved: (message: String) -> Unit,
+    /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
+    onLoginRequest: () -> Unit,
     wizardViewModel: WizardViewModel,
     viewModel: ResultViewModel,
     modifier: Modifier = Modifier,
 ) {
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 저장됐다. **이 화면은 문구를 그리지 않는다** — §4.10 이 마이[동선]으로 옮기라고
+    // 하므로 곧바로 떠나고, 문구는 옮겨 간 자리에서 스낵바로 뜬다.
+    val saved = state.save as? SaveItineraryState.Saved
+    LaunchedEffect(saved) {
+        saved?.let {
+            onSaved(it.message)
+            // **쓰고 나면 비운다.** 안 비우면 마이에서 뒤로 왔을 때 이 화면이 다시
+            // 합성되면서 같은 상태로 또 마이로 튕긴다 — 뒤로가기가 막힌다 (#214 리뷰)
+            viewModel.onSavedHandled()
+        }
+    }
+
+    if (state.save is SaveItineraryState.NeedsLogin) {
+        LoginPromptDialog(
+            onConfirm = {
+                viewModel.onLoginPromptDismiss()
+                onLoginRequest()
+            },
+            onDismiss = viewModel::onLoginPromptDismiss,
+        )
+    }
 
     LaunchedEffect(wizard) {
         // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
@@ -137,7 +171,7 @@ fun ResultScreen(
         },
         bottomBar = {
             if (state.phase == ResultUiState.Phase.CONTENT) {
-                SaveBar()
+                SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
             }
         },
     ) { innerPadding ->
@@ -167,6 +201,9 @@ fun ResultScreen(
                 ResultUiState.Phase.CONTENT -> Content(
                     state = state,
                     onDaySelect = viewModel::onDaySelect,
+                    onPinClick = viewModel::onPinClick,
+                    onCardClick = viewModel::onCardClick,
+                    onCardCentered = viewModel::onCardCentered,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
@@ -194,6 +231,9 @@ fun ResultScreen(
 private fun Content(
     state: ResultUiState,
     onDaySelect: (Int) -> Unit,
+    onPinClick: (String) -> Unit,
+    onCardClick: (String) -> Unit,
+    onCardCentered: (String) -> Unit,
     onOpenCourses: () -> Unit,
     onToggleEdit: () -> Unit,
     onRemoveBlock: (String) -> Unit,
@@ -209,6 +249,68 @@ private fun Content(
     val listState = rememberLazyListState()
 
     val day = state.activeDay
+
+    // 핀을 눌러 고른 카드를 보이는 곳으로 끌어온다 (SPEC §3-8 · §4.10).
+    //
+    // `BringIntoViewRequester` 는 못 쓴다 — `LazyColumn` 은 화면 밖 item 을 컴포즈하지
+    // 않아서 requester 가 아예 없고, 그 카드의 핀을 누르면 아무 일도 일어나지 않는다.
+    // 목록 상태로 직접 스크롤한다 (#208 리뷰).
+    // **핀 탭으로 시작한 스크롤인가.** 중앙 밴드가 이 사이에 판정하면 되먹임이 생긴다
+    // (아래 밴드 주석 · #208 리뷰).
+    var scrollingToPin by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.activeBlockId, state.activeDayIndex, state.isEditing) {
+        val blockId = state.activeBlockId ?: return@LaunchedEffect
+        // 편집 중에는 동기화를 멈춘다(§4.10). 조회 카드가 컴포즈되지도 않는다
+        if (day == null || state.isEditing) return@LaunchedEffect
+        val index = day.blocks.indexOfFirst { it.id == blockId }
+        if (index < 0) return@LaunchedEffect
+        // **이미 보이면 건드리지 않는다.** 카드를 탭해서 고른 것까지 끌어오면 화면이 튄다
+        if (listState.layoutInfo.visibleItemsInfo.none { it.key == blockId }) {
+            scrollingToPin = true
+            // 도중에 이 효과가 취소돼도(일자 이동 등) 반드시 내린다. 켜진 채로 남으면
+            // 밴드가 영영 멈춘다
+            try {
+                listState.animateScrollToItem(TIMELINE_FIRST_ITEM_INDEX + index)
+            } finally {
+                scrollingToPin = false
+            }
+        }
+    }
+
+    // 스크롤 중앙 밴드에 든 카드를 활성으로 옮긴다. (SPEC §4.10)
+    //
+    // **판정 조건이 둘이다.**
+    //
+    // - `isScrollInProgress` — 손으로 굴리는 동안(관성 포함)만 본다. 멈춰 있을 때도
+    //   판정하면 일자를 고른 직후 "첫 핀 활성"(§4.10)을 가운데 카드가 곧바로 덮어쓴다
+    // - `!scrollingToPin` — **핀 탭이 굴린 스크롤은 셈에 넣지 않는다.** 넣으면
+    //   `핀 탭 → 스크롤 → 밴드가 다른 카드를 잡음 → 활성이 또 바뀜 → 카메라가 엉뚱한 곳`
+    //   으로 도는 되먹임이 생긴다. `isScrollInProgress` 만으로는 사용자 스크롤과 구분이
+    //   안 돼서 플래그를 따로 든다 (#208 리뷰 — 건모 님 지적)
+    val blockIds = remember(day) { day?.blocks?.map { it.id }?.toSet().orEmpty() }
+    LaunchedEffect(listState, state.isEditing, blockIds) {
+        // 편집 중에는 동기화를 멈춘다 (§4.10). 카드 탭·핀 탭과 같은 자리다
+        if (state.isEditing || blockIds.isEmpty()) return@LaunchedEffect
+        snapshotFlow {
+            if (scrollingToPin || !listState.isScrollInProgress) {
+                null
+            } else {
+                val info = listState.layoutInfo
+                centeredBlockId(
+                    viewportStart = info.viewportStartOffset,
+                    viewportEnd = info.viewportEndOffset,
+                    items = info.visibleItemsInfo.map {
+                        TimelineItemBounds(key = it.key, offset = it.offset, size = it.size)
+                    },
+                    blockIds = blockIds,
+                )
+            }
+        }
+            // 스크롤 한 번에 수십 번 도는 자리다. 값이 바뀔 때만 ViewModel 을 건드린다
+            .distinctUntilChanged()
+            .collect { blockId -> blockId?.let(onCardCentered) }
+    }
 
     LazyColumn(
         state = listState,
@@ -227,8 +329,12 @@ private fun Content(
     ) {
         // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
         item(key = "map") {
-            // TODO(AP-03): 상단 지도. 활성 일자의 번호 핀·폴리라인 (SPEC §3-8 · §4.10).
-            MapPlaceholder()
+            // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
+            // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
+            DayMap(
+                state = state,
+                onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
+            )
         }
 
         item(key = "summary") {
@@ -291,7 +397,12 @@ private fun Content(
                 // "지금 보이는 카드" 를 돌려준다 — §4.10 의 중앙 밴드 자동 활성이 서는 조건이다.
                 itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
                     Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                        TimelineRow(number = index + 1, block = block)
+                        TimelineRow(
+                            number = index + 1,
+                            block = block,
+                            active = block.id == state.activeBlockId,
+                            onClick = { onCardClick(block.id) },
+                        )
                         // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
                         // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
                         if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
@@ -738,6 +849,17 @@ private val HORIZONTAL_PADDING = 20.dp
 /** 조회 타임라인 카드 사이 간격. 예전 `Arrangement.spacedBy(10.dp)` 를 대신한다. */
 private val TIMELINE_ROW_GAP = 10.dp
 
+/**
+ * 조회 모드 타임라인 **첫 카드의 item 인덱스**. (SPEC §4.10 · #208 리뷰)
+ *
+ * 카드 위에 `map` · `summary` · `dayHeader` · `dayNote` 넷이 있다. 뒤 셋은 `day != null`
+ * 안에 있지만 **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 넷이 항상 선다.
+ *
+ * [Content] 의 item 을 늘리거나 줄이면 **여기도 같이 고쳐야 한다.** 어긋나도 조용하다 —
+ * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다.
+ */
+private const val TIMELINE_FIRST_ITEM_INDEX = 4
+
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
 
@@ -932,14 +1054,25 @@ private fun DayNote(note: String) {
 
 /** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
-private fun TimelineRow(number: Int, block: ItineraryBlock) {
-    Row(Modifier.fillMaxWidth()) {
+private fun TimelineRow(
+    number: Int,
+    block: ItineraryBlock,
+    active: Boolean = false,
+    onClick: () -> Unit = {},
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
         NumberRail(number)
         Spacer(Modifier.width(12.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
             shape = MaterialTheme.shapes.medium,
-            tonalElevation = 1.dp,
+            // 색이 아니라 테두리로 표시한다. 카드 배경을 바꾸면 회복 배지·태그 색과 겹친다
+            border = if (active) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+            tonalElevation = if (active) 3.dp else 1.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(14.dp)) {
@@ -1049,39 +1182,97 @@ private fun CourseLinkCard(targetKm: Double, onClick: () -> Unit) {
     }
 }
 
-/** 지도 자리. AP-03 에서 카카오맵으로 바뀐다. (SPEC §3-8) */
+/**
+ * 활성 일자의 지도. (SPEC §3-8 · §4.10 · AP-03)
+ *
+ * **핀을 잇는다** — 하루 동선은 방문 순서가 있어서 폴리라인이 의미를 갖는다.
+ * S8 러닝코스가 흩어진 장소를 안 잇는 것과 반대다(§4.11-4).
+ *
+ * 카메라는 [MapScene] 규칙이 정한다 — 일자를 바꾸면 전체 bounds, 핀만 골랐으면 그 좌표로
+ * 이동이다. 핀을 탭하면 [onPinClick] 이 그 블록을 활성으로 만들고 카드가 따라 강조된다.
+ *
+ * ## 좌표가 하나도 없으면 안내만 남긴다
+ *
+ * 서버가 외부 POI 조회에 실패하면 장소를 null 로 강등하되 생성은 성공시킨다(§5-1 ·
+ * NFR-3). 그날 블록이 전부 그러면 세울 핀이 없다. **그래도 타임라인은 정상이다** —
+ * 지도 영역에만 안내를 띄우고 나머지는 그대로 둔다(§3-8 실패 격리 · NFR-1·3).
+ */
 @Composable
-private fun MapPlaceholder() {
+private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
+    val pins = state.mapPins
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = "지도는 준비 중이에요",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (pins.isEmpty()) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    // 조회 중에 단정하지 않는다 — 내용이 있는데 좌표만 없는 경우다
+                    text = "이 날은 지도에 표시할 장소가 없어요",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            RunningGuMap(
+                scene = MapScene(
+                    pins = pins,
+                    connectPins = true,
+                    activePinId = state.activePinId,
+                ),
+                modifier = Modifier.fillMaxSize(),
+                onPinClick = onPinClick,
             )
         }
     }
 }
 
-/** 저장 CTA. (SPEC §4.10) */
+/**
+ * 저장 CTA. (SPEC §4.10 · API 명세 §5-2)
+ *
+ * **성공 문구는 여기 없다.** 저장되면 화면이 마이[동선]으로 옮겨 가므로 그릴 자리가
+ * 없다. 남는 것은 실패뿐이라 [SaveItineraryState.Failed] 만 버튼 아래 한 줄로 그린다.
+ */
 @Composable
-private fun SaveBar() {
+private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
     Surface(shadowElevation = 8.dp) {
-        Button(
-            // TODO(AP-14): `POST /api/itineraries` 저장 후 마이[동선]으로 이동한다 (API 명세 §5-2).
-            onClick = {},
-            enabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .height(52.dp),
+        Column(
+            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
-            Text("이 동선 저장하기", style = MaterialTheme.typography.titleMedium)
+            Button(
+                onClick = onSave,
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (save is SaveItineraryState.Failed) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = save.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
+}
+
+/** 게스트 저장 유도. (매핑표 S7 "새 동선 저장 … 게스트 modal" · D-27) */
+@Composable
+private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("로그인이 필요해요") },
+        text = { Text("동선을 저장하려면 로그인해 주세요.") },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("로그인하기") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
 }

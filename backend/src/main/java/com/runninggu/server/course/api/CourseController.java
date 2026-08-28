@@ -25,11 +25,15 @@ public class CourseController {
         this.nearService = nearService;
     }
 
-    @Operation(summary = "내 주변 경로·장소 통합 목록 조회")
+    @Operation(summary = "출발지 주변 경로·장소 통합 목록 조회")
     @GetMapping("/near")
     public CourseNearResponse near(
-            @RequestParam BigDecimal lat,
-            @RequestParam BigDecimal lng,
+            @Parameter(description = "사용자가 검색·프리셋·S7 숙소에서 고른 출발지 위도")
+                    @RequestParam
+                    BigDecimal lat,
+            @Parameter(description = "사용자가 검색·프리셋·S7 숙소에서 고른 출발지 경도")
+                    @RequestParam
+                    BigDecimal lng,
             @RequestParam(defaultValue = "5") BigDecimal targetKm,
             @RequestParam(defaultValue = "8") BigDecimal radiusKm,
             @RequestParam(defaultValue = "12") int size) {

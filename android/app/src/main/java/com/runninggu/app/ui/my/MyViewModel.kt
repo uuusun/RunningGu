@@ -661,6 +661,16 @@ class MyViewModel(
         }
     }
 
+    /**
+     * 다른 화면이 넘긴 안내를 띄운다. (SPEC §4.10 — S7 저장 성공)
+     *
+     * 마이가 스스로 만든 문구가 아니라 **옮겨 온 문구**다. 저장은 S7 에서 끝났는데
+     * 사용자는 여기에 도착하므로, 결과를 알리는 자리도 여기다.
+     */
+    fun showMessage(text: String) {
+        _message.value = text
+    }
+
     fun onMessageShown() {
         _message.value = null
     }

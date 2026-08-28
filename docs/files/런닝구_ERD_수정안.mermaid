@@ -1,6 +1,7 @@
 %% 런닝구 논리 ERD v4.5 — SPEC v4 · API 명세 v3.1 기준 (2026-08-23)
-%% P0: USER~SAVED_COURSE + CONTEST_SNAPSHOT_IMPORT 14개 / P1 계약 초안: RUN_RECORD, RUN_TRACK 2개
-%% 이 문서는 논리 계약이다. P0 물리 DB 계약은 모두 확정됐고 TBD-P1-01만 P1 착수 시 결정한다.
+%% P0: USER~SAVED_COURSE + CONTEST_SNAPSHOT_IMPORT 14개
+%% 러닝 기록 엔티티는 제거했다 — GPS 기록을 제품에서 뺐다(SPEC 결정-56 · 이슈 #215)
+%% 이 문서는 논리 계약이다. 물리 DB 계약은 모두 확정됐다 (TBD-P1-01 은 SPEC 결정-56 으로 사라졌다).
 %% 확정-DB-01 path_polyline=2D Google Encoded Polyline precision 5(E5), route_fingerprint=v1: + SHA-256 lowercase hex, 고정 5자리 lat,lng canonical geometry, 진행 순서 유지, 연속 중복점 제거, VARCHAR(67), elevation_profile_m=JSONB NOT NULL DEFAULT '[]'·최대 100개 정수
 %% 확정-DB-02 SAVED_COURSE.attributions=JSONB NOT NULL DEFAULT '[]', 서버 생성 완성 문구 snapshot, 상세만 반환, fingerprint 제외
 %% 확정-DB-03 USER:LOGIN_IDENTITY=1:1, 가입 시 EMAIL/KAKAO 중 하나, P0 연결·추가·전환 미지원
@@ -15,8 +16,7 @@
 %% DB-07 null 규약: "nullable" 표기가 없는 저장 컬럼은 NOT NULL, derived는 DB 컬럼이 아님
 %% DB-07 CHECK: LOGIN_IDENTITY는 EMAIL(password_hash·email_verified_at 필수, email_snapshot null) 또는 KAKAO(password_hash·email_verified_at null)
 %% DB-07 CHECK: EMAIL_VERIFICATION은 SIGNUP(code_hash 사용) 또는 PASSWORD_RESET(token_hash 사용), 다른 hash는 null
-%% DB-07 주요 조회 인덱스: CONTEST(contest_date,id), CONTEST(region,contest_date,id), FAVORITE(user_id,created_at,id), ITINERARY(user_id,created_at,id), SAVED_COURSE(user_id,saved_at,id), RUN_RECORD(user_id,ran_at,id)
-%% TBD-P1-01 saved/ran 통합 정렬·페이징과 RUN 응답 projection (SPEC 결정-36, D-21)
+%% DB-07 주요 조회 인덱스: CONTEST(contest_date,id), CONTEST(region,contest_date,id), FAVORITE(user_id,created_at,id), ITINERARY(user_id,created_at,id), SAVED_COURSE(user_id,saved_at,id)
 
 erDiagram
     USER ||--|| LOGIN_IDENTITY : "가입 수단 1개 · CASCADE"
@@ -25,7 +25,6 @@ erDiagram
     USER ||--o{ FAVORITE : "찜 · CASCADE"
     USER ||--o{ ITINERARY : "저장 동선 · CASCADE"
     USER ||--o{ SAVED_COURSE : "저장 코스 · CASCADE"
-    USER ||--o{ RUN_RECORD : "P1 러닝 기록 · CASCADE"
 
     CONTEST ||--|{ CONTEST_SOURCE : "canonical 원천 · CASCADE"
     CONTEST ||--o{ CONTEST_EVENT : "표준 종목 · CASCADE"
@@ -35,7 +34,6 @@ erDiagram
 
     ITINERARY ||--|{ ITINERARY_DAY : "일자 · CASCADE"
     ITINERARY_DAY ||--o{ ITINERARY_BLOCK : "일정 블록 · CASCADE"
-    RUN_RECORD ||--|| RUN_TRACK : "P1 궤적 필수 1:1 · CASCADE"
 
     USER {
         bigint id PK
@@ -215,20 +213,4 @@ erDiagram
         numeric entry_lng "NUMERIC(10,7)"
         text path_polyline
         timestamptz saved_at
-    }
-
-    RUN_RECORD {
-        bigint id PK "P1 계약 초안"
-        bigint user_id FK "ON DELETE CASCADE"
-        varchar course_name "nullable, 자유 러닝은 null"
-        timestamptz ran_at "UTC 저장"
-        numeric distance_km "NUMERIC(8,3)"
-        int duration_sec
-        int avg_pace_sec
-    }
-
-    RUN_TRACK {
-        bigint run_record_id PK "P1, FK 겸용 공유 PK, ON DELETE CASCADE"
-        text encoded_polyline "5m 방어 필터 후 압축"
-        int point_count
     }

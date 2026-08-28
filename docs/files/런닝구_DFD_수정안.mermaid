@@ -8,11 +8,10 @@ subgraph SRV["Spring Boot 백엔드 — 온라인 SSOT"]
   AUTH["인증 API<br/>EMAIL·KAKAO 중 단일 가입 수단<br/>연결·전환 없음 · 토큰 회전"]
   PROFILE["마이·회원 API<br/>프로필 · 약관 · 비밀번호 · 탈퇴"]
   CONTEST["대회 API<br/>활성 canonical 검색/필터/커서<br/>비활성 참조 상세 유지 · 파생 접수상태"]
-  MY["마이 API<br/>동선 · 저장 코스 · 찜<br/>P1 러닝 기록"]
+  MY["마이 API<br/>동선 · 저장 코스 · 찜"]
   GEN["동선 생성 API (무상태)<br/>날짜→고정 RACE→피로도→회복→POI 슬롯"]
   ITIN["동선 저장·편집 API<br/>RACE·지역·회복 snapshot<br/>변경 감지 · 사용자 확정 시 재생성 교체"]
   COURSE["코스 API<br/>큐레이션 우선<br/>적격 0건이면 OSM 경로 최대 1건"]
-  RUN["P1 러닝 기록 API<br/>5m 재필터 → polyline 압축"]
   POIP["외부 POI 프록시<br/>축제(searchFestival2) · 숙소(AD5)<br/>POI · 걷기 스팟 · 지오코딩"]
   RACEBATCH["대회 snapshot Importer<br/>완전성 검증 · 원자적 upsert<br/>2회 연속 누락 비활성 · 재등장 복구"]
   COURSESYNC["큐레이션 동기화<br/>두루누비 메타 + 라이선스 검증 GPX<br/>courseId 매칭 · fail-open"]
@@ -28,7 +27,6 @@ subgraph DBX["PostgreSQL — 자체·사용자·대회 canonical 데이터"]
   TF[("FAVORITE")]
   TI[("ITINERARY · DAY · BLOCK<br/>RACE=system_managed")]
   TS[("SAVED_COURSE")]
-  TR[("P1 RUN_RECORD · RUN_TRACK 1:1")]
 end
 
 subgraph RES["버전 관리 정적 리소스"]
@@ -61,8 +59,7 @@ U -->|"검색·필터·불투명 커서"| CONTEST
 U -->|"찜·마이 조회·저장"| MY
 U -->|"기간·종목·themes·숙소 스냅샷"| GEN
 U -->|"동선 저장·USER 블록 편집"| ITIN
-U -->|"출발지·목표거리"| COURSE
-U -->|"P1 GPS 궤적 + 요약"| RUN
+U -->|"사용자가 고른 출발지·목표거리"| COURSE
 U -->|"축제·숙소·POI"| POIP
 
 %% 자체 DB
@@ -72,9 +69,7 @@ CONTEST --> TC
 MY --> TF
 MY --> TI
 MY --> TS
-MY -.->|"P1"| TR
 ITIN --> TI
-RUN -->|"P1"| TR
 
 %% 생성·대회 보호
 CONTEST -->|"대회·좌표·고정 RACE 정보"| GEN
@@ -115,8 +110,8 @@ classDef ext fill:#FFF3CC,stroke:#A66A00,color:#15161B
 classDef proc fill:#FFFFFF,stroke:#15161B,color:#15161B
 classDef user fill:#C9F23C,stroke:#15161B,color:#15161B
 classDef resource fill:#E6F7EE,stroke:#1B8A5A,color:#15161B
-class TU,TC,TF,TI,TS,TR,LIVE,OSMGRAPH store
+class TU,TC,TF,TI,TS,LIVE,OSMGRAPH store
 class MARA,TOUR,DURU,KAKAO,SMTP,KAKAOAUTH ext
-class AUTH,PROFILE,CONTEST,MY,GEN,ITIN,COURSE,RUN,POIP,RACEBATCH,COURSESYNC,RACEPIPE,GH proc
+class AUTH,PROFILE,CONTEST,MY,GEN,ITIN,COURSE,POIP,RACEBATCH,COURSESYNC,RACEPIPE,GH proc
 class U,A user
 class GPX,APP resource

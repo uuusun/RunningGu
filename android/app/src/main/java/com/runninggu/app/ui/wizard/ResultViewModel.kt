@@ -14,6 +14,8 @@ import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.Poi
 import com.runninggu.app.domain.PoiCategory
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,9 +23,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
+import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.PoiRepository
+import com.runninggu.app.ui.course.saveMessage
 
 /**
  * S7 동선 결과 ViewModel. (SPEC §4.10 · AP-11)
@@ -32,18 +37,20 @@ import com.runninggu.app.data.repository.PoiRepository
  * 서버에 맡기고(결정-41), 받은 응답을 화면 상태로 들고 있는다. 저장 전 USER 블록 편집만
  * 앱 몫이다(§5.7).
  *
- * **동선 저장소는 아직 가짜다** — 서버에 `/api/itineraries` 가 없다(AP-07). 서면
- * [com.runninggu.app.data.repository.RemoteItineraryRepository] 로 바꾼다. 교체·추가
- * 시트가 쓰는 POI 는 `GET /api/pois` 가 서 있어 먼저 옮겼다. 화면은 그대로다(AGENTS 4장).
+ * **저장소는 서버다** — 생성(`POST /api/itineraries/generate`)과 저장
+ * (`POST /api/itineraries`) 둘 다 서 있다(AP-07). 예전에는
+ * [com.runninggu.app.data.repository.FakeItineraryRepository] 를 들고 있었는데,
+ * 가짜에는 `save()` 가 없어 저장 CTA 를 붙일 수 없었다 — 위저드가 서버 대회를 싣게
+ * 되면서(#140 · `contestPhase`) 옮길 조건이 갖춰졌다.
  */
 class ResultViewModel(
     /**
-     * **아직 가짜다.** 서버에 `/api/itineraries` 가 없다(AP-07 · SPEC 결정-41).
+     * 생성·저장 둘 다 서버가 한다. (SPEC 결정-41 · API 명세 §5-1 · §5-2)
      *
-     * 동선 생성은 서버 단일 주체라 앱 엔진을 대신 붙일 수도 없다 — 서면 이 한 줄을
-     * `ServiceLocator` 것으로 바꾼다.
+     * 테스트는 [FakeItineraryRepository] 나 자체 스텁을 넣는다. 가짜를 넣으면
+     * [demoContestId] 가 살아나 `serverId` 없는 샘플 대회로도 화면이 돈다.
      */
-    private val repository: ItineraryRepository = FakeItineraryRepository,
+    private val repository: ItineraryRepository = ServiceLocator.itineraryRepository,
     /** 교체·추가 시트의 후보. 이쪽은 서버에 `GET /api/pois` 가 있어 옮겼다. */
     private val poiRepository: PoiRepository = ServiceLocator.poiRepository,
 ) : ViewModel() {
@@ -61,6 +68,18 @@ class ResultViewModel(
         if (repository === FakeItineraryRepository) DEMO_CONTEST_ID else null
 
     private var lastRequest: GenerateItineraryRequest? = null
+
+    /** 저장 요청. 내용을 고치면 이전 결과가 [SaveItineraryState.Idle] 로 지워지므로 함께 끊는다. */
+    private var saveJob: Job? = null
+
+    /**
+     * 저장 요청 세대. **내용이 바뀔 때마다 올라간다.** (#214 리뷰)
+     *
+     * 끊는 것만으로는 부족하다 — 취소가 닿기 전에 응답이 도착하면 그 코루틴은 마지막
+     * 줄까지 달린다. 그러면 **편집 전 동선**이 `Saved` 가 되어 화면이 마이로 옮겨 가고,
+     * 사용자는 방금 고친 것이 저장된 줄 안다. 세대가 다르면 결과를 버린다.
+     */
+    private var saveGeneration = 0
     private var lastRegion: String = ""
 
     /**
@@ -107,10 +126,176 @@ class ResultViewModel(
         lastRequest?.let(::send)
     }
 
-    /** 일자 탭 선택. 지도와 타임라인이 함께 따라간다. (SPEC §4.10) */
-    fun onDaySelect(index: Int) {
-        _uiState.update { it.copy(activeDayIndex = index) }
+    // ── 저장 (SPEC §4.10 · API 명세 §5-2) ──────────────────────
+
+    /**
+     * [이 동선 저장하기]. 편집을 마친 결과를 통째로 보낸다. (§5-2)
+     *
+     * **RACE 블록도 그대로 실어 보낸다.** 서버가 `blockType=RACE` 를 확인한 뒤 저장 시점
+     * canonical 대회로 다시 채우므로 앱이 걸러 낼 이유가 없다(이슈 #204 · 선경 님 확정).
+     *
+     * 성공하면 화면이 마이[동선]으로 옮겨 간다 — 그래서 문구를 상태에 실어 보낸다.
+     */
+    fun onSave() {
+        val state = _uiState.value
+        val result = state.result ?: return
+        // 연타로 같은 동선이 두 번 나가는 것을 막는다. 교체 규칙이 있어 두 벌이 쌓이지는
+        // 않지만, 두 번째 응답이 늦게 와서 이미 옮겨 간 화면을 다시 건드린다.
+        if (state.save is SaveItineraryState.Saving) return
+
+        // 기다리는 사이 세션이 바뀌면 그 결과는 남의 것이다 (S8 `onSaveCourse` 와 같은
+        // 장치 · #166 리뷰). 저장은 계정에 쌓는 일이라 여기가 특히 중요하다.
+        val epoch = SessionStore.sessionEpoch
+        // 보내는 중에 내용을 고치면 `save` 가 Idle 로 풀려 다시 누를 수 있다. 앞의 요청을
+        // 안 끊으면 **고치기 전 동선**의 응답이 뒤늦게 화면을 옮긴다.
+        saveJob?.cancel()
+        val generation = ++saveGeneration
+        saveJob = viewModelScope.launch {
+            _uiState.update { it.copy(save = SaveItineraryState.Saving) }
+            val next = try {
+                val outcome = repository.save(result)
+                SaveItineraryState.Saved(
+                    id = outcome.id,
+                    replaced = outcome.replaced,
+                    // 새로 담은 것과 덮어쓴 것은 사용자에게 다른 일이다 (§5-2)
+                    message = if (outcome.replaced) {
+                        "이전에 저장한 동선을 새로 바꿨어요."
+                    } else {
+                        "마이에 저장했어요."
+                    },
+                )
+            } catch (e: ApiException) {
+                // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
+                if (e is ApiException.Http && e.needsLogin) SaveItineraryState.NeedsLogin
+                else SaveItineraryState.Failed(e.saveMessage())
+            } catch (e: CancellationException) {
+                // 취소는 실패가 아니다. 여기서 삼키면 코루틴 취소가 끊긴다
+                throw e
+            } catch (e: Throwable) {
+                // **계약 밖의 실패도 버튼은 푼다** (#214 리뷰). 직렬화 오류처럼 `ApiException`
+                // 이 아닌 것이 올라오면 코루틴이 죽고 `Saving` 이 그대로 남는다 — 화면은
+                // "저장 중…" 에 굳고 다시 누를 수도 없다. 사용자에게는 앱이 멈춘 것이다
+                SaveItineraryState.Failed("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.")
+            }
+            // **`NeedsLogin` 은 통과시킨다.** 세대가 오르는 흔한 이유가 바로 "세션이
+            // 죽었다" 이다 — `401` 을 받은 `TokenAuthenticator` 가 재발급에 실패하면
+            // `signOut()` 이 응답보다 먼저 세대를 올린다. 그 결과까지 버리면 정작
+            // 로그인하라는 말을 못 한다(#166 리뷰 · S8 과 같은 판단).
+            //
+            // **버리더라도 버튼은 푼다.** `Saving` 인 채로 두면 "저장 중…" 이 굳는다.
+            // **보내는 사이 동선이 바뀌었으면 버린다** (#214 리뷰). 편집이 `save` 를
+            // 이미 Idle 로 돌려놨는데 낡은 응답이 그 위에 Saved 를 얹으면, 고치기 전
+            // 동선을 저장해 놓고 마이로 옮겨 간다. 로그인 안내도 같이 버린다 — 그
+            // 요청은 사용자가 지금 보고 있는 동선의 것이 아니다
+            if (generation != saveGeneration) return@launch
+            if (epoch != SessionStore.sessionEpoch && next !is SaveItineraryState.NeedsLogin) {
+                _uiState.update {
+                    if (it.save is SaveItineraryState.Saving) it.copy(save = SaveItineraryState.Idle) else it
+                }
+                return@launch
+            }
+            _uiState.update { it.copy(save = next) }
+        }
     }
+
+    /**
+     * 성공을 화면이 **한 번 쓰고 나면 비운다.** (SPEC §4.10 · #214 리뷰)
+     *
+     * [SaveItineraryState.Saved] 를 그대로 두면 마이에서 뒤로 왔을 때 S7 이 다시
+     * 합성되면서 **같은 상태로 또 마이로 튕긴다** — 뒤로가기가 막힌다. 화면이 이미
+     * 떠났으므로 여기서는 지우기만 한다.
+     *
+     * 내비게이션 쪽에서 위저드 그래프를 백스택에서 걷는 것과 **둘 다 필요하다.** 상태만
+     * 비우면 백스택에 남은 위저드로 돌아가 이미 저장한 동선을 다시 편집하게 되고,
+     * 백스택만 걷으면 다른 경로로 재진입할 때 같은 일이 난다.
+     */
+    fun onSavedHandled() {
+        _uiState.update {
+            if (it.save is SaveItineraryState.Saved) it.copy(save = SaveItineraryState.Idle) else it
+        }
+    }
+
+    /** 로그인 유도 모달을 닫았다. 돌아와서 다시 누르면 된다 (D-27). */
+    fun onLoginPromptDismiss() {
+        _uiState.update {
+            if (it.save is SaveItineraryState.NeedsLogin) it.copy(save = SaveItineraryState.Idle) else it
+        }
+    }
+
+    /**
+     * 일자 탭. **활성화 + 지도 재계산 + 첫 핀 활성**이다. (SPEC §4.10)
+     *
+     * 첫 핀을 골라 두는 것이 계약이다 — 일자를 바꿨는데 아무것도 안 골라져 있으면
+     * 타임라인에 강조된 카드가 없어 어디부터 보는지 알 수 없다.
+     *
+     * 좌표 있는 블록이 하나도 없는 날이면 `null` 이다. 그때는 지도 자리에 안내만 뜬다.
+     */
+    fun onDaySelect(index: Int) {
+        _uiState.update { state ->
+            val moved = state.copy(activeDayIndex = index, activeBlockId = null)
+            moved.copy(activeBlockId = moved.mapPins.firstOrNull()?.id)
+        }
+    }
+
+    /**
+     * 지도 핀을 탭했다. (SPEC §3-8 · §4.10 — "핀 탭 → 카드로 스크롤")
+     *
+     * **편집 모드에서는 아무것도 하지 않는다.** §4.10 이 "편집 모드 중 동기화 중단" 을
+     * 요구한다 — 편집 중에는 사용자가 행을 옮기고 지우는 중이라, 그때 카드가 저절로
+     * 스크롤되면 누르려던 버튼이 발밑에서 움직인다.
+     *
+     * **같은 핀을 다시 눌러도 풀지 않는다.** 계약은 "핀 탭 → 해당 항목 활성" 뿐이고,
+     * 일자를 고르면 항상 첫 핀이 활성이므로 "아무것도 안 골라진 상태" 는 이 화면에 없다.
+     *
+     * 처음에는 눌러서 놓을 수 있게 두면 카메라가 전체 bounds 로 돌아간다고 적었는데
+     * **사실이 아니었다.** [com.runninggu.app.ui.map.cameraCommandFor] 는 다음 활성이
+     * null 이면 `None` 을 돌려주므로, 강조만 사라지고 카메라는 확대된 채 남는다(#208 리뷰).
+     */
+    fun onPinClick(blockId: String) {
+        _uiState.update { if (it.isEditing) it else it.copy(activeBlockId = blockId) }
+    }
+
+    /**
+     * 타임라인 카드를 탭했다. (SPEC §4.10 — "카드 탭 → 핀 카메라 이동")
+     *
+     * 핀 탭의 반대 방향이다. 활성이 바뀌면 [com.runninggu.app.ui.map.MapScene] 규칙이
+     * 카메라를 그 좌표로 옮긴다.
+     *
+     * 좌표 없는 블록을 눌러도 **활성으로 두지 않는다** — 카메라가 갈 곳이 없어서
+     * 지도는 그대로인데 카드만 강조되면 왜 안 움직이는지 알 수 없다.
+     */
+    fun onCardClick(blockId: String) {
+        _uiState.update { state ->
+            if (state.isEditing) return@update state
+            if (state.mapPins.none { it.id == blockId }) return@update state
+            state.copy(activeBlockId = blockId)
+        }
+    }
+
+    /**
+     * 사용자가 타임라인을 스크롤해 이 카드가 **중앙 밴드**에 들어왔다.
+     * (SPEC §4.10 — "LazyList 스크롤 중앙 밴드(상하 45% 제외)에 든 카드 자동 활성")
+     *
+     * 탭과 결과는 같지만 **부르는 쪽이 다르다.** 탭은 한 번이고 이쪽은 스크롤이 굴러가는
+     * 동안 계속 들어온다 — 그래서 [onCardClick] 와 나눠 두고, 화면 쪽에서도 값이 바뀔
+     * 때만 부른다.
+     *
+     * 좌표 없는 카드를 지나쳐도 활성을 옮기지 않는 것은 [onCardClick] 와 같은 이유다.
+     * 카메라가 갈 곳이 없어 지도는 그대로인데 강조만 옮겨 다니면 지도가 고장 난 것처럼
+     * 보인다. **가운데 있는 것과 다른 카드가 강조된 채로 지나가는 편이 낫다.**
+     *
+     * 편집 중에는 화면이 아예 부르지 않지만(§4.10 동기화 중단) 여기서도 한 번 막는다 —
+     * 부르는 자리가 여럿이면 한 곳이 빠졌을 때 조용히 뚫린다.
+     */
+    fun onCardCentered(blockId: String) {
+        _uiState.update { state ->
+            if (state.isEditing) return@update state
+            if (state.activeBlockId == blockId) return@update state
+            if (state.mapPins.none { it.id == blockId }) return@update state
+            state.copy(activeBlockId = blockId)
+        }
+    }
+
 
     // ── 저장 전 로컬 편집 (SPEC §4.10 · §5.7) ───────────────────
     //
@@ -138,9 +323,18 @@ class ResultViewModel(
     private inline fun editActiveDay(
         transform: (days: List<ItineraryDay>, dayIndex: Int) -> List<ItineraryDay>,
     ) {
+        // 보내는 중인 저장은 **고치기 전 동선**의 것이다. 끊고, 이미 떠난 응답도 세대로
+        // 버린다 (#214 리뷰)
+        saveJob?.cancel()
+        saveGeneration++
         _uiState.update { state ->
             val result = state.result ?: return@update state
-            state.copy(result = result.copy(days = transform(result.days, state.activeDayIndex)))
+            state.copy(
+                result = result.copy(days = transform(result.days, state.activeDayIndex)),
+                // 내용이 바뀌면 이전 저장 결과 문구는 거짓말이 된다. "저장하지 못했어요" 가
+                // 남은 채 장소를 바꾸면, 방금 바꾼 것이 실패한 줄로 읽힌다.
+                save = SaveItineraryState.Idle,
+            )
         }
     }
 
@@ -272,7 +466,7 @@ class ResultViewModel(
             val outcome = runCatchingUnlessCancelled { repository.generate(request) }
             _uiState.value = outcome.fold(
                 onSuccess = { result ->
-                    ResultUiState(
+                    val loaded = ResultUiState(
                         // 200 인데 days=[] 면 오류가 아니라 빈 상태다 (API 명세 §5-1 · SPEC §4.10).
                         phase = if (result.days.isEmpty()) {
                             ResultUiState.Phase.EMPTY
@@ -283,6 +477,9 @@ class ResultViewModel(
                         event = request.event,
                         region = lastRegion,
                     )
+                    // 첫 일자도 "고른 일자" 다 — 탭을 눌렀을 때와 같이 첫 핀을 활성으로 둔다
+                    // (SPEC §4.10). 안 그러면 처음 화면만 강조된 카드가 없다
+                    loaded.copy(activeBlockId = loaded.mapPins.firstOrNull()?.id)
                 },
                 onFailure = { cause ->
                     // 네트워크·timeout·4xx/5xx 는 Error 이며 Empty 로 강등하지 않는다 (API 명세 §5-1).
