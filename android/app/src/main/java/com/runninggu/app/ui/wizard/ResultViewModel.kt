@@ -14,6 +14,7 @@ import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.Poi
 import com.runninggu.app.domain.PoiCategory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -157,6 +158,14 @@ class ResultViewModel(
                 // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
                 if (e is ApiException.Http && e.needsLogin) SaveItineraryState.NeedsLogin
                 else SaveItineraryState.Failed(e.saveMessage())
+            } catch (e: CancellationException) {
+                // 취소는 실패가 아니다. 여기서 삼키면 코루틴 취소가 끊긴다
+                throw e
+            } catch (e: Throwable) {
+                // **계약 밖의 실패도 버튼은 푼다** (#214 리뷰). 직렬화 오류처럼 `ApiException`
+                // 이 아닌 것이 올라오면 코루틴이 죽고 `Saving` 이 그대로 남는다 — 화면은
+                // "저장 중…" 에 굳고 다시 누를 수도 없다. 사용자에게는 앱이 멈춘 것이다
+                SaveItineraryState.Failed("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.")
             }
             // **`NeedsLogin` 은 통과시킨다.** 세대가 오르는 흔한 이유가 바로 "세션이
             // 죽었다" 이다 — `401` 을 받은 `TokenAuthenticator` 가 재발급에 실패하면

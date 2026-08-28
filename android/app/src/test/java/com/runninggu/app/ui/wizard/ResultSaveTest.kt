@@ -191,6 +191,21 @@ class ResultSaveTest {
         assertEquals(SaveItineraryState.Idle, viewModel.uiState.value.save)
     }
 
+    @Test
+    fun `계약 밖의 실패도 버튼을 푼다`() = runTest(dispatcher) {
+        // `ApiException` 이 아닌 것이 올라오면 코루틴이 죽어 Saving 이 그대로 남는다.
+        // 화면은 "저장 중…" 에 굳고 다시 누를 수도 없다 — 사용자에게는 앱이 멈춘 것이다
+        val viewModel = loaded(failing(IllegalStateException("직렬화 실패")))
+        advanceUntilIdle()
+
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        val save = viewModel.uiState.value.save
+        assertTrue("저장 중인 채로 굳었다: $save", save is SaveItineraryState.Failed)
+        assertTrue(viewModel.uiState.value.canSave)
+    }
+
     // ── 화면을 떠난 뒤 (SPEC §4.10 · #214 리뷰) ──────────────────
 
     @Test

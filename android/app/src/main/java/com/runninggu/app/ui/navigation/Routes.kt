@@ -23,6 +23,18 @@ object Routes {
 
     fun authGraph(returnTo: String = HOME): String = "auth?$ARG_RETURN_TO=${Uri.encode(returnTo)}"
 
+    /**
+     * 복귀 지점을 route 로 못 적는 화면을 위한 값. (매핑표 D-27 · #214 리뷰)
+     *
+     * 위저드처럼 **상태를 들고 있는 그래프**는 route 로 되돌아가면 그래프가 새로 만들어져
+     * `WizardViewModel` · `ResultViewModel` 이 다시 생긴다 — 로그인 전에 편집한 동선이
+     * 날아간다. 그때는 이 값을 주고, 로그인 그래프만 백스택에서 걷어 **아래에 그대로 있는
+     * 화면으로 돌아간다.**
+     *
+     * route 로 쓰이지 않으므로 목적지 이름과 겹치지 않는 형태로 둔다.
+     */
+    const val RETURN_BACK = "__back__"
+
     /** A1 로그인. (SPEC §4.1) */
     const val LOGIN = "login"
 

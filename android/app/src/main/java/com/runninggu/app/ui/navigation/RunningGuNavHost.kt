@@ -191,7 +191,15 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
             .arguments?.getString(Routes.ARG_RETURN_TO) ?: Routes.HOME
 
     fun leaveAuthGraph() {
-        navController.navigate(returnTarget()) {
+        val target = returnTarget()
+        // **아래에 있는 화면으로 그냥 돌아간다.** 위저드처럼 상태를 들고 있는 그래프는
+        // route 로 되돌아가면 새로 만들어져 편집한 동선이 날아간다(D-27 · #214 리뷰).
+        // 로그인 그래프만 걷어내면 그 아래 entry 가 그대로 살아 있어 ViewModel 도 같다.
+        if (target == Routes.RETURN_BACK) {
+            navController.popBackStack(Routes.AUTH_GRAPH_PATTERN, inclusive = true)
+            return
+        }
+        navController.navigate(target) {
             popUpTo(Routes.AUTH_GRAPH_PATTERN) { inclusive = true }
             // 마이에서 들어왔다 돌아갈 때 같은 화면이 두 장 쌓이지 않게 한다.
             launchSingleTop = true
@@ -358,7 +366,10 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                         message = message,
                     )
                 },
-                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.MY)) },
+                // **S7 으로 돌아온다** (매핑표 D-27 "원래 화면 복귀"). 위저드 route 를 주면
+                // 그래프가 새로 만들어져 로그인 전에 편집한 동선이 날아간다 (#214 리뷰).
+                // 돌아와도 저장은 저절로 일어나지 않는다 — 사용자가 다시 누른다.
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.RETURN_BACK)) },
                 wizardViewModel = wizardViewModel,
                 viewModel = resultViewModel,
             )
