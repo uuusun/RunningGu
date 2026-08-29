@@ -20,6 +20,7 @@ docker compose up -d
 
 `.env`는 Docker Compose가 읽지만 Spring Boot가 직접 읽지는 않는다. `bootRun`을 실행할 때는
 IDE 실행 구성 또는 셸 환경변수에 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 주입한다.
+`deploy/env/*.env.example`은 EC2 배포 전용 예시이며 로컬 `.env.example`을 대체하지 않는다.
 
 ```powershell
 $env:SPRING_PROFILES_ACTIVE = 'local'
@@ -143,6 +144,21 @@ cd backend
 검증 실패, 과거 snapshot, 동일 기준 시각의 다른 snapshot 파일 hash는 전체 롤백한다. 같은
 `snapshot_sha256 + checked_at_max`를 다시 실행하면 성공 no-op다. `source_sha256`은 입력 CSV
 출처 추적용이며 snapshot 식별에는 사용하지 않는다.
+
+Gradle `contestImport`는 로컬 개발용이다. EC2는 소스·Gradle·Playwright를 설치해 빌드하지 않고,
+CI가 검증한 `runninggu-contest-import.jar`를 사용한다. 이 JAR은 비웹 컨텍스트라 JWT·카카오
+로그인 설정을 로드하지 않으며, 배포용 one-shot 서비스는 `COURSE_SYNC_ENABLED=false`를 강제한다.
+빈 DB에서 먼저 실행하면 Flyway 마이그레이션 후 snapshot을 적재한다.
+
+CI와 같은 EC2 배포 디렉터리를 로컬에서 만들 때는 다음 태스크를 사용한다.
+
+```powershell
+cd backend
+.\gradlew.bat clean test ec2Artifact --console=plain
+```
+
+산출물은 `backend/build/ec2-artifact/`에 생성된다. 실제 EC2 배포 순서와 롤백은
+[`docs/deploy/aws-ec2-staging-runbook.md`](../docs/deploy/aws-ec2-staging-runbook.md)를 따른다.
 
 ## 검증
 

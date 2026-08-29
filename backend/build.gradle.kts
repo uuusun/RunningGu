@@ -1,3 +1,5 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+
 plugins {
     java
     id("org.springframework.boot") version "3.5.16"
@@ -58,6 +60,7 @@ tasks.register<JavaExec>("playwright") {
 }
 
 val courseBundleFile = rootProject.projectDir.parentFile.resolve("data/courses.json")
+val contestSnapshotFile = rootProject.projectDir.parentFile.resolve("data/contest_snapshot.json")
 
 tasks.processResources {
     doFirst {
@@ -77,4 +80,36 @@ tasks.register<JavaExec>("contestImport") {
     mainClass = "com.runninggu.server.contest.ContestSnapshotImporterApplication"
     workingDir = rootProject.projectDir.parentFile
     project.findProperty("snapshotPath")?.toString()?.let { args(it) }
+}
+
+val contestImportJar = tasks.register<BootJar>("contestImportJar") {
+    group = "build"
+    description = "Gradle 없이 실행할 수 있는 대회 snapshot Importer JAR을 만든다"
+    archiveClassifier.set("contest-import")
+    mainClass.set("com.runninggu.server.contest.ContestSnapshotImporterApplication")
+    targetJavaVersion.set(JavaVersion.VERSION_21)
+    classpath(sourceSets["main"].runtimeClasspath)
+}
+
+tasks.register<Sync>("ec2Artifact") {
+    group = "build"
+    description = "EC2 배포용 서버·Importer JAR과 대회 snapshot을 한 디렉터리에 모은다"
+    dependsOn(tasks.named("bootJar"), contestImportJar)
+
+    into(layout.buildDirectory.dir("ec2-artifact"))
+    from(tasks.named<BootJar>("bootJar").flatMap { it.archiveFile }) {
+        rename { "runninggu-server.jar" }
+    }
+    from(contestImportJar.flatMap { it.archiveFile }) {
+        rename { "runninggu-contest-import.jar" }
+    }
+    from(contestSnapshotFile) {
+        into("data")
+    }
+
+    doFirst {
+        require(contestSnapshotFile.isFile) {
+            "서버 대회 snapshot이 없습니다: ${contestSnapshotFile.absolutePath}"
+        }
+    }
 }

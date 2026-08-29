@@ -2,6 +2,7 @@
 local.properties
 .env
 .env.local
+/backend/deploy/env/*.env
 *.jks
 *.keystore
 

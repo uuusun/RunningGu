@@ -47,6 +47,20 @@ jobs:
     name: Unit, integration, and bootJar
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10
+        env:
+          POSTGRES_DB: runninggu_import_smoke
+          POSTGRES_USER: runninggu
+          POSTGRES_PASSWORD: importer-smoke-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U runninggu -d runninggu_import_smoke"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -67,8 +81,56 @@ jobs:
       - name: Install Playwright Chromium
         run: ./gradlew playwright --args="install --with-deps chromium" --console=plain
 
-      - name: Test and build
-        run: ./gradlew clean test bootJar --console=plain
+      - name: Validate EC2 Compose model
+        env:
+          DB_PASSWORD: compose-config-check
+        run: |
+          docker compose \
+            --profile routing \
+            -f compose.yaml \
+            -f compose.ec2.yaml \
+            config --format json > build-compose-ec2.json
+          python3 -c 'import json; d=json.load(open("build-compose-ec2.json", encoding="utf-8")); p=d["services"]["postgres"]["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0]["host_ip"]=="127.0.0.1" and p[0]["target"]==5432, p; assert len(g)==1 and g[0]["host_ip"]=="127.0.0.1" and g[0]["target"]==8989, g; assert d["services"]["postgres"]["restart"]=="unless-stopped"; assert d["services"]["postgres"]["logging"]["driver"]=="local"; assert d["services"]["graphhopper"]["logging"]["driver"]=="local"'
+
+      - name: Test and prepare EC2 artifact
+        run: ./gradlew clean test ec2Artifact --console=plain
+
+      - name: Smoke test executable Importer JAR
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/runninggu_import_smoke
+          DB_USERNAME: runninggu
+          DB_PASSWORD: importer-smoke-password
+          COURSE_SYNC_ENABLED: "false"
+        run: |
+          mkdir -p build/reports/importer-smoke
+          cd build/ec2-artifact
+          java -jar runninggu-contest-import.jar \
+            2>&1 | tee ../reports/importer-smoke/first.log
+          java -jar runninggu-contest-import.jar \
+            2>&1 | tee ../reports/importer-smoke/second.log
+          grep -q "status=APPLIED" ../reports/importer-smoke/first.log
+          grep -q "status=NO_OP" ../reports/importer-smoke/second.log
+
+      - name: Record artifact identity and checksums
+        run: |
+          printf 'git_commit=%s\nworkflow_run_id=%s\n' \
+            "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+            > build/ec2-artifact/release-manifest.txt
+          cd build/ec2-artifact
+          sha256sum \
+            runninggu-server.jar \
+            runninggu-contest-import.jar \
+            data/contest_snapshot.json \
+            release-manifest.txt \
+            > SHA256SUMS
+
+      - name: Upload EC2 deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runninggu-backend-${{ github.sha }}
+          path: backend/build/ec2-artifact/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload test report
         if: failure()
