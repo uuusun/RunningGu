@@ -171,9 +171,13 @@ android {
             buildConfigField("String", "BASE_URL", "\"$escapedBaseUrl\"")
             // keystore 가 없으면 서명 없이 만든다 — 빌드가 깨지지 않아야 CI 가 돈다.
             signingConfig = signingConfigs.findByName("release")
-            optimization {
-                enable = false
-            }
+            // **R8 을 켠다.** NFR-14 가 릴리스 빌드 R8 활성을 확정해 뒀다 (#232 · #225 BLOCKER 4).
+            //
+            // 축소·난독화는 리플렉션을 쓰는 자리에서 **조용히** 깨진다 — 컴파일도 되고 앱도
+            // 뜨는데 특정 응답 파싱만 실패한다. 그래서 `src/main/keepRules/` 에 무엇을 왜
+            // 남기는지 근거와 함께 적어 둔다. 규칙을 지울 때는 그 근거부터 확인한다.
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
     compileOptions {
