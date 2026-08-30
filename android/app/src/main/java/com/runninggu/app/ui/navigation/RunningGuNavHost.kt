@@ -205,6 +205,9 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
      * 화면은 **이메일 가입 UI 를 그린다** — 카카오로 시작한 사람이 이메일 칸을 보게 된다.
      * 그래서 [KAKAO_SIGNUP_MODE] 를 `savedStateHandle` 에 남긴다. **토큰이 아니라 "카카오로
      * 시작했다" 는 사실뿐이라 비밀이 아니다.**
+     *
+     * **가입이 끝나면 모드와 함께 비운다.** 그래프가 사는 동안 계속 쥐고 있으면 위의 "짧게
+     * 사는 값" 이라는 말과 어긋난다(#216 리뷰).
      */
     var kakaoSignup: KakaoSignupHandoff? = null
 
@@ -239,11 +242,12 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
                 onLoggedIn = ::leaveAuthGraph,
                 onBrowseAsGuest = ::leaveAuthGraph,
                 onSignup = {
-                    // 이메일 가입이다. 앞선 카카오 시도가 남아 있으면 지운다
+                    // 이메일 가입이다. `kakaoSignup` 은 그래프가 공유하는 변수라 앞선 카카오
+                    // 시도가 남아 있으면 지운다. **모드는 손대지 않는다** — `navigate` 가
+                    // 새 entry 와 새 `savedStateHandle` 을 만들어서 앞의 값이 딸려올 자리가
+                    // 없다. `= false` 를 적으면 있지도 않은 상황을 막는 것처럼 읽힌다(#216 리뷰).
                     kakaoSignup = null
                     navController.navigate(Routes.SIGNUP)
-                    navController.getBackStackEntry(Routes.SIGNUP)
-                        .savedStateHandle[KAKAO_SIGNUP_MODE] = false
                 },
                 onReset = { navController.navigate(Routes.RESET) },
                 onKakaoSignup = { handoff ->
@@ -274,7 +278,17 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
             SignupScreen(
                 onBack = { navController.popBackStack() },
                 // 가입 완료 = 자동 로그인 (명세 §1-5) → 복귀 지점으로.
-                onCompleted = ::leaveAuthGraph,
+                onCompleted = {
+                    // **끝났으면 토큰을 들고 있지 않는다.** 위 KDoc 이 "카카오 토큰도 짧게
+                    // 사는 값" 이라고 적어 두고선 그래프가 사는 동안 계속 쥐고 있었다(#216 리뷰).
+                    //
+                    // 모드도 함께 지운다. 둘은 "카카오 가입 진행 중" 이라는 **한 가지 사실을
+                    // 나눠 든 짝**이라, 하나만 지우면 남은 쪽이 거짓말을 한다. 지금은 바로
+                    // 그래프를 떠나 entry 가 사라지므로 이것만으로 동작이 달라지지는 않는다.
+                    kakaoSignup = null
+                    entry.savedStateHandle.remove<Boolean>(KAKAO_SIGNUP_MODE)
+                    leaveAuthGraph()
+                },
                 kakaoSignup = handoff,
                 modifier = Modifier.statusBarsPadding(),
             )
