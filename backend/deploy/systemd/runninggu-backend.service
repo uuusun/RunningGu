@@ -1,0 +1,33 @@
+[Unit]
+Description=런닝구 Spring Boot 백엔드
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+# 부팅 시 PostgreSQL 컨테이너가 늦게 준비되면 Flyway 연결 실패 후 5초 간격으로
+# 다시 시작해 최종적으로 DB에 연결한다. 이 재시도를 systemd가 차단하지 않게 한다.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=runninggu
+Group=runninggu
+WorkingDirectory=/opt/runninggu/current
+EnvironmentFile=/etc/runninggu/application.env
+ExecStart=/usr/bin/java -Xms256m -Xmx2g -jar /opt/runninggu/current/runninggu-server.jar
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=0027
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=runninggu-backend
+
+[Install]
+WantedBy=multi-user.target

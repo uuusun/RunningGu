@@ -1,0 +1,30 @@
+[Unit]
+Description=런닝구 대회 snapshot Importer
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+ConditionPathExists=/opt/runninggu/current/runninggu-contest-import.jar
+ConditionPathExists=/opt/runninggu/current/data/contest_snapshot.json
+
+[Service]
+Type=oneshot
+User=runninggu
+Group=runninggu
+WorkingDirectory=/opt/runninggu/current
+EnvironmentFile=/etc/runninggu/application.env
+# 비웹 Importer에서는 코스 동기화와 웹 전용 시크릿을 사용하지 않는다. Importer가 먼저
+# 기동하면서 Flyway를 적용한 뒤 같은 snapshot의 재실행을 NO_OP으로 처리한다.
+UnsetEnvironment=JWT_SECRET KAKAO_APP_ID KAKAO_REST_KEY KTO_SERVICE_KEY SMTP_HOST SMTP_USERNAME SMTP_PASSWORD
+# EnvironmentFile의 COURSE_SYNC_ENABLED·MAIL_ENABLED보다 우선하는 시스템 프로퍼티로
+# 배포 환경파일의 값과 무관하게 Importer 부수 작업을 끈다.
+ExecStart=/usr/bin/java -Xms128m -Xmx1g -Drunninggu.course.sync.enabled=false -Drunninggu.mail.enabled=false -jar /opt/runninggu/current/runninggu-contest-import.jar
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=0027
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=runninggu-contest-import

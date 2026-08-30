@@ -335,7 +335,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 | 외부 API 키 | 개발 키 | 스테이징/개발 키 | 제출에 연결된 운영 키 |
 | 사용자 데이터 | 가짜 데이터 | 심사용 가짜 계정 | 실제 사용자 데이터 |
 | 로그 | 상세 가능, 시크릿 금지 | 제한 | 최소·구조화·보존기간 적용 |
-| Swagger | 개발 편의 | 제한 접근 | 비활성 또는 접근 통제 |
+| Swagger | 개발 편의 | 기본 비활성, 필요할 때만 접근 통제 후 활성 | 비활성 또는 접근 통제 |
 
 스테이징과 운영의 DB·JWT·SMTP·외부 API 키를 공유하지 않는다.
 
@@ -354,7 +354,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 
 ### 7.4 프로덕션 배포 전 체크
 
-- [ ] 호스팅 사업자·리전·도메인·예산·결제 책임자 확정 **[결정 필요]**
+- [ ] 호스팅은 AWS EC2, 기본 도메인은 `runninggu.store`로 확정했다. 리전·예산·결제 책임자 확정 **[부분 결정]**
 - [ ] 운영 계정 소유자와 2단계 인증·복구 수단 확정 **[결정 필요]**
 - [ ] HTTPS 인증서와 자동 갱신, 앱 `BASE_URL` 확정
 - [ ] PostgreSQL 백업 주기·보존 기간·복구 절차와 실제 복구 리허설
@@ -379,27 +379,31 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 7. 치명 오류면 DB를 임의로 되돌리지 않고, 호환되는 직전 서버 artifact로 복귀한다. 마이그레이션 역호환이 없으면 정해진 복구 절차를 따른다.
 8. hotfix는 `main`에서 `hotfix/*`를 만들고 `main`과 `develop` 양쪽에 반영한다.
 
+AWS EC2 스테이징의 파일 배치·실행 명령·검증·롤백은
+[`deploy/aws-ec2-staging-runbook.md`](deploy/aws-ec2-staging-runbook.md)를 따른다. 이 실행서는
+이 절의 구현판이며 정책이나 절차가 충돌하면 §7이 우선한다.
+
 ---
 
 ## 8. 현재 저장소의 출시 차단 항목
 
-아래는 2026-08-26 `develop` 기준이다. 완료될 때마다 근거 PR·검증 명령을 붙여 갱신한다.
+아래는 2026-08-28 `develop` 기준이다. 완료될 때마다 근거 PR·검증 명령을 붙여 갱신한다.
 
 | 상태 | 차단 항목 | 현재 근거 | 완료 조건 |
 |---|---|---|---|
-| **BLOCKER** | 운영 API 호스트 미정 | 호스트가 아직 없다. release `BASE_URL`은 `local.properties` 의 `API_BASE_URL`을 쓰고, 없으면 `api.runninggu.example` 자리표시자 + 빌드 경고 (#196) | 실제 HTTPS 도메인·인증서·운영 연결 후 `API_BASE_URL` 확정 |
+| **BLOCKER** | 운영 API 호스트 미정 | 기본 도메인은 `runninggu.store`, 스테이징 후보는 `staging-api.runninggu.store`로 정했다. 실제 DNS·HTTPS 호스트와 release `API_BASE_URL` 연결은 아직 없다 | 실제 HTTPS 도메인·인증서·운영 연결 후 `API_BASE_URL` 확정 |
 | **BLOCKER** | Android 릴리스 서명 미완료 | `local.properties` 에 keystore가 있을 때만 붙는 조건부 release `signingConfig` 추가 (#196). 실제 upload key는 아직 없어 산출물은 서명 없이 나온다 | upload key 안전 보관, Play App Signing, CI/로컬 서명 절차 |
 | **BLOCKER** | R8 비활성 | release optimization `enable = false`, NFR-14와 충돌 | R8 활성 후 회귀 테스트·필요 keep rule |
 | **BLOCKER** | 카카오 릴리스 설정 미완료 | build 설정에 네이티브 키 주입·릴리스 키 해시 설정 없음 | 패키지명+debug/release 키 해시 등록, 스토어 설치본 로그인/지도 확인 |
 | 해소됨 | ~~위치 기능·신고 미완료~~ | Manifest 에 위치 권한·서비스가 **없는 것이 맞다**(결정-56) | 자동 위치 추정을 제품에서 뺐다. #195 공식 검토는 실제 APK·네트워크 흐름 기준으로 다시 확인 |
 | **BLOCKER** | 백엔드 P0 미완료 | 현재 `common`·`contest` 중심, 인증·동선·외부 프록시·마이·코스 미완료 | AP-07·23·25와 계약 테스트·E2E 완료 |
-| **BLOCKER** | 운영 배포 방식 미정 | Dockerfile·배포 workflow·IaC 없음 | 호스팅·DB·GraphHopper·백업·배포/롤백 절차 확정 |
+| **BLOCKER** | 운영 배포 방식 미정 | EC2용 JAR systemd + PostgreSQL·GraphHopper Compose + Nginx 실행서와 CI artifact는 준비 중이다. 실제 EC2·백업 복구 리허설·IaC는 없다 | 호스팅·DB·GraphHopper·백업·배포/롤백 절차 확정 및 실제 복구 검증 |
 | **BLOCKER** | 개인정보 공개 문서 없음 | 공개 URL·앱 내부 링크·외부 탈퇴 URL 없음 | 개인정보처리방침·Data safety·계정 삭제 양 경로 |
 | **BLOCKER** | 공모전 심사 계정 없음 | 제출 전용 계정 절차 없음 | 공식 형식 전용 계정, 모든 제한 기능 접근, 새 기기 검증 |
 | **REQUIRED** | 릴리스 버전 정책 | `versionCode=1`, `versionName=1.0` 초기값 | 태그·스토어 버전·변경기록 일치, 업데이트마다 code 증가 |
 | **REQUIRED** | 릴리스 CI 없음 | CI가 debug test/build만 수행 | 서명 없는 release compile 검증 또는 승인된 안전한 서명 배포 절차 |
 | **REQUIRED** | 스토어 등록자료 없음 | 아이콘·기능 그래픽·설명·정책 응답 미정 | Play Console 필수 항목과 실제 화면 이미지 완료 |
-| **REQUIRED** | 운영 프로필 보강 | springdoc 운영 제한·운영 관측 설정 미정 | 프로덕션 설정과 접근 통제 검증 |
+| **REQUIRED** | 운영 프로필 보강 | EC2 스테이징 예시는 springdoc을 기본 비활성화하지만 운영 관측·보존 정책은 미정 | 프로덕션 설정과 접근 통제 검증 |
 
 새 라이브러리, 공개 API, DB 스키마, 배포 사업자 선택은 담당자 합의 없이 이 표를 구현으로 먼저 확정하지 않는다.
 

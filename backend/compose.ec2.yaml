@@ -1,0 +1,13 @@
+x-bounded-logging: &bounded-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    restart: unless-stopped
+    logging: *bounded-logging
+
+  graphhopper:
+    logging: *bounded-logging
