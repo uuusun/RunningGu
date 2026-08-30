@@ -19,6 +19,12 @@ captures/
 *.apk
 *.aab
 
+# ── 설치 파일 (커밋 금지) ──
+# 저장소 루트에 받아 둔 설치 파일이 `git add .` 로 딸려 들어가는 것을 막는다.
+*.exe
+*.msi
+*.dmg
+
 # ── Python (scripts/) ──
 __pycache__/
 *.pyc
