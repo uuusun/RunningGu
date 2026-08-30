@@ -103,6 +103,7 @@ sudo useradd \
   --shell /usr/sbin/nologin \
   runninggu
 
+sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu
 sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu/repository
 sudo install -d -o root -g runninggu -m 0750 /opt/runninggu/releases
 sudo install -d -o root -g root -m 0755 /opt/runninggu-data/osm
@@ -135,6 +136,7 @@ sudo sysctl --system
 저장소의 journal 제한을 설치한다. 이는 Spring Boot만이 아니라 host 전체 journal에 적용된다.
 
 ```bash
+sudo install -d -m 0755 /etc/systemd/journald.conf.d
 sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/journald-runninggu.conf \
   /etc/systemd/journald.conf.d/runninggu.conf
@@ -152,7 +154,7 @@ sudo systemctl restart systemd-journald
 cd /opt/runninggu/repository
 sudo -u runninggu git clone https://github.com/uuusun/RunningGu.git .
 sudo -u runninggu git checkout --detach <artifact의_git_commit>
-git rev-parse HEAD
+sudo -u runninggu git rev-parse HEAD
 ```
 
 배포 환경 예시를 `/etc`에 복사한 뒤 `sudoedit`으로 실제 값을 채운다.
@@ -444,7 +446,7 @@ sudo install -m 0755 \
   /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
 sudo systemctl enable --now certbot.timer
 sudo systemctl status --no-pager certbot.timer
-sudo certbot renew --dry-run
+sudo certbot renew --dry-run --run-deploy-hooks
 ```
 
 dry-run 성공과 deploy hook의 `nginx -t`, reload 성공을 모두 확인한다.
@@ -464,7 +466,7 @@ curl --fail --silent --show-error \
 - HTTP가 HTTPS로 redirect되는가
 - Swagger와 `/v3/api-docs`가 비활성인가
 - 외부에서 5432·8080·8989에 연결할 수 없는가
-- Nginx access log에 token·비밀번호·이메일·좌표가 없는가
+- Nginx access log가 쿼리스트링을 제외한 `runninggu_noqs` 포맷을 사용하는가
 - GraphHopper 그래프·SRTM 볼륨이 재시작 후 재사용되는가
 - `free -h`, `docker stats --no-stream`에서 swap을 지속 사용하지 않는가
 
