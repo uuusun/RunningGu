@@ -22,8 +22,9 @@ import java.io.IOException
  *
  * **버전은 약관마다 따로 든다**([AgreementDoc.version]). 서버도
  * `tos-version` · `privacy-version` · `marketing-version` 을 각각 관리하고, 실제로
- * `v1.1/privacy.md` 만 준비돼 있다. 하나로 묶으면 PRIVACY 를 올리는 순간 있지도 않은
- * `v1.1/tos.md` 를 읽어 **두 문안이 안 열리고 버전 표시까지 틀린다**(#191 리뷰).
+ * PRIVACY 만 다음 버전이 준비돼 있다(`v1.1` · `v1.2`). 하나로 묶으면 PRIVACY 를 올리는
+ * 순간 있지도 않은 `v1.2/tos.md` 를 읽어 **두 문안이 안 열리고 버전 표시까지
+ * 틀린다**(#191 리뷰).
  */
 object AgreementTexts {
 
@@ -54,8 +55,8 @@ object AgreementTexts {
  *  그때도 `agreed=false` 이력이 남는다(이슈 #111).
  * @param version 이 약관의 활성 버전. 서버 `runninggu.auth.agreements.{type}-version` 과
  *  **같아야 한다.** 셋을 하나로 묶지 않는 이유는 서버가 따로 관리하기 때문이다 — 실제로
- *  `v1.1/privacy.md` 만 준비돼 있어서, 묶으면 PRIVACY 를 올릴 때 나머지 둘이 깨진다
- *  (#191 리뷰). 올릴 때는 서버 설정과 **같은 PR 에서** 바꾼다(D-32).
+ *  PRIVACY 만 다음 버전이 준비돼 있어서(`v1.1` · `v1.2`), 묶으면 PRIVACY 를 올릴 때
+ *  나머지 둘이 깨진다 (#191 리뷰). 올릴 때는 서버 설정과 **같은 PR 에서** 바꾼다(D-32).
  */
 enum class AgreementDoc(
     val label: String,
