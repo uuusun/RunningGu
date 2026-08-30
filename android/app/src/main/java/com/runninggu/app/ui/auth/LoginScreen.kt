@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,15 +58,26 @@ fun LoginScreen(
     onSignup: () -> Unit,
     onReset: () -> Unit,
     onBrowseAsGuest: () -> Unit,
+    onKakaoSignup: (KakaoSignupHandoff) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LoginViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(state.loggedIn) {
         if (state.loggedIn) onLoggedIn()
+    }
+
+    // 카카오 미가입자는 A2 로 보낸다 (§1-7 → §1-8). 보내고 나면 ViewModel 이 비워서
+    // 돌아왔을 때 또 넘어가지 않게 한다
+    LaunchedEffect(state.kakaoSignup) {
+        state.kakaoSignup?.let {
+            onKakaoSignup(it)
+            viewModel.onKakaoSignupHandled()
+        }
     }
 
     Scaffold(
@@ -150,11 +162,10 @@ fun LoginScreen(
 
             Spacer(Modifier.height(10.dp))
             Button(
-                // TODO(AP-02): 카카오 콘솔 등록·네이티브 키 발급 후 카카오 로그인 SDK 를 연결한다
-                //  (SPEC §4.1 · §7.4-10). 그 전에는 준비 중 안내만 띄운다.
-                onClick = {
-                    scope.launch { snackbarHostState.showSnackbar("카카오 로그인은 준비 중이에요") }
-                },
+                onClick = { viewModel.onKakaoLogin(context) },
+                // 키가 없으면(CI·키 못 받은 팀원) SDK 초기화가 안 됐다. 눌러도 실패할 뿐이라
+                // 아예 막는다 — 이메일 로그인은 그대로 쓴다 (NFR-1·3 · AGENTS 8장)
+                enabled = KakaoAuthAvailability.isReady && !state.isSubmitting,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = KakaoYellow,
                     contentColor = KakaoLabel,

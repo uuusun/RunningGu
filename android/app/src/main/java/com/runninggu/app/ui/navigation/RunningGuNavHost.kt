@@ -3,13 +3,18 @@ package com.runninggu.app.ui.navigation
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.navigation
 import androidx.navigation.navArgument
 import kotlinx.coroutines.flow.filterNotNull
+import com.runninggu.app.ui.auth.KakaoSignupHandoff
 import com.runninggu.app.ui.auth.LoginScreen
 import com.runninggu.app.ui.auth.ResetScreen
 import com.runninggu.app.ui.auth.SignupScreen
@@ -20,10 +25,6 @@ import com.runninggu.app.ui.course.CourseLaunchContext
 import com.runninggu.app.ui.course.CourseScreen
 import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
-import androidx.compose.runtime.remember
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.navigation
 import com.runninggu.app.ui.my.AccountScreen
 import com.runninggu.app.ui.my.ItinerarySavedNotice
 import com.runninggu.app.ui.my.MyScreen
@@ -190,6 +191,23 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
         navController.getBackStackEntry(Routes.AUTH_GRAPH_PATTERN)
             .arguments?.getString(Routes.ARG_RETURN_TO) ?: Routes.HOME
 
+    /**
+     * A1 → A2 로 넘길 카카오 가입 정보. (§1-7 → §1-8)
+     *
+     * **route 인자로 넘기지 않는다.** 카카오 액세스 토큰은 자격 증명이라 route 문자열에
+     * 실으면 백스택과 로그에 남는다(AGENTS 8장). 그래프가 살아 있는 동안만 메모리에 둔다.
+     *
+     * 프로세스가 죽으면 사라지는데, 그때는 **다시 로그인하는 것이 맞다** — 카카오 토큰도
+     * 짧게 사는 값이라 되살려 쓸 것이 아니다.
+     *
+     * **그 "다시 로그인" 을 실제로 시키려면 모드가 따로 남아야 한다** (#216 리뷰).
+     * `NavController` 는 백스택을 복원하므로 A2 가 되살아나는데, 이 변수만 null 이 되면
+     * 화면은 **이메일 가입 UI 를 그린다** — 카카오로 시작한 사람이 이메일 칸을 보게 된다.
+     * 그래서 [KAKAO_SIGNUP_MODE] 를 `savedStateHandle` 에 남긴다. **토큰이 아니라 "카카오로
+     * 시작했다" 는 사실뿐이라 비밀이 아니다.**
+     */
+    var kakaoSignup: KakaoSignupHandoff? = null
+
     fun leaveAuthGraph() {
         val target = returnTarget()
         // **아래에 있는 화면으로 그냥 돌아간다.** 위저드처럼 상태를 들고 있는 그래프는
@@ -220,16 +238,44 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
             LoginScreen(
                 onLoggedIn = ::leaveAuthGraph,
                 onBrowseAsGuest = ::leaveAuthGraph,
-                onSignup = { navController.navigate(Routes.SIGNUP) },
+                onSignup = {
+                    // 이메일 가입이다. 앞선 카카오 시도가 남아 있으면 지운다
+                    kakaoSignup = null
+                    navController.navigate(Routes.SIGNUP)
+                    navController.getBackStackEntry(Routes.SIGNUP)
+                        .savedStateHandle[KAKAO_SIGNUP_MODE] = false
+                },
                 onReset = { navController.navigate(Routes.RESET) },
+                onKakaoSignup = { handoff ->
+                    kakaoSignup = handoff
+                    navController.navigate(Routes.SIGNUP)
+                    // 토큰은 안 넘긴다. **모드만** 남겨서 복원됐을 때 알아볼 수 있게 한다
+                    navController.getBackStackEntry(Routes.SIGNUP)
+                        .savedStateHandle[KAKAO_SIGNUP_MODE] = true
+                },
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.SIGNUP) {
+        composable(Routes.SIGNUP) { entry ->
+            val handoff = kakaoSignup
+            val kakaoMode = entry.savedStateHandle.get<Boolean>(KAKAO_SIGNUP_MODE) == true
+
+            // **되살아났는데 토큰이 없다.** 모드는 남았으니 카카오로 시작한 것은 아는데,
+            // 이어갈 자격 증명이 없다 — 그대로 두면 이메일 가입 화면을 그린다(#216 리뷰).
+            // 여기서 A1 로 돌려보내는 것이 위 KDoc 이 말한 "다시 로그인" 이다.
+            if (kakaoMode && handoff == null) {
+                LaunchedEffect(entry) {
+                    entry.savedStateHandle.remove<Boolean>(KAKAO_SIGNUP_MODE)
+                    navController.popBackStack(Routes.LOGIN, inclusive = false)
+                }
+                return@composable
+            }
+
             SignupScreen(
                 onBack = { navController.popBackStack() },
                 // 가입 완료 = 자동 로그인 (명세 §1-5) → 복귀 지점으로.
                 onCompleted = ::leaveAuthGraph,
+                kakaoSignup = handoff,
                 modifier = Modifier.statusBarsPadding(),
             )
         }
@@ -241,6 +287,14 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
         }
     }
 }
+
+/**
+ * A2 가 카카오 갈래인가. `savedStateHandle` 에 남겨 **프로세스 종료를 넘긴다.**
+ *
+ * 토큰은 여기 담지 않는다 — 자격 증명이라 저장하면 안 된다(AGENTS 8장). 담는 것은
+ * "카카오로 시작했다" 는 사실뿐이고, 토큰이 없으면 화면을 A1 로 되돌리는 판단에만 쓴다.
+ */
+private const val KAKAO_SIGNUP_MODE = "signup.kakao"
 
 /**
  * 위저드 그래프 S4~S7. (SPEC §2.2 · §2.4)

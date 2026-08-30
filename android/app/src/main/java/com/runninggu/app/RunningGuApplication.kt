@@ -1,13 +1,15 @@
 package com.runninggu.app
 
-import com.runninggu.app.ui.map.MapAvailability
 import android.app.Application
+import android.util.Log
+import com.kakao.sdk.common.KakaoSdk
+import com.kakao.vectormap.KakaoMapSdk
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.DataStoreSessionPersistence
+import com.runninggu.app.ui.auth.KakaoAuthAvailability
 import com.runninggu.app.data.local.SessionStore
-import android.util.Log
-import com.kakao.vectormap.KakaoMapSdk
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.map.MapAvailability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,6 +35,33 @@ class RunningGuApplication : Application() {
             validator = ServiceLocator.sessionValidator,
         )
         initKakaoMap()
+        initKakaoAuth()
+    }
+
+    /**
+     * 카카오 로그인 SDK 초기화. (SPEC §4.1 · §1-7 · AP-08)
+     *
+     * 지도와 **같은 네이티브 앱 키**를 쓰지만 초기화는 따로다(다른 SDK 다). 지도가 실패해도
+     * 로그인은 될 수 있고 그 반대도 마찬가지라, 한쪽 실패가 다른 쪽을 끌고 가지 않게 나눈다.
+     *
+     * **실패해도 앱을 죽이지 않는다.** 키가 없으면(CI·키 못 받은 팀원) 카카오 버튼만 막히고
+     * 이메일 로그인은 그대로 쓴다(NFR-1·3). 그 판정은 [KakaoAuthAvailability] 가 들고 있다.
+     *
+     * 키 값은 로그에 남기지 않는다(AGENTS 8장).
+     */
+    private fun initKakaoAuth() {
+        val appKey = BuildConfig.KAKAO_NATIVE_APP_KEY
+        if (appKey.isBlank()) {
+            Log.w(TAG, "카카오 네이티브 앱 키가 없어 카카오 로그인을 끕니다. local.properties 를 확인하세요")
+            return
+        }
+        try {
+            KakaoSdk.init(this, appKey)
+            KakaoAuthAvailability.markReady()
+        } catch (e: Exception) {
+            // 지도와 달리 네이티브 라이브러리를 열지 않아 LinkageError 를 따로 받지 않는다
+            Log.w(TAG, "카카오 로그인 SDK 초기화 실패 — 카카오 로그인만 비활성화됩니다", e)
+        }
     }
 
     /**
