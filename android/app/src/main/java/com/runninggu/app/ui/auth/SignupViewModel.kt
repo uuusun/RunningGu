@@ -338,13 +338,66 @@ class SignupViewModel(
                     )
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
-                onFailure = {
+                onFailure = { cause ->
+                    // **사유마다 나가는 길이 다르다.** 여기서 뭉뚱그리면 사용자는 같은
+                    // 버튼만 계속 누르게 된다 — VERIFY 화면에는 닉네임도 이메일도 없다
                     _uiState.update {
-                        it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
+                        it.copy(
+                            isSubmitting = false,
+                            // 인증이 풀린 것은 재발송해야 빠져나온다 (§1-4 와 같은 처리)
+                            mustResend = it.mustResend ||
+                                cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED,
+                            // 뒤로 돌아갔을 때 그 칸이 이미 빨갛게 보이도록 결과를 남긴다
+                            nicknameCheck = if (cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED) {
+                                DuplicateCheck.Duplicate
+                            } else {
+                                it.nicknameCheck
+                            },
+                            emailCheck = if (cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED) {
+                                DuplicateCheck.Duplicate
+                            } else {
+                                it.emailCheck
+                            },
+                            errorMessage = signupFailureMessage(cause),
+                        )
                     }
                 },
             )
         }
+    }
+
+    /**
+     * 가입 확정 실패 문구. (API 명세 §1-5)
+     *
+     * **[뒤로] 로 앞 단계에 가야 풀리는 것들이 있다.** VERIFY 화면에는 [인증 확인] 버튼
+     * 하나뿐이라, 닉네임이 겹쳤다는 말을 안 하면 사용자는 같은 버튼만 누르며 영원히 같은
+     * 409 를 받는다(#227 리뷰).
+     *
+     * 특히 [NICKNAME_DUPLICATED] 는 **설계가 최종 방어로 삼은 것**이다 — 중복확인은
+     * 진행을 막지 않기로 했고([DuplicateCheck] KDoc), 확인과 제출 사이에 남이 먼저
+     * 가입하는 경우를 여기서 잡는다. 그 마지막 방어가 원인 불명으로 도착하면 안 된다.
+     */
+    private fun signupFailureMessage(cause: Throwable): String = when {
+        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED ->
+            "이미 쓰는 닉네임이에요. [뒤로] 를 눌러 다른 닉네임으로 바꿔 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED ->
+            "이미 가입된 이메일이에요. 로그인 화면에서 로그인해 주세요."
+
+        // 앱 흐름에서는 인증 직후 곧바로 가입해서 닿기 어렵다. 구버전 앱이나 검증을
+        // 건너뛴 요청에서 올 수 있어 매핑만 해 둔다 (#228 리뷰의 같은 기준)
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED ->
+            "인증이 만료됐어요. 메일을 다시 받아 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.INVALID_PASSWORD ->
+            "비밀번호가 조건에 맞지 않아요. [뒤로] 를 눌러 다시 정해 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.AGREEMENT_REQUIRED ->
+            "필수 약관에 동의해야 가입할 수 있어요."
+
+        else -> "가입에 실패했어요. 다시 시도해 주세요."
     }
 
     /**
