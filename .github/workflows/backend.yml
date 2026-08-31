@@ -84,13 +84,20 @@ jobs:
       - name: Validate EC2 Compose model
         env:
           DB_PASSWORD: compose-config-check
+          PGBACKREST_S3_BUCKET: runninggu-compose-check
+          PGBACKREST_S3_KMS_KEY_ID: arn:aws:kms:ap-northeast-2:000000000000:key/compose-check
+          PGBACKREST_S3_ROLE: runninggu-compose-check
         run: |
           docker compose \
             --profile routing \
             -f compose.yaml \
             -f compose.ec2.yaml \
             config --format json > build-compose-ec2.json
-          python3 -c 'import json; d=json.load(open("build-compose-ec2.json", encoding="utf-8")); p=d["services"]["postgres"]["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0]["host_ip"]=="127.0.0.1" and p[0]["target"]==5432, p; assert len(g)==1 and g[0]["host_ip"]=="127.0.0.1" and g[0]["target"]==8989, g; assert d["services"]["postgres"]["restart"]=="unless-stopped"; assert d["services"]["postgres"]["logging"]["driver"]=="local"; assert d["services"]["graphhopper"]["logging"]["driver"]=="local"'
+          python3 -c 'import json; d=json.load(open("build-compose-ec2.json", encoding="utf-8")); s=d["services"]["postgres"]; p=s["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0]["host_ip"]=="127.0.0.1" and p[0]["target"]==5432, p; assert len(g)==1 and g[0]["host_ip"]=="127.0.0.1" and g[0]["target"]==8989, g; assert s["restart"]=="unless-stopped"; assert s["logging"]["driver"]=="local"; assert d["services"]["graphhopper"]["logging"]["driver"]=="local"; assert "archive_mode=on" in s["command"]; assert "archive_timeout=300s" in s["command"]; assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
+          docker compose \
+            -f compose.recovery.yaml \
+            config --format json > build-compose-recovery.json
+          python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
 
       - name: Test and prepare EC2 artifact
         run: ./gradlew clean test ec2Artifact --console=plain
