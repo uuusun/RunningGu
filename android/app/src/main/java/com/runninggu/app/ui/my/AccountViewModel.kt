@@ -11,6 +11,9 @@ import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.repository.MemberRepository
+import android.content.Context
+import com.runninggu.app.ui.auth.KakaoAuthResult
+import com.runninggu.app.ui.auth.requestKakaoToken
 import com.runninggu.app.data.repository.ReauthCredential
 import com.runninggu.app.ui.auth.AuthValidation
 import com.runninggu.app.ui.auth.PasswordIssue
@@ -111,6 +114,9 @@ data class WithdrawEdit(
  * 따지지 않고 세션을 통째로 갈아끼운다. 그래서 낙관적 갱신도, 롤백도 없다 — **서버가
  * 답하기 전에는 화면이 움직이지 않는다.** 되돌릴 것이 없으니 되돌리다 틀릴 일도 없다.
  */
+/** 카카오 재인증이 SDK 단계에서 실패했다. 서버까지 못 간 것이라 탈퇴는 그대로다. */
+private const val KAKAO_REAUTH_FAILED = "카카오 확인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요."
+
 class AccountViewModel(
     private val repository: AuthRepository = ServiceLocator.authRepository,
     private val memberRepository: MemberRepository = ServiceLocator.memberRepository,
@@ -408,11 +414,11 @@ class AccountViewModel(
      * 계정이 남는다(#198 KDoc). 로그아웃이 #89 에서 `signOutAndAwait` 를 쓰게 된 것과
      * 같은 자리다: 지워진 것을 **확인하기 전에는** 완료가 아니다.
      *
-     * ## 지금은 EMAIL 만이다
+     * ## 재인증 수단은 가입 경로를 따라간다 (§2-2)
      *
-     * KAKAO 는 SDK 가 방금 발급한 액세스 토큰으로 재인증해야 하는데(§2-2), 그 SDK 가 아직
-     * 없다(AP-08 · 이슈 #206). 화면이 카카오 가입자에게 탈퇴를 **막고** 안내한다 —
-     * 누르게 두고 실패시키는 것보다 낫다.
+     * EMAIL 은 현재 비밀번호, KAKAO 는 **SDK 가 방금 발급한** 액세스 토큰이다. 카카오는
+     * [onWithdrawWithKakao] 로 들어온다 — 앞쪽(SDK)이 `Context` 를 요구해 기기 없이는
+     * 못 돌리므로, 뒤쪽만 [startWithdraw] 로 갈라 두었다.
      */
     fun onWithdraw(reauthPassword: String) {
         val current = _uiState.value.withdraw
@@ -428,12 +434,57 @@ class AccountViewModel(
             _uiState.update { it.copy(withdraw = WithdrawEdit(error = "비밀번호를 입력해 주세요")) }
             return
         }
+        startWithdraw(ReauthCredential.Password(reauthPassword))
+    }
+
+    /**
+     * 카카오 가입자의 탈퇴. (§2-2 · #237 리뷰)
+     *
+     * **SDK 가 방금 발급한 토큰이어야 한다.** 로그인할 때 받은 토큰을 들고 있다가 쓰는
+     * 것이 아니라, 이 순간 사용자가 카카오로 본인임을 다시 보이는 절차다 — 비밀번호를
+     * 다시 묻는 것과 같은 자리다.
+     *
+     * 앞쪽(SDK)이 `Context` 와 실제 카카오 앱을 요구해 **기기 없이는 돌릴 수 없다.**
+     * 그래서 뒤쪽은 [onWithdrawWithKakaoToken] 으로 갈라 두었다 — 어떤 결말로 가는지는
+     * 기기 없이 고정할 수 있어야 한다([LoginViewModel] 과 같은 이유).
+     */
+    fun onWithdrawWithKakao(context: Context) {
+        val current = _uiState.value.withdraw
+        if (current?.saving == true) return
+        if (current?.serverDone == true) {
+            withdrawJob?.cancel()
+            withdrawJob = viewModelScope.launch { finishLocally() }
+            return
+        }
+        withdrawJob?.cancel()
+        withdrawJob = viewModelScope.launch {
+            _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true)) }
+            when (val auth = requestKakaoToken(context)) {
+                // 되돌릴 수 없는 조작 앞에서 그만둔 것이다. 문구 없이 원래대로 둔다
+                is KakaoAuthResult.Cancelled ->
+                    _uiState.update { it.copy(withdraw = WithdrawEdit()) }
+
+                is KakaoAuthResult.Failed ->
+                    _uiState.update { it.copy(withdraw = WithdrawEdit(error = KAKAO_REAUTH_FAILED)) }
+
+                is KakaoAuthResult.Token -> onWithdrawWithKakaoToken(auth.accessToken)
+            }
+        }
+    }
+
+    /** SDK 와 서버 사이의 경계. 기기 없이 여기부터 고정한다. */
+    internal fun onWithdrawWithKakaoToken(accessToken: String) {
+        startWithdraw(ReauthCredential.Kakao(accessToken))
+    }
+
+    /** 재인증 수단만 다르고 그 뒤는 같다 — 순서도 실패 처리도 한곳에 둔다. */
+    private fun startWithdraw(credential: ReauthCredential) {
         val epoch = SessionStore.sessionEpoch
         withdrawJob?.cancel()
         withdrawJob = viewModelScope.launch {
             _uiState.update { it.copy(withdraw = WithdrawEdit(saving = true)) }
             val result = runCatchingUnlessCancelled {
-                val token = memberRepository.reauth(ReauthCredential.Password(reauthPassword))
+                val token = memberRepository.reauth(credential)
                 memberRepository.withdraw(token)
             }
             result.fold(

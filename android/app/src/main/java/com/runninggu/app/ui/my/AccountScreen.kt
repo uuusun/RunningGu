@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +60,8 @@ fun AccountScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // 카카오 재인증이 SDK 를 부르는 데 필요하다 (§2-2)
+    val context = LocalContext.current
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
@@ -168,8 +171,8 @@ fun AccountScreen(
     // 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다 (§2-2)
     state.withdraw?.let { edit ->
         WithdrawDialog(
-            // 카카오 가입자는 SDK 가 방금 발급한 토큰으로 재인증해야 한다(§2-2). 그 SDK 가
-            // 아직 없어(AP-08 · #206) 지금은 막고 안내한다 — 누르게 두고 실패시키는 것보다 낫다.
+            // 재인증 수단이 가입 경로를 따라간다(§2-2) — EMAIL 은 비밀번호, KAKAO 는
+            // SDK 가 방금 발급한 토큰이다. 화면이 다른 것은 **입력칸의 유무**뿐이다.
             emailAccount = state.profile?.loginProvider == LoginProvider.EMAIL,
             saving = edit.saving,
             error = edit.error,
@@ -177,6 +180,7 @@ fun AccountScreen(
             onDismiss = viewModel::onWithdrawDismiss,
             onGiveUp = viewModel::onWithdrawGiveUp,
             onConfirm = viewModel::onWithdraw,
+            onConfirmKakao = { viewModel.onWithdrawWithKakao(context) },
         )
     }
 }
@@ -364,6 +368,7 @@ private fun WithdrawDialog(
     onDismiss: () -> Unit,
     onGiveUp: () -> Unit,
     onConfirm: (String) -> Unit,
+    onConfirmKakao: () -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
@@ -396,11 +401,11 @@ private fun WithdrawDialog(
                         enabled = !saving,
                     )
                 } else if (!serverDone) {
-                    // 카카오는 SDK 토큰으로 재인증한다(§2-2). SDK 가 아직 없다(AP-08 · #206).
-                    // **누르게 두고 실패시키지 않는다** — 되돌릴 수 없는 조작이라 더 그렇다.
+                    // 카카오는 **SDK 가 방금 발급한** 토큰으로 재인증한다(§2-2). 비밀번호를
+                    // 다시 묻는 것과 같은 자리라, [탈퇴] 를 누르면 카카오로 한 번 더 확인한다
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "카카오로 가입한 계정은 아직 앱에서 탈퇴할 수 없어요. 준비 중이에요.",
+                        text = "카카오로 한 번 더 확인해요.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -417,12 +422,14 @@ private fun WithdrawDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(password) },
+                onClick = { if (emailAccount || serverDone) onConfirm(password) else onConfirmKakao() },
                 enabled = when {
                     saving -> false
                     // 비밀번호는 이미 확인됐다. 다시 묻지 않는다
                     serverDone -> true
-                    else -> emailAccount && password.isNotEmpty()
+                    // 카카오는 여기서 받을 값이 없다 — 누르면 SDK 가 본인 확인을 한다
+                    !emailAccount -> true
+                    else -> password.isNotEmpty()
                 },
             ) {
                 Text(

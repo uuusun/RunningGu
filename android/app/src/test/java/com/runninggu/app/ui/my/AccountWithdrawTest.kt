@@ -73,6 +73,55 @@ class AccountWithdrawTest {
         AccountViewModel(repository = WithdrawAuthStub(), memberRepository = member)
             .also { advanceUntilIdle() }
 
+    // ── 카카오 가입자 (§2-2 · #237 리뷰) ────────────────────────────
+
+    @Test
+    fun `카카오도 같은 순서로 탈퇴한다`() = runTest(dispatcher) {
+        // 개인정보 문안이 "탈퇴할 수 있습니다" 라고 적는데 카카오 회원만 못 하면
+        // 문안이 못 지키는 약속을 하게 된다(#237 리뷰). 수단만 다르고 절차는 같다.
+        //
+        // **프로필을 KAKAO 로 바꾸지 않는다.** ViewModel 은 `loginProvider` 로 갈라지지
+        // 않고 **어떤 자격을 받았는지**로만 움직인다 — 가르는 것은 화면이다. 여기서
+        // `signIn` 을 다시 부르면 `setUp` 의 것과 겹쳐 Main dispatcher 가 오염되고
+        // 뒤에 도는 다른 테스트가 깨진다
+        val member = FakeWithdrawRepository()
+        val viewModel = viewModel(member)
+
+        viewModel.onWithdrawOpen()
+        viewModel.onWithdrawWithKakaoToken("kakao-fresh-token")
+        advanceUntilIdle()
+
+        // **SDK 가 방금 발급한 토큰**을 그대로 넘긴다 (§2-2)
+        assertEquals(ReauthCredential.Kakao("kakao-fresh-token"), member.sentCredential)
+        assertEquals(FakeWithdrawRepository.REAUTH_TOKEN, member.sentReauthToken)
+        assertTrue(
+            "세션이 DELETE /me 보다 먼저 지워졌다",
+            member.signedOutWhenWithdrawCalled == false,
+        )
+        assertNull(viewModel.uiState.value.withdraw)
+        assertTrue(viewModel.uiState.value.signedOut)
+        assertNull(SessionStore.session.value)
+    }
+
+    @Test
+    fun `카카오 재인증이 실패하면 계정은 그대로 남는다`() = runTest(dispatcher) {
+        val member = FakeWithdrawRepository(
+            reauthResult = Result.failure(
+                ApiException.Http(status = 401, code = ApiErrorCode.REAUTH_FAILED, problem = null),
+            ),
+        )
+        val viewModel = viewModel(member)
+
+        viewModel.onWithdrawOpen()
+        viewModel.onWithdrawWithKakaoToken("kakao-stale-token")
+        advanceUntilIdle()
+
+        // 되돌릴 수 없는 조작이라 **어중간하게 끝나면 안 된다** — 서버도 기기도 그대로다
+        assertEquals(0, member.withdrawCalls)
+        assertNotNull("세션이 남아 있어야 한다", SessionStore.session.value)
+        assertNotNull(viewModel.uiState.value.withdraw?.error)
+    }
+
     @Test
     fun `재인증 토큰으로 탈퇴하고 기기를 비운다`() = runTest(dispatcher) {
         val member = FakeWithdrawRepository()
