@@ -276,7 +276,14 @@ private fun NavGraphBuilder.authGraph(navController: NavHostController) {
             }
 
             SignupScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    // **떠날 때도 비운다.** 가입을 마치지 않고 A2 를 벗어나면 여기로 온다 —
+                    // 아래 `onCompleted` 와 같은 이유다(@M1nnnji · #234 리뷰). 안 지우면
+                    // 다음 이메일 가입이나 그래프 이탈 전까지 토큰이 남는다.
+                    kakaoSignup = null
+                    entry.savedStateHandle.remove<Boolean>(KAKAO_SIGNUP_MODE)
+                    navController.popBackStack()
+                },
                 // 가입 완료 = 자동 로그인 (명세 §1-5) → 복귀 지점으로.
                 onCompleted = {
                     // **끝났으면 토큰을 들고 있지 않는다.** 위 KDoc 이 "카카오 토큰도 짧게
