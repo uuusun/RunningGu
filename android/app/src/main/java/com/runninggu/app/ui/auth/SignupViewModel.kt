@@ -370,12 +370,12 @@ class SignupViewModel(
                             // 인증이 풀린 것은 재발송해야 빠져나온다 (§1-4 와 같은 처리).
                             // **여기 오는 시점의 `mustResend` 는 항상 false 다** —
                             // `canVerify` 가 `!mustResend` 로 막고 있어서다(#235 리뷰).
-                            mustResend = cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED,
+                            mustResend = cause.apiErrorCode() in VERIFICATION_LOST,
                             // **쿨다운을 면제한다.** 안 그러면 "메일을 다시 받아 주세요" 를
                             // 띄워 놓고 [재발송] 이 최대 60초 잠겨 있다 — 시키는 일을 할
                             // 수단이 없는 화면이 된다(#235 리뷰). 인증이 실제로 풀렸다면
                             // 마지막 발송에서 30분이 지났으므로 서버 쿨다운도 끝나 있다
-                            resendCooldownSec = if (cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED) {
+                            resendCooldownSec = if (cause.apiErrorCode() in VERIFICATION_LOST) {
                                 0
                             } else {
                                 it.resendCooldownSec
@@ -419,9 +419,18 @@ class SignupViewModel(
         cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED ->
             "이미 가입된 이메일이에요. 로그인 화면에서 로그인해 주세요."
 
-        // 앱 흐름에서는 인증 직후 곧바로 가입해서 닿기 어렵다. 구버전 앱이나 검증을
-        // 건너뛴 요청에서 올 수 있어 매핑만 해 둔다 (#228 리뷰의 같은 기준)
-        cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED ->
+        // **인증이 풀린 것이 둘이다** (§1-5 · #237 로 계약이 갈렸다).
+        //
+        //   403 EMAIL_NOT_VERIFIED  행은 있는데 아직 인증 전
+        //   400 CODE_EXPIRED        인증은 했는데 30분이 지났거나 행이 없다
+        //
+        // 앱에서 실제로 닿는 것은 **뒤쪽**이다 — 닉네임이 겹쳐 뒤로 갔다 오는 사이
+        // 30분이 지나면 여기로 온다. 앞쪽은 인증 직후 곧바로 가입해서 닿기 어렵지만
+        // 구버전 앱이나 검증을 건너뛴 요청에서 올 수 있어 함께 매핑한다.
+        //
+        // 사용자가 할 일은 둘 다 같다 — 메일을 다시 받는 것이다.
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED ||
+            cause.apiErrorCode() == ApiErrorCode.CODE_EXPIRED ->
             "인증이 만료됐어요. 아래 [재발송] 으로 메일을 다시 받아 주세요."
 
         cause.apiErrorCode() == ApiErrorCode.INVALID_PASSWORD ->
@@ -589,6 +598,17 @@ class SignupViewModel(
 
         /** SPEC §4.2-3 — 재발송 쿨다운 60초. */
         const val RESEND_COOLDOWN_SEC = 60
+
+        /**
+         * 가입 확정에서 **인증이 풀렸다**는 두 코드. (§1-5)
+         *
+         * `403` 은 아직 인증 전, `400 CODE_EXPIRED` 는 인증 후 30분이 지났거나 행이
+         * 없는 것이다. 사용자가 할 일은 둘 다 재발송이라 같이 다룬다(#237 계약).
+         */
+        val VERIFICATION_LOST = setOf(
+            ApiErrorCode.EMAIL_NOT_VERIFIED,
+            ApiErrorCode.CODE_EXPIRED,
+        )
 
         /** 이 사유들은 같은 코드로 재시도해도 소용없다 — 재발송해야 한다. (§1-4 · NFR-10 🔒) */
         val RESEND_REQUIRED_CODES = setOf(

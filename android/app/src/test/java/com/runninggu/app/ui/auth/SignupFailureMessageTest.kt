@@ -125,6 +125,37 @@ class SignupFailureMessageTest {
     }
 
     @Test
+    fun `인증 후 30분이 지나도 같은 길을 연다`() = runTest(dispatcher) {
+        // §1-5 는 인증이 풀린 것을 둘로 가른다 — 아직 인증 전이면 403, 인증 후 30분이
+        // 지났거나 행이 없으면 400 CODE_EXPIRED. **앱에서 실제로 닿는 것은 뒤쪽이다**
+        // (닉네임을 고치러 뒤로 갔다 오는 사이 창이 닫힌다). 사용자가 할 일은 같다
+        val viewModel = SignupViewModel(
+            repository = FakeSignupRepository(
+                ApiException.Http(status = 400, code = ApiErrorCode.CODE_EXPIRED, problem = null),
+            ),
+        )
+        viewModel.onToggleTos()
+        viewModel.onTogglePrivacy()
+        viewModel.onAgreeNext()
+        viewModel.onEmailChange("runner@test.com")
+        viewModel.onPasswordChange("run4life1")
+        viewModel.onPasswordConfirmChange("run4life1")
+        viewModel.onNicknameChange("김러너")
+        viewModel.onInfoNext()
+        runCurrent()
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        runCurrent()
+
+        assertEquals(
+            "인증이 만료됐어요. 아래 [재발송] 으로 메일을 다시 받아 주세요.",
+            viewModel.uiState.value.errorMessage,
+        )
+        assertTrue("재발송이 열려야 한다", viewModel.uiState.value.mustResend)
+        assertEquals("쿨다운도 함께 풀려야 한다", 0, viewModel.uiState.value.resendCooldownSec)
+    }
+
+    @Test
     fun `비밀번호와 약관은 각각 다른 곳을 가리킨다`() = runTest(dispatcher) {
         val password = submit(
             ApiException.Http(status = 400, code = ApiErrorCode.INVALID_PASSWORD, problem = null),
