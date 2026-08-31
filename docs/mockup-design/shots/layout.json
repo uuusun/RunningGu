@@ -290,12 +290,12 @@
     },
     {
       "id": "courses",
-      "title": "[러닝 코스 · GPS 기록]",
+      "title": "[러닝 코스]",
       "fill": "#F8F5FF",
-      "note": "코스 상세에서 기록을 시작하면 심연(deep) 지면의 GPS 화면으로 전환되고, 종료 시 요약으로 넘어간다. 두루누비 코스가 없는 수도권은 걷기 좋은 곳이 기본 화면이 되며, 경로 없이 바로 기록을 시작한다.",
+      "note": "출발지를 검색·프리셋으로 고르면 그 좌표를 기준으로 코스를 찾는다. 두루누비 코스가 없는 수도권은 걷기 좋은 곳이 기본 화면이 된다. 기기 위치는 쓰지 않는다(결정-56).",
       "x": 0,
       "y": 7823,
-      "w": 2500,
+      "w": 1200,
       "h": 3414,
       "rowTops": [
         190,
@@ -308,7 +308,7 @@
       "items": [
         {
           "name": "30-courses",
-          "label": "러닝 코스 · 내 주변",
+          "label": "러닝 코스 · 출발지 주변",
           "file": "png/30-courses.png",
           "row": 0,
           "col": 0,
@@ -324,28 +324,6 @@
           "row": 0,
           "col": 1,
           "x": 730,
-          "y": 190,
-          "w": 390,
-          "h": 844
-        },
-        {
-          "name": "33-run",
-          "label": "GPS 기록 중",
-          "file": "png/33-run.png",
-          "row": 0,
-          "col": 2,
-          "x": 1380,
-          "y": 190,
-          "w": 390,
-          "h": 844
-        },
-        {
-          "name": "34-runsum",
-          "label": "러닝 요약",
-          "file": "png/34-runsum.png",
-          "row": 0,
-          "col": 3,
-          "x": 2030,
           "y": 190,
           "w": 390,
           "h": 844
@@ -518,7 +496,7 @@
       "note": "삭제·탈퇴처럼 복구가 어려운 동작 앞에 확인 모달을 세운다. [취소]와 [삭제]/[탈퇴] 두 갈래.",
       "x": 0,
       "y": 15529,
-      "w": 3150,
+      "w": 1850,
       "h": 1174,
       "rowTops": [
         190
@@ -550,34 +528,12 @@
           "h": 844
         },
         {
-          "name": "102-confirm-run",
-          "label": "확인 · 러닝 기록 삭제",
-          "file": "png/102-confirm-run.png",
-          "row": 0,
-          "col": 2,
-          "x": 1380,
-          "y": 190,
-          "w": 390,
-          "h": 844
-        },
-        {
           "name": "103-confirm-quit",
           "label": "확인 · 회원 탈퇴",
           "file": "png/103-confirm-quit.png",
           "row": 0,
-          "col": 3,
-          "x": 2030,
-          "y": 190,
-          "w": 390,
-          "h": 844
-        },
-        {
-          "name": "104-confirm-runsave",
-          "label": "확인 · 기록 저장 전 취소",
-          "file": "png/104-confirm-runsave.png",
-          "row": 0,
-          "col": 4,
-          "x": 2680,
+          "col": 2,
+          "x": 1380,
           "y": 190,
           "w": 390,
           "h": 844
@@ -928,34 +884,12 @@
           "h": 844
         },
         {
-          "name": "71-coursedetail-ran",
-          "label": "코스 상세 · 뛴 기록",
-          "file": "png/71-coursedetail-ran.png",
-          "row": 1,
-          "col": 3,
-          "x": 2030,
-          "y": 1367,
-          "w": 390,
-          "h": 844
-        },
-        {
-          "name": "66-courses-locating",
-          "label": "러닝 코스 · 위치 확인 중",
-          "file": "png/66-courses-locating.png",
-          "row": 2,
-          "col": 0,
-          "x": 80,
-          "y": 2411,
-          "w": 390,
-          "h": 844
-        },
-        {
           "name": "67-courses-nostart",
           "label": "러닝 코스 · 출발지 없음",
           "file": "png/67-courses-nostart.png",
           "row": 2,
-          "col": 1,
-          "x": 730,
+          "col": 0,
+          "x": 80,
           "y": 2411,
           "w": 390,
           "h": 844
@@ -965,8 +899,8 @@
           "label": "러닝 코스 · 코스 0",
           "file": "png/68-courses-nocourse.png",
           "row": 2,
-          "col": 2,
-          "x": 1380,
+          "col": 1,
+          "x": 730,
           "y": 2411,
           "w": 390,
           "h": 1249
@@ -976,8 +910,8 @@
           "label": "러닝 코스 · 결과 0건",
           "file": "png/69-courses-none.png",
           "row": 2,
-          "col": 3,
-          "x": 2030,
+          "col": 2,
+          "x": 1380,
           "y": 2411,
           "w": 390,
           "h": 844
@@ -1403,30 +1337,6 @@
       "kind": "inner"
     },
     {
-      "from": "140-courses-seoul",
-      "to": "33-run",
-      "label": "여기서 뛰기",
-      "kind": "inner"
-    },
-    {
-      "from": "32-coursedetail",
-      "to": "33-run",
-      "label": "기록 시작",
-      "kind": "inner"
-    },
-    {
-      "from": "33-run",
-      "to": "34-runsum",
-      "label": "종료",
-      "kind": "inner"
-    },
-    {
-      "from": "34-runsum",
-      "to": "40-library",
-      "label": "기록 저장",
-      "kind": "cross"
-    },
-    {
       "from": "40-library",
       "to": "41-library-course",
       "label": "코스 탭",
@@ -1448,12 +1358,6 @@
       "from": "41-library-course",
       "to": "32-coursedetail",
       "label": "저장 코스 선택",
-      "kind": "cross"
-    },
-    {
-      "from": "41-library-course",
-      "to": "71-coursedetail-ran",
-      "label": "러닝 기록 선택",
       "kind": "cross"
     },
     {
@@ -1562,18 +1466,6 @@
       "from": "41-library-course",
       "to": "101-confirm-course",
       "label": "코스 삭제",
-      "kind": "cross"
-    },
-    {
-      "from": "41-library-course",
-      "to": "102-confirm-run",
-      "label": "기록 삭제",
-      "kind": "cross"
-    },
-    {
-      "from": "34-runsum",
-      "to": "104-confirm-runsave",
-      "label": "저장 안 하고 나가기",
       "kind": "cross"
     },
     {

@@ -19,7 +19,7 @@
   --ink:#15161B; --ink2:#54565E; --ink3:#71747C; --ink4:#86878E; --ink5:#9A9CA2;
   --surface:#FFFFFF; --page:#EDECE8; --fill:#F2F2F0; --fill2:#E9EBEF;
   --line:#E4E4E6; --line2:#ECECEE; --line3:#F0F0F0;
-  /* 몰입 레지스터 — 블루 잉크의 심연 (3D·GPS 무대) */
+  /* 몰입 레지스터 — 블루 잉크의 심연 (3D 지형 무대) */
   --deep:#0C1024; --deep-2:#131A38; --deep-3:#1B2450;
   --deep-t1:#F2F5FF; --deep-t2:#A9B4DC; --deep-t3:#6E7AA8; --deep-line:rgba(169,180,220,.16);
   --cat-tour-bg:#EAF1FF; --cat-tour-fg:#2B5CFF;
@@ -270,18 +270,13 @@ input{font-family:inherit;outline:none}
 .debug-rail button{font-size:11px;font-weight:700;padding:5px 9px;border-radius:7px;text-align:center;color:#fff;background:rgba(255,255,255,.12)}
 .debug-rail button.on{color:var(--ink);background:#fff}
 
-/* GPS 기록(다크 몰입) */
-.runmap{position:absolute;inset:0;overflow:hidden}
-.runmap svg{position:absolute;inset:0;width:100%;height:100%}
-.run-pill{position:relative;margin:10px auto 0;background:rgba(201,242,60,.14);border:1px solid rgba(201,242,60,.3);
-  color:var(--lime);font-size:11.5px;font-weight:700;padding:7px 13px;border-radius:12px;width:max-content}
 </style>
 </head>
 <body>
 <!--
 THESIS: 러너의 데이터(코스 지형·경로·기록)가 화면의 주인공이 되는 러닝 관광 앱 — 회색 카드 나열형 카테고리 디폴트를 거부한다.
-OWN-WORLD: 확정 브랜드 블루 #2B5CFF·라임 #C9F23C·오렌지 #FF6A2B. 라이트 오퍼레이트 지면 + 블루 잉크 심연(--deep)의 몰입 무대 이원 레지스터. Pretendard 본문, Archivo 초고중량 숫자. 라임 리본이 3D 지형 위를 스스로 그린다. 콘텐츠 없이도 알아볼 표식: 심연 위 라임 경로 리본 + 고도 스트립이 박힌 대회 로우.
-STORY: 러너가 대회를 찾고(검색·캘린더) → 코스를 몸으로 이해하고(3D 지형) → 대회 전후 여행 동선을 받고 편집하고 → 뛴 기록이 리본으로 남는다. 게스트는 탐색까지, 저장은 로그인.
+OWN-WORLD: 확정 브랜드 블루 #2B5CFF·라임 #C9F23C·오렌지 #FF6A2B. 라이트 오퍼레이트 지면 + 블루 잉크 심연(--deep)의 몰입 무대 이원 레지스터. Pretendard 본문, Archivo 초고중량 숫자. 라임 리본이 3D 지형 위를 스스로 그린다. 콘텐츠 없이도 알아볼 표식: 심연 위 라임 코스 리본 + 고도 스트립이 박힌 대회 로우.
+STORY: 러너가 대회를 찾고(검색·캘린더) → 코스를 몸으로 이해하고(3D 지형) → 대회 전후 여행 동선을 받고 편집하고 → 고른 코스가 보관함에 남는다. 게스트는 탐색까지, 저장은 로그인.
 FIRST VIEWPORT: 홈 상단 절반이 심연 3D 히어로 — 세종 호수공원 코스 리본이 지형 위로 그려지고 D-21이 대형 Archivo로 선다. 검색 바가 히어로 위 첫 레이어(회의 결정 '검색 우선'), 그 아래 마감임박·축제가 라이트 지면으로 이어진다. 주 액션: 히어로 CTA "이 대회로 동선 만들기".
 FORM: 사용자 핀 방향(기존 색감 유지 + NRC·스트라바/애플 피트니스 품질 기준) — 롤 2회(ef4f3062·c8c022c9) 재롤 후 사용자 지정이 롤을 대체. 데이터 3D 한정, 오브제 3D 배제, 하이브리드 포팅(3D는 히어로 존 전용).
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
@@ -598,7 +593,7 @@ const PATTERNS = [
   { key:'custom', label:'직접 선택', sub:'달력에서 직접 고르기', s:null, e:null }
 ];
 const PREF_LIST = ['관광지','맛집','카페','힐링웰니스','자연트레킹','역사문화'];
-const PREV = { detail:'calendar', w1:'detail', w2:'w1', w3:'w2', result:'w3', run:'courses', runsum:'run', account:'library', coursedetail:'library' };
+const PREV = { detail:'calendar', w1:'detail', w2:'w1', w3:'w2', result:'w3', account:'library', coursedetail:'library' };
 
 /* 대회별 3D 코스 형상 (정규화 -1..1) — 데이터 3D의 원천 */
 const ROUTES3D = {
@@ -608,7 +603,6 @@ const ROUTES3D = {
   chuncheon:{ seed:31, amp:.52, loop:true,  km:['10','20','30'], route:[[-.5,-.3],[.1,-.5],[.55,-.1],[.4,.4],[-.15,.5],[-.55,.2]] },
   jeonju:   { seed:17, amp:.3,  loop:true,  km:['3','6','9'],   route:[[-.45,-.35],[.2,-.45],[.5,0],[.2,.45],[-.4,.35]] },
   jeju:     { seed:41, amp:.56, loop:false, km:['4','8','12'],  route:[[-.65,.4],[-.3,.05],[.05,-.25],[.45,-.45],[.68,-.2]] },
-  runTrack: { seed:23, amp:.38, loop:true,  km:['1','2','3','4','5'], route:[[-.6,.25],[-.25,-.1],[.15,-.35],[.55,-.15],[.6,.25],[.15,.45],[-.3,.45]] },
   haeparang:{ seed:23, amp:.42, loop:false, km:['1','2','3','4'], route:[[-.68,.3],[-.35,.1],[0,.28],[.35,.05],[.68,.22]] }
 };
 
@@ -623,15 +617,15 @@ const S = {
   hotelQ:'', hotel:null, generating:false,
   dbg:{ w3:'ok', courses:'ok', result:'ok', lib:'ok', login:'ok', home:'ok', fest:'ok', cal:'ok' },
   itin:JSON.parse(JSON.stringify(ITIN0)), activeDay:1, activeBlock:0, editMode:false, poi:null, saved:true, courseStart:'부산 해운대',
-  cTab:'near', startQ:'', dist:5, course:'해파랑길 1코스', cRegion:null, ranSaved:true, libTab:'route',
-  cdRan:false, resultFrom:'w3', guest:false, guestOpen:false, suStep:1, agree:{ tos:false, privacy:false, mkt:false },
+  cTab:'near', startQ:'', dist:5, course:'해파랑길 1코스', cRegion:null, libTab:'route',
+  resultFrom:'w3', guest:false, guestOpen:false, suStep:1, agree:{ tos:false, privacy:false, mkt:false },
   code:'', resendLeft:0, resetSent:false, pwChanged:false, homeQ:'',
-  runT:0, runOn:false, _drag:null,
+  _drag:null,
   /* 보완 — 코스 저장 · 계정 · 확인 모달 · 오프라인 · 게스트 복귀 */
   courseSaved:false, guestReason:'save', returnTo:null, confirm:null, offline:false,
   nick:'민지', acctMkt:true, kakaoLinked:true, syncedAt:'08.13 21:40'
 };
-let glHandles = [], runTimer = null, resendTimer = null;
+let glHandles = [], resendTimer = null;
 
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -643,7 +637,6 @@ function set(patch, rerender = true){
 function go(k){
   glHandles.forEach(h => h && h.dispose && h.dispose());
   glHandles = [];
-  if (runTimer && k !== 'run'){ clearInterval(runTimer); runTimer = null; S.runOn = false; }
   S.screen = k;
   render();
   $('#viewport').scrollTop = 0;
@@ -659,7 +652,6 @@ const GUEST_MSG = {
   fav:    ['로그인이 필요해요', '대회를 찜하려면 로그인해 주세요'],
   route:  ['로그인이 필요해요', '만든 동선을 저장하려면 로그인해 주세요'],
   course: ['로그인이 필요해요', '코스를 보관함에 담으려면 로그인해 주세요'],
-  run:    ['로그인이 필요해요', '오늘 뛴 기록을 남기려면 로그인해 주세요'],
   library:['로그인이 필요해요', '보관함은 로그인하면 쓸 수 있어요']
 };
 function guard(reason){
@@ -675,9 +667,7 @@ function guard(reason){
 const CONFIRMS = {
   route:   { title:'이 동선을 삭제할까요?',   desc:'저장한 세종 2박 3일 동선이 지워져요.', yes:'삭제', act:'doDeleteRoute' },
   course:  { title:'저장한 코스를 삭제할까요?', desc:'보관함에서 이 코스가 사라져요.',       yes:'삭제', act:'doDeleteCourse' },
-  run:     { title:'러닝 기록을 삭제할까요?',   desc:'기록한 거리·시간·경로가 모두 지워져요.', yes:'삭제', act:'doDeleteRun' },
-  quit:    { title:'탈퇴하면 저장한 동선과 기록이 모두 삭제돼요. 계속할까요?', desc:'삭제된 데이터는 되돌릴 수 없어요.', yes:'탈퇴', act:'doQuit' },
-  runsave: { title:'기록을 저장하지 않고 나갈까요?', desc:'방금 뛴 5.21km 기록이 사라져요.', yes:'저장 안 함', act:'doDropRun' }
+  quit:    { title:'탈퇴하면 저장한 동선과 코스가 모두 삭제돼요. 계속할까요?', desc:'삭제된 데이터는 되돌릴 수 없어요.', yes:'탈퇴', act:'doQuit' }
 };
 
 /* 오류 · 오프라인 공통 조각 */
@@ -1204,8 +1194,7 @@ SCREENS.library = () => {
   const libErr = S.dbg.lib === 'error';
   const LIB_ERR = { route:'저장한 동선을 불러오지 못했어요', course:'러닝코스 기록을 불러오지 못했어요', fav:'찜한 대회를 불러오지 못했어요' };
   const off = S.offline;
-  const courses = (S.ranSaved ? [{ ran:true, name:'해파랑길 1코스 왕복', meta:"07.28 (화) · 실제 5.21km · 32:10 · 6'11\"/km" }] : [])
-    .concat([{ ran:false, name:'해파랑길 1코스 왕복', meta:'부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }]);
+  const courses = [{ name:'해파랑길 1코스 왕복', meta:'부산 해운대구 · 5.0km · 약 45분 · 난이도 중' }];
   let body = '';
   if (libErr){
     body = errorBlock(LIB_ERR[S.libTab], "APP.dbgLib('ok')", '70px');
@@ -1234,19 +1223,18 @@ SCREENS.library = () => {
     body = !libEmpty ? `
       <div style="padding:16px 22px 0;display:flex;flex-direction:column;gap:9px">
         ${courses.map(c => `
-          <article style="border:1px solid var(--line2);border-radius:20px;padding:16px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openCourseDetail(${c.ran})">
+          <article style="border:1px solid var(--line2);border-radius:20px;padding:16px;background:var(--surface);cursor:pointer;box-shadow:var(--sh-1)" onclick="APP.openCourseDetail()">
             <div style="display:flex;align-items:flex-start;gap:8px">
               <div style="flex:1;min-width:0">
-                ${c.ran ? `<span style="background:var(--lime);color:var(--ink);font-size:11px;font-weight:800;padding:4px 9px;border-radius:11px">완료</span>` : ''}
-                <div style="font-size:15.5px;font-weight:700;letter-spacing:-.025em;margin-top:${c.ran ? 8 : 0}px">${esc(c.name)}</div>
+                <div style="font-size:15.5px;font-weight:700;letter-spacing:-.025em">${esc(c.name)}</div>
                 <div style="font-size:12.5px;color:var(--ink4);margin-top:5px">${esc(c.meta)}</div>
               </div>
-              <button ${off ? 'disabled' : ''} onclick="event.stopPropagation();APP.askDelete('${c.ran ? 'run' : 'course'}')" aria-label="삭제" style="flex:none">${msr('delete', { size:20, color: off ? 'var(--line)' : 'var(--ink5)' })}</button>
+              <button ${off ? 'disabled' : ''} onclick="event.stopPropagation();APP.askDelete('course')" aria-label="삭제" style="flex:none">${msr('delete', { size:20, color: off ? 'var(--line)' : 'var(--ink5)' })}</button>
             </div>
           </article>`).join('')}
       </div>` : `
       <div class="empty" style="padding:70px 34px">
-        <div class="t">저장한 코스나 러닝 기록이 없어요.</div>
+        <div class="t">저장한 코스가 없어요.</div>
         <button onclick="APP.go('courses')">러닝코스 둘러보기</button>
       </div>`;
   } else {
@@ -1294,20 +1282,15 @@ SCREENS.coursedetail = () => {
 <div class="screen" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
   <div style="padding:4px 18px 0;display:flex;align-items:center;justify-content:space-between">
     <button class="backbtn" onclick="APP.goLibrary()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button>
-    ${S.cdRan
-      ? `<button class="backbtn" style="margin:0" onclick="APP.askDelete('run')" aria-label="기록 삭제">${msr('delete', { size:22, color:'var(--ink2)' })}</button>`
-      : `<button class="backbtn" style="margin:0" onclick="APP.saveCourse()" aria-label="코스 저장">${msr('bookmark', { size:23, fill:S.courseSaved, color:S.courseSaved ? 'var(--blue)' : 'var(--ink2)' })}</button>`}
+    <button class="backbtn" style="margin:0" onclick="APP.saveCourse()" aria-label="코스 저장">${msr('bookmark', { size:23, fill:S.courseSaved, color:S.courseSaved ? 'var(--blue)' : 'var(--ink2)' })}</button>
   </div>
   <div class="px" style="padding-top:6px">
-    <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin:0">${S.cdRan ? '해파랑길 1코스 왕복 · 뛴 기록' : '해파랑길 1코스 왕복'}</h1>
-    <div style="font-size:13px;color:var(--ink4);margin-top:5px">${S.cdRan ? '07.28 (화) · 부산 해운대구' : '부산 해운대구 · 5.0km · 약 45분 · 난이도 중'}</div>
-    <div class="glcard" data-gl="${S.cdRan ? 'runTrack' : 'haeparang'}" data-gl-opts='{"dist":4.1,"alt":0.6}' style="margin-top:16px;height:230px">
-      <div class="cap">${S.cdRan ? '<span class="badge-live">GPS</span>' : '<span class="badge-sample">샘플</span>'}<span class="t">${S.cdRan ? '뛴 경로 · 라임 리본' : '코스 지형 · 드래그로 회전'}</span></div>
+    <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin:0">해파랑길 1코스 왕복</h1>
+    <div style="font-size:13px;color:var(--ink4);margin-top:5px">부산 해운대구 · 5.0km · 약 45분 · 난이도 중</div>
+    <div class="glcard" data-gl="haeparang" data-gl-opts='{"dist":4.1,"alt":0.6}' style="margin-top:16px;height:230px">
+      <div class="cap"><span class="badge-sample">샘플</span><span class="t">코스 지형 · 드래그로 회전</span></div>
     </div>
-    ${S.cdRan
-      ? statRow([['거리','5.21 km'],['시간','32:10'],["페이스","6'11\""]]) + `
-        <div class="src" style="margin-top:12px">GPS 기록 · 해파랑길 1코스 왕복 기준</div>`
-      : statRow([['거리','5.0 km'],['예상 시간','약 45분'],['난이도','중']]) + `
+    ${statRow([['거리','5.0 km'],['예상 시간','약 45분'],['난이도','중']]) + `
         <div style="margin-top:14px;border:1px solid var(--line);border-radius:16px;padding:13px 15px;background:var(--surface)">
           <div style="display:flex;align-items:center;gap:8px">
             ${msr('my_location', { size:18, color:'var(--blue)' })}
@@ -1318,11 +1301,9 @@ SCREENS.coursedetail = () => {
         <div class="src" style="margin-top:12px">두루누비 걷기길 · 한국관광공사</div>`}
   </div>
   <div style="flex:1;min-height:20px"></div>
-  ${!S.cdRan ? `
-  <div style="display:flex;gap:9px;padding:0 22px 18px">
+  <div style="display:flex;padding:0 22px 18px">
     <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">${S.courseSaved ? '저장됨' : '코스 저장'}</button>
-    <button class="cta lime" style="flex:1.3" onclick="APP.go('run')">이 코스 뛰기</button>
-  </div>` : ''}
+  </div>
 </div>`;
 };
 
@@ -1617,9 +1598,6 @@ SCREENS.courses = () => {
   const nearBody = `
     <div style="padding:16px 22px 0">
       <div style="display:flex;gap:8px">
-        <button onclick="APP.useMyLocation()" style="flex:none;height:44px;padding:0 13px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;gap:5px;white-space:nowrap;background:#fff">
-          ${msr('my_location', { size:19, color:'var(--blue)' })}<span style="font-size:13px;font-weight:700">내 위치</span>
-        </button>
         <div class="field" style="flex:1;height:44px;min-width:0;border-radius:14px;padding:0 13px">
           ${msr('search', { size:19, color:'var(--ink4)' })}
           <input id="startQ" value="${esc(S.startQ)}" placeholder="출발지 검색" oninput="APP.setStartQ(this.value)" style="font-size:14px">
@@ -1637,17 +1615,15 @@ SCREENS.courses = () => {
         style="width:100%;margin-top:10px;accent-color:var(--blue)" aria-label="목표 거리">
       <div class="num" style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink5)"><span>1km</span><span>21km</span></div>
     </div>
-    ${cd === 'locating' ? `<div style="padding:60px 22px;display:flex;justify-content:center">${spinnerLine('위치를 확인하는 중…')}</div>` : ''}
     ${cd === 'nostart' ? `<div class="empty" style="padding:60px 34px"><div class="t">출발지를 정해주세요.</div><div class="d">장소를 검색하거나 아래 추천 지역에서 골라 주세요.</div></div>` : ''}
     ${cd === 'none' ? `<div class="empty" style="padding:60px 34px"><div class="t">이 근처엔 걸을 곳을 못 찾았어요.</div><div class="d">위 프리셋 지역으로 바꿔서 찾아보세요.</div></div>` : ''}
     ${hasMap ? coursesMapHtml() : ''}
     ${hasMap ? `<div id="course-card">${courseInfoHtml()}</div>` : ''}
     ${hasMap ? `
-      <div style="display:flex;gap:9px;padding:22px 22px 0">
+      <div style="display:flex;padding:22px 22px 0">
         <button class="cta ghost" style="flex:1" onclick="APP.saveCourse()">${S.courseSaved ? '저장됨' : '저장'}</button>
-        <button class="cta lime" style="flex:1.3" onclick="APP.go('run')">뛰기</button>
       </div>
-      ${cd === 'ok' ? '' : `<div style="font-size:12px;color:var(--ink4);text-align:center;margin-top:9px;padding:0 22px;line-height:1.45">이 근처엔 따라갈 경로가 없어요. 자유롭게 뛰어도 기록은 그대로 남습니다.</div>`}` : ''}`;
+      ${cd === 'ok' ? '' : `<div style="font-size:12px;color:var(--ink4);text-align:center;margin-top:9px;padding:0 22px;line-height:1.45">이 근처엔 따라갈 경로가 없어요. 다른 출발지로 찾아보세요.</div>`}` : ''}`;
   const regionBody = `
     <div style="display:flex;gap:7px;overflow-x:auto;padding:16px 22px 2px">
       ${COURSE_REGIONS.map(r => `<button class="opt-chip ${S.cRegion === r.name ? 'on' : ''}" style="flex:none;font-size:12.5px;padding:9px 13px" onclick="APP.setCRegion('${r.name}')">${r.name} <span class="num">${r.n}</span></button>`).join('')}
@@ -1670,109 +1646,13 @@ SCREENS.courses = () => {
   <div style="padding:6px 22px 0">
     <h1 style="font-size:23px;font-weight:800;letter-spacing:-.035em;margin:0">러닝·산책 코스</h1>
     <div class="seg" style="margin-top:14px">
-      <button class="${S.cTab === 'near' ? 'on' : ''}" onclick="APP.setCTab('near')">내 주변</button>
+      <button class="${S.cTab === 'near' ? 'on' : ''}" onclick="APP.setCTab('near')">출발지 주변</button>
       <button class="${S.cTab === 'region' ? 'on' : ''}" onclick="APP.setCTab('region')">지역별</button>
     </div>
   </div>
   ${S.cTab === 'near' ? nearBody : regionBody}
 </div>`;
 };
-
-/* ── R1 러닝 기록 중 (다크 몰입 · 라이브) ── */
-const RUN_PTS = [[70,600],[110,520],[150,470],[210,440],[268,400],[300,330],[330,250]];
-function runPathLen(pts){ let L = 0; for (let i = 1; i < pts.length; i++){ const dx = pts[i][0]-pts[i-1][0], dy = pts[i][1]-pts[i-1][1]; L += Math.hypot(dx, dy); } return L; }
-function runPointAt(pts, t){
-  const total = runPathLen(pts); let target = total * t;
-  for (let i = 1; i < pts.length; i++){
-    const seg = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
-    if (target <= seg){ const r = target / seg; return [pts[i-1][0] + (pts[i][0]-pts[i-1][0]) * r, pts[i-1][1] + (pts[i][1]-pts[i-1][1]) * r]; }
-    target -= seg;
-  }
-  return pts[pts.length - 1];
-}
-const fmtClock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-SCREENS.run = () => {
-  const pts = RUN_PTS.map(p => p.join(',')).join(' ');
-  const len = runPathLen(RUN_PTS);
-  const prog = Math.min(1, .52 + (S.runT % 600) * .0006);
-  const pos = runPointAt(RUN_PTS, prog);
-  return `
-<div class="screen deepzone" style="height:100%;position:relative;display:flex;flex-direction:column;background:var(--deep)">
-  <div class="runmap">
-    <svg viewBox="0 0 390 740" preserveAspectRatio="xMidYMid slice">
-      <rect width="390" height="740" fill="var(--deep)"/>
-      <path d="M-20 210 L200 170 L410 230" stroke="#1B2450" stroke-width="16" fill="none"/>
-      <path d="M120 -20 L150 380 L110 760" stroke="#1B2450" stroke-width="12" fill="none"/>
-      <path d="M-20 470 L240 500 L410 450" stroke="#161E42" stroke-width="26" fill="none"/>
-      <path d="M240 520 C 300 540, 360 600, 400 640 L400 740 L200 740 Z" fill="#131A38"/>
-      <polyline points="${pts}" fill="none" stroke="#2A356B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-      <polyline id="runProg" points="${pts}" fill="none" stroke="var(--lime)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"
-        stroke-dasharray="${len.toFixed(0)}" stroke-dashoffset="${(len * (1 - prog)).toFixed(0)}"/>
-    </svg>
-    <div id="runDot" style="position:absolute;width:22px;height:22px;border-radius:50%;background:var(--lime);
-      border:4px solid var(--deep);box-shadow:0 0 0 2px var(--lime),0 0 18px rgba(201,242,60,.5);
-      left:${(pos[0] / 390 * 100).toFixed(2)}%;top:${(pos[1] / 740 * 100).toFixed(2)}%;margin:-11px 0 0 -11px;animation:pulse 2.2s ease-in-out infinite"></div>
-  </div>
-  <div style="position:relative;margin:14px 14px 0;background:rgba(19,26,56,.86);backdrop-filter:blur(12px);border:1px solid var(--deep-line);border-radius:24px;padding:20px;box-shadow:var(--sh-3)">
-    <div style="font-size:12px;font-weight:700;color:var(--deep-t2);letter-spacing:.02em">경과 시간</div>
-    <div id="runClock" class="stat-num" style="font-size:58px;line-height:1.05;color:var(--deep-t1)">${fmtClock(1421 + S.runT)}</div>
-    <div style="display:flex;gap:26px;margin-top:12px">
-      <div>
-        <div style="font-size:11.5px;color:var(--deep-t2);font-weight:600">거리 <span style="color:var(--deep-t3)">/ 목표 ${S.dist.toFixed(1)}km</span></div>
-        <div id="runDist" class="stat-num" style="font-size:22px;margin-top:2px">${(3.82 + S.runT * .00269).toFixed(2)} km</div>
-        <div style="height:4px;border-radius:2px;background:rgba(169,180,220,.22);margin-top:7px;overflow:hidden">
-          <div id="runGoal" style="height:100%;border-radius:2px;background:var(--lime);width:${Math.min(100, (3.82 + S.runT * .00269) / S.dist * 100).toFixed(1)}%"></div>
-        </div>
-      </div>
-      <div style="width:1px;background:var(--deep-line)"></div>
-      <div>
-        <div style="font-size:11.5px;color:var(--deep-t2);font-weight:600">평균 페이스</div>
-        <div class="stat-num" style="font-size:22px;margin-top:2px">6'12"/km</div>
-      </div>
-    </div>
-  </div>
-  <div class="run-pill">기록 중 · 화면을 꺼도 계속 기록돼요</div>
-  <div style="flex:1"></div>
-  <div style="position:relative;padding:0 22px 22px">
-    <button class="cta" style="height:60px;border-radius:18px;background:var(--lime);color:var(--ink);font-size:17px;box-shadow:0 10px 26px rgba(201,242,60,.22)" onclick="APP.go('runsum')">종료</button>
-  </div>
-</div>`;
-};
-
-/* ── R1 러닝 종료 요약 ── */
-SCREENS.runsum = () => `
-<div class="screen" style="min-height:100%;display:flex;flex-direction:column;padding-bottom:6px">
-  <div style="padding:4px 18px 0"><button class="backbtn" onclick="APP.back()" aria-label="뒤로">${msr('arrow_back', { size:25 })}</button></div>
-  <div class="px" style="padding-top:6px">
-    <h1 style="font-size:25px;font-weight:800;letter-spacing:-.035em;margin:0">오늘의 러닝</h1>
-    <div style="font-size:13.5px;color:var(--ink4);margin-top:5px">08.01 (토)</div>
-    <div class="glcard" data-gl="runTrack" data-gl-opts='{"drawSec":2.4,"dist":2.9}' style="margin-top:16px;height:210px">
-      <div class="cap"><span class="badge-live">GPS</span><span class="t">뛴 경로 · 라임 리본이 내 트랙</span></div>
-    </div>
-    <div style="display:flex;margin-top:20px;border:1px solid var(--line);border-radius:20px;padding:18px 8px;background:var(--surface)">
-      ${[['거리','5.21 km','runsum-d'],['시간','32:10','runsum-t'],['평균 페이스',"6'11\"",'runsum-p']].map(([k, v, id], i) => `
-        ${i ? '<div style="width:1px;background:var(--line3)"></div>' : ''}
-        <div style="flex:1;text-align:center">
-          <div style="font-size:11.5px;color:var(--ink4);font-weight:600">${k}</div>
-          <div id="${id}" class="stat-num" style="font-size:23px;margin-top:4px">${v}</div>
-        </div>`).join('')}
-    </div>
-    <div style="font-size:12.5px;color:var(--ink2);margin-top:12px">해파랑길 1코스 왕복 기준</div>
-  </div>
-  <div style="flex:1;min-height:20px"></div>
-  <div style="padding:0 22px 18px">
-    <button class="cta" onclick="APP.saveRun()">기록 저장하기</button>
-    <button style="display:block;margin:14px auto 0;font-size:13.5px;font-weight:700;color:var(--ink5)" onclick="APP.askDelete('runsave')">삭제</button>
-  </div>
-</div>`;
-
-/* 회복 배지 (SPEC §5.6-6) — 하프·풀에만 뜬다. D+ 일자가 있으면 그 라벨을, 없으면 D-day 를 쓴다. */
-function recoveryBadge(){
-  const rule = RECOVERY[S.wEvent] || RECOVERY['5K'];
-  if (!rule.noHard) return '';
-  const plus = S.itin.find(d => d.recovery);
-  return plus ? `D+1 회복 모드 · ${rule.dplus}` : `D-day 회복 모드 · ${rule.dday}`;
-}
 
 /* ── S7 추천 동선 결과 ── */
 function resultBlocks(day, dayC){
@@ -2172,13 +2052,13 @@ function debugHtml(){
   if (S.screen === 'detail') return rail('STATE', [['ok','기본'],['loading','로딩'],['empty','빈']], S.festState, 'setFestState');
   if (S.screen === 'w3') return rail('STATE', [['ok','기본'],['loading','로딩']], S.dbg.w3, 'dbgW3');
   if (S.screen === 'result') return rail('STATE', [['ok','기본'],['empty','빈']], S.dbg.result, 'dbgResult');
-  if (S.screen === 'courses') return rail('STATE', [['ok','기본'],['locating','위치'],['nostart','출발지'],['nocourse','코스0'],['none','0건']], S.dbg.courses, 'dbgCourses');
+  if (S.screen === 'courses') return rail('STATE', [['ok','기본'],['nostart','출발지'],['nocourse','코스0'],['none','0건']], S.dbg.courses, 'dbgCourses');
   if (S.screen === 'library') return rail('STATE', LBE.filter(o => o[0] !== 'loading'), S.dbg.lib, 'dbgLib') + net(200);
   if (S.screen === 'login') return rail('STATE', [['ok','기본'],['error','오류']], S.dbg.login || 'ok', 'dbgLogin');
   return '';
 }
 function stageNavHtml(){
-  const nav = [['sheet','디자인 시스템'],['home','홈'],['calendar','캘린더'],['detail','대회 상세'],['w1','위저드'],['result','동선 결과'],['courses','러닝코스'],['run','GPS 기록'],['library','보관함'],['account','내 정보'],['login','로그인']];
+  const nav = [['sheet','디자인 시스템'],['home','홈'],['calendar','캘린더'],['detail','대회 상세'],['w1','위저드'],['result','동선 결과'],['courses','러닝코스'],['library','보관함'],['account','내 정보'],['login','로그인']];
   return `<span class="brand">런닝구 · UI MOCKUP V2</span>
     ${nav.map(([k, l]) => `<button class="${S.screen === k || (k === 'w1' && ['w1','w2','w3'].indexOf(S.screen) >= 0) ? 'on' : ''}" onclick="APP.go('${k}')">${l}</button>`).join('')}`;
 }
@@ -2195,22 +2075,6 @@ function mountScenes(){
     glHandles.push(RG3D.mount(el, spec));
   });
 }
-function startRunTimer(){
-  clearInterval(runTimer);
-  const len = runPathLen(RUN_PTS);
-  runTimer = setInterval(() => {
-    if (S.screen !== 'run'){ clearInterval(runTimer); return; }
-    S.runT += 1;
-    const clock = $('#runClock'), dist = $('#runDist'), prog = $('#runProg'), dot = $('#runDot');
-    if (clock) clock.textContent = fmtClock(1421 + S.runT);
-    if (dist) dist.textContent = (3.82 + S.runT * .00269).toFixed(2) + ' km';
-    const goal = $('#runGoal');
-    if (goal) goal.style.width = Math.min(100, (3.82 + S.runT * .00269) / S.dist * 100).toFixed(1) + '%';
-    const p = Math.min(1, .52 + (S.runT % 600) * .0006);
-    if (prog) prog.setAttribute('stroke-dashoffset', (len * (1 - p)).toFixed(0));
-    if (dot){ const pos = runPointAt(RUN_PTS, p); dot.style.left = (pos[0] / 390 * 100) + '%'; dot.style.top = (pos[1] / 740 * 100) + '%'; }
-  }, 1000);
-}
 function countUp(id, target, fmt, ms){
   const el = document.getElementById(id);
   if (!el) return;
@@ -2223,11 +2087,6 @@ function countUp(id, target, fmt, ms){
   requestAnimationFrame(tick);
 }
 function bootScreen(){
-  if (S.screen === 'run') startRunTimer();
-  if (S.screen === 'runsum'){
-    countUp('runsum-d', 5.21, v => v.toFixed(2) + ' km', 1100);
-    countUp('runsum-t', 1930, v => fmtClock(v), 1100);
-  }
   if (S.screen === 'result' && !S.editMode){
     const vp = $('#viewport');
     vp.onscroll = () => {
@@ -2301,7 +2160,7 @@ const APP = {
   setLibTab(t){ set({ libTab: t }); },
   openSavedRoute(){ S.activeDay = 0; S.activeBlock = 0; S.editMode = false; S.resultFrom = 'library'; go('result'); },
   deleteSavedRoute(){ set({ saved:false }); },
-  openCourseDetail(ran){ S.cdRan = ran; go('coursedetail'); },
+  openCourseDetail(){ go('coursedetail'); },
   goLibrary(){ if (guard('library')) return; go('library'); },
   /* 인증 — 게스트가 로그인 유도를 거쳐 왔으면 원래 화면으로 돌려보낸다.
      돌아온 뒤 저장·찜을 자동 실행하지는 않는다 (사용자가 다시 누르게 둔다). */
@@ -2360,12 +2219,7 @@ const APP = {
     const lb = $('#dist-label'); if (lb) lb.textContent = S.dist.toFixed(1) + 'km';
     const card = $('#course-card'); if (card) card.innerHTML = courseInfoHtml();
   },
-  useMyLocation(){
-    S.dbg.courses = 'locating'; render();
-    setTimeout(() => { S.dbg.courses = 'ok'; S.courseStart = '내 위치'; render(); }, 900);
-  },
   saveCourse(){ if (guard('course')) return; S.courseSaved = true; S.libTab = 'course'; render(); toast('보관함에 저장했어요'); },
-  saveRun(){ if (guard('run')) return; S.ranSaved = true; S.libTab = 'course'; toast('러닝 기록을 저장했어요'); setTimeout(() => go('library'), 700); },
   /* 동선 결과 · 편집 */
   setDay(i){ set({ activeDay:i, activeBlock:0 }); },
   setActiveBlock(i){ set({ activeBlock:i }); },
@@ -2429,8 +2283,6 @@ const APP = {
   closeConfirm(){ S.confirm = null; renderOverlays(); },
   doDeleteRoute(){ S.confirm = null; S.saved = false; render(); toast('동선을 삭제했어요'); },
   doDeleteCourse(){ S.confirm = null; S.courseSaved = false; S.libTab = 'course'; go('library'); toast('코스를 삭제했어요'); },
-  doDeleteRun(){ S.confirm = null; S.ranSaved = false; S.libTab = 'course'; go('library'); toast('러닝 기록을 삭제했어요'); },
-  doDropRun(){ S.confirm = null; go('courses'); toast('기록을 저장하지 않았어요'); },
   doQuit(){ S.confirm = null; S.guest = false; S.returnTo = null; go('login'); toast('탈퇴가 처리됐어요'); },
   /* 내 정보 · 계정 관리 */
   toast,
