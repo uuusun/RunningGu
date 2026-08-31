@@ -1654,6 +1654,13 @@ SCREENS.courses = () => {
 </div>`;
 };
 
+function recoveryBadge(){
+  const rule = RECOVERY[S.wEvent] || RECOVERY['5K'];
+  if (!rule.noHard) return '';
+  const plus = S.itin.find(d => d.recovery);
+  return plus ? `D+1 회복 모드 · ${rule.dplus}` : `D-day 회복 모드 · ${rule.dday}`;
+}
+
 /* ── S7 추천 동선 결과 ── */
 function resultBlocks(day, dayC){
   return day.blocks.map((b, i) => {

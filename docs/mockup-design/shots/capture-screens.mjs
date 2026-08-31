@@ -1,9 +1,11 @@
 import { chromium } from 'playwright';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs';
 import path from 'path';
 
-const MOCKUP = 'C:/git/RunningGu/docs/mockup-design/런닝구-목업-v2.html';
+/* 이 스크립트 위치에서 찾는다. 절대경로를 박아 두면 그 PC 에서만 돈다 — 실제로
+   `C:/git/RunningGu/...` 가 박혀 있어 다른 기기에서는 ERR_FILE_NOT_FOUND 였다 (#215). */
+const MOCKUP = fileURLToPath(new URL('../런닝구-목업-v2.html', import.meta.url));
 const OUT = './png';   // 캡처는 곧바로 png/ 에 떨어진다 (예전엔 임시폴더에 찍고 손으로 옮겼다)
 fs.mkdirSync(OUT, { recursive: true });
 
