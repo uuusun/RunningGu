@@ -94,6 +94,14 @@ data class SignupUiState(
      * 이 상태에서 [확인]을 열어 두면 사용자가 같은 코드로 계속 시도하다 빠져나오지 못한다.
      */
     val mustResend: Boolean = false,
+    /**
+     * **인증을 마친 이메일.** (API 명세 §1-4)
+     *
+     * 닉네임이 겹쳐 뒤로 갔다 오는 길에서 쓴다 — 이 값이 지금 이메일과 같으면 인증이
+     * 아직 살아 있으므로 **재발송하지 않는다.** §1-3 이 *"재발송은 이전 코드·검증 상태를
+     * 무효화한다"* 고 정해 두어서, 새로 보내면 30분 남은 인증을 스스로 버리게 된다(#235 리뷰).
+     */
+    val verifiedEmail: String? = null,
 
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
@@ -264,6 +272,15 @@ class SignupViewModel(
             submitKakaoSignup(token, state)
             return
         }
+        // **인증이 아직 살아 있으면 새로 보내지 않는다.** 닉네임이 겹쳐 뒤로 갔다 오는
+        // 길이 여기다. §1-3 상 재발송은 이전 검증 상태를 무효화하므로, 새로 보내면
+        // 30분 남은 인증을 스스로 버리고 코드를 다시 받아 입력해야 한다(#235 리뷰).
+        // 같은 코드 재확인은 §1-4 가 30분 동안 멱등 `200` 으로 보장한다.
+        if (state.email.trim() == state.verifiedEmail) {
+            _uiState.update { it.copy(step = SignupStep.VERIFY, errorMessage = null) }
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
             repository.sendSignupCode(state.email.trim()).fold(
@@ -294,7 +311,10 @@ class SignupViewModel(
             repository.sendSignupCode(state.email.trim()).fold(
                 onSuccess = {
                     // 재발송하면 시도 횟수가 초기화되므로 잠금도 풀린다 (§1-4).
-                    _uiState.update { it.copy(mustResend = false, code = "", errorMessage = null) }
+                    // **이전 검증 상태도 무효가 된다**(§1-3) — 들고 있던 것을 버린다
+                    _uiState.update {
+                        it.copy(mustResend = false, code = "", errorMessage = null, verifiedEmail = null)
+                    }
                     startResendCooldown()
                 },
                 onFailure = { cause ->
@@ -323,6 +343,9 @@ class SignupViewModel(
                 }
                 return@launch
             }
+            // 인증이 살아 있다는 것을 남긴다 — 뒤로 갔다 와도 재발송 없이 재제출한다
+            _uiState.update { it.copy(verifiedEmail = state.email.trim()) }
+
             repository.signup(
                 email = state.email.trim(),
                 password = state.password,
@@ -344,9 +367,19 @@ class SignupViewModel(
                     _uiState.update {
                         it.copy(
                             isSubmitting = false,
-                            // 인증이 풀린 것은 재발송해야 빠져나온다 (§1-4 와 같은 처리)
-                            mustResend = it.mustResend ||
-                                cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED,
+                            // 인증이 풀린 것은 재발송해야 빠져나온다 (§1-4 와 같은 처리).
+                            // **여기 오는 시점의 `mustResend` 는 항상 false 다** —
+                            // `canVerify` 가 `!mustResend` 로 막고 있어서다(#235 리뷰).
+                            mustResend = cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED,
+                            // **쿨다운을 면제한다.** 안 그러면 "메일을 다시 받아 주세요" 를
+                            // 띄워 놓고 [재발송] 이 최대 60초 잠겨 있다 — 시키는 일을 할
+                            // 수단이 없는 화면이 된다(#235 리뷰). 인증이 실제로 풀렸다면
+                            // 마지막 발송에서 30분이 지났으므로 서버 쿨다운도 끝나 있다
+                            resendCooldownSec = if (cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED) {
+                                0
+                            } else {
+                                it.resendCooldownSec
+                            },
                             // 뒤로 돌아갔을 때 그 칸이 이미 빨갛게 보이도록 결과를 남긴다
                             nicknameCheck = if (cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED) {
                                 DuplicateCheck.Duplicate
@@ -389,7 +422,7 @@ class SignupViewModel(
         // 앱 흐름에서는 인증 직후 곧바로 가입해서 닿기 어렵다. 구버전 앱이나 검증을
         // 건너뛴 요청에서 올 수 있어 매핑만 해 둔다 (#228 리뷰의 같은 기준)
         cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED ->
-            "인증이 만료됐어요. 메일을 다시 받아 주세요."
+            "인증이 만료됐어요. 아래 [재발송] 으로 메일을 다시 받아 주세요."
 
         cause.apiErrorCode() == ApiErrorCode.INVALID_PASSWORD ->
             "비밀번호가 조건에 맞지 않아요. [뒤로] 를 눌러 다시 정해 주세요."
@@ -493,7 +526,16 @@ class SignupViewModel(
             true
         }
         SignupStep.VERIFY -> {
-            _uiState.update { it.copy(step = SignupStep.INFO, errorMessage = null, code = "") }
+            // 인증이 살아 있으면 코드를 들고 간다 — 돌아와서 그대로 [인증 확인] 을 누르면
+            // §1-4 의 멱등 `200` 으로 재발송 없이 가입을 다시 시도할 수 있다(#235 리뷰)
+            _uiState.update {
+                val keepCode = it.email.trim() == it.verifiedEmail
+                it.copy(
+                    step = SignupStep.INFO,
+                    errorMessage = null,
+                    code = if (keepCode) it.code else "",
+                )
+            }
             true
         }
     }

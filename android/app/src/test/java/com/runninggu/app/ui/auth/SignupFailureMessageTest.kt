@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -116,7 +117,7 @@ class SignupFailureMessageTest {
         advanceUntilIdle()
 
         assertEquals(
-            "인증이 만료됐어요. 메일을 다시 받아 주세요.",
+            "인증이 만료됐어요. 아래 [재발송] 으로 메일을 다시 받아 주세요.",
             viewModel.uiState.value.errorMessage,
         )
         // 문구만 고치면 "다시 하라" 는데 할 방법이 없다. 재발송 버튼이 열려야 말이 완성된다
@@ -181,6 +182,105 @@ class SignupFailureMessageTest {
         assertEquals("가입에 실패했어요. 다시 시도해 주세요.", viewModel.uiState.value.errorMessage)
     }
 
+    // ── #235 리뷰: 안내대로 실제로 할 수 있는가 ──────────────────────
+
+    @Test
+    fun `인증이 풀리면 재발송 쿨다운을 면제한다`() = runTest(dispatcher) {
+        // **`advanceUntilIdle()` 을 쓰면 안 된다** — 60초 카운트다운을 가상 시간으로
+        // 통째로 흘려 버려서 쿨다운이 0 이 된 채 검사하게 된다. 그러면 이 테스트가
+        // 헛돈다. `runCurrent()` 는 지금 시각의 일만 처리하고 시간을 안 넘긴다
+        val viewModel = SignupViewModel(
+            repository = FakeSignupRepository(
+                ApiException.Http(status = 403, code = ApiErrorCode.EMAIL_NOT_VERIFIED, problem = null),
+            ),
+        )
+        viewModel.onToggleTos()
+        viewModel.onTogglePrivacy()
+        viewModel.onAgreeNext()
+        viewModel.onEmailChange("runner@test.com")
+        viewModel.onPasswordChange("run4life1")
+        viewModel.onPasswordConfirmChange("run4life1")
+        viewModel.onNicknameChange("김러너")
+        viewModel.onInfoNext()
+        runCurrent()
+        // 발송 직후라 쿨다운이 돌고 있다
+        assertTrue("전제가 깨졌다 — 발송 후 쿨다운이 시작돼야 한다", viewModel.uiState.value.resendCooldownSec > 0)
+
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        runCurrent()
+
+        // "메일을 다시 받아 주세요" 를 띄워 놓고 버튼이 잠겨 있으면 할 수 있는 게 없다
+        assertTrue("재발송이 열려야 한다", viewModel.uiState.value.mustResend)
+        assertEquals(0, viewModel.uiState.value.resendCooldownSec)
+    }
+
+    @Test
+    fun `닉네임을 고쳐 돌아와도 인증을 다시 받지 않는다`() = runTest(dispatcher) {
+        // 닉네임이 겹쳐 실패 → 안내대로 [뒤로] → 닉네임 변경 → [다음]
+        val repository = FakeSignupRepository(
+            ApiException.Http(status = 409, code = ApiErrorCode.NICKNAME_DUPLICATED, problem = null),
+        )
+        val viewModel = SignupViewModel(repository = repository)
+        viewModel.onToggleTos()
+        viewModel.onTogglePrivacy()
+        viewModel.onAgreeNext()
+        viewModel.onEmailChange("runner@test.com")
+        viewModel.onPasswordChange("run4life1")
+        viewModel.onPasswordConfirmChange("run4life1")
+        viewModel.onNicknameChange("김러너")
+        viewModel.onInfoNext()
+        advanceUntilIdle()
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        advanceUntilIdle()
+        assertEquals(1, repository.sendCount)
+
+        viewModel.onStepBack()
+        viewModel.onNicknameChange("김러너2")
+        viewModel.onInfoNext()
+        advanceUntilIdle()
+
+        // **여기가 요점이다.** 재발송하면 §1-3 상 30분 남은 인증이 무효가 되고,
+        // 60초 안이면 429 SEND_COOLDOWN 으로 아예 막힌다
+        assertEquals("재발송하면 안 된다", 1, repository.sendCount)
+        assertEquals(SignupStep.VERIFY, viewModel.uiState.value.step)
+        // 들고 온 코드로 그대로 [인증 확인] 을 누를 수 있어야 한다 (§1-4 멱등 200)
+        assertEquals("123456", viewModel.uiState.value.code)
+    }
+
+    @Test
+    fun `이메일을 바꾸면 인증을 다시 받는다`() = runTest(dispatcher) {
+        val repository = FakeSignupRepository(
+            ApiException.Http(status = 409, code = ApiErrorCode.NICKNAME_DUPLICATED, problem = null),
+        )
+        val viewModel = SignupViewModel(repository = repository)
+        viewModel.onToggleTos()
+        viewModel.onTogglePrivacy()
+        viewModel.onAgreeNext()
+        viewModel.onEmailChange("runner@test.com")
+        viewModel.onPasswordChange("run4life1")
+        viewModel.onPasswordConfirmChange("run4life1")
+        viewModel.onNicknameChange("김러너")
+        viewModel.onInfoNext()
+        advanceUntilIdle()
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        advanceUntilIdle()
+
+        viewModel.onStepBack()
+        // 닉네임도 함께 고친다 — 409 로 `nicknameCheck` 가 Duplicate 라 그대로면
+        // `canProceedInfo` 가 막는다(그 자체는 의도한 동작이다)
+        viewModel.onNicknameChange("김러너2")
+        viewModel.onEmailChange("other@test.com")
+        viewModel.onInfoNext()
+        advanceUntilIdle()
+
+        // 인증은 이메일에 붙은 것이라 바뀌면 다시 받아야 한다 — 건너뛰기가 과하면 안 된다
+        assertEquals("이메일이 바뀌면 보내야 한다", 2, repository.sendCount)
+        assertEquals("", viewModel.uiState.value.code)
+    }
+
     @Test
     fun `여섯 문구가 서로 다르다`() = runTest(dispatcher) {
         // 하나씩 보면 통과하는데 둘이 같아지는 사고를 막는다 — 가르는 것이 이 파일의 목적이다
@@ -206,8 +306,11 @@ class SignupFailureMessageTest {
     }
 }
 
-/** 인증은 통과시키고 **가입만** 실패시킨다. */
+/** 인증은 통과시키고 **가입만** 실패시킨다. 발송 횟수를 센다. */
 private class FakeSignupRepository(private val signupFailure: Throwable) : AuthRepository {
+    var sendCount = 0
+        private set
+
     override suspend fun signup(
         email: String,
         password: String,
@@ -215,7 +318,10 @@ private class FakeSignupRepository(private val signupFailure: Throwable) : AuthR
         marketingAgreed: Boolean,
     ): Result<AuthSession> = Result.failure(signupFailure)
 
-    override suspend fun sendSignupCode(email: String): Result<Unit> = Result.success(Unit)
+    override suspend fun sendSignupCode(email: String): Result<Unit> {
+        sendCount++
+        return Result.success(Unit)
+    }
     override suspend fun verifySignupCode(email: String, code: String): Result<Unit> = Result.success(Unit)
 
     // 중복확인은 이 파일이 보려는 자리가 아니다 — 둘 다 "없음" 으로 두어 진행만 시킨다
