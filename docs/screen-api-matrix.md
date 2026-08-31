@@ -181,12 +181,13 @@ Compose 화면
 | 단계/행동 | 처리/API | 입력 | 응답·다음 상태 | 저장 |
 |---|---|---|---|---|
 | 약관 동의 | 로컬 | tos, privacy, marketing | 필수 2종 동의 시 다음 활성화. 활성 카피 버전 `TOS/PRIVACY/MARKETING=1.0` | 가입 완료 전 로컬, 가입 시 서버가 버전 포함 3행 저장 |
+| 연령 확인 | 로컬 | `ageOver14` | `(필수) 만 14세 이상입니다`. 전체 동의 그룹 밖에 두고 전체 동의로 자동 선택하지 않음 | 가입 요청 최상위 필드로만 전달. 생년월일·별도 연령 컬럼 없음, TOS 1.1 동의 이력이 확인 근거 |
 | 정보 입력·검증 | 로컬 + 중복 API | email, password, confirm, nickname | exists/validation | 가입 완료 전 로컬 |
 | 이메일·닉네임 중복 | `GET /api/auth/email/exists`, `GET /api/auth/nickname/exists` | query | `Unchecked/Checking/Available/Duplicate/Error`; 입력 변경 시 이전 응답 무효화 | 없음 |
 | 코드 발송 | `POST /api/auth/email/send-code` | email | 204, 60초 타이머 | 서버 검증 상태 |
 | 코드 확인 | `POST /api/auth/email/verify` | email, code | verified | 서버 검증 상태 |
-| 이메일 가입 | `POST /api/auth/signup` | email, password, nickname, agreements | token pair + user | PostgreSQL |
-| 카카오 신규 가입 | `POST /api/auth/kakao/signup` | kakaoAccessToken, nickname, agreements | token pair + user. 이미 가입된 카카오 회원번호는 `409 KAKAO_ACCOUNT_DUPLICATED` | PostgreSQL |
+| 이메일 가입 | `POST /api/auth/signup` | email, password, nickname, **ageOver14**, agreements | token pair + user. 누락 `VALIDATION_FAILED`, false `AGE_REQUIREMENT_NOT_MET`, 인증 후 30분 만료·이력 없음 `CODE_EXPIRED` | PostgreSQL |
+| 카카오 신규 가입 | `POST /api/auth/kakao/signup` | kakaoAccessToken, nickname, **ageOver14**, agreements | token pair + user. 이미 가입된 카카오 회원번호는 `409 KAKAO_ACCOUNT_DUPLICATED` | PostgreSQL |
 | 가입 완료 | Navigation | 없음 | 홈 | token은 DataStore |
 
 ### A3 비밀번호 찾기·웹 재설정
@@ -360,6 +361,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 |---|---|---|---|
 | 닉네임 변경 | `PATCH /api/me` | nickname | `200` 현재 프로필 전체, duplicated 처리 |
 | 마케팅 동의 | `PATCH /api/me/agreements` | marketing | `200` 현재 프로필 전체. 같은 값은 이력 추가 없는 멱등 성공 |
+| 마케팅 메일 | P0에서 호출 없음 | 없음 | SES는 가입 인증·비밀번호 재설정 거래성 메일만 발송. 찜 지역으로 관심 지역을 추정하지 않음 | 실제 발송 기능을 열 때 공개 수신거부 계약과 MARKETING 1.1 선행 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
 | 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
@@ -475,7 +477,10 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | D-30 / SPEC 결정-50 | 이메일·닉네임 중복 확인은 모두 P0에서 호출한다. `Checking` 동안 인증 메일 발송을 막고 `Available`에서 허용하며, `Duplicate`만 확정 차단한다. `Unchecked`·네트워크/`RATE_LIMITED` `Error`는 발송·가입의 서버 유니크 방어를 믿고 진행을 막지 않는다. 입력 변경 시 결과를 즉시 무효화하고 늦은 응답은 버린다 |
 | D-31 / SPEC 결정-51 | Access 30분·Refresh 14일, 기기별 refresh family 회전·재사용 탐지를 적용한다. 로그아웃은 Access 없이 Authenticator가 붙지 않는 클라이언트로 호출하고 non-blank refresh 결과와 무관하게 204를 받으면 로컬 세션을 삭제한다 |
 | D-33 | 위저드 대회 조회 실패는 `WizardUiState.contestPhase`(LOADING/LOADED/ERROR/NOT_FOUND)로 담는다. S3 `RaceDetailUiState.Phase`와 같은 기준이며 ERROR만 [다시 시도], `404`와 canonical id 없는 대회는 NOT_FOUND로 [뒤로]. `race == null`을 로딩으로 읽던 규칙 폐기(이슈 #140) |
-| D-32 / SPEC 결정-52 | 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 계약 PR에서 함께 확인한다(이슈 #111) |
+| D-32 / SPEC 결정-52 | 현재 가입 화면 약관 카피와 서버 활성 버전은 `TOS/PRIVACY/MARKETING=1.0`으로 맞춘다. 앱은 boolean만 보내고 버전 변경은 앱·서버가 같은 활성화 PR에서 함께 확인한다. 다음 문안 TOS 1.1·PRIVACY 1.2는 #227·#228 구현 전까지 비활성이다(이슈 #111) |
+| D-34 / SPEC 결정-58 | 이메일·카카오 가입은 전체 동의 밖의 별도 `ageOver14` 필수 확인을 사용한다. 요청 최상위 필드이며 누락은 `VALIDATION_FAILED`, false는 `AGE_REQUIREMENT_NOT_MET`("만 14세 이상만 가입할 수 있습니다.")이다. 생년월일·별도 연령 저장은 없다 |
+| D-35 / SPEC 결정-57 | 이메일 가입은 활성 미인증 행만 `EMAIL_NOT_VERIFIED`, 인증 후 30분 만료나 인증 이력 없음은 `CODE_EXPIRED`다. 앱은 `CODE_EXPIRED`를 일반 가입 실패로 처리하지 않고 `mustResend=true`로 바꿔 A2에서 재발송·재인증을 안내한다(#228). Refresh는 14일이며 회전 토큰 재사용 시 같은 family 전체를 폐기하고 재로그인한다 |
+| D-36 / SPEC 결정-59 | P0는 마케팅 메일을 보내지 않고 선택 동의 상태만 유지한다. 발송 범위를 열 때 수신거부 API·토큰·페이지와 MARKETING 1.1을 계약부터 추가한다 |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-01 / SPEC 결정-33(08-23 재개정) | 저장 코스 polyline은 2D Google Encoded Polyline precision 5(E5). 고정 `lat,lng` canonical geometry로 fingerprint를 계산하고, `elevationProfileM`은 최대 100개 정수·미보유 `[]`·PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |

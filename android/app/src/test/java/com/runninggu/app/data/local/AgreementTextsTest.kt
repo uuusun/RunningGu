@@ -76,9 +76,9 @@ class AgreementTextsTest {
 
     @Test
     fun `버전은 약관마다 따로 든다`() {
-        // 서버가 tos-version · privacy-version · marketing-version 을 각각 관리한다.
-        // 하나로 묶으면 PRIVACY 만 1.2 로 올릴 때 있지도 않은 v1.2/tos.md 를 읽어
-        // **두 문안이 안 열리고 버전 표시까지 틀린다**(#191 리뷰).
+        // 서버가 tos-version · privacy-version · marketing-version 을 각각 관리하고,
+        // TOS 1.1 과 PRIVACY 1.1·1.2 초안도 서로 따로 준비됐다. 하나로 묶으면 PRIVACY 를
+        // 1.2 로 올릴 때 있지도 않은 v1.2/tos.md 를 읽어 문안과 버전 표시가 깨진다(#191 리뷰).
         AgreementDoc.entries.forEach { doc ->
             assertEquals("v${doc.version}/${doc.fileName}", AgreementTexts.assetPath(doc))
         }

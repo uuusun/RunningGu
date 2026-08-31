@@ -95,7 +95,7 @@ PR #22의 Kotlin `ItineraryEngine`과 단위 테스트는 서버 이식 시 동�
 | 출발지 검색(지오코딩) | 서버 → 카카오 | `GET /geocode` |
 | **근처에서 뛸 만한 곳** | 서버 (목표 거리·HARD 제외 큐레이션 경로 우선, 적합 경로가 없으면 품질 상한 OSM/GraphHopper 생성 1건 + 카카오 걷기 스팟을 **서버에서 합쳐** 거리순으로) | `GET /courses/near` — 아래 참고 |
 | 코스 목록(지역별) | 서버 (두루누비 메타 + GPX) | `GET /courses` · `/courses/regions` |
-| 대회·찜·동선·기록 | 서버 (SSOT) | `GET /contests` · `/me/**` · `/itineraries` · `/runs` |
+| 대회·찜·동선·저장 코스 | 서버 (SSOT) | `GET /contests` · `/me/**` · `/itineraries` · `/me/courses` |
 
 **앱에 남는 계산은 이것뿐이다.** 서버가 생성한 동선을 저장 전에 편집하고, 회복 안내를 미리 표시하고,
 종목을 표준화하는 일. 그리고 오프라인일 때 번들된 GPX 축약본으로 코스를 자르는 일. 새 동선 조립은 서버만 한다.

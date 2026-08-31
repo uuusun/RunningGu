@@ -7,19 +7,37 @@
 GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator를 추가하지 않으며 기존
 `GET /api/contests?size=1`로 애플리케이션 준비 상태를 확인한다.
 
-## 1. 고정 구조와 남은 결정
+## 1. 고정 구조와 운영 결정
 
 | 항목 | 스테이징 기준 |
 |---|---|
 | 호스트 | AWS EC2, Ubuntu 24.04 LTS x86_64 |
+| 리전 | 서울 `ap-northeast-2` |
 | 도메인 | `staging-api.runninggu.store` |
 | 프로세스 | Spring Boot는 host systemd, PostgreSQL·GraphHopper는 Docker Compose |
-| 권장 크기 | `t3.xlarge` 4 vCPU·16GiB, 암호화 gp3 80GB |
-| 메모리 | GraphHopper `-Xmx6g`, Spring Boot `-Xmx2g`, 긴급 완충용 swap 4GB |
+| 인스턴스 크기 | 스테이징 정상 기동은 x86_64 8GiB를 목표로 하고, 첫 GraphHopper import 또는 메모리 부족 때 16GiB로 임시 증설 |
+| 메모리 | 현재 GraphHopper `-Xmx6g` + Spring Boot `-Xmx2g`는 16GiB가 필요. 8GiB 전환 전 힙 환경변수화·실측 필수, swap 4GB는 긴급 완충용 |
 | 외부 포트 | Nginx 80·443만 허용. 5432·8080·8989는 loopback |
 | 접속 | SSM Session Manager. SSH 22는 열지 않음 |
+| 운영책임자 | 유선경 — AWS·결제·도메인·Google Play·인프라 |
+| 운영 연락처 | `runninggu.play@gmail.com` — Certbot·예산 알림 |
+| 월 예산 | 총 100,000원, 실제 비용 80,000원·예상 비용 100,000원 도달 알림 |
+| 백업 | pgBackRest 일일 전체 백업 + 연속 WAL, 서울 리전 암호화 S3, 7일 보존, 운영책임자만 접근 |
 
-AWS 리전·월 예산·결제 책임자와 PostgreSQL 백업 보존 기간은 실제 인스턴스 생성 전에 확정한다.
+월 100,000원은 스테이징 전체 예산이다. 24시간 상시 기동을 전제로 승인한 값이 아니므로
+검증하지 않는 시간에는 EC2를 중지하고, 계획한 월 기동 시간을 비용 계산에 넣는다. 중지 중에도
+EBS·공인 IPv4·S3·KMS 등 남는 비용을 포함해 생성 직전 계산한다. 공개 앱이 사용할 프로덕션
+상시 서버는 출시 전에 실측 사양과 별도 월 예상비용을 다시 승인한다. 8GiB x86_64 인스턴스는
+GraphHopper·Spring Boot 힙을
+환경변수화하고 첫 import·cold start·대표 API 부하에서 PostgreSQL과 OS 여유 메모리까지 실측한
+뒤에만 사용한다. 현재 고정값 `-Xmx6g` + `-Xmx2g` 상태에서 8GiB를 만들지 않는다.
+
+첫 GraphHopper import나 운영 중 메모리 부족에는 EBS와 Elastic IP를 유지한 채 EC2를 중지하고
+16GiB x86_64 유형으로 바꿔 다시 시작할 수 있다. 이때 짧은 중단을 공지하고 §15 검증을 전부
+다시 수행한다. 16GiB를 일시 사용해도 월 예상비용이 100,000원을 넘으면 먼저 예산을 다시
+승인한다. 16GiB 상시 운영이나 프로덕션 사용이 필요하면 #230의 월 예산과 80% 알림값을 같은
+결정으로 올린다.
+
 swap은 RAM 대체재가 아니다. 지속적으로 사용되면 인스턴스를 늘린다.
 
 ## 2. 배포 artifact 원칙
@@ -57,8 +75,10 @@ EC2의 저장소 checkout은 Compose와 GraphHopper Docker build context를 위�
 4. 가비아 DNS에 `staging-api` A 레코드를 만들고 Elastic IP를 지정한다.
 5. 외부 DNS 조회에서 `staging-api.runninggu.store`가 해당 Elastic IP를 반환하는지 확인한다.
 
-AWS 계정에는 예산 알림, MFA, 복구 수단을 먼저 설정한다. 종료 방지와 EBS 암호화를 켜고 인스턴스,
-볼륨, Elastic IP에 환경·담당자 태그를 붙인다.
+AWS 계정에는 월 총예산 100,000원, 실제 비용 80,000원 도달 알림, 예상 비용 100,000원 도달
+알림을 `runninggu.play@gmail.com`으로 설정하고, MFA와 복구 수단을 먼저 설정한다. 종료 방지와
+EBS 암호화를 켜고 인스턴스, 볼륨, Elastic IP에 환경·담당자 태그를 붙인다. AWS 콘솔의 결제
+통화가 원화가 아니면 생성 시점 환산값과 환율 기준일을 운영 기록에 함께 남긴다.
 
 ## 4. 호스트 패키지와 사용자
 
@@ -393,14 +413,14 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-도메인 운영 담당자 이메일로 인증서를 발급한다.
+Certbot 운영 이메일 `runninggu.play@gmail.com`으로 인증서를 발급한다.
 
 ```bash
 sudo certbot certonly \
   --webroot \
   --webroot-path /var/www/certbot \
   --domain staging-api.runninggu.store \
-  --email <운영_담당자_이메일> \
+  --email runninggu.play@gmail.com \
   --agree-tos \
   --no-eff-email
 ```
@@ -473,7 +493,131 @@ curl --fail --silent --show-error \
 마지막으로 EC2를 한 번 재부팅해 PostgreSQL·GraphHopper의 `unless-stopped`, Docker 의존 systemd,
 Spring Boot 재시도, Nginx, certbot timer가 모두 복구되는지 확인한다.
 
-## 16. 이후 배포
+## 16. 백업·복구
+
+### 16.1 확정 구성
+
+운영 PostgreSQL은 pgBackRest로 매일 한 번 전체 백업하고 WAL을 연속 보관한다. 저장소는
+서울 `ap-northeast-2`의 전용 비공개 S3 버킷이며 고객 관리형 KMS 키로 암호화한다. EC2
+instance profile은 해당 버킷 prefix와 KMS 키에 필요한 최소 권한만 받고 정적 access key를
+파일에 두지 않는다. 전체 백업과 복구에 필요한 WAL은 7일 보존 후 pgBackRest `expire`로
+자동 삭제한다.
+
+pgBackRest가 Docker 안에서 instance profile 임시 자격 증명을 받도록 EC2 metadata option은
+IMDSv2 token 필수·response hop limit 2로 설정한다. 이 인스턴스에는 저장소에서 관리하는
+신뢰된 컨테이너만 실행하고 `pgbackrest check`로 임시 자격 증명 갱신까지 확인한다.
+
+EBS snapshot은 추가적인 장애 대응 수단으로는 쓸 수 있지만 PostgreSQL 기준 백업과 WAL을
+대체하지 않는다. `pg_dump`도 논리 점검용 보조 산출물일 뿐 이 복구 절차의 기준 백업으로
+삼지 않는다.
+
+후속 #227 구현 PR은 다음을 함께 추가해야 한다. 하나라도 없으면 TOS 1.1·PRIVACY 1.2를
+활성화하지 않는다.
+
+1. PostgreSQL 17과 버전을 고정한 pgBackRest를 포함하는 저장소 관리 이미지
+2. `/var/lib/postgresql/data`와 pgBackRest 설정을 연결한 Compose 구성
+3. 일일 전체 백업 systemd service·timer와 실패 알림
+4. 아래 설정·초기화·백업·복원 명령의 실행 검증
+
+S3 버킷은 public access block을 모두 켜고, TLS가 아닌 요청을 거부하며, bucket versioning을
+켠다면 현재·비현재 객체가 모두 7일 정책을 지키도록 lifecycle을 함께 설정한다. 불완전한
+multipart upload는 1일 뒤 중단한다. 버킷 이름·KMS key ARN·role 이름은 운영 환경에서 채우고
+저장소에는 넣지 않는다.
+
+pgBackRest 설정 기준은 다음과 같다. 실제 bucket·KMS key·role 값은 운영 설정으로 주입한다.
+
+```ini
+[runninggu]
+pg1-path=/var/lib/postgresql/data
+
+[global]
+repo1-type=s3
+repo1-path=/runninggu/staging
+repo1-s3-bucket=<BACKUP_BUCKET>
+repo1-s3-endpoint=s3.ap-northeast-2.amazonaws.com
+repo1-s3-region=ap-northeast-2
+repo1-s3-key-type=auto
+repo1-s3-role=<INSTANCE_PROFILE_ROLE_NAME>
+repo1-s3-kms-key-id=<KMS_KEY_ARN>
+repo1-retention-full-type=time
+repo1-retention-full=7
+repo1-retention-history=0
+start-fast=y
+```
+
+PostgreSQL은 다음 기준으로 WAL archive를 켠다. 낮은 트래픽에서도 최근 변경을 오래 로컬에만
+남기지 않도록 최대 5분마다 segment 전환을 요청한다.
+
+```conf
+archive_mode = on
+archive_command = 'pgbackrest --stanza=runninggu archive-push %p'
+archive_timeout = '300s'
+```
+
+최초 한 번 stanza를 만들고 archive·repository 연결을 검사한다.
+
+```bash
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T postgres pgbackrest --stanza=runninggu stanza-create
+
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T postgres pgbackrest --stanza=runninggu check
+```
+
+timer는 매일 03:20 KST에 다음 순서로 실행한다. 백업이나 `check`가 실패하면 성공으로 기록하지
+않고 운영책임자에게 알린다.
+
+```bash
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T postgres pgbackrest --stanza=runninggu --type=full backup
+
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T postgres pgbackrest --stanza=runninggu expire
+
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T postgres pgbackrest --stanza=runninggu check
+```
+
+`pgbackrest info --output=json`의 마지막 성공 시각, backup label, WAL archive 범위만 운영 기록에
+남긴다. 사용자 개인정보·S3 자격 증명은 로그에 남기지 않는다.
+
+### 16.2 복구 리허설
+
+실제 서비스 공개 전 한 번, 이후 분기마다 격리된 별도 Compose project·새 volume에서 복구를
+리허설한다. #227은 운영 포트를 열지 않고 별도 volume만 사용하는 `compose.recovery.yaml`도
+추가한다. 운영 volume에 `restore --delta`를 시험하지 않는다. 복구 명령의 project 이름과
+volume을 먼저 확인한 뒤 다음처럼 최신 안전 시점을 복원한다.
+
+```bash
+docker compose --project-name runninggu-recovery \
+  --env-file /etc/runninggu/recovery-compose.env \
+  -f compose.yaml -f compose.recovery.yaml \
+  run --rm --no-deps --entrypoint pgbackrest postgres \
+  --stanza=runninggu restore
+```
+
+백업 시각·복원 지점·검증 결과만 운영 기록에 남기고 사용자 개인정보는 기록에 복사하지 않는다.
+
+1. 외부 접근을 차단한 복구 환경에 백업을 복원한다.
+2. pgBackRest가 보관한 가능한 최신 안전 시점까지 WAL을 재생한다.
+3. 백업 이후 발생한 회원 탈퇴 삭제를 다시 반영한다.
+4. 만료된 이메일 인증 기록과 Refresh Token 정리 작업을 실행한다.
+5. 탈퇴 회원 데이터와 만료 데이터가 API·DB 조회에서 노출되지 않는지 검증한다.
+6. 검증이 끝난 뒤에만 외부 접근을 연다.
+
+WAL에 공백이 있거나 탈퇴 이후 시점까지 복구하지 못했거나 검증이 실패하면 복원본을 공개하지
+않는다. 복구 환경을 폐기할 때도 운영 project·volume 이름과 다른지 먼저 확인한다.
+`docker compose down -v`나 볼륨 삭제는 백업·복구 절차가 아니다.
+
+근거 문서는 [PostgreSQL 연속 아카이빙·PITR](https://www.postgresql.org/docs/17/continuous-archiving.html)과
+[pgBackRest 공식 사용자 가이드](https://pgbackrest.org/user-guide.html)다.
+
+## 17. 이후 배포
 
 1. exact commit CI artifact와 checksum을 검증한다.
 2. 배포 직전 DB 백업과 현재 release SHA를 기록한다.
@@ -486,7 +630,7 @@ Spring Boot 재시도, Nginx, certbot timer가 모두 복구되는지 확인한�
 DB 마이그레이션은 이전 서버와 역호환되게 설계한다. Importer 또는 앱 기동 실패 시 DB migration을
 임의로 되돌리지 않는다.
 
-## 17. 애플리케이션 artifact 롤백
+## 18. 애플리케이션 artifact 롤백
 
 호환되는 직전 release를 명시적으로 선택한다.
 
@@ -501,7 +645,7 @@ sudo systemctl restart runninggu-backend.service
 호환되지 않으면 JAR만 되돌리지 않고 §7에서 정한 복구 절차를 따른다. `docker compose down -v`,
 PostgreSQL volume 삭제, GraphHopper cache 삭제는 롤백 명령이 아니다.
 
-## 18. 출시 차단 항목 갱신 기준
+## 19. 출시 차단 항목 갱신 기준
 
 저장소에 이 실행서와 템플릿이 생긴 것만으로 배포 BLOCKER를 해소하지 않는다. 다음 근거가 모두
 있을 때 [`development-release-contest-guide.md` §8](../development-release-contest-guide.md#8-현재-저장소의-출시-차단-항목)을
