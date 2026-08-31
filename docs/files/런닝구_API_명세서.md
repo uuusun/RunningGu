@@ -1,4 +1,4 @@
-# 런닝구 백엔드 API 명세서 v3.2
+# 런닝구 백엔드 API 명세서 v3.3
 
 > **기준 문서**: SPEC v4(SSOT) + 화면별 데이터정리 v5 + ERD v4.5·수정 DFD
 > **스택**: Spring Boot 3.x (Java 21) · PostgreSQL(결정-3) · Spring Security + JWT · QueryDSL · Spring Mail · Flyway · Spring Cache + Caffeine · 내부 GraphHopper 프로세스(결정-42)
@@ -149,11 +149,14 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
   "email": "runner@test.com",
   "password": "run4life1",
   "nickname": "김러너",
+  "ageOver14": true,
   "agreements": { "tos": true, "privacy": true, "marketing": false }
 }
 ```
 `201` — 응답은 1-6 로그인과 동일(가입 완료 → "시작하기 → 홈" 목업 플로우에 맞춰 **자동 로그인** 🔧).
-검증: 이메일 인증 완료 상태 필수(`403 EMAIL_NOT_VERIFIED`) · 비밀번호 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒 · 필수 동의 2종(`400 AGREEMENT_REQUIRED`) · `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`. 비밀번호는 BCrypt strength 10 단방향 해시(NFR-9). 서버 활성 버전 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`으로 선택 동의를 포함한 세 행을 같은 `changedAt`에 append-only 저장하며 앱은 버전을 보내지 않는다(NFR-12, 결정-52, 이슈 #111).
+검증: `ageOver14` 누락·자료형 오류는 `400 VALIDATION_FAILED`, `false`는 `400 AGE_REQUIREMENT_NOT_MET`("만 14세 이상만 가입할 수 있습니다.")이며 회원·동의·토큰을 만들기 전에 거부한다. 활성 인증 행이 있으나 미인증이면 `403 EMAIL_NOT_VERIFIED`, 인증 완료 후 가입 가능 기간 30분이 지났거나 인증 행이 없으면 `400 CODE_EXPIRED`다. 만료는 정리 작업 실행 여부와 관계없이 서버 요청 시각으로 판정한다. 비밀번호는 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒, 필수 동의 2종은 `400 AGREEMENT_REQUIRED`, 유니크 충돌은 `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`다.
+
+비밀번호는 BCrypt strength 10 단방향 해시(NFR-9). 현재 서버 활성 버전은 `TOS=1.0`, `PRIVACY=1.0`, `MARKETING=1.0`이며 선택 동의를 포함한 세 행을 같은 `changedAt`에 append-only 저장하고 앱은 버전을 보내지 않는다(NFR-12, 결정-52, 이슈 #111). `ageOver14` 전용 DB 컬럼이나 `AgreementType`은 두지 않는다. TOS 1.1 활성화 뒤에는 그 동의 시각·버전이 만 14세 이상 제한 확인 기록 역할을 하며, TOS 1.1·PRIVACY 1.2 활성화는 앱·서버 동시 전환 PR에서 별도로 수행한다(결정-58, 이슈 #228).
 
 ### 1-6 `POST /auth/login`
 
@@ -204,17 +207,19 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 {
   "kakaoAccessToken": "...",
   "nickname": "김러너",
+  "ageOver14": true,
   "agreements": { "tos": true, "privacy": true, "marketing": false }
 }
 ```
 `201` — 1-6과 동일 응답. **이메일 인증 생략** 🔒(§4.2 카카오 가입). KAKAO 로그인 수단에는 비밀번호를 저장하지 않는다.
+`ageOver14` 검증과 오류는 1-5와 같으며 불필요한 카카오 외부 호출보다 먼저 수행한다. `POST /auth/kakao`의 기존 회원 로그인·신규 가입 대기 응답에는 이 필드를 추가하지 않는다.
 구현은 `USER`와 `LOGIN_IDENTITY(provider=KAKAO)`를 한 트랜잭션에서 생성한다. 비밀번호는 USER가 아니라 EMAIL 로그인 수단에만 존재한다.
 `LOGIN_IDENTITY.user_id`와 `(provider, provider_subject)`는 각각 UNIQUE다. EMAIL은 `password_hash`·`email_verified_at`이 필수이고, KAKAO는 둘 다 null이다.
 동일 카카오 회원번호의 가입 요청은 회원번호별로 직렬화하고, 이미 가입된 경우 기존 계정으로 자동 로그인하지 않고 `409 KAKAO_ACCOUNT_DUPLICATED`를 반환한다. 토큰 검증은 1-7의 결과를 신뢰하지 않고 가입 요청마다 다시 수행한다.
 
 ### 1-9 ~ 1-10 토큰 관리
 
-`POST /auth/refresh` `{"refreshToken": "..."}` → `200 {"accessToken":"...","refreshToken":"..."}`. 새 기기 로그인은 새 `familyId`를 만들고, 재발급은 기존 토큰을 revoke한 뒤 같은 family의 새 토큰으로 **회전**한다. 만료·서명/claim 오류·알 수 없는 토큰은 `401 INVALID_REFRESH_TOKEN`이다. 이미 회전·revoke된 과거 토큰이 다시 제시되면 같은 family의 활성 토큰을 모두 revoke하고 `401`을 반환하되 다른 기기 family는 유지한다. DB에는 원문 대신 SHA-256 lowercase hex만 저장한다.
+`POST /auth/refresh` `{"refreshToken": "..."}` → `200 {"accessToken":"...","refreshToken":"..."}`. Refresh Token 유효기간은 **14일**이다. 새 기기 로그인은 새 `familyId`를 만들고, 재발급은 기존 토큰을 revoke한 뒤 같은 family의 새 토큰으로 **회전**한다. 만료·서명/claim 오류·알 수 없는 토큰은 `401 INVALID_REFRESH_TOKEN`이다. 이미 회전·revoke된 과거 토큰이 원래 만료 시각 전에 다시 제시되면 같은 family의 활성 토큰을 모두 revoke하고 `401 INVALID_REFRESH_TOKEN`을 반환하되 다른 기기 family는 유지한다. 서버 응답 뒤 클라이언트 저장 전 연결이 끊긴 정상 상황과 공격을 구분하지 못하는 위험을 수용하며, P0에는 grace window나 이전 회전 응답 재전송을 두지 않는다. DB에는 원문 대신 SHA-256 lowercase hex만 저장한다.
 
 `POST /auth/logout` `{"refreshToken": "..."}` → `204`. Access 토큰 없이 호출하는 공개 경로이고, 알려진 refresh token이면 같은 family의 활성 토큰을 revoke한다. 활성·이미 revoked·만료·알 수 없는 non-blank 토큰 모두 멱등 `204`이며 빈 값은 `400 VALIDATION_FAILED`다. Access blacklist는 두지 않아 기존 Access는 최대 30분까지 유효할 수 있다. 앱은 Authenticator가 붙지 않는 클라이언트로 호출해 refresh 재시도 루프를 만들지 않는다(결정-51).
 
@@ -232,6 +237,32 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 ```
 `204` — 변경 + 사용 즉시 토큰 만료 + **해당 계정의 모든 리프레시 토큰 revoke** 🔒(§4.3-4, NFR-11) → 앱 재로그인.
 오류: `400 INVALID_RESET_TOKEN`(만료·사용됨·불일치) · `400 INVALID_PASSWORD`
+
+### 인증·세션 기록 보존과 동시성 🔒(결정-57, 이슈 #227)
+
+- 가입 또는 비밀번호 재설정이 성공하면 해당 `email_verification` 행을 같은 트랜잭션에서
+  즉시 삭제한다. 사용 완료·삭제된 재설정 토큰 재사용은 `INVALID_RESET_TOKEN`이며, 가입이
+  이미 끝난 이메일의 재가입은 `EMAIL_DUPLICATED`다. 인증 코드 확인 성공 자체는 행을
+  삭제하지 않고 가입 가능 기간 30분 동안 같은 코드 재확인을 멱등 `200`으로 유지한다.
+- 미인증 가입 코드는 `expires_at`, 인증됐지만 미가입인 행은 `verified_at + 30분`, 비밀번호
+  재설정은 `expires_at`을 요청 시각과 비교해 만료를 판정한다. 정리 대기 행이 남아 있어도
+  만료된 요청을 성공시키지 않는다.
+- 사용하지 않은 만료 인증 기록과 기존 소비 완료 행은 애플리케이션 시작 시 한 번, 이후
+  매시간 멱등 정리한다. 정상 운영 시 만료 후 1시간 이내, 대외 보유 상한은 24시간이다.
+  탈퇴 시 정규화 이메일의 가입·재설정 기록을 탈퇴 트랜잭션에서 즉시 삭제한다.
+- revoke된 Refresh Token hash는 과거 토큰 재사용 탐지를 위해 원래 `expires_at`까지 보관한다.
+  만료 행은 애플리케이션 시작 시와 이후 매시간 정리해 늦어도 24시간 안에 삭제하고,
+  회원 탈퇴 시 활성·revoke 상태와 관계없이 즉시 삭제한다.
+- 회원과 인증·세션 행을 함께 다루는 경로의 잠금 순서는
+  `LOGIN_IDENTITY → EMAIL_VERIFICATION → REFRESH_TOKEN`이다. 비밀번호 재설정 발급·완료와
+  회원 탈퇴를 이 순서로 직렬화한다. 탈퇴가 먼저 끝났다면 대기 요청은 인증 기록·토큰을
+  만들지 않는다.
+- 이메일 인증 기록과 Refresh Token 정리는 서로 독립된 트랜잭션으로 실행하며, 실패하면
+  다음 주기에 재시도한다. 로그에는 테이블별 삭제 건수와 기준 시각만 남기고 이메일·코드·
+  토큰·토큰 hash는 남기지 않는다. 2회 연속 실패와 마지막 성공 후 24시간 임박·초과를
+  운영 경고로 올린다.
+- 정리 쿼리는 Flyway로 `email_verification(expires_at)`,
+  `email_verification(verified_at)`, `refresh_token(expires_at)` 인덱스를 추가하고 사용한다.
 
 ---
 
@@ -854,7 +885,8 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | `CURRENT_PASSWORD_MISMATCH` | 400 | 비밀번호 변경의 현재 비밀번호 불일치 |
 | `INVALID_TRAVEL_PERIOD` | 400 | CUSTOM 기간이 7일 초과·역순·대회일 미포함 |
 | `AGREEMENT_REQUIRED` | 400 | 필수 약관 미동의 |
-| `INVALID_CODE` / `CODE_EXPIRED` | 400 | 인증 코드 불일치 / 만료(10분) |
+| `AGE_REQUIREMENT_NOT_MET` | 400 | 가입 요청의 `ageOver14=false` |
+| `INVALID_CODE` / `CODE_EXPIRED` | 400 | 인증 코드 불일치 / 코드 만료(10분)·인증 후 가입 가능 기간(30분) 만료·가입 인증 이력 없음 |
 | `INVALID_RESET_TOKEN` | 400 | 재설정 토큰 만료·사용됨 |
 | `BLOCK_SET_MISMATCH` | 400 | 순서 PUT의 blockIds가 day 전체 집합과 불일치 |
 | `INVALID_TRACK` | 400 | 궤적 좌표 2개 미만·한국 영역 밖 |
