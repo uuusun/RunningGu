@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: runninggu-postgres:17.10-pgbackrest-2.55.1
+    build:
+      context: ./postgres
+      args:
+        PGBACKREST_VERSION: 2.55.1-1
+    environment:
+      POSTGRES_DB: ${DB_NAME:-runninggu}
+      POSTGRES_USER: ${DB_USERNAME:-runninggu}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 설정해야 합니다}
+      PGBACKREST_REPO1_S3_BUCKET: ${PGBACKREST_S3_BUCKET:?PGBACKREST_S3_BUCKET을 설정해야 합니다}
+      PGBACKREST_REPO1_S3_KMS_KEY_ID: ${PGBACKREST_S3_KMS_KEY_ID:?PGBACKREST_S3_KMS_KEY_ID를 설정해야 합니다}
+      PGBACKREST_REPO1_S3_ROLE: ${PGBACKREST_S3_ROLE:?PGBACKREST_S3_ROLE을 설정해야 합니다}
+    command:
+      - postgres
+      - -c
+      - archive_mode=off
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - runninggu-postgres-recovery-data:/var/lib/postgresql/data
+      - ./deploy/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+
+volumes:
+  runninggu-postgres-recovery-data:

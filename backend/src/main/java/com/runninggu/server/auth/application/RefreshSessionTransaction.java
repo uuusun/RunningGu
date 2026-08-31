@@ -40,7 +40,10 @@ public class RefreshSessionTransaction {
         }
 
         Instant now = clock.instant();
-        if (!current.isActiveAt(now)) {
+        if (current.isExpiredAt(now)) {
+            return Optional.empty();
+        }
+        if (current.isRevoked()) {
             revokeFamily(current, now);
             return Optional.empty();
         }

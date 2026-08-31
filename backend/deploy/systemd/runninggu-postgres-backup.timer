@@ -1,0 +1,11 @@
+[Unit]
+Description=런닝구 PostgreSQL 매일 03:20 KST 백업
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=runninggu-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

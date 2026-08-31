@@ -105,10 +105,7 @@ class PasswordResetApiIntegrationTest extends PostgreSqlContainerSupport {
                         "SELECT COUNT(*) FROM refresh_token WHERE revoked_at IS NOT NULL",
                         Integer.class))
                 .isEqualTo(2);
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT consumed_at IS NOT NULL FROM email_verification",
-                        Boolean.class))
-                .isTrue();
+        assertThat(verificationCount()).isZero();
 
         resetPassword(rawToken, "otherRun4life3")
                 .andExpect(status().isBadRequest())

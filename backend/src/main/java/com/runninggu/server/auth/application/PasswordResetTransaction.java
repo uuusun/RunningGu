@@ -48,14 +48,15 @@ public class PasswordResetTransaction {
 
     @Transactional
     public void issueIfEmailIdentityExists(String email, Instant now) {
-        verificationLock.lock(email, PURPOSE);
         LoginIdentity identity = loginIdentityRepository
-                .findByProviderAndProviderSubject(LoginProvider.EMAIL, email)
+                .findByProviderAndProviderSubjectForUpdate(LoginProvider.EMAIL, email)
                 .orElse(null);
         if (identity == null) {
             return;
         }
 
+        // LOGIN_IDENTITY 다음에 EMAIL_VERIFICATION을 잠근다. (SPEC §6.5, 결정-57)
+        verificationLock.lock(email, PURPOSE);
         EmailVerification current = verificationRepository
                 .findByEmailAndPurpose(email, PURPOSE)
                 .orElse(null);
@@ -81,30 +82,38 @@ public class PasswordResetTransaction {
     /** 토큰 소비·비밀번호 교체·전체 세션 폐기를 한 트랜잭션으로 묶는다. (SPEC §4.3, NFR-11) */
     @Transactional
     public boolean reset(String tokenHash, String newPassword, Instant now) {
-        List<EmailVerification> matches = verificationRepository.findAllByTokenHash(tokenHash);
-        if (matches.size() != 1) {
+        // 먼저 잠그지 않는 조회로 LOGIN_IDENTITY 잠금 대상을 찾고, 아래에서 순서대로 재검증한다.
+        List<String> emails = verificationRepository.findEmailsByTokenHash(tokenHash);
+        if (emails.size() != 1) {
             return false;
         }
 
-        EmailVerification verification = matches.getFirst();
-        if (!verification.isPasswordResetActive(now)) {
-            return false;
-        }
-
+        String email = emails.getFirst();
         LoginIdentity identity = loginIdentityRepository
                 .findByProviderAndProviderSubjectForUpdate(
                         LoginProvider.EMAIL,
-                        verification.getEmail())
+                        email)
                 .orElse(null);
         if (identity == null) {
             return false;
         }
 
+        verificationLock.lock(email, PURPOSE);
+        EmailVerification verification = verificationRepository
+                .findByEmailAndPurpose(email, PURPOSE)
+                .orElse(null);
+        if (verification == null
+                || !tokenHash.equals(verification.getTokenHash())
+                || !verification.isPasswordResetActive(now)) {
+            return false;
+        }
+
         identity.changeEmailPassword(passwordHasher.hash(newPassword));
-        verification.markConsumed(now);
         refreshTokenRepository.findAllByUser_IdAndRevokedAtIsNull(identity.getUser().getId())
                 .forEach(refreshToken -> refreshToken.revoke(now));
         refreshTokenRepository.flush();
+        verificationRepository.delete(verification);
+        verificationRepository.flush();
         return true;
     }
 }

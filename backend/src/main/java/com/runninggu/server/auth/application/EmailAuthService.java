@@ -11,6 +11,7 @@ import com.runninggu.server.auth.domain.UserAgreement;
 import com.runninggu.server.auth.infrastructure.AgreementProperties;
 import com.runninggu.server.auth.infrastructure.AppUserRepository;
 import com.runninggu.server.auth.infrastructure.EmailVerificationRepository;
+import com.runninggu.server.auth.infrastructure.LoginIdentityLock;
 import com.runninggu.server.auth.infrastructure.LoginIdentityRepository;
 import com.runninggu.server.auth.infrastructure.RefreshTokenRepository;
 import com.runninggu.server.auth.infrastructure.UserAgreementRepository;
@@ -37,6 +38,7 @@ public class EmailAuthService {
     private final PasswordHasher passwordHasher;
     private final LoginAttemptRateLimiter loginAttemptRateLimiter;
     private final AppUserRepository appUserRepository;
+    private final LoginIdentityLock loginIdentityLock;
     private final LoginIdentityRepository loginIdentityRepository;
     private final EmailVerificationRepository verificationRepository;
     private final UserAgreementRepository agreementRepository;
@@ -54,6 +56,7 @@ public class EmailAuthService {
             PasswordHasher passwordHasher,
             LoginAttemptRateLimiter loginAttemptRateLimiter,
             AppUserRepository appUserRepository,
+            LoginIdentityLock loginIdentityLock,
             LoginIdentityRepository loginIdentityRepository,
             EmailVerificationRepository verificationRepository,
             UserAgreementRepository agreementRepository,
@@ -68,6 +71,7 @@ public class EmailAuthService {
         this.passwordHasher = passwordHasher;
         this.loginAttemptRateLimiter = loginAttemptRateLimiter;
         this.appUserRepository = appUserRepository;
+        this.loginIdentityLock = loginIdentityLock;
         this.loginIdentityRepository = loginIdentityRepository;
         this.verificationRepository = verificationRepository;
         this.agreementRepository = agreementRepository;
@@ -98,23 +102,35 @@ public class EmailAuthService {
                     "이용약관과 개인정보 수집·이용 동의가 필요합니다.");
         }
 
+        // 회원·인증·세션을 함께 다룰 때의 잠금 순서를 고정한다. (SPEC §6.5, 결정-57)
+        loginIdentityLock.lock(LoginProvider.EMAIL, normalizedEmail);
+        if (loginIdentityRepository.findByProviderAndProviderSubjectForUpdate(
+                        LoginProvider.EMAIL,
+                        normalizedEmail)
+                .isPresent()) {
+            throw new ApiException(ErrorCode.EMAIL_DUPLICATED, "이미 가입된 이메일입니다.");
+        }
         EmailVerification verification = verificationRepository
                 .findByEmailAndPurpose(normalizedEmail, SIGNUP)
                 .orElse(null);
-        if (loginIdentityRepository.existsByProviderAndProviderSubject(
-                LoginProvider.EMAIL,
-                normalizedEmail)) {
-            throw new ApiException(ErrorCode.EMAIL_DUPLICATED, "이미 가입된 이메일입니다.");
-        }
         if (appUserRepository.existsByNicknameKey(nicknameKey)) {
             throw new ApiException(ErrorCode.NICKNAME_DUPLICATED, "이미 사용 중인 닉네임입니다.");
         }
 
         Instant now = clock.instant();
-        if (verification == null || !verification.isVerifiedAndActive(now)) {
+        if (verification == null) {
+            throw verificationExpired();
+        }
+        if (verification.getVerifiedAt() == null) {
+            if (verification.isCodeExpired(now)) {
+                throw verificationExpired();
+            }
             throw new ApiException(
                     ErrorCode.EMAIL_NOT_VERIFIED,
-                    "30분 안에 완료된 이메일 인증이 필요합니다.");
+                    "이메일 인증을 완료해 주세요.");
+        }
+        if (!verification.isVerifiedAndActive(now)) {
+            throw verificationExpired();
         }
 
         AppUser user = appUserRepository.saveAndFlush(
@@ -145,9 +161,9 @@ public class EmailAuthService {
                         agreementProperties.marketingVersion(),
                         marketing,
                         now)));
-        verification.markConsumed(now);
-
         IssuedTokenPair issued = issueNewFamily(user, now);
+        verificationRepository.delete(verification);
+        verificationRepository.flush();
         return result(issued, user, normalizedEmail);
     }
 
@@ -217,5 +233,11 @@ public class EmailAuthService {
 
     private ApiException loginFailed() {
         return new ApiException(ErrorCode.LOGIN_FAILED, LOGIN_FAILURE_DETAIL);
+    }
+
+    private ApiException verificationExpired() {
+        return new ApiException(
+                ErrorCode.CODE_EXPIRED,
+                "이메일 인증이 만료됐습니다. 인증 코드를 다시 받아 주세요.");
     }
 }

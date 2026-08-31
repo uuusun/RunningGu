@@ -1,5 +1,6 @@
 package com.runninggu.server.member.application;
 
+import com.runninggu.server.auth.domain.EmailVerificationPurpose;
 import com.runninggu.server.auth.domain.LoginIdentity;
 import com.runninggu.server.auth.domain.LoginProvider;
 import com.runninggu.server.auth.infrastructure.AppUserRepository;
@@ -8,8 +9,6 @@ import com.runninggu.server.auth.infrastructure.LoginIdentityRepository;
 import com.runninggu.server.auth.infrastructure.RefreshTokenRepository;
 import com.runninggu.server.common.error.ApiException;
 import com.runninggu.server.common.error.ErrorCode;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -25,21 +24,18 @@ public class MemberDeletionService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final AppUserRepository appUserRepository;
-    private final Clock clock;
 
     public MemberDeletionService(
             ReauthTokenManager reauthTokenManager,
             LoginIdentityRepository loginIdentityRepository,
             RefreshTokenRepository refreshTokenRepository,
             EmailVerificationRepository emailVerificationRepository,
-            AppUserRepository appUserRepository,
-            Clock clock) {
+            AppUserRepository appUserRepository) {
         this.reauthTokenManager = reauthTokenManager;
         this.loginIdentityRepository = loginIdentityRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.emailVerificationRepository = emailVerificationRepository;
         this.appUserRepository = appUserRepository;
-        this.clock = clock;
     }
 
     @Transactional
@@ -51,15 +47,18 @@ public class MemberDeletionService {
 
         LoginIdentity identity = loginIdentityRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(this::unauthorized);
-        Instant now = clock.instant();
-        refreshTokenRepository.findAllByUser_IdAndRevokedAtIsNull(userId)
-                .forEach(refreshToken -> refreshToken.revoke(now));
-        refreshTokenRepository.flush();
-
+        // LOGIN_IDENTITY → EMAIL_VERIFICATION → REFRESH_TOKEN 순서로 잠근다. (SPEC §6.5, 결정-57)
         if (identity.getProvider() == LoginProvider.EMAIL) {
+            emailVerificationRepository.findByEmailAndPurpose(
+                    identity.getProviderSubject(),
+                    EmailVerificationPurpose.SIGNUP);
+            emailVerificationRepository.findByEmailAndPurpose(
+                    identity.getProviderSubject(),
+                    EmailVerificationPurpose.PASSWORD_RESET);
             emailVerificationRepository.deleteAllByEmail(identity.getProviderSubject());
             emailVerificationRepository.flush();
         }
+        refreshTokenRepository.findAllByUser_Id(userId);
         appUserRepository.deleteAllByIdInBatch(List.of(userId));
     }
 

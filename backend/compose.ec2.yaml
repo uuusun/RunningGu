@@ -8,6 +8,20 @@ services:
   postgres:
     restart: unless-stopped
     logging: *bounded-logging
+    environment:
+      PGBACKREST_REPO1_S3_BUCKET: ${PGBACKREST_S3_BUCKET:?PGBACKREST_S3_BUCKET을 설정해야 합니다}
+      PGBACKREST_REPO1_S3_KMS_KEY_ID: ${PGBACKREST_S3_KMS_KEY_ID:?PGBACKREST_S3_KMS_KEY_ID를 설정해야 합니다}
+      PGBACKREST_REPO1_S3_ROLE: ${PGBACKREST_S3_ROLE:?PGBACKREST_S3_ROLE을 설정해야 합니다}
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=runninggu archive-push %p
+      - -c
+      - archive_timeout=300s
+    volumes:
+      - ./deploy/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
 
   graphhopper:
     logging: *bounded-logging

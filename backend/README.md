@@ -18,6 +18,10 @@ Copy-Item .env.example .env
 docker compose up -d
 ```
 
+Compose의 PostgreSQL은 운영과 같은 기반을 검증하도록 `postgres:17.10-trixie`에
+pgBackRest `2.55.1-1`을 설치한 저장소 관리 이미지를 빌드한다. 로컬에서는 WAL 아카이빙과
+S3 백업을 켜지 않으며 `compose.ec2.yaml`을 함께 적용할 때만 활성화된다.
+
 `.env`는 Docker Compose가 읽지만 Spring Boot가 직접 읽지는 않는다. `bootRun`을 실행할 때는
 IDE 실행 구성 또는 셸 환경변수에 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 주입한다.
 `deploy/env/*.env.example`은 EC2 배포 전용 예시이며 로컬 `.env.example`을 대체하지 않는다.

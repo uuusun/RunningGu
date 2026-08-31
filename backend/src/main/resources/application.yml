@@ -68,6 +68,8 @@ runninggu:
       enabled: ${COURSE_SYNC_ENABLED:true}
       interval: 24h
   auth:
+    cleanup:
+      interval: 1h
     jwt:
       secret: ${JWT_SECRET}
       issuer: runninggu
