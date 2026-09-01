@@ -362,6 +362,11 @@ class SignupViewModel(
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
                 onFailure = { cause ->
+                    // **인증이 풀렸으면 타이머부터 멈춘다.** 값만 0 으로 바꾸면 자고 있던
+                    // 타이머가 깨어나 1 을 빼서 -1 이 되고, 화면은 `== 0` 일 때만 [재발송]
+                    // 을 열어서 **버튼이 영영 잠긴다**(#235 리뷰)
+                    if (cause.apiErrorCode() in VERIFICATION_LOST) clearResendCooldown()
+
                     // **사유마다 나가는 길이 다르다.** 여기서 뭉뚱그리면 사용자는 같은
                     // 버튼만 계속 누르게 된다 — VERIFY 화면에는 닉네임도 이메일도 없다
                     _uiState.update {
@@ -371,15 +376,6 @@ class SignupViewModel(
                             // **여기 오는 시점의 `mustResend` 는 항상 false 다** —
                             // `canVerify` 가 `!mustResend` 로 막고 있어서다(#235 리뷰).
                             mustResend = cause.apiErrorCode() in VERIFICATION_LOST,
-                            // **쿨다운을 면제한다.** 안 그러면 "메일을 다시 받아 주세요" 를
-                            // 띄워 놓고 [재발송] 이 최대 60초 잠겨 있다 — 시키는 일을 할
-                            // 수단이 없는 화면이 된다(#235 리뷰). 인증이 실제로 풀렸다면
-                            // 마지막 발송에서 30분이 지났으므로 서버 쿨다운도 끝나 있다
-                            resendCooldownSec = if (cause.apiErrorCode() in VERIFICATION_LOST) {
-                                0
-                            } else {
-                                it.resendCooldownSec
-                            },
                             // 뒤로 돌아갔을 때 그 칸이 이미 빨갛게 보이도록 결과를 남긴다
                             nicknameCheck = if (cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED) {
                                 DuplicateCheck.Duplicate
@@ -555,13 +551,33 @@ class SignupViewModel(
      * 3단계에서 뒤로 갔다 다시 들어오면 타이머가 겹쳐 1초에 2씩 줄어든다 — 60초 쿨다운이
      * 30초가 되어 NFR-10 을 어긴다.
      */
+    /**
+     * 쿨다운을 **지금 끝낸다.** (#235 리뷰)
+     *
+     * "메일을 다시 받아 주세요" 를 띄우면서 [재발송] 이 최대 60초 잠겨 있으면, 시키는
+     * 일을 할 수단이 없는 화면이 된다. 그래서 인증이 풀렸을 때 쿨다운을 면제한다 —
+     * 인증이 실제로 풀렸다면 마지막 발송에서 30분이 지났으므로(§1-4) 서버 쿨다운도
+     * 끝나 있다.
+     *
+     * **값만 0 으로 바꾸면 안 된다.** 타이머가 `delay(1_000)` 에서 자고 있다가 깨어나
+     * 조건을 다시 보지 않고 1 을 뺀다. 그러면 `-1` 이 되고, 화면은 `== 0` 일 때만
+     * [재발송] 을 열어서 **버튼이 영영 잠긴다.**
+     */
+    private fun clearResendCooldown() {
+        cooldownJob?.cancel()
+        cooldownJob = null
+        _uiState.update { it.copy(resendCooldownSec = 0) }
+    }
+
     private fun startResendCooldown() {
         cooldownJob?.cancel()
         cooldownJob = viewModelScope.launch {
             _uiState.update { it.copy(resendCooldownSec = RESEND_COOLDOWN_SEC) }
             while (_uiState.value.resendCooldownSec > 0) {
                 delay(1_000)
-                _uiState.update { it.copy(resendCooldownSec = it.resendCooldownSec - 1) }
+                // 0 아래로 내려가지 않게 막는다. [clearResendCooldown] 과 이중으로 지킨다 —
+            // 취소가 한 박자 늦어도 화면이 잠기지 않는다
+            _uiState.update { it.copy(resendCooldownSec = (it.resendCooldownSec - 1).coerceAtLeast(0)) }
             }
         }
     }

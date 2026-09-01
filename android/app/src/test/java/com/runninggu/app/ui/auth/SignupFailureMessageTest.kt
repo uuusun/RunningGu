@@ -9,6 +9,7 @@ import com.runninggu.app.data.repository.KakaoLoginOutcome
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -244,6 +245,47 @@ class SignupFailureMessageTest {
         // "메일을 다시 받아 주세요" 를 띄워 놓고 버튼이 잠겨 있으면 할 수 있는 게 없다
         assertTrue("재발송이 열려야 한다", viewModel.uiState.value.mustResend)
         assertEquals(0, viewModel.uiState.value.resendCooldownSec)
+    }
+
+    @Test
+    fun `쿨다운을 면제한 뒤 1초가 지나도 재발송할 수 있다`() = runTest(dispatcher) {
+        // **면제한 값이 유지되는지가 요점이다.** 값만 0 으로 바꾸면 `delay(1_000)` 에서
+        // 자고 있던 타이머가 깨어나 1 을 빼서 -1 이 된다. 화면은 `== 0` 일 때만 [재발송]
+        // 을 열므로 버튼이 영영 잠긴다 — "메일을 다시 받아 주세요" 를 띄워 놓고
+        // 할 수단을 뺏는 셈이다(@uuusun · #235 리뷰)
+        val viewModel = SignupViewModel(
+            repository = FakeSignupRepository(
+                ApiException.Http(status = 400, code = ApiErrorCode.CODE_EXPIRED, problem = null),
+            ),
+        )
+        viewModel.onToggleTos()
+        viewModel.onTogglePrivacy()
+        viewModel.onAgreeNext()
+        viewModel.onEmailChange("runner@test.com")
+        viewModel.onPasswordChange("run4life1")
+        viewModel.onPasswordConfirmChange("run4life1")
+        viewModel.onNicknameChange("김러너")
+        viewModel.onInfoNext()
+        runCurrent()
+        assertTrue("전제 — 발송 후 쿨다운이 돌아야 한다", viewModel.uiState.value.resendCooldownSec > 0)
+
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        runCurrent()
+        assertEquals("면제 직후", 0, viewModel.uiState.value.resendCooldownSec)
+
+        // **여기가 이전 테스트가 놓친 자리다** — 타이머가 깨어날 시간을 준다
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals("1초 뒤에도 0 이어야 한다", 0, viewModel.uiState.value.resendCooldownSec)
+
+        // 실제로 재발송이 되는지까지 본다. 값이 맞아도 길이 막혀 있으면 소용없다
+        // 여기서도 `advanceUntilIdle()` 을 쓰면 새로 시작된 60초를 또 흘려 버려
+        // 0 이 된 것을 보고 "안 나갔다" 고 잘못 읽는다
+        viewModel.onResendCode()
+        runCurrent()
+        assertTrue("재발송이 안 나갔다", viewModel.uiState.value.resendCooldownSec > 0)
+        assertTrue("재발송했으면 잠금이 풀려야 한다", !viewModel.uiState.value.mustResend)
     }
 
     @Test
