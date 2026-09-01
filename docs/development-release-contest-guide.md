@@ -320,7 +320,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 |---|---|---|
 | Spring Boot JAR | 인증·대회·동선·마이·외부 API 프록시 | Java 21, `bootJar` |
 | PostgreSQL 17 | 온라인 SSOT | Flyway, UTC timestamp |
-| GraphHopper 프로세스 | 적격 큐레이션 0건일 때 OSM 순환 경로 | 서버 내부 별도 프로세스, 영속 그래프 캐시 |
+| GraphHopper 프로세스 | 적격 큐레이션 0건일 때 OSM 순환 경로 | EC2 server-only 별도 프로세스, 외부 builder가 만든 버전별 graph artifact |
 | 데이터 Importer | canonical 대회 snapshot 적재 | 서버 시작 자동 실행 금지, 명시 실행 |
 | Android 앱 | 사용자 클라이언트 | 운영 서버만 호출, KTO·카카오 REST 직호출 금지 |
 
@@ -356,7 +356,10 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 
 - [ ] 호스팅은 AWS EC2, 리전은 서울 `ap-northeast-2`, 기본 도메인은 `runninggu.store`로 확정했다. AWS·결제·도메인·Google Play·인프라 운영책임자는 유선경이다(#230)
 - [ ] 월 총예산 100,000원과 **실제 비용 80,000원**, **예상 비용 100,000원** 알림을 `runninggu.play@gmail.com`으로 설정했다(#230)
-- [ ] 스테이징 정상 기동은 x86_64 8GiB를 목표로 하되 GraphHopper·Spring Boot 힙 환경변수화와 import·cold start·부하 실측을 먼저 통과했다. 첫 GraphHopper import나 메모리 부족에는 16GiB로 임시 증설하고, 검증하지 않는 시간에는 중지한다. 16GiB 상시 운영이나 프로덕션 사용 전에는 실측 사양·월 예산·80% 알림값을 다시 확정한다
+- [ ] GraphHopper graph import는 저장소에 고정한 Linux builder로 EC2 밖에서 수행하고, manifest·checksum을 갖춘 artifact만 서울 리전 KMS 암호화 비공개 S3로 전달한다. EC2에는 PBF·SRTM cache·import service를 두지 않는다
+- [ ] EC2 GraphHopper container는 `compose.ec2.yaml`에서 Docker restart를 `"no"`로 override하고 systemd가 검증 선행·foreground Compose·예상 밖 exit 0 포함 `Restart=always`·10분 window start 3회·전용 알림을 단일 소유한다. 운영자가 `docker compose up -d graphhopper`로 우회하지 않는다
+- [ ] GraphHopper runtime 기준 저장소는 10MB×3의 Docker `local` 로그다. 주 systemd service는 stdout을 버리고 stderr journal에는 container 생성 전 Compose·`ExecStartPre` 실패 이유만 남긴다. container runtime stderr가 중복 릴레이되면 failure-only wrapper 적용 뒤 재검증하며, journal과 runtime log의 시크릿·사용자 정보 부재를 각각 확인한다
+- [ ] 스테이징은 x86_64 8GiB에서 GraphHopper·Spring Boot heap 환경변수화, cold start, 30분 부하, 백업 동시 실행, OOM·GC·swap·재부팅 합격 기준을 먼저 통과했다. 4GiB는 같은 시나리오를 3회 연속 통과한 경우에만 사용하며, 결과에 맞춰 기준이나 요청량을 낮추지 않는다. 더 큰 사양이 필요하면 임시 증설을 기본 해법으로 두지 않고 실측 사양·월 예산·80% 알림값을 다시 승인한다
 - [ ] EC2·EBS·Elastic IP·S3·KMS·전송·SES의 월 예상비용이 100,000원 안인지 생성 직전 확인했다. 초과하면 메모리 기준을 임의로 낮추거나 리소스를 먼저 만들지 않고 사양·예산을 다시 결정한다
 - [ ] 운영 계정 2단계 인증·복구 수단과 팀 대리 접근을 설정했다
 - [ ] HTTPS 인증서와 자동 갱신(Certbot 연락처 `runninggu.play@gmail.com`), 앱 `BASE_URL`을 확정했다
@@ -364,7 +367,7 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 - [ ] Flyway 마이그레이션 순서, 롤백이 아니라 전진 수정하는 기준 합의
 - [ ] 다중 인스턴스라면 Flyway·Importer의 단일 실행 주체 확정
 - [ ] `contestImport`를 명시 실행하고 동일 입력 no-op·오류 전체 롤백 확인
-- [ ] GraphHopper PBF/SRTM 버전·그래프 캐시 영속성·메모리·기동 시간 확인
+- [ ] GraphHopper version·PBF·SRTM·import 설정 hash, graph artifact checksum, 상대 symlink 활성화·2세대 롤백, 메모리·기동 시간을 확인했다
 - [ ] KTO·카카오 timeout·캐시·레이트리밋·429 정책 확인
 - [ ] AWS SES 발신 `no-reply@runninggu.store`와 스팸함·인증 코드·재설정 링크의 운영 도메인을 확인했다. SES는 거래성 메일만 보내며 P0 마케팅 메일은 보내지 않는다(#229·#230)
 - [ ] 로그에 토큰·비밀번호·이메일·좌표가 없는지 샘플 검사
@@ -374,17 +377,21 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 ### 7.5 배포·롤백 절차
 
 1. 릴리스 후보 커밋에서 Android·백엔드 전체 테스트를 실행한다.
-2. 백엔드 JAR과 데이터 snapshot의 SHA-256, Git commit, 환경 이름을 릴리스 기록에 남긴다.
-3. 스테이징에 동일 artifact를 배포하고 전체 스모크 테스트를 실행한다.
+2. 백엔드 JAR·데이터 snapshot·GraphHopper graph artifact의 SHA-256, Git commit 또는 builder
+   digest, 환경 이름을 릴리스 기록에 남긴다.
+3. 스테이징에 동일 artifact를 배포하고 GraphHopper manifest 검증·활성화와 전체 스모크 테스트를
+   실행한다.
 4. 운영 DB를 백업하고 새 서버 버전을 배포한다.
 5. Flyway 결과, 애플리케이션 기동, 외부 API, GraphHopper, SMTP를 확인한다.
 6. Android 운영 빌드가 실제 운영 URL에 연결되는지 확인한다.
 7. 치명 오류면 DB를 임의로 되돌리지 않고, 호환되는 직전 서버 artifact로 복귀한다. 마이그레이션 역호환이 없으면 정해진 복구 절차를 따른다.
 8. hotfix는 `main`에서 `hotfix/*`를 만들고 `main`과 `develop` 양쪽에 반영한다.
 
-AWS EC2 스테이징의 파일 배치·실행 명령·검증·롤백은
-[`deploy/aws-ec2-staging-runbook.md`](deploy/aws-ec2-staging-runbook.md)를 따른다. 이 실행서는
-이 절의 구현판이며 정책이나 절차가 충돌하면 §7이 우선한다.
+GraphHopper graph 생산·manifest·활성화 계약은
+[`deploy/graphhopper-artifact-contract.md`](deploy/graphhopper-artifact-contract.md), AWS EC2
+스테이징의 전체 파일 배치·실행 명령·검증·롤백은
+[`deploy/aws-ec2-staging-runbook.md`](deploy/aws-ec2-staging-runbook.md)를 따른다. 두 실행서는 이
+절의 구현판이며 정책이나 절차가 충돌하면 §7이 우선한다.
 
 ---
 
@@ -400,7 +407,7 @@ AWS EC2 스테이징의 파일 배치·실행 명령·검증·롤백은
 | **BLOCKER** | 카카오 릴리스 설정 미완료 | build 설정에 네이티브 키 주입·릴리스 키 해시 설정 없음 | 패키지명+debug/release 키 해시 등록, 스토어 설치본 로그인/지도 확인 |
 | 해소됨 | ~~위치 기능·신고 미완료~~ | Manifest 에 위치 권한·서비스가 **없는 것이 맞다**(결정-56) | 자동 위치 추정을 제품에서 뺐다. #195 공식 검토는 실제 APK·네트워크 흐름 기준으로 다시 확인 |
 | **BLOCKER** | 백엔드 P0 미완료 | 현재 `common`·`contest` 중심, 인증·동선·외부 프록시·마이·코스 미완료 | AP-07·23·25와 계약 테스트·E2E 완료 |
-| **BLOCKER** | 운영 배포 방식 미정 | EC2용 JAR systemd + PostgreSQL·GraphHopper Compose + Nginx 실행서와 CI artifact는 준비 중이다. 실제 EC2·백업 복구 리허설·IaC는 없다 | 호스팅·DB·GraphHopper·백업·배포/롤백 절차 확정 및 실제 복구 검증 |
+| **BLOCKER** | 운영 배포 방식 미정 | EC2용 JAR systemd + PostgreSQL Compose + systemd 단일 소유 GraphHopper server container + Nginx 실행서와 graph artifact 계약 초안이 있다. builder·검증 unit·heap/restart 변경과 실제 EC2·백업 복구 리허설·IaC는 없다 | 호스팅·DB·GraphHopper artifact·백업·배포/롤백 구현 및 실제 복구 검증 |
 | **BLOCKER** | 개인정보 공개 문서 없음 | 공개 URL·앱 내부 링크·외부 탈퇴 URL 없음 | 개인정보처리방침·Data safety·계정 삭제 양 경로 |
 | **BLOCKER** | 공모전 심사 계정 없음 | 제출 전용 계정 절차 없음 | 공식 형식 전용 계정, 모든 제한 기능 접근, 새 기기 검증 |
 | **REQUIRED** | 릴리스 버전 정책 | `versionCode=1`, `versionName=1.0` 초기값 | 태그·스토어 버전·변경기록 일치, 업데이트마다 code 증가 |

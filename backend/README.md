@@ -81,7 +81,11 @@ HTTP 클라이언트가 쿼리를 인코딩하므로 디코딩 키를 사용한�
 동작한다. 두루누비 키가 없거나 전체 페이지 동기화가 실패하면 현재 코스 snapshot을 유지한다.
 홈 축제는 전국 월간 결과를 5분, 대회 인근 축제는 대회별 결과를 하루 캐시한다.
 
-## GraphHopper 러닝 경로
+## GraphHopper 러닝 경로 — 로컬 개발·PoC 전용
+
+아래 PBF bind mount와 named volume import 절차는 로컬 개발·PoC 전용이다. EC2는 PBF를 받거나
+import하지 않고 [`GraphHopper graph artifact 계약`](../docs/deploy/graphhopper-artifact-contract.md)에
+따라 외부 builder가 만든 artifact와 systemd 소유 server만 사용한다.
 
 `GET /api/courses/near`는 적격 큐레이션 경로가 없을 때만 별도 GraphHopper 11 프로세스에
 `run` 프로파일의 순환 경로를 요청한다. 한국 OSM PBF를 저장소 밖의 ignore 대상 경로에 내려받고
@@ -93,9 +97,10 @@ curl.exe -L -o ..\.cache\osm\korea.osm.pbf https://download.geofabrik.de/asia/so
 docker compose --profile routing up -d --build postgres graphhopper
 ```
 
-첫 실행은 OSM 그래프와 SRTM 고도 캐시를 만드는 데 수분이 걸린다. `runninggu-graphhopper-graph`와
+로컬 첫 실행은 OSM 그래프와 SRTM 고도 캐시를 만드는 데 수분이 걸린다. `runninggu-graphhopper-graph`와
 `runninggu-graphhopper-srtm` 볼륨은 컨테이너를 재기동해도 유지된다. PBF를 갱신해 그래프를 다시
-만들 때는 기존 그래프와의 버전 일관성을 확인한 뒤 별도 배포 절차로 볼륨을 교체한다.
+만들 때는 로컬 volume을 다시 생성한다. 이 volume이나 `latest` PBF 결과를 운영 artifact로
+승격하지 않는다.
 
 Spring Boot에는 `GRAPHHOPPER_ENABLED=true`와 호스트 실행 기준
 `GRAPHHOPPER_BASE_URL=http://localhost:8989`를 설정한다. GraphHopper가 꺼져 있거나 호출에

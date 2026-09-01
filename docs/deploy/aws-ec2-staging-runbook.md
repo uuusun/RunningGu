@@ -2,6 +2,11 @@
 
 > 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)의
 > AWS EC2 스테이징 구현 실행서다. 정책이나 절차가 충돌하면 상위 §7이 우선한다.
+>
+> **PR 1 초안 주의:** GraphHopper 관련 목표 구조는
+> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. builder·검증
+> 스크립트·systemd unit·Compose 변경이 PR 2로 구현되고 8GiB 합격 기준을 통과하기 전에는 이
+> 실행서만 보고 실제 배포하지 않는다.
 
 이 실행서는 `staging-api.runninggu.store` 단일 EC2에 Spring Boot JAR, PostgreSQL 17,
 GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator를 추가하지 않으며 기존
@@ -14,9 +19,10 @@ GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator�
 | 호스트 | AWS EC2, Ubuntu 24.04 LTS x86_64 |
 | 리전 | 서울 `ap-northeast-2` |
 | 도메인 | `staging-api.runninggu.store` |
-| 프로세스 | Spring Boot는 host systemd, PostgreSQL·GraphHopper는 Docker Compose |
-| 인스턴스 크기 | 스테이징 정상 기동은 x86_64 8GiB를 목표로 하고, 첫 GraphHopper import 또는 메모리 부족 때 16GiB로 임시 증설 |
-| 메모리 | 현재 GraphHopper `-Xmx6g` + Spring Boot `-Xmx2g`는 16GiB가 필요. 8GiB 전환 전 힙 환경변수화·실측 필수, swap 4GB는 긴급 완충용 |
+| 프로세스 | Spring Boot는 host systemd. PostgreSQL은 Docker `unless-stopped`, GraphHopper container는 systemd가 foreground Compose로 단일 소유 |
+| 인스턴스 크기 | PR 2 구현 뒤 x86_64 8GiB에서 먼저 검증. 4GiB는 계약 시나리오 3회 연속 통과 뒤에만 사용 |
+| GraphHopper | graph import는 저장소 고정 Linux builder로 EC2 밖에서 수행. EC2는 검증된 graph server만 실행 |
+| 메모리 | 현재 고정값 GraphHopper `-Xmx6g` + Spring Boot `-Xmx2g`는 그대로 배포하지 않음. heap 환경변수화·재시작 상한·실측이 선행, swap 4GB는 긴급 완충용 |
 | 외부 포트 | Nginx 80·443만 허용. 5432·8080·8989는 loopback |
 | 접속 | SSM Session Manager. SSH 22는 열지 않음 |
 | 운영책임자 | 유선경 — AWS·결제·도메인·Google Play·인프라 |
@@ -27,16 +33,14 @@ GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator�
 월 100,000원은 스테이징 전체 예산이다. 24시간 상시 기동을 전제로 승인한 값이 아니므로
 검증하지 않는 시간에는 EC2를 중지하고, 계획한 월 기동 시간을 비용 계산에 넣는다. 중지 중에도
 EBS·공인 IPv4·S3·KMS 등 남는 비용을 포함해 생성 직전 계산한다. 공개 앱이 사용할 프로덕션
-상시 서버는 출시 전에 실측 사양과 별도 월 예상비용을 다시 승인한다. 8GiB x86_64 인스턴스는
-GraphHopper·Spring Boot 힙을
-환경변수화하고 첫 import·cold start·대표 API 부하에서 PostgreSQL과 OS 여유 메모리까지 실측한
-뒤에만 사용한다. 현재 고정값 `-Xmx6g` + `-Xmx2g` 상태에서 8GiB를 만들지 않는다.
+상시 서버는 출시 전에 실측 사양과 별도 월 예상비용을 다시 승인한다. GraphHopper import peak는
+EC2 사양에 포함하지 않는다. 8GiB에서 heap 환경변수화, cold start, 30분 부하, 전체 백업 동시
+실행, 재부팅을 먼저 검증하고, 4GiB는 같은 시나리오를 3회 연속 통과한 뒤에만 사용한다. 현재
+고정값 `-Xmx6g` + `-Xmx2g` 상태에서는 8GiB·4GiB 어느 쪽에도 배포하지 않는다.
 
-첫 GraphHopper import나 운영 중 메모리 부족에는 EBS와 Elastic IP를 유지한 채 EC2를 중지하고
-16GiB x86_64 유형으로 바꿔 다시 시작할 수 있다. 이때 짧은 중단을 공지하고 §15 검증을 전부
-다시 수행한다. 16GiB를 일시 사용해도 월 예상비용이 100,000원을 넘으면 먼저 예산을 다시
-승인한다. 16GiB 상시 운영이나 프로덕션 사용이 필요하면 #230의 월 예산과 80% 알림값을 같은
-결정으로 올린다.
+메모리 부족을 16GiB 임시 증설로 먼저 숨기지 않는다. 합격 기준을 통과하지 못하면 heap·실제
+working set·GC·동시 프로세스를 기록하고 사양 또는 구조를 다시 결정한다. 더 큰 사양을 승인할
+때는 §15 검증과 월 예상비용·80% 알림값을 같은 결정으로 갱신한다.
 
 swap은 RAM 대체재가 아니다. 지속적으로 사용되면 인스턴스를 늘린다.
 
@@ -62,8 +66,9 @@ release-manifest.txt
 SHA256SUMS
 ```
 
-EC2의 저장소 checkout은 Compose와 GraphHopper Docker build context를 위한 것이다. JAR을 다시
-빌드하거나 CI artifact를 다른 commit의 checkout과 섞지 않는다.
+EC2의 저장소 checkout은 Compose와 GraphHopper **server** Docker build context를 위한 것이다.
+EC2에서 graph import image를 실행하거나 JAR을 다시 빌드하지 않고, CI artifact를 다른 commit의
+checkout과 섞지 않는다.
 
 ## 3. AWS 선행 조건
 
@@ -128,7 +133,8 @@ sudo useradd \
 sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu
 sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu/repository
 sudo install -d -o root -g runninggu -m 0750 /opt/runninggu/releases
-sudo install -d -o root -g root -m 0755 /opt/runninggu-data/osm
+sudo install -d -o root -g root -m 0755 /opt/runninggu-data
+sudo install -d -o root -g root -m 0755 /opt/runninggu-data/graph
 sudo install -d -o root -g runninggu -m 0750 /etc/runninggu
 ```
 
@@ -166,7 +172,10 @@ sudo systemctl restart systemd-journald
 ```
 
 현재 정책은 디스크 용량만 제한한다. 정확한 로그 보존 일수는 운영·개인정보 정책을 확정한 뒤
-별도로 추가한다.
+별도로 추가한다. GraphHopper runtime의 기준 저장소는 Compose의 크기 제한된 Docker `local`
+driver다. 주 service의 stdout은 버리고 stderr는 container 생성 전 Compose 오류와 `ExecStartPre`
+실패 이유를 위해 journal에 둔다. journal에는 그 밖에 Spring Boot·Importer·백업·WAL 감시와
+GraphHopper 검증·알림 같은 control-plane 기록을 보존한다.
 
 ## 6. exact commit checkout과 환경파일
 
@@ -191,10 +200,14 @@ sudo install -m 0640 -o root -g runninggu \
 sudo install -m 0600 -o root -g root \
   backend/deploy/env/backup-alert.env.example \
   /etc/runninggu/backup-alert.env
+sudo install -m 0600 -o root -g root \
+  backend/deploy/env/graphhopper-alert.env.example \
+  /etc/runninggu/graphhopper-alert.env
 
 sudoedit /etc/runninggu/compose.env
 sudoedit /etc/runninggu/application.env
 sudoedit /etc/runninggu/backup-alert.env
+sudoedit /etc/runninggu/graphhopper-alert.env
 ```
 
 - 두 파일의 `DB_PASSWORD`에는 같은 URL-safe 값을 넣는다.
@@ -207,23 +220,54 @@ sudoedit /etc/runninggu/backup-alert.env
   instance profile role 이름을 넣는다. 정적 access key는 넣지 않는다.
 - `backup-alert.env`에는 운영책임자 이메일을 구독시킨 SNS topic ARN을 넣는다. instance
   profile에는 해당 topic의 `sns:Publish` 최소 권한만 추가한다.
+- `graphhopper-alert.env`는 같은 SNS topic을 쓸 수 있지만 알림 unit과 메시지는 백업 실패와
+  구분한다. PR 2가 예시 파일과 GraphHopper 전용 알림 unit을 제공하기 전에는 배포하지 않는다.
 
-## 7. 고정 OSM PBF 설치
+## 7. GraphHopper graph artifact 설치 준비
 
-`latest` URL을 배포 기록 없이 사용하지 않는다. 날짜가 고정된 대한민국 PBF URL, 다운로드 시각,
-배포처, SHA-256을 릴리스 기록에 남긴 뒤 검증한 파일을 설치한다.
+EC2에는 대한민국 PBF와 SRTM cache를 설치하지 않는다. 권한 있는 팀원이
+[`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)의 저장소 고정 builder로
+만들어 비공개 S3에 올린 graph artifact ID를 배포 입력으로 받는다.
+
+배포 기록에는 다음을 먼저 남긴다.
+
+- artifact ID와 S3 key
+- GraphHopper version·JAR hash·builder image digest
+- PBF 파일명·기준일·SHA-256
+- SRTM tile 목록 hash와 import 설정 정규화 hash
+- archive·압축 해제 graph file 목록 SHA-256
+- 생성 시각·생성 주체, 배포 승인자
+
+PR 2는 계약 §3에 정의된 다음 명령 인터페이스를 구현해야 한다. 스크립트가 저장소에 없거나
+`runninggu-graphhopper-verify.service` 검증이 실패하면 수동 압축 해제·symlink 전환으로 우회하지
+않는다.
 
 ```bash
-sha256sum <다운로드한_고정버전_PBF>
-sudo install -m 0444 \
-  <다운로드한_고정버전_PBF> \
-  /opt/runninggu-data/osm/korea.osm.pbf
+sudo /bin/sh \
+  /opt/runninggu/repository/backend/deploy/graphhopper/install-graph-artifact.sh \
+  --artifact-id '<검증할_artifact_id>'
 ```
 
-PBF 교체 시 기존 그래프 볼륨을 즉시 삭제하지 않는다. 새 그래프를 별도로 검증하고 교체·복구
-절차를 기록한 작업에서만 처리한다.
+이 명령은 S3 다운로드, archive·manifest·압축 해제 파일 hash 검증, 최종 version directory
+rename까지만 수행한다. 실행 중인 GraphHopper를 중지하고 상대 symlink를 바꾸는 활성화 절차는
+최초 배포는 §10, 이후 갱신은 §17.1을 따른다. install script는 첫 배포에서도 `current`를 만들거나
+service를 제어하지 않는다.
 
-## 8. Compose 사전 검증과 기동
+```text
+/opt/runninggu-data/graph/
+├── <artifact_id>/
+└── current -> <artifact_id>
+```
+
+현재와 직전 성공 세대를 유지한다. 새 artifact가 스모크를 통과하기 전에는 이전 세대를 삭제하지
+않는다.
+
+기존 EC2가 named volume import 구조로 이미 실행 중이면 계약 §5.2의 일회성 전환 절차를 먼저
+적용한다. 실제 Compose project와 graph·SRTM volume 이름을 inspect해 기록하고 새 artifact의
+스모크·재부팅·롤백 세대 확보 전에는 지우지 않는다. PostgreSQL volume과 구분하지 않은
+`docker compose down -v` 또는 glob 기반 volume 삭제는 금지한다.
+
+## 8. Compose 사전 검증과 PostgreSQL 기동
 
 모든 Compose 명령은 `/opt/runninggu/repository/backend`에서 base와 EC2 파일을 함께 사용한다.
 `config` 전체 출력에는 DB 비밀번호가 포함될 수 있으므로 화면이나 로그로 출력하지 않는다.
@@ -247,15 +291,30 @@ sudo docker compose \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); p=d["services"]["postgres"]["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0].get("host_ip")=="127.0.0.1", "PostgreSQL loopback binding 실패"; assert len(g)==1 and g[0].get("host_ip")=="127.0.0.1", "GraphHopper loopback binding 실패"'
 ```
 
-PostgreSQL과 GraphHopper를 시작한다.
+PR 2의 Compose는 이 검증에 더해 다음을 만족해야 한다.
+
+- EC2 GraphHopper service에 PBF·SRTM mount와 import profile이 없다.
+- host `/opt/runninggu-data/graph` 상위 directory 하나만 `/data/graph`에 bind mount한다.
+- server 설정의 `graph.location`은 `/data/graph/current`다.
+- server profile과 LM은 `run` 하나다.
+- base `compose.yaml`의 로컬용 `restart: unless-stopped`를 `compose.ec2.yaml`이
+  GraphHopper에 한해 `restart: "no"`로 override하며 systemd만 lifecycle을 소유한다.
+- GraphHopper logging은 Docker `local`, `max-size: "10m"`, `max-file: "3"`이고 주 systemd
+  service는 `StandardOutput=null`, `StandardError=journal`이다. container runtime stderr가
+  foreground Compose를 거쳐 journal로 중복되는지는 PR 2에서 실측하고, 중복되면 계약 §7의
+  failure-only wrapper를 적용한다.
+- PostgreSQL·GraphHopper 포트는 loopback이다.
+
+먼저 PostgreSQL만 시작한다. GraphHopper는 §10에서 주 service와 검증 unit을 설치하고
+`current`를 활성화한 뒤 systemd로 시작한다. 운영자가 직접 `docker compose up -d graphhopper`를
+실행하지 않는다.
 
 ```bash
 sudo docker compose \
   --env-file /etc/runninggu/compose.env \
-  --profile routing \
   -f compose.yaml \
   -f compose.ec2.yaml \
-  up -d --build postgres graphhopper
+  up -d --build postgres
 ```
 
 PostgreSQL이 준비될 때까지 확인한다.
@@ -300,25 +359,6 @@ sudo /bin/sh deploy/backup/check-wal-archive.sh
 사이에는 archive 명령이 실패할 수 있으므로 애플리케이션과 감시 timer를 아직 시작하지 않는다.
 최초 `check`와 `check-wal-archive.sh`가 모두 성공한 뒤에만 다음 단계로 진행한다.
 
-GraphHopper 첫 그래프와 SRTM 캐시 생성은 수분 이상 걸릴 수 있다. 로그와 메모리를 별도로 본다.
-
-```bash
-sudo docker compose \
-  --env-file /etc/runninggu/compose.env \
-  --profile routing \
-  -f compose.yaml \
-  -f compose.ec2.yaml \
-  ps
-sudo docker compose \
-  --env-file /etc/runninggu/compose.env \
-  --profile routing \
-  -f compose.yaml \
-  -f compose.ec2.yaml \
-  logs --tail 200 graphhopper
-free -h
-sudo docker stats --no-stream
-```
-
 `docker compose down -v`는 실행하지 않는다.
 
 ## 9. CI artifact 설치
@@ -359,11 +399,13 @@ sudo ln -sfn \
 
 `release-manifest.txt`, checkout HEAD, 배포 요청 commit이 모두 같은지 확인한다.
 
-## 10. systemd 설치와 최초 Flyway·Importer
+## 10. systemd·GraphHopper 검증 설치와 최초 Flyway·Importer
 
-백엔드·Importer와 백업·WAL 감시 service·timer·실패 알림 unit을 설치한다. Importer와 두
-service는 one-shot이며 직접 enable하지 않는다. §8의 최초 archive 검증이 끝났으므로 WAL 감시
-timer는 이 절에서 켜고, 백업 timer만 §16의 실제 백업 검증 뒤 enable한다.
+백엔드·Importer, GraphHopper 주 service·검증·알림, 백업·WAL 감시 service·timer·실패 알림 unit을
+설치한다. GraphHopper 주 service만 enable하고 EC2 override의 Docker restart policy는 `"no"`로
+둔다. Importer와
+검증·백업·WAL 감시 service는 one-shot이며 직접 enable하지 않는다. §7의 최초 archive 검증이
+끝났으므로 WAL 감시 timer는 이 절에서 켜고, 백업 timer만 §16의 실제 백업 검증 뒤 enable한다.
 
 ```bash
 sudo install -m 0644 \
@@ -372,6 +414,15 @@ sudo install -m 0644 \
 sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend.service \
   /etc/systemd/system/runninggu-backend.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-graphhopper.service \
+  /etc/systemd/system/runninggu-graphhopper.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-graphhopper-verify.service \
+  /etc/systemd/system/runninggu-graphhopper-verify.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-graphhopper-alert@.service \
+  /etc/systemd/system/runninggu-graphhopper-alert@.service
 sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-backup.service \
   /etc/systemd/system/runninggu-postgres-backup.service
@@ -391,17 +442,89 @@ sudo systemctl daemon-reload
 sudo systemd-analyze verify \
   /etc/systemd/system/runninggu-contest-import.service \
   /etc/systemd/system/runninggu-backend.service \
+  /etc/systemd/system/runninggu-graphhopper.service \
+  /etc/systemd/system/runninggu-graphhopper-verify.service \
+  /etc/systemd/system/runninggu-graphhopper-alert@.service \
   /etc/systemd/system/runninggu-postgres-backup.service \
   /etc/systemd/system/runninggu-postgres-backup.timer \
   /etc/systemd/system/runninggu-postgres-wal-archive-check.service \
   /etc/systemd/system/runninggu-postgres-wal-archive-check.timer \
   /etc/systemd/system/runninggu-backup-alert@.service
 
+cd /opt/runninggu/repository/backend
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  build graphhopper
+
+cd /opt/runninggu-data/graph
+test -d '<최초_artifact_id>'
+test ! -e current
+test ! -L current
+sudo ln -s '<최초_artifact_id>' 'current.next.<배포_식별자>'
+sudo mv -Tf 'current.next.<배포_식별자>' current
+
+graphhopper_activation_started_ms=$(date +%s%3N)
+graphhopper_verify_started_ms=$(date +%s%3N)
+sudo systemctl start runninggu-graphhopper-verify.service
+graphhopper_verify_finished_ms=$(date +%s%3N)
+sudo systemctl status --no-pager runninggu-graphhopper-verify.service
+sudo systemctl enable runninggu-graphhopper.service
+graphhopper_prestart_started_ms=$(date +%s%3N)
+sudo systemctl start runninggu-graphhopper.service
+graphhopper_prestart_finished_ms=$(date +%s%3N)
+sudo systemctl status --no-pager runninggu-graphhopper.service
+
+graphhopper_ready=0
+for attempt in $(seq 1 60); do
+  if curl --fail --silent --show-error \
+    --output /dev/null \
+    'http://127.0.0.1:8989/route?point=37.5665,126.9780&profile=run&algorithm=round_trip&round_trip.distance=5000&round_trip.seed=0'
+  then
+    graphhopper_ready=1
+    break
+  fi
+  sleep 2
+done
+test "$graphhopper_ready" -eq 1
+graphhopper_ready_ms=$(date +%s%3N)
+test $((graphhopper_ready_ms - graphhopper_activation_started_ms)) -le 120000
+
+echo "verify_ms=$((graphhopper_verify_finished_ms - graphhopper_verify_started_ms))"
+echo "start_job_with_exec_start_pre_ms=$((graphhopper_prestart_finished_ms - graphhopper_prestart_started_ms))"
+echo "activation_to_ready_ms=$((graphhopper_ready_ms - graphhopper_activation_started_ms))"
+
+cd /opt/runninggu/repository/backend
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  logs --tail 200 graphhopper
+
 sudo systemctl start runninggu-postgres-wal-archive-check.service
 sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
 sudo systemctl enable --now runninggu-postgres-wal-archive-check.timer
 sudo systemctl list-timers runninggu-postgres-wal-archive-check.timer --no-pager
 ```
+
+`docker compose logs graphhopper`는 GraphHopper runtime 로그의 기준 저장소다. 여기에는
+manifest의 artifact ID와 기존 graph load가 있어야 하고 PBF 읽기·SRTM download·import 시작
+로그가 없어야 한다. 주 service의 Compose·`ExecStartPre` 실패는
+`journalctl -u runninggu-graphhopper.service`, 검증·실패 알림은
+`journalctl -u runninggu-graphhopper-verify.service`와
+`journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. 주 service journal에 foreground
+Compose가 릴레이한 container runtime stdout이 있으면 실패다. runtime stderr까지 릴레이되면
+계약 §7의 wrapper를 적용하기 전에는 배포하지 않는다.
+
+`systemctl show runninggu-graphhopper.service`에서 `NRestarts`, `StartLimitIntervalUSec`,
+`StartLimitBurst`, `TimeoutStartUSec`, `StandardOutput`, `StandardError`도 확인한다. 초기
+`TimeoutStartSec=60s`는 검증 전용 후보이고 전체 readiness 120초와 같은 뜻이 아니다. 검증
+unit·주 service의
+`ExecStartPre` 또는 내부 스모크가 실패하면 Spring Boot를 시작하지 않는다. 운영자가 직접
+`docker compose up -d graphhopper`로 systemd를 우회하지 않는다.
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
@@ -421,7 +544,8 @@ Flyway 버전을 먼저 기록한다.
 
 ## 11. Spring Boot 기동과 내부 준비 확인
 
-첫 배포에서는 enable과 start를 함께 수행한다. 이후 배포는 artifact 링크를 바꾼 다음 restart한다.
+첫 배포에서는 enable과 start를 함께 수행한다. 이후 배포는 §17에 따라 백엔드를 먼저 중지하고
+artifact 링크와 대회 snapshot을 적용한 뒤 다시 시작한다.
 
 ```bash
 sudo systemctl enable --now runninggu-backend.service
@@ -553,11 +677,35 @@ curl --fail --silent --show-error \
 - Swagger와 `/v3/api-docs`가 비활성인가
 - 외부에서 5432·8080·8989에 연결할 수 없는가
 - Nginx access log가 쿼리스트링을 제외한 `runninggu_noqs` 포맷을 사용하는가
-- GraphHopper 그래프·SRTM 볼륨이 재시작 후 재사용되는가
-- `free -h`, `docker stats --no-stream`에서 swap을 지속 사용하지 않는가
+- GraphHopper가 같은 graph artifact ID를 재사용하고 PBF·SRTM download·import를 시작하지 않는가
+- GraphHopper runtime stdout은 Docker `local`에만 있고 주 service journal에 중복되지 않는가
+- container runtime stderr가 주 service journal로 릴레이되지 않으며, 릴레이되면 failure-only wrapper가 적용됐는가
+- GraphHopper 검증·알림 journal과 Docker runtime log 모두에 PBF 내용·AWS 자격 증명·사용자 정보가 없는가
+- `free -h`, `docker stats --no-stream`, `systemd-cgtop`에서 swap·메모리 합격 기준을 만족하는가
 
-마지막으로 EC2를 한 번 재부팅해 PostgreSQL·GraphHopper의 `unless-stopped`, Docker 의존 systemd,
-Spring Boot 재시도, Nginx, certbot timer가 모두 복구되는지 확인한다.
+마지막으로 EC2를 한 번 재부팅해 PostgreSQL의 `unless-stopped`, Docker 의존
+`runninggu-graphhopper.service`, Spring Boot, Nginx, certbot timer가 모두 복구되는지 확인한다.
+GraphHopper는 Docker가 직접 자동 시작하면 실패다. systemd 주 service의 `ExecStartPre`가 활성
+artifact를 먼저 검증한 뒤 같은 artifact ID로 server를 시작했고 `NRestarts`가 불필요하게 늘지
+않았는지 확인한다. 재부팅에서는 GraphHopper unit activation부터, artifact 배포에서는 verify
+oneshot 시작부터 GraphHopper·Spring readiness까지 2분이며, verify와 `ExecStartPre` 포함 start job
+소요시간을 각각 기록한다. 활성 graph를 고의로 손상시키는 시험은 운영 재부팅 검증과 섞지 않고
+계약 §9.3의 격리 환경에서만 수행한다.
+
+PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확인한다.
+
+1. `systemctl stop`은 container를 정상 종료하고 자동 재시작하지 않는다.
+2. GraphHopper 또는 foreground Compose가 예상하지 않게 exit 0이면 `Restart=always`가 다시 시작한다.
+3. cgroup OOM/exit 137은 5초 간격으로 재시도하되 PostgreSQL을 종료하지 않는다.
+4. 10분 window의 start 시도 3회를 소진하면 무한 반복하지 않고 failed 상태와 전용 알림을 남긴다.
+5. 격리된 시험 env에서 Compose required 변수를 하나 누락하면 container 생성 전 보간 실패 이유가
+   주 service journal에 남고 시크릿 값은 남지 않는다.
+6. container stderr 표식은 Docker `local`에 남되 주 service journal에는 중복되지 않는다. 직접
+   Compose에서 중복되면 계약 §7의 wrapper 적용 뒤 다시 통과해야 한다.
+
+인스턴스 크기 판정은 [`graphhopper-artifact-contract.md` §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의
+30분 부하·백업·OOM·GC·swap·재부팅 기준을 사용한다. 8GiB 한 번 통과를 4GiB 승인 근거로 쓰지
+않으며 4GiB는 같은 시나리오를 3회 연속 통과해야 한다.
 
 ## 16. 백업·복구
 
@@ -715,29 +863,70 @@ WAL에 공백이 있거나 탈퇴 이후 시점까지 복구하지 못했거나 
 
 1. exact commit CI artifact와 checksum을 검증한다.
 2. 배포 직전 DB 백업과 현재 release SHA를 기록한다.
-3. 새 release 디렉터리를 만들고 `current` 링크를 바꾼다.
-4. `runninggu-contest-import.service`를 명시 실행한다.
-5. Flyway·Importer 성공 뒤 `runninggu-backend.service`를 restart한다.
-6. 내부 재시도와 외부 HTTPS 스모크를 통과시킨다.
-7. 직전 artifact와 DB 백업을 정해진 보존 정책에 따라 유지한다.
+3. 새 release 디렉터리를 만든다.
+4. `runninggu-backend.service`를 중지한다.
+5. 애플리케이션 `current` 링크를 새 release로 바꾼다.
+6. `runninggu-contest-import.service`를 명시 실행한다.
+7. Flyway·Importer 성공 또는 `NO_OP` 뒤 `runninggu-backend.service`를 시작한다.
+8. 내부 readiness와 외부 HTTPS 스모크를 통과시킨다.
+9. 직전 artifact와 DB 백업을 정해진 보존 정책에 따라 유지한다.
 
 DB 마이그레이션은 이전 서버와 역호환되게 설계한다. Importer 또는 앱 기동 실패 시 DB migration을
-임의로 되돌리지 않는다.
+임의로 되돌리지 않는다. Importer 실패 시 직전 애플리케이션 symlink로 복원해 기존 백엔드를
+다시 시작할 수 있는지 확인하고, 적용된 Flyway와 실패 원인을 기록한다.
+
+### 17.1 GraphHopper graph artifact 갱신
+
+애플리케이션 배포와 graph 갱신은 독립 배포 단위다. PBF·GraphHopper version·import 영향 설정이
+바뀐 릴리스에서만 새 graph artifact를 활성화한다.
+
+1. §7의 install script로 새 세대를 다운로드·검증하고 현재 artifact ID를 기록한다.
+2. 새 version directory와 기존 `current` 상대 symlink를 확인한다.
+3. `runninggu-graphhopper.service`를 중지한다. container를 직접 제어하지 않는다.
+4. 새 상대 symlink를 임시 이름으로 만든 뒤 rename해 `current`를 원자적으로 교체한다.
+5. `runninggu-graphhopper-verify.service`를 실행한다.
+6. 검증 성공 뒤 `runninggu-graphhopper.service`를 시작하고 내부 round-trip 스모크를 실행한다.
+   주 service의 `ExecStartPre`가 같은 검증을 다시 수행한다.
+7. 실패하면 주 service를 중지하고 직전 symlink로 복원한 뒤 검증·시작·스모크한다.
+
+5~6의 두 검증은 배포 게이트와 모든 기동 게이트로 각각 유지한다. 두 검증 시간과 5번 시작부터
+readiness까지의 전체 시간을 기록하며 전체 2분 기준에 포함한다.
+
+```bash
+sudo systemctl stop runninggu-graphhopper.service
+
+cd /opt/runninggu-data/graph
+sudo ln -s '<새_artifact_id>' 'current.next.<배포_식별자>'
+sudo mv -Tf 'current.next.<배포_식별자>' current
+
+sudo systemctl start runninggu-graphhopper-verify.service
+sudo systemctl start runninggu-graphhopper.service
+```
+
+실행 중 symlink를 먼저 바꾸거나 `current` 자체를 bind source로 바꾸지 않는다. GraphHopper server
+image 또는 server 설정도 바뀐 배포라면 service 시작 전에 exact commit의 image를 명시적으로
+build한다. 주 service의 foreground Compose가 필요한 container recreate를 수행하며, 검증기는 새
+server image의 version·JAR hash label과 활성 manifest도 대조한다.
 
 ## 18. 애플리케이션 artifact 롤백
 
 호환되는 직전 release를 명시적으로 선택한다.
 
 ```bash
+sudo systemctl stop runninggu-backend.service
 sudo ln -sfn \
   /opt/runninggu/releases/<직전_git_commit> \
   /opt/runninggu/current
-sudo systemctl restart runninggu-backend.service
+sudo systemctl start runninggu-backend.service
 ```
 
 11장의 내부 준비 확인과 15장의 외부 스모크를 다시 실행한다. 이전 JAR가 이미 적용된 DB migration과
-호환되지 않으면 JAR만 되돌리지 않고 §7에서 정한 복구 절차를 따른다. `docker compose down -v`,
-PostgreSQL volume 삭제, GraphHopper cache 삭제는 롤백 명령이 아니다.
+호환되지 않으면 JAR만 되돌리지 않고 상위 배포 가이드 §7에서 정한 복구 절차를 따른다.
+`docker compose down -v`,
+PostgreSQL volume 삭제, GraphHopper version directory 삭제는 롤백 명령이 아니다.
+
+GraphHopper graph rollback은 §17.1과 같은 stop → 직전 상대 symlink 원자 교체 → verify → start →
+스모크 순서를 사용한다. 현재·직전 성공 세대가 아닌 임의 PBF 재import로 롤백하지 않는다.
 
 ## 19. 출시 차단 항목 갱신 기준
 
@@ -747,8 +936,11 @@ PostgreSQL volume 삭제, GraphHopper cache 삭제는 롤백 명령이 아니다
 
 - 실제 EC2·Elastic IP·DNS·HTTPS 연결
 - CI artifact와 EC2 release SHA 일치 기록
+- GraphHopper builder image digest·manifest·S3 artifact checksum·활성/직전 세대 기록
+- GraphHopper Docker local 로그 단일 저장·검증/알림 journal 분리, verify·`ExecStartPre` 시간과 exit 0/137·정상 stop·start limit 시험 기록
 - Flyway·Importer·앱·GraphHopper·SMTP 스모크 결과
 - certbot 자동 갱신 dry-run
 - DB 백업과 실제 복원 리허설
-- 재부팅 자동 복구와 메모리 측정
+- 8GiB 재부팅 자동 복구와 30분 메모리·백업 동시 부하 합격 기록
+- 4GiB를 사용한다면 같은 시나리오 3회 연속 합격 기록
 - Android 스테이징 `BASE_URL` E2E
