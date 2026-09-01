@@ -58,7 +58,7 @@ function sliceSegment(points, cum, startIdx, targetM) {
 
 // ── 위치 기반 코스 자르기 ──
 //  (lat,lng) 반경 radiusKm 안을 지나는 코스를 찾아, 가까운 지점부터 lengthKm 구간을 잘라 반환.
-//  가까운 순 정렬. 장거리 트레일도 '내 근처 Lkm'로 축약돼 나온다.
+//  가까운 순 정렬. 장거리 트레일도 '출발지 주변 Lkm'로 축약돼 나온다.
 export function sliceCoursesNear({ lat, lng, lengthKm = 5, radiusKm = 5, limit = 20 }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return []
   const targetM = lengthKm * 1000
@@ -76,7 +76,7 @@ export function sliceCoursesNear({ lat, lng, lengthKm = 5, radiusKm = 5, limit =
       sigun: c.sigun,
       levelLabel: c.levelLabel,
       fullDistKm: c.distKm,
-      accessM: Math.round(near.distM),          // 내 위치 → 코스 진입점 거리
+      accessM: Math.round(near.distM),          // 출발지 → 코스 진입점 거리
       segKm: Math.round((seg.distM / 1000) * 10) / 10, // 잘라낸 구간 길이
       segPoints: seg.points,
     })
