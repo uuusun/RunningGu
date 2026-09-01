@@ -1,0 +1,18 @@
+[Unit]
+Description=런닝구 PostgreSQL 백업·WAL 보호 작업 실패 SNS 알림 (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/runninggu/backup-alert.env
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/backup/notify-backup-failure.sh %i
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=runninggu-backup-alert

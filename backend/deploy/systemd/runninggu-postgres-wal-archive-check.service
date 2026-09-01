@@ -1,0 +1,22 @@
+[Unit]
+Description=런닝구 PostgreSQL WAL archive 상태 검사
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+OnFailure=runninggu-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/runninggu/repository/backend
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/backup/check-wal-archive.sh
+TimeoutStartSec=2min
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=runninggu-postgres-wal-archive-check

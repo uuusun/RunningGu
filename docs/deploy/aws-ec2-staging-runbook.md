@@ -90,6 +90,7 @@ sudo apt-get install -y \
   openjdk-21-jre-headless \
   nginx \
   certbot \
+  awscli \
   git \
   curl \
   unzip \
@@ -107,6 +108,7 @@ sudo docker version
 sudo docker compose version
 nginx -v
 certbot --version
+aws --version
 ```
 
 Compose의 특정 버전 확장 문법에 기대지는 않지만 `docker compose` v2 plugin이 실제 EC2에
@@ -186,9 +188,13 @@ sudo install -m 0640 -o root -g runninggu \
 sudo install -m 0640 -o root -g runninggu \
   backend/deploy/env/application.env.example \
   /etc/runninggu/application.env
+sudo install -m 0600 -o root -g root \
+  backend/deploy/env/backup-alert.env.example \
+  /etc/runninggu/backup-alert.env
 
 sudoedit /etc/runninggu/compose.env
 sudoedit /etc/runninggu/application.env
+sudoedit /etc/runninggu/backup-alert.env
 ```
 
 - 두 파일의 `DB_PASSWORD`에는 같은 URL-safe 값을 넣는다.
@@ -197,6 +203,10 @@ sudoedit /etc/runninggu/application.env
 - 스테이징과 운영의 DB·JWT·SMTP·외부 API 키를 공유하지 않는다.
 - `SERVER_ADDRESS=127.0.0.1`과 `FORWARD_HEADERS_STRATEGY=framework`를 유지한다.
 - springdoc 두 항목은 기본 `false`다.
+- `compose.env`의 pgBackRest 항목에는 S3 bucket 이름, 고객 관리형 KMS key ARN, EC2
+  instance profile role 이름을 넣는다. 정적 access key는 넣지 않는다.
+- `backup-alert.env`에는 운영책임자 이메일을 구독시킨 SNS topic ARN을 넣는다. instance
+  profile에는 해당 topic의 `sns:Publish` 최소 권한만 추가한다.
 
 ## 7. 고정 OSM PBF 설치
 
@@ -261,6 +271,35 @@ do
 done
 ```
 
+저장소 이미지에 고정된 버전을 확인하고, 최초 한 번 stanza를 만든 뒤 WAL archive와 S3 연결을
+검사한다. 이 단계가 실패하면 애플리케이션을 시작하지 않는다.
+
+```bash
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  exec -T --user postgres postgres pgbackrest version
+
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu stanza-create
+
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu check
+
+sudo /bin/sh deploy/backup/check-wal-archive.sh
+```
+
+`pgbackrest version`은 저장소가 고정한 `2.55.1`이어야 한다. PostgreSQL 기동부터 stanza 생성
+사이에는 archive 명령이 실패할 수 있으므로 애플리케이션과 감시 timer를 아직 시작하지 않는다.
+최초 `check`와 `check-wal-archive.sh`가 모두 성공한 뒤에만 다음 단계로 진행한다.
+
 GraphHopper 첫 그래프와 SRTM 캐시 생성은 수분 이상 걸릴 수 있다. 로그와 메모리를 별도로 본다.
 
 ```bash
@@ -322,7 +361,9 @@ sudo ln -sfn \
 
 ## 10. systemd 설치와 최초 Flyway·Importer
 
-두 unit을 설치한다. Importer는 배포 때 명시 실행하는 one-shot이며 enable하지 않는다.
+백엔드·Importer와 백업·WAL 감시 service·timer·실패 알림 unit을 설치한다. Importer와 두
+service는 one-shot이며 직접 enable하지 않는다. §8의 최초 archive 검증이 끝났으므로 WAL 감시
+timer는 이 절에서 켜고, 백업 timer만 §16의 실제 백업 검증 뒤 enable한다.
 
 ```bash
 sudo install -m 0644 \
@@ -331,10 +372,35 @@ sudo install -m 0644 \
 sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend.service \
   /etc/systemd/system/runninggu-backend.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-backup.service \
+  /etc/systemd/system/runninggu-postgres-backup.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-backup.timer \
+  /etc/systemd/system/runninggu-postgres-backup.timer
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-wal-archive-check.service \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-wal-archive-check.timer \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.timer
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-backup-alert@.service \
+  /etc/systemd/system/runninggu-backup-alert@.service
 sudo systemctl daemon-reload
 sudo systemd-analyze verify \
   /etc/systemd/system/runninggu-contest-import.service \
-  /etc/systemd/system/runninggu-backend.service
+  /etc/systemd/system/runninggu-backend.service \
+  /etc/systemd/system/runninggu-postgres-backup.service \
+  /etc/systemd/system/runninggu-postgres-backup.timer \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.service \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.timer \
+  /etc/systemd/system/runninggu-backup-alert@.service
+
+sudo systemctl start runninggu-postgres-wal-archive-check.service
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
+sudo systemctl enable --now runninggu-postgres-wal-archive-check.timer
+sudo systemctl list-timers runninggu-postgres-wal-archive-check.timer --no-pager
 ```
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
@@ -511,10 +577,10 @@ EBS snapshot은 추가적인 장애 대응 수단으로는 쓸 수 있지만 Pos
 대체하지 않는다. `pg_dump`도 논리 점검용 보조 산출물일 뿐 이 복구 절차의 기준 백업으로
 삼지 않는다.
 
-후속 #227 구현 PR은 다음을 함께 추가해야 한다. 하나라도 없으면 TOS 1.1·PRIVACY 1.2를
-활성화하지 않는다.
+저장소의 #227 구현은 다음을 제공한다. 실제 S3·KMS·instance profile·SNS topic을 만들고 아래
+명령을 검증하기 전에는 TOS 1.1·PRIVACY 1.2를 활성화하지 않는다.
 
-1. PostgreSQL 17과 버전을 고정한 pgBackRest를 포함하는 저장소 관리 이미지
+1. PostgreSQL `17.10-trixie`와 pgBackRest `2.55.1-1`을 고정한 저장소 관리 이미지
 2. `/var/lib/postgresql/data`와 pgBackRest 설정을 연결한 Compose 구성
 3. 일일 전체 백업 systemd service·timer와 실패 알림
 4. 아래 설정·초기화·백업·복원 명령의 실행 검증
@@ -524,7 +590,9 @@ S3 버킷은 public access block을 모두 켜고, TLS가 아닌 요청을 거�
 multipart upload는 1일 뒤 중단한다. 버킷 이름·KMS key ARN·role 이름은 운영 환경에서 채우고
 저장소에는 넣지 않는다.
 
-pgBackRest 설정 기준은 다음과 같다. 실제 bucket·KMS key·role 값은 운영 설정으로 주입한다.
+pgBackRest 설정 기준은 다음과 같다. 공통 값은 `backend/deploy/pgbackrest/pgbackrest.conf`에
+있고 실제 bucket·KMS key·role 값은 `compose.env`에서 `PGBACKREST_REPO1_*` 환경변수로
+주입한다.
 
 ```ini
 [runninggu]
@@ -554,33 +622,41 @@ archive_command = 'pgbackrest --stanza=runninggu archive-push %p'
 archive_timeout = '300s'
 ```
 
-최초 한 번 stanza를 만들고 archive·repository 연결을 검사한다.
+stanza 생성과 최초 `check`는 §8에서 수행한다. 백업 timer는 매일 03:20 KST에 다음 순서로
+실행한다. 별도 WAL 감시 timer는 10분마다 `pg_stat_archiver`의 마지막 실패가 이후 성공으로
+회복됐는지와 10분 넘게 `.ready` 상태인 segment가 있는지 확인한다. 백업·`check`·WAL 감시가
+실패하면 해당 service가 실패하고 `runninggu-backup-alert@.service`가 SNS로 운영책임자에게
+알린다.
 
 ```bash
 docker compose --env-file /etc/runninggu/compose.env \
   -f compose.yaml -f compose.ec2.yaml \
-  exec -T postgres pgbackrest --stanza=runninggu stanza-create
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu --type=full backup
 
 docker compose --env-file /etc/runninggu/compose.env \
   -f compose.yaml -f compose.ec2.yaml \
-  exec -T postgres pgbackrest --stanza=runninggu check
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu expire
+
+docker compose --env-file /etc/runninggu/compose.env \
+  -f compose.yaml -f compose.ec2.yaml \
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu check
 ```
 
-timer는 매일 03:20 KST에 다음 순서로 실행한다. 백업이나 `check`가 실패하면 성공으로 기록하지
-않고 운영책임자에게 알린다.
+백업 timer를 켜기 전에 백업 service를 수동 실행하고 백업 정보를 확인한다. WAL 감시는 §10에서
+수동 실행과 timer 활성화를 마쳤으므로 현재 상태를 함께 확인한다.
 
 ```bash
-docker compose --env-file /etc/runninggu/compose.env \
+sudo systemctl start runninggu-postgres-backup.service
+sudo systemctl status --no-pager runninggu-postgres-backup.service
+sudo docker compose --env-file /etc/runninggu/compose.env \
   -f compose.yaml -f compose.ec2.yaml \
-  exec -T postgres pgbackrest --stanza=runninggu --type=full backup
-
-docker compose --env-file /etc/runninggu/compose.env \
-  -f compose.yaml -f compose.ec2.yaml \
-  exec -T postgres pgbackrest --stanza=runninggu expire
-
-docker compose --env-file /etc/runninggu/compose.env \
-  -f compose.yaml -f compose.ec2.yaml \
-  exec -T postgres pgbackrest --stanza=runninggu check
+  exec -T --user postgres postgres pgbackrest --stanza=runninggu info --output=json
+sudo systemctl enable --now runninggu-postgres-backup.timer
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.timer
+sudo systemctl list-timers \
+  runninggu-postgres-backup.timer \
+  runninggu-postgres-wal-archive-check.timer \
+  --no-pager
 ```
 
 `pgbackrest info --output=json`의 마지막 성공 시각, backup label, WAL archive 범위만 운영 기록에
@@ -589,16 +665,34 @@ docker compose --env-file /etc/runninggu/compose.env \
 ### 16.2 복구 리허설
 
 실제 서비스 공개 전 한 번, 이후 분기마다 격리된 별도 Compose project·새 volume에서 복구를
-리허설한다. #227은 운영 포트를 열지 않고 별도 volume만 사용하는 `compose.recovery.yaml`도
-추가한다. 운영 volume에 `restore --delta`를 시험하지 않는다. 복구 명령의 project 이름과
-volume을 먼저 확인한 뒤 다음처럼 최신 안전 시점을 복원한다.
+리허설한다. `compose.recovery.yaml`은 운영 포트를 열지 않는 독립 파일이며
+`runninggu-postgres-recovery-data` volume만 사용한다. 운영 volume에 `restore --delta`를
+시험하지 않는다. `/etc/runninggu/recovery-compose.env`는 운영 DB 비밀번호를 재사용하지 않고
+S3·KMS·role 값만 같은 저장소를 가리키게 만든다. 복구 명령의 project 이름과 volume을 먼저
+확인한 뒤 다음처럼 최신 안전 시점을 복원한다.
 
 ```bash
 docker compose --project-name runninggu-recovery \
   --env-file /etc/runninggu/recovery-compose.env \
-  -f compose.yaml -f compose.recovery.yaml \
-  run --rm --no-deps --entrypoint pgbackrest postgres \
+  -f compose.recovery.yaml \
+  run --rm --no-deps --entrypoint sh postgres \
+  -c 'install -d -o postgres -g postgres -m 0700 "$PGDATA"'
+
+docker compose --project-name runninggu-recovery \
+  --env-file /etc/runninggu/recovery-compose.env \
+  -f compose.recovery.yaml \
+  run --rm --no-deps --user postgres --entrypoint pgbackrest postgres \
   --stanza=runninggu restore
+```
+
+복원이 끝난 뒤 같은 독립 파일로 PostgreSQL을 기동한다. `archive_mode=off`를 강제하므로 복구
+리허설이 운영 S3 repository에 새 WAL을 밀어 넣지 않는다.
+
+```bash
+docker compose --project-name runninggu-recovery \
+  --env-file /etc/runninggu/recovery-compose.env \
+  -f compose.recovery.yaml \
+  up -d postgres
 ```
 
 백업 시각·복원 지점·검증 결과만 운영 기록에 남기고 사용자 개인정보는 기록에 복사하지 않는다.

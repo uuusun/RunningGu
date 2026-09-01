@@ -1,6 +1,10 @@
 services:
   postgres:
-    image: postgres:17.10
+    image: runninggu-postgres:17.10-pgbackrest-2.55.1
+    build:
+      context: ./postgres
+      args:
+        PGBACKREST_VERSION: 2.55.1-1
     environment:
       POSTGRES_DB: ${DB_NAME:-runninggu}
       POSTGRES_USER: ${DB_USERNAME:-runninggu}

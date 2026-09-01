@@ -56,8 +56,12 @@ public class RefreshToken {
         return token;
     }
 
-    public boolean isActiveAt(Instant now) {
-        return revokedAt == null && now.isBefore(expiresAt);
+    public boolean isExpiredAt(Instant now) {
+        return !now.isBefore(expiresAt);
+    }
+
+    public boolean isRevoked() {
+        return revokedAt != null;
     }
 
     public void revoke(Instant now) {

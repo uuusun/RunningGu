@@ -1,0 +1,11 @@
+[Unit]
+Description=런닝구 PostgreSQL WAL archive 10분 감시
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+AccuracySec=1min
+Unit=runninggu-postgres-wal-archive-check.service
+
+[Install]
+WantedBy=timers.target

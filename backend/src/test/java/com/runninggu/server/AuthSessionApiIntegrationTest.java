@@ -8,10 +8,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.auth.application.IssuedTokenPair;
+import com.runninggu.server.auth.application.RefreshTokenHasher;
+import com.runninggu.server.auth.application.TokenIssuer;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +51,12 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     @Qualifier("refreshJwtDecoder")
     private JwtDecoder refreshJwtDecoder;
 
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
+    @Autowired
+    private RefreshTokenHasher refreshTokenHasher;
+
     @BeforeEach
     void reset() {
         jdbcTemplate.execute(
@@ -53,7 +64,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
-    void 가입은_인증을_소비하고_약관과_BCrypt_비밀번호와_해시된_세션을_저장한다() throws Exception {
+    void 가입은_인증행을_즉시삭제하고_약관과_BCrypt_비밀번호와_해시된_세션을_저장한다() throws Exception {
         verifyEmail("runner@example.com");
 
         JsonNode response = signup(
@@ -86,8 +97,8 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
             assertThat(row.get("agreed")).isEqualTo(false);
         });
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT consumed_at IS NOT NULL FROM email_verification",
-                Boolean.class)).isTrue();
+                "SELECT COUNT(*) FROM email_verification",
+                Integer.class)).isZero();
 
         String rawRefresh = response.path("refreshToken").asText();
         Map<String, Object> storedRefresh = jdbcTemplate.queryForMap(
@@ -126,9 +137,28 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
+                                "missing@example.com", "run4life1", "이력없음", true, true, false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
+
+        insertUnverifiedEmail("unverified@example.com");
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
                                 "unverified@example.com", "run4life1", "미인증", true, true, false)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
+
+        verifyEmail("expired@example.com");
+        jdbcTemplate.update(
+                "UPDATE email_verification SET verified_at = CURRENT_TIMESTAMP - INTERVAL '30 minutes' WHERE email = ?",
+                "expired@example.com");
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                "expired@example.com", "run4life1", "인증만료", true, true, false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
 
         signup("policy@example.com", "run4life1", "정책러너", true, true, false);
         mockMvc.perform(post("/api/auth/signup")
@@ -174,6 +204,58 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         refresh(oldRefresh, 401);
         refresh(rotatedRefresh, 401);
         refresh(otherDeviceRefresh, 200);
+    }
+
+    @Test
+    void 원래_만료시각을_지난_폐기토큰은_재사용탐지로_family를_폐기하지_않는다() throws Exception {
+        verifyEmail("expired-history@example.com");
+        signup("expired-history@example.com", "run4life1", "만료이력", true, true, false);
+        long userId = jdbcTemplate.queryForObject(
+                "SELECT id FROM app_user WHERE nickname_key = ?",
+                Long.class,
+                "만료이력");
+        UUID familyId = UUID.randomUUID();
+        Instant now = Instant.now();
+        IssuedTokenPair expired = tokenIssuer.issue(
+                userId,
+                familyId,
+                now.minus(Duration.ofDays(15)));
+        IssuedTokenPair current = tokenIssuer.issue(
+                userId,
+                familyId,
+                now.minusSeconds(1));
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO refresh_token(
+                    user_id, family_id, token_hash, expires_at, revoked_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                userId,
+                familyId,
+                refreshTokenHasher.hash(expired.refreshToken()),
+                Timestamp.from(expired.refreshExpiresAt()),
+                Timestamp.from(expired.refreshExpiresAt().minusSeconds(1)),
+                Timestamp.from(now.minus(Duration.ofDays(15))));
+        jdbcTemplate.update(
+                """
+                INSERT INTO refresh_token(
+                    user_id, family_id, token_hash, expires_at, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                userId,
+                familyId,
+                refreshTokenHasher.hash(current.refreshToken()),
+                Timestamp.from(current.refreshExpiresAt()),
+                Timestamp.from(now.minusSeconds(1)));
+
+        refresh(expired.refreshToken(), 401);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM refresh_token WHERE family_id = ? AND revoked_at IS NULL",
+                Integer.class,
+                familyId)).isOne();
+        refresh(current.refreshToken(), 200);
     }
 
     @Test
@@ -286,6 +368,17 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
                     email, purpose, code_hash, attempts, sent_at, expires_at, verified_at)
                 VALUES (?, 'SIGNUP', '$2a$10$test-verification-hash', 0,
                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP)
+                """,
+                email);
+    }
+
+    private void insertUnverifiedEmail(String email) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO email_verification(
+                    email, purpose, code_hash, attempts, sent_at, expires_at)
+                VALUES (?, 'SIGNUP', '$2a$10$test-verification-hash', 0,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '10 minutes')
                 """,
                 email);
     }
