@@ -1,0 +1,22 @@
+[Unit]
+Description=런닝구 활성 GraphHopper graph artifact 검증
+After=docker.service
+Requires=docker.service
+OnFailure=runninggu-graphhopper-alert@%n.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/runninggu/repository/backend
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/verify-active-graph.sh
+TimeoutStartSec=60s
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=0027
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=runninggu-graphhopper-verify

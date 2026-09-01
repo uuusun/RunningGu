@@ -3,10 +3,10 @@
 > 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)의
 > AWS EC2 스테이징 구현 실행서다. 정책이나 절차가 충돌하면 상위 §7이 우선한다.
 >
-> **PR 1 초안 주의:** GraphHopper 관련 목표 구조는
-> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. builder·검증
-> 스크립트·systemd unit·Compose 변경이 PR 2로 구현되고 8GiB 합격 기준을 통과하기 전에는 이
-> 실행서만 보고 실제 배포하지 않는다.
+> **PR 2 구현 주의:** GraphHopper 관련 목표 구조는
+> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. PR 2 구현만으로
+> EC2 크기가 승인되는 것은 아니다. 실제 운영 release descriptor를 확정하고 8GiB 합격 기준을
+> 통과하기 전에는 이 실행서의 GraphHopper 활성화 단계를 운영에 적용하지 않는다.
 
 이 실행서는 `staging-api.runninggu.store` 단일 EC2에 Spring Boot JAR, PostgreSQL 17,
 GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator를 추가하지 않으며 기존
@@ -203,11 +203,15 @@ sudo install -m 0600 -o root -g root \
 sudo install -m 0600 -o root -g root \
   backend/deploy/env/graphhopper-alert.env.example \
   /etc/runninggu/graphhopper-alert.env
+sudo install -m 0600 -o root -g root \
+  backend/deploy/env/backend-alert.env.example \
+  /etc/runninggu/backend-alert.env
 
 sudoedit /etc/runninggu/compose.env
 sudoedit /etc/runninggu/application.env
 sudoedit /etc/runninggu/backup-alert.env
 sudoedit /etc/runninggu/graphhopper-alert.env
+sudoedit /etc/runninggu/backend-alert.env
 ```
 
 - 두 파일의 `DB_PASSWORD`에는 같은 URL-safe 값을 넣는다.
@@ -221,7 +225,9 @@ sudoedit /etc/runninggu/graphhopper-alert.env
 - `backup-alert.env`에는 운영책임자 이메일을 구독시킨 SNS topic ARN을 넣는다. instance
   profile에는 해당 topic의 `sns:Publish` 최소 권한만 추가한다.
 - `graphhopper-alert.env`는 같은 SNS topic을 쓸 수 있지만 알림 unit과 메시지는 백업 실패와
-  구분한다. PR 2가 예시 파일과 GraphHopper 전용 알림 unit을 제공하기 전에는 배포하지 않는다.
+  구분한다.
+- `backend-alert.env`도 topic 공유는 가능하지만 Spring Boot 기동·OOM·start-limit 실패로 메시지를
+  구분한다. 세 alert env에는 정적 AWS access key를 넣지 않는다.
 
 ## 7. GraphHopper graph artifact 설치 준비
 
@@ -271,6 +277,7 @@ service를 제어하지 않는다.
 
 모든 Compose 명령은 `/opt/runninggu/repository/backend`에서 base와 EC2 파일을 함께 사용한다.
 `config` 전체 출력에는 DB 비밀번호가 포함될 수 있으므로 화면이나 로그로 출력하지 않는다.
+EC2의 `docker compose version --short`는 `!override`를 지원하는 **2.24.4 이상**이어야 한다.
 
 ```bash
 cd /opt/runninggu/repository/backend
@@ -415,6 +422,9 @@ sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend.service \
   /etc/systemd/system/runninggu-backend.service
 sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend-alert@.service \
+  /etc/systemd/system/runninggu-backend-alert@.service
+sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-graphhopper.service \
   /etc/systemd/system/runninggu-graphhopper.service
 sudo install -m 0644 \
@@ -442,6 +452,7 @@ sudo systemctl daemon-reload
 sudo systemd-analyze verify \
   /etc/systemd/system/runninggu-contest-import.service \
   /etc/systemd/system/runninggu-backend.service \
+  /etc/systemd/system/runninggu-backend-alert@.service \
   /etc/systemd/system/runninggu-graphhopper.service \
   /etc/systemd/system/runninggu-graphhopper-verify.service \
   /etc/systemd/system/runninggu-graphhopper-alert@.service \
@@ -516,15 +527,24 @@ manifest의 artifact ID와 기존 graph load가 있어야 하고 PBF 읽기·SRT
 `journalctl -u runninggu-graphhopper.service`, 검증·실패 알림은
 `journalctl -u runninggu-graphhopper-verify.service`와
 `journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. 주 service journal에 foreground
-Compose가 릴레이한 container runtime stdout이 있으면 실패다. runtime stderr까지 릴레이되면
-계약 §7의 wrapper를 적용하기 전에는 배포하지 않는다.
+Compose가 릴레이한 container runtime stdout·stderr가 있으면 실패다. 주 service는
+`start-graphhopper-compose.sh` wrapper로 runtime stderr를 내부 임시 파일에만 받고, 실패했을 때만
+민감정보를 제거한 종료 code와 마지막 stderr 일부를 journal에 남긴다.
 
 `systemctl show runninggu-graphhopper.service`에서 `NRestarts`, `StartLimitIntervalUSec`,
-`StartLimitBurst`, `TimeoutStartUSec`, `StandardOutput`, `StandardError`도 확인한다. 초기
+`StartLimitBurst`, `TimeoutStartUSec`, `TimeoutStopUSec`, `StandardOutput`, `StandardError`도
+확인한다. `TimeoutStopUSec`는 container의 `stop_grace_period=30s`보다 긴 45초여야 Compose stop이
+중간에 잘리지 않는다. 초기
 `TimeoutStartSec=60s`는 검증 전용 후보이고 전체 readiness 120초와 같은 뜻이 아니다. 검증
 unit·주 service의
 `ExecStartPre` 또는 내부 스모크가 실패하면 Spring Boot를 시작하지 않는다. 운영자가 직접
 `docker compose up -d graphhopper`로 systemd를 우회하지 않는다.
+
+첫 8GiB baseline에서는 `docker inspect`의 GraphHopper `HostConfig.Memory`가 `0`,
+`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`가 `infinity`인지 확인한다.
+이는 상한 누락이 아니라 실제 peak를 얻기 위한 명시적 무제한 상태다. 계약 §9.3 합격 뒤에만
+`compose.env`의 `GRAPHHOPPER_MEMORY_RESERVATION`·`GRAPHHOPPER_MEMORY_LIMIT`과 backend unit의
+`MemoryHigh`·`MemoryMax`를 관측값으로 함께 바꾸고 `daemon-reload` 후 전체 시험을 반복한다.
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
@@ -679,7 +699,8 @@ curl --fail --silent --show-error \
 - Nginx access log가 쿼리스트링을 제외한 `runninggu_noqs` 포맷을 사용하는가
 - GraphHopper가 같은 graph artifact ID를 재사용하고 PBF·SRTM download·import를 시작하지 않는가
 - GraphHopper runtime stdout은 Docker `local`에만 있고 주 service journal에 중복되지 않는가
-- container runtime stderr가 주 service journal로 릴레이되지 않으며, 릴레이되면 failure-only wrapper가 적용됐는가
+- container runtime stderr가 주 service journal로 릴레이되지 않고, failure-only wrapper가
+  Compose 실패의 정제된 마지막 stderr만 남기는가
 - GraphHopper 검증·알림 journal과 Docker runtime log 모두에 PBF 내용·AWS 자격 증명·사용자 정보가 없는가
 - `free -h`, `docker stats --no-stream`, `systemd-cgtop`에서 swap·메모리 합격 기준을 만족하는가
 

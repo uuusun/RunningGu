@@ -4,10 +4,48 @@
 8km 내 0건). OpenStreetMap 보행로를 GraphHopper 로 라우팅해 코스를 **생성**할 수 있는지 검증한
 기록이다. 결과는 [`docs/osm-routing-poc.md`](../../docs/osm-routing-poc.md).
 
-GraphHopper 도입은 SPEC 결정-42로 확정됐지만, 이 폴더의 명령과 `graphhopper.yml`은 PoC 재현·비교
-전용이다. 운영 builder·manifest·배포 계약은
+GraphHopper 도입은 SPEC 결정-42로 확정됐지만, 이 폴더 최상위의 명령과 `graphhopper.yml`은 PoC
+재현·비교 전용이다. 운영 builder·manifest·배포 계약은
 [`docs/deploy/graphhopper-artifact-contract.md`](../../docs/deploy/graphhopper-artifact-contract.md)를
-따르며 PR 2 구현 전에는 이 명령으로 운영 artifact를 만들지 않는다.
+따르며 운영 artifact는 `import/`의 고정 builder로만 만든다.
+
+## 운영 graph artifact builder
+
+먼저 날짜가 고정된 한국 PBF를 별도 경로에 받고, 배포 입력으로 승인할 SHA-256을 팀 기록에
+남긴다. `latest` URL이나 기존 작업 directory는 받지 않는다. 아래 두 명령은 host JDK를 쓰지 않고
+같은 `linux/amd64` builder image 안에서 GraphHopper `import`와 package·verify를 실행한다.
+
+macOS·Linux·WSL/Git Bash:
+
+```bash
+./scripts/osm/import/build-graph.sh \
+  --pbf /absolute/path/south-korea-2026-09-01.osm.pbf \
+  --pbf-date 2026-09-01 \
+  --pbf-sha256 '<64자리_lowercase_sha256>' \
+  --work-dir /absolute/path/runninggu-graph-build-20260901 \
+  --created-by '<팀_식별자>' \
+  --import-xms 1g \
+  --import-xmx 8g
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\osm\import\build-graph.ps1 `
+  -Pbf 'C:\graph-input\south-korea-2026-09-01.osm.pbf' `
+  -PbfDate '2026-09-01' `
+  -PbfSha256 '<64자리_lowercase_sha256>' `
+  -WorkDirectory 'C:\graph-build\runninggu-20260901' `
+  -CreatedBy '<팀_식별자>' `
+  -ImportXms '1g' `
+  -ImportXmx '8g'
+```
+
+출력의 `<work-dir>/artifacts/<artifact-id>/` 아래 세 파일만 비공개 S3의 계약 key에 업로드한다.
+`graph-release.example.json`을 복사해 실제 manifest hash와 build input hash를 채운
+`backend/graphhopper/graph-release.json`은 별도 리뷰를 받아야 하며, 비어 있는 예시를 배포하지
+않는다. 운영 PBF import에는 builder host가 8GiB보다 큰 메모리를 사용할 수 있지만 그 메모리는
+EC2 server 상시 사양과 무관하다.
 
 ## 준비물
 

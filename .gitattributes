@@ -6,3 +6,6 @@ reference-web/public/data/races.json text eol=lf
 # 파일 해시를 그대로 비교하는 fixture — Windows 에서 CRLF 로 체크아웃되면 SHA-256 이 갈려
 # ContestSnapshotFileContractTest 가 그 PC 에서만 깨진다 (결정-47 Importer 해시 · AP-24).
 backend/src/test/resources/contest/*.json text eol=lf
+
+# 배포·builder shell은 Windows checkout에서도 Linux container와 EC2가 실행할 LF를 유지한다.
+*.sh text eol=lf
