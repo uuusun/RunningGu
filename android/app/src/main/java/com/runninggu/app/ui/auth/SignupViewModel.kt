@@ -94,6 +94,14 @@ data class SignupUiState(
      * 이 상태에서 [확인]을 열어 두면 사용자가 같은 코드로 계속 시도하다 빠져나오지 못한다.
      */
     val mustResend: Boolean = false,
+    /**
+     * **인증을 마친 이메일.** (API 명세 §1-4)
+     *
+     * 닉네임이 겹쳐 뒤로 갔다 오는 길에서 쓴다 — 이 값이 지금 이메일과 같으면 인증이
+     * 아직 살아 있으므로 **재발송하지 않는다.** §1-3 이 *"재발송은 이전 코드·검증 상태를
+     * 무효화한다"* 고 정해 두어서, 새로 보내면 30분 남은 인증을 스스로 버리게 된다(#235 리뷰).
+     */
+    val verifiedEmail: String? = null,
 
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
@@ -264,6 +272,15 @@ class SignupViewModel(
             submitKakaoSignup(token, state)
             return
         }
+        // **인증이 아직 살아 있으면 새로 보내지 않는다.** 닉네임이 겹쳐 뒤로 갔다 오는
+        // 길이 여기다. §1-3 상 재발송은 이전 검증 상태를 무효화하므로, 새로 보내면
+        // 30분 남은 인증을 스스로 버리고 코드를 다시 받아 입력해야 한다(#235 리뷰).
+        // 같은 코드 재확인은 §1-4 가 30분 동안 멱등 `200` 으로 보장한다.
+        if (state.email.trim() == state.verifiedEmail) {
+            _uiState.update { it.copy(step = SignupStep.VERIFY, errorMessage = null) }
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
             repository.sendSignupCode(state.email.trim()).fold(
@@ -294,7 +311,10 @@ class SignupViewModel(
             repository.sendSignupCode(state.email.trim()).fold(
                 onSuccess = {
                     // 재발송하면 시도 횟수가 초기화되므로 잠금도 풀린다 (§1-4).
-                    _uiState.update { it.copy(mustResend = false, code = "", errorMessage = null) }
+                    // **이전 검증 상태도 무효가 된다**(§1-3) — 들고 있던 것을 버린다
+                    _uiState.update {
+                        it.copy(mustResend = false, code = "", errorMessage = null, verifiedEmail = null)
+                    }
                     startResendCooldown()
                 },
                 onFailure = { cause ->
@@ -323,6 +343,9 @@ class SignupViewModel(
                 }
                 return@launch
             }
+            // 인증이 살아 있다는 것을 남긴다 — 뒤로 갔다 와도 재발송 없이 재제출한다
+            _uiState.update { it.copy(verifiedEmail = state.email.trim()) }
+
             repository.signup(
                 email = state.email.trim(),
                 password = state.password,
@@ -338,13 +361,81 @@ class SignupViewModel(
                     )
                     _uiState.update { it.copy(isSubmitting = false, step = SignupStep.DONE) }
                 },
-                onFailure = {
+                onFailure = { cause ->
+                    // **인증이 풀렸으면 타이머부터 멈춘다.** 값만 0 으로 바꾸면 자고 있던
+                    // 타이머가 깨어나 1 을 빼서 -1 이 되고, 화면은 `== 0` 일 때만 [재발송]
+                    // 을 열어서 **버튼이 영영 잠긴다**(#235 리뷰)
+                    if (cause.apiErrorCode() in VERIFICATION_LOST) clearResendCooldown()
+
+                    // **사유마다 나가는 길이 다르다.** 여기서 뭉뚱그리면 사용자는 같은
+                    // 버튼만 계속 누르게 된다 — VERIFY 화면에는 닉네임도 이메일도 없다
                     _uiState.update {
-                        it.copy(isSubmitting = false, errorMessage = "가입에 실패했어요. 다시 시도해 주세요.")
+                        it.copy(
+                            isSubmitting = false,
+                            // 인증이 풀린 것은 재발송해야 빠져나온다 (§1-4 와 같은 처리).
+                            // **여기 오는 시점의 `mustResend` 는 항상 false 다** —
+                            // `canVerify` 가 `!mustResend` 로 막고 있어서다(#235 리뷰).
+                            mustResend = cause.apiErrorCode() in VERIFICATION_LOST,
+                            // 뒤로 돌아갔을 때 그 칸이 이미 빨갛게 보이도록 결과를 남긴다
+                            nicknameCheck = if (cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED) {
+                                DuplicateCheck.Duplicate
+                            } else {
+                                it.nicknameCheck
+                            },
+                            emailCheck = if (cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED) {
+                                DuplicateCheck.Duplicate
+                            } else {
+                                it.emailCheck
+                            },
+                            errorMessage = signupFailureMessage(cause),
+                        )
                     }
                 },
             )
         }
+    }
+
+    /**
+     * 가입 확정 실패 문구. (API 명세 §1-5)
+     *
+     * **[뒤로] 로 앞 단계에 가야 풀리는 것들이 있다.** VERIFY 화면에는 [인증 확인] 버튼
+     * 하나뿐이라, 닉네임이 겹쳤다는 말을 안 하면 사용자는 같은 버튼만 누르며 영원히 같은
+     * 409 를 받는다(#227 리뷰).
+     *
+     * 특히 [NICKNAME_DUPLICATED] 는 **설계가 최종 방어로 삼은 것**이다 — 중복확인은
+     * 진행을 막지 않기로 했고([DuplicateCheck] KDoc), 확인과 제출 사이에 남이 먼저
+     * 가입하는 경우를 여기서 잡는다. 그 마지막 방어가 원인 불명으로 도착하면 안 된다.
+     */
+    private fun signupFailureMessage(cause: Throwable): String = when {
+        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED ->
+            "이미 쓰는 닉네임이에요. [뒤로] 를 눌러 다른 닉네임으로 바꿔 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED ->
+            "이미 가입된 이메일이에요. 로그인 화면에서 로그인해 주세요."
+
+        // **인증이 풀린 것이 둘이다** (§1-5 · #237 로 계약이 갈렸다).
+        //
+        //   403 EMAIL_NOT_VERIFIED  행은 있는데 아직 인증 전
+        //   400 CODE_EXPIRED        인증은 했는데 30분이 지났거나 행이 없다
+        //
+        // 앱에서 실제로 닿는 것은 **뒤쪽**이다 — 닉네임이 겹쳐 뒤로 갔다 오는 사이
+        // 30분이 지나면 여기로 온다. 앞쪽은 인증 직후 곧바로 가입해서 닿기 어렵지만
+        // 구버전 앱이나 검증을 건너뛴 요청에서 올 수 있어 함께 매핑한다.
+        //
+        // 사용자가 할 일은 둘 다 같다 — 메일을 다시 받는 것이다.
+        cause.apiErrorCode() == ApiErrorCode.EMAIL_NOT_VERIFIED ||
+            cause.apiErrorCode() == ApiErrorCode.CODE_EXPIRED ->
+            "인증이 만료됐어요. 아래 [재발송] 으로 메일을 다시 받아 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.INVALID_PASSWORD ->
+            "비밀번호가 조건에 맞지 않아요. [뒤로] 를 눌러 다시 정해 주세요."
+
+        cause.apiErrorCode() == ApiErrorCode.AGREEMENT_REQUIRED ->
+            "필수 약관에 동의해야 가입할 수 있어요."
+
+        else -> "가입에 실패했어요. 다시 시도해 주세요."
     }
 
     /**
@@ -440,7 +531,16 @@ class SignupViewModel(
             true
         }
         SignupStep.VERIFY -> {
-            _uiState.update { it.copy(step = SignupStep.INFO, errorMessage = null, code = "") }
+            // 인증이 살아 있으면 코드를 들고 간다 — 돌아와서 그대로 [인증 확인] 을 누르면
+            // §1-4 의 멱등 `200` 으로 재발송 없이 가입을 다시 시도할 수 있다(#235 리뷰)
+            _uiState.update {
+                val keepCode = it.email.trim() == it.verifiedEmail
+                it.copy(
+                    step = SignupStep.INFO,
+                    errorMessage = null,
+                    code = if (keepCode) it.code else "",
+                )
+            }
             true
         }
     }
@@ -451,13 +551,33 @@ class SignupViewModel(
      * 3단계에서 뒤로 갔다 다시 들어오면 타이머가 겹쳐 1초에 2씩 줄어든다 — 60초 쿨다운이
      * 30초가 되어 NFR-10 을 어긴다.
      */
+    /**
+     * 쿨다운을 **지금 끝낸다.** (#235 리뷰)
+     *
+     * "메일을 다시 받아 주세요" 를 띄우면서 [재발송] 이 최대 60초 잠겨 있으면, 시키는
+     * 일을 할 수단이 없는 화면이 된다. 그래서 인증이 풀렸을 때 쿨다운을 면제한다 —
+     * 인증이 실제로 풀렸다면 마지막 발송에서 30분이 지났으므로(§1-4) 서버 쿨다운도
+     * 끝나 있다.
+     *
+     * **값만 0 으로 바꾸면 안 된다.** 타이머가 `delay(1_000)` 에서 자고 있다가 깨어나
+     * 조건을 다시 보지 않고 1 을 뺀다. 그러면 `-1` 이 되고, 화면은 `== 0` 일 때만
+     * [재발송] 을 열어서 **버튼이 영영 잠긴다.**
+     */
+    private fun clearResendCooldown() {
+        cooldownJob?.cancel()
+        cooldownJob = null
+        _uiState.update { it.copy(resendCooldownSec = 0) }
+    }
+
     private fun startResendCooldown() {
         cooldownJob?.cancel()
         cooldownJob = viewModelScope.launch {
             _uiState.update { it.copy(resendCooldownSec = RESEND_COOLDOWN_SEC) }
             while (_uiState.value.resendCooldownSec > 0) {
                 delay(1_000)
-                _uiState.update { it.copy(resendCooldownSec = it.resendCooldownSec - 1) }
+                // 0 아래로 내려가지 않게 막는다. [clearResendCooldown] 과 이중으로 지킨다 —
+            // 취소가 한 박자 늦어도 화면이 잠기지 않는다
+            _uiState.update { it.copy(resendCooldownSec = (it.resendCooldownSec - 1).coerceAtLeast(0)) }
             }
         }
     }
@@ -494,6 +614,17 @@ class SignupViewModel(
 
         /** SPEC §4.2-3 — 재발송 쿨다운 60초. */
         const val RESEND_COOLDOWN_SEC = 60
+
+        /**
+         * 가입 확정에서 **인증이 풀렸다**는 두 코드. (§1-5)
+         *
+         * `403` 은 아직 인증 전, `400 CODE_EXPIRED` 는 인증 후 30분이 지났거나 행이
+         * 없는 것이다. 사용자가 할 일은 둘 다 재발송이라 같이 다룬다(#237 계약).
+         */
+        val VERIFICATION_LOST = setOf(
+            ApiErrorCode.EMAIL_NOT_VERIFIED,
+            ApiErrorCode.CODE_EXPIRED,
+        )
 
         /** 이 사유들은 같은 코드로 재시도해도 소용없다 — 재발송해야 한다. (§1-4 · NFR-10 🔒) */
         val RESEND_REQUIRED_CODES = setOf(
