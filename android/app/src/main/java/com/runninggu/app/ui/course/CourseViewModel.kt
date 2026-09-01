@@ -37,9 +37,17 @@ class CourseViewModel(
      * (매핑표 D-15). 탭바로 그냥 열었으면 비어 있다.
      */
     launchState: SavedStateHandle = SavedStateHandle(),
+    /**
+     * 처음 펼 탭. 홈 퀵바의 [코스] 가 지역별로 열 때만 기본값과 다르다 (SPEC §4.4-2).
+     *
+     * [onTabChange] 를 대신 부르지 않는 이유는 **화면이 뜨기 전이라서**다. 그때 상태를
+     * 갈면 사용자가 탭을 누른 적 없는데 눌린 것처럼 기록되고, 첫 조합(`init` 순서)이
+     * 여기와 [applyLaunchContext] 로 갈려 읽기 어려워진다.
+     */
+    initialTab: CourseUiState.Tab = CourseUiState.Tab.NEARBY,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CourseUiState())
+    private val _uiState = MutableStateFlow(CourseUiState(tab = initialTab))
     val uiState: StateFlow<CourseUiState> = _uiState.asStateFlow()
 
     /** 슬라이더를 끌 때마다 조회하면 요청이 쏟아진다 — 이전 조회를 취소하고 마지막 것만 남긴다. */
@@ -68,7 +76,12 @@ class CourseViewModel(
 
     init {
         loadRegions()
-        // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 출발지 주변이라 미리 부르면 헛 호출이다
+        // 지역별 목록은 그 탭에 들어갈 때 부른다 — 기본 탭은 출발지 주변이라 미리 부르면 헛 호출이다.
+        //
+        // **지역별로 열렸으면 여기서 한 번 부른다.** 그 진입은 [onTabChange] 를 거치지
+        // 않아서, 안 부르면 사용자가 탭을 한 번 눌렀다 돌아와야 목록이 나온다 — 목록을
+        // 보러 누른 버튼인데 빈 화면이 뜬다.
+        if (initialTab == CourseUiState.Tab.BY_REGION) loadRegionCourses()
         applyLaunchContext(launchState)
     }
 
@@ -365,6 +378,8 @@ class CourseViewModel(
              * S7 이 쓴 값이 보이지 않는다.
              */
             launchState: SavedStateHandle = SavedStateHandle(),
+            /** 홈 퀵바의 [코스] 로 열면 지역별이다. 그 밖의 진입은 출발지 주변. (SPEC §4.4-2) */
+            initialTab: CourseUiState.Tab = CourseUiState.Tab.NEARBY,
         ) = viewModelFactory {
             initializer {
                 CourseViewModel(
@@ -372,6 +387,7 @@ class CourseViewModel(
                     geocodeRepository,
                     savedCourseRepository,
                     launchState,
+                    initialTab,
                 )
             }
         }

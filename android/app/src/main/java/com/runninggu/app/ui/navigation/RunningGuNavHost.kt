@@ -23,6 +23,7 @@ import com.runninggu.app.ui.course.CourseDetailScreen
 import com.runninggu.app.ui.course.CourseDetailViewModel
 import com.runninggu.app.ui.course.CourseLaunchContext
 import com.runninggu.app.ui.course.CourseScreen
+import com.runninggu.app.ui.course.CourseUiState
 import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
 import com.runninggu.app.ui.my.AccountScreen
@@ -65,7 +66,10 @@ fun RunningGuNavHost(
                     navController.navigate(Routes.calendarWithQuery(query))
                 },
                 onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
-                onOpenCourses = { navController.navigate(Routes.COURSES) },
+                // 퀵바의 [지도]·[코스]는 **같은 S8 의 다른 탭**이다 (SPEC §4.4-2).
+                // 지도는 지도가 그려지는 출발지 주변, 코스는 지역별 목록으로 보낸다
+                onOpenCourseMap = { navController.navigate(Routes.COURSES) },
+                onOpenCourseRegions = { navController.navigate(Routes.coursesByRegion()) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
                 onStartWizard = { raceId -> navController.navigate(Routes.wizard(raceId)) },
             )
@@ -87,12 +91,32 @@ fun RunningGuNavHost(
                 modifier = Modifier.statusBarsPadding(),
             )
         }
-        composable(Routes.COURSES) { entry ->
+        composable(
+            route = Routes.COURSES_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_COURSE_TAB) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
             CourseScreen(
                 // S7 연계로 열렸으면 출발지·목표 거리가 **이 항목의 상태**에 담겨 온다
                 // (매핑표 D-15). 탭바로 연 항목은 비어 있어 아무것도 반영되지 않는다
                 viewModel = viewModel(
-                    factory = CourseViewModel.factory(launchState = entry.savedStateHandle),
+                    factory = CourseViewModel.factory(
+                        launchState = entry.savedStateHandle,
+                        // 홈 퀵바의 [코스] 만 지역별로 연다. 인자가 없으면(하단 탭바 ·
+                        // S7 연계 · 로그인 복귀) 기본 탭이다 (SPEC §4.4-2)
+                        initialTab = if (
+                            entry.arguments?.getString(Routes.ARG_COURSE_TAB) ==
+                            Routes.COURSE_TAB_REGION
+                        ) {
+                            CourseUiState.Tab.BY_REGION
+                        } else {
+                            CourseUiState.Tab.NEARBY
+                        },
+                    ),
                 ),
                 // 게스트가 코스를 저장하려 하면 로그인으로 보내고, 끝나면 러닝코스로 돌아온다 (D-27)
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.COURSES)) },
