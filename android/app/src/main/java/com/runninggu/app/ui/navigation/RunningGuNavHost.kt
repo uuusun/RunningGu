@@ -35,6 +35,7 @@ import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
 import com.runninggu.app.ui.wizard.ResultScreen
 import com.runninggu.app.ui.wizard.ResultViewModel
+import com.runninggu.app.ui.wizard.SavedItineraryScreen
 import com.runninggu.app.ui.wizard.StayScreen
 import com.runninggu.app.ui.wizard.StayViewModel
 import com.runninggu.app.ui.wizard.WizardViewModel
@@ -144,6 +145,12 @@ fun RunningGuNavHost(
                 onOpenAccount = { navController.navigate(Routes.ACCOUNT) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
                 onCourseClick = { id -> navController.navigate(Routes.courseDetailSaved(id)) },
+                // canonical id 가 숫자가 아니면 서버에 없는 것이다 — 삭제와 같은 판단으로
+                // 아무 데도 안 보낸다(`MyViewModel.onDeleteItinerary`). 목록에 그런 항목이
+                // 생기면 그건 이 자리가 아니라 매핑이 잘못된 것이다
+                onItineraryClick = { id ->
+                    id.toLongOrNull()?.let { navController.navigate(Routes.itinerary(it)) }
+                },
                 onBrowseRaces = { navController.navigate(Routes.CALENDAR) },
                 onBrowseCourses = { navController.navigate(Routes.COURSES) },
                 modifier = Modifier.statusBarsPadding(),
@@ -163,6 +170,48 @@ fun RunningGuNavHost(
             CourseDetailScreen(
                 onBack = { navController.popBackStack() },
                 viewModel = viewModel(factory = CourseDetailViewModel.factory(savedCourseId)),
+                modifier = Modifier.statusBarsPadding(),
+            )
+        }
+
+        /**
+         * S7-R 저장 동선 상세. **위저드 그래프 밖이다.** (§5-5 · #213)
+         *
+         * 복원은 S4 를 지나오지 않아서, 위저드 그래프에 얹으면 그래프 스코프 ViewModel 이
+         * 기본값으로 살아나 `planConfirmed` 가드가 S4 로 되돌린다(#192). 편집 상태는 이
+         * 백스택 항목의 ViewModel 이 든다 — 다른 동선을 열면 다른 인스턴스다.
+         */
+        composable(
+            route = Routes.ITINERARY_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_ITINERARY_ID) { type = NavType.LongType },
+            ),
+        ) { entry ->
+            val itineraryId = entry.arguments?.getLong(Routes.ARG_ITINERARY_ID) ?: 0L
+            SavedItineraryScreen(
+                itineraryId = itineraryId,
+                onBack = { navController.popBackStack() },
+                // 저장된 동선의 조건을 바꾸는 것은 **새로 만드는 것**이다. 대회를 다시
+                // 골라야 하므로 캘린더로 보낸다 — 위저드는 raceId 로 시작한다
+                onChangeConditions = { navController.navigate(Routes.CALENDAR) },
+                onOpenCourses = { targetKm ->
+                    navController.navigate(Routes.COURSES)
+                    CourseLaunchContext.set(
+                        navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
+                        stay = null,
+                        targetKm = targetKm,
+                    )
+                },
+                onSaved = { message ->
+                    // 같은 키면 교체다(§5-2) — 저장하면 이 동선이 갱신되고 마이로 돌아간다
+                    navController.popBackStack()
+                    ItinerarySavedNotice.set(
+                        navController.getBackStackEntry(Routes.MY).savedStateHandle,
+                        message,
+                    )
+                },
+                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.RETURN_BACK)) },
+                viewModel = viewModel(),
                 modifier = Modifier.statusBarsPadding(),
             )
         }

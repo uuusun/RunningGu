@@ -105,7 +105,6 @@ import kotlinx.coroutines.launch
  * - 상단 지도(번호 핀·폴리라인) — AP-03 카카오맵이 필요하다
  * - 저장 CTA 의 실제 저장 — `POST /api/itineraries`(AP-14)
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultScreen(
     onBack: () -> Unit,
@@ -120,6 +119,103 @@ fun ResultScreen(
     modifier: Modifier = Modifier,
 ) {
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(wizard) {
+        // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
+        //
+        // 시스템이 프로세스를 되살리며 S7 로 바로 복원하면 `wizard` 가 기본값이라, 그대로
+        // 부르면 "여행 조건이 덜 정해졌어요" 가 뜬다 — 사용자가 잘못한 게 없는데 조건을
+        // 다시 고르라고 한다. 조회가 끝나면 `wizard` 가 바뀌어 여기가 다시 돈다.
+        // **복원된 기본값으로는 만들지 않는다.** (#192 리뷰) 사용자가 S4 를 지나온 상태여야
+        // 날짜·종목·취향이 그의 선택이다. 아니면 내비게이션이 S4 로 되돌린다.
+        if (wizard.contestPhase == WizardUiState.Phase.LOADED && wizard.planConfirmed) {
+            viewModel.generate(wizard)
+        }
+    }
+
+    ResultContent(
+        onBack = onBack,
+        onChangeConditions = onChangeConditions,
+        onOpenCourses = onOpenCourses,
+        onSaved = onSaved,
+        onLoginRequest = onLoginRequest,
+        viewModel = viewModel,
+        modifier = modifier,
+    ) { inner, content ->
+        // 대회를 실는 동안의 로딩·오류를 가린다. 넘겨받는 `RaceSummary` 는 본문이 쓰지
+        // 않는다 — 이 게이트는 **표시가 아니라 관문**이다
+        WizardContestGate(state = wizard, onRetry = wizardViewModel::load, modifier = inner) {
+            content()
+        }
+    }
+}
+
+/**
+ * S7-R 저장 동선 상세. **S7 과 같은 본문을 쓴다.** (§5-5 · #213)
+ *
+ * 생성 경로와 다른 것은 둘뿐이다.
+ *
+ * - 채우는 것 — `POST /itineraries/generate` 가 아니라 `GET /api/itineraries/{id}`
+ * - 대회 게이트 없음 — 저장된 동선은 대회 snapshot 을 이미 들고 있다
+ *
+ * **위저드 그래프 안에 두지 않는다.** 복원은 S4(일정 선택)를 지나오지 않아서, 그래프
+ * 스코프 ViewModel 이 기본값으로 살아나면 `planConfirmed` 가드가 S4 로 되돌린다(#192).
+ * 편집 상태는 이 route 자신의 ViewModel 이 든다.
+ */
+@Composable
+fun SavedItineraryScreen(
+    itineraryId: Long,
+    onBack: () -> Unit,
+    onChangeConditions: () -> Unit,
+    onOpenCourses: (targetKm: Double) -> Unit,
+    onSaved: (message: String) -> Unit,
+    onLoginRequest: () -> Unit,
+    viewModel: ResultViewModel,
+    modifier: Modifier = Modifier,
+) {
+    // 같은 id 로 다시 들어오면 ViewModel 이 막는다 — 회전·재진입으로 여기가 다시 돈다
+    LaunchedEffect(itineraryId) { viewModel.restore(itineraryId) }
+
+    ResultContent(
+        onBack = onBack,
+        onChangeConditions = onChangeConditions,
+        onOpenCourses = onOpenCourses,
+        onSaved = onSaved,
+        onLoginRequest = onLoginRequest,
+        viewModel = viewModel,
+        modifier = modifier,
+    ) { inner, content ->
+        Box(inner) { content() }
+    }
+}
+
+/**
+ * **생성(S7)과 복원(S7-R)이 함께 쓰는 본문.** (#213)
+ *
+ * 두 경로가 화면에서 하는 일이 같다 — 회복 배지 · 요약 · 일자 탭 · 타임라인 · 편집
+ * 모드 · 지도. 다른 것은 **무엇으로 채우는가**와 **대회 조회 게이트가 있는가** 둘뿐이라,
+ * 그 둘만 진입점이 정하고 나머지는 여기 한 벌로 둔다.
+ *
+ * 두 벌로 두면 드래그 그립 · 스와이프 삭제 · 재생성 · 장소 추가를 두 곳에서 고치게
+ * 되고, 계측 테스트(#71)도 두 벌이 된다.
+ *
+ * @param gate 본문을 감싸는 것. 생성 경로는 대회 조회의 로딩·오류를 가리고,
+ *  복원 경로는 가릴 것이 없어 그대로 그린다.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResultContent(
+    onBack: () -> Unit,
+    onChangeConditions: () -> Unit,
+    onOpenCourses: (targetKm: Double) -> Unit,
+    /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
+    onSaved: (message: String) -> Unit,
+    /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
+    onLoginRequest: () -> Unit,
+    viewModel: ResultViewModel,
+    modifier: Modifier = Modifier,
+    gate: @Composable (Modifier, @Composable () -> Unit) -> Unit,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // 저장됐다. **이 화면은 문구를 그리지 않는다** — §4.10 이 마이[동선]으로 옮기라고
@@ -144,19 +240,6 @@ fun ResultScreen(
         )
     }
 
-    LaunchedEffect(wizard) {
-        // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
-        //
-        // 시스템이 프로세스를 되살리며 S7 로 바로 복원하면 `wizard` 가 기본값이라, 그대로
-        // 부르면 "여행 조건이 덜 정해졌어요" 가 뜬다 — 사용자가 잘못한 게 없는데 조건을
-        // 다시 고르라고 한다. 조회가 끝나면 `wizard` 가 바뀌어 여기가 다시 돈다.
-        // **복원된 기본값으로는 만들지 않는다.** (#192 리뷰) 사용자가 S4 를 지나온 상태여야
-        // 날짜·종목·취향이 그의 선택이다. 아니면 내비게이션이 S4 로 되돌린다.
-        if (wizard.contestPhase == WizardUiState.Phase.LOADED && wizard.planConfirmed) {
-            viewModel.generate(wizard)
-        }
-    }
-
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -175,11 +258,7 @@ fun ResultScreen(
             }
         },
     ) { innerPadding ->
-        WizardContestGate(
-            state = wizard,
-            onRetry = wizardViewModel::load,
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        gate(Modifier.padding(innerPadding)) {
         Box {
             when (state.phase) {
                 ResultUiState.Phase.LOADING -> LoadingState("동선 짜는 중…")
