@@ -2,12 +2,15 @@ package com.runninggu.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.runninggu.server.auth.application.EmailVerificationCleanupTransaction;
 import com.runninggu.server.auth.application.PasswordHasher;
 import com.runninggu.server.auth.application.PasswordResetTokenManager;
 import com.runninggu.server.auth.application.PasswordResetTransaction;
+import com.runninggu.server.auth.application.RefreshTokenCleanupTransaction;
 import com.runninggu.server.auth.application.VerificationMailSender;
 import com.runninggu.server.member.application.MemberDeletionService;
 import com.runninggu.server.member.application.ReauthTokenManager;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -37,6 +40,12 @@ class AuthLifecycleConcurrencyIntegrationTest extends PostgreSqlContainerSupport
 
     @Autowired
     private PasswordResetTransaction passwordResetTransaction;
+
+    @Autowired
+    private EmailVerificationCleanupTransaction emailCleanup;
+
+    @Autowired
+    private RefreshTokenCleanupTransaction refreshCleanup;
 
     @Autowired
     private MemberDeletionService memberDeletionService;
@@ -94,6 +103,56 @@ class AuthLifecycleConcurrencyIntegrationTest extends PostgreSqlContainerSupport
                         tokenManager.hash(rawToken),
                         "changedRun4life2",
                         Instant.now()),
+                () -> {
+                    memberDeletionService.delete(seeded.userId(), reauthToken);
+                    return null;
+                });
+
+        assertDeleted();
+    }
+
+    @Test
+    void 탈퇴와_만료정리가_경합해도_데드락없이_인증행과_세션을_삭제한다() throws Exception {
+        SeededIdentity seeded = insertEmailIdentity("cleanup-race@example.com", "정리경합");
+        Instant cutoff = Instant.now();
+        jdbcTemplate.update(
+                """
+                INSERT INTO email_verification(
+                    email, purpose, code_hash, attempts, sent_at, expires_at)
+                VALUES (?, 'SIGNUP', 'hash', 0, ?, ?)
+                """,
+                seeded.email(),
+                Timestamp.from(cutoff.minusSeconds(601)),
+                Timestamp.from(cutoff.minusSeconds(1)));
+        jdbcTemplate.update(
+                """
+                INSERT INTO email_verification(
+                    email, purpose, token_hash, attempts, sent_at, expires_at)
+                VALUES (?, 'PASSWORD_RESET', ?, 0, ?, ?)
+                """,
+                seeded.email(),
+                UUID.randomUUID().toString().replace("-", "").repeat(2),
+                Timestamp.from(cutoff.minusSeconds(1801)),
+                Timestamp.from(cutoff.minusSeconds(1)));
+        jdbcTemplate.update(
+                """
+                INSERT INTO refresh_token(
+                    user_id, family_id, token_hash, expires_at, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                seeded.userId(),
+                UUID.randomUUID(),
+                UUID.randomUUID().toString().replace("-", "").repeat(2),
+                Timestamp.from(cutoff.minusSeconds(1)),
+                Timestamp.from(cutoff.minusSeconds(1209601)));
+        String reauthToken = reauthTokenManager.issue(seeded.userId(), cutoff).token();
+
+        runConcurrently(
+                () -> {
+                    emailCleanup.cleanup(cutoff);
+                    refreshCleanup.cleanup(cutoff);
+                    return null;
+                },
                 () -> {
                     memberDeletionService.delete(seeded.userId(), reauthToken);
                     return null;

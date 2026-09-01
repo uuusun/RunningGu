@@ -22,21 +22,43 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
             + "WHERE verification.tokenHash = :tokenHash")
     List<String> findEmailsByTokenHash(@Param("tokenHash") String tokenHash);
 
-    void deleteAllByEmail(String email);
+    /** 탈퇴 시 같은 이메일의 두 목적 행을 id 순서로 잠그고 삭제한다. (SPEC §6.5, 결정-57) */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            WITH targets AS MATERIALIZED (
+                SELECT id
+                FROM email_verification
+                WHERE email = :email
+                ORDER BY id
+                FOR UPDATE
+            )
+            DELETE FROM email_verification verification
+            USING targets
+            WHERE verification.id = targets.id
+            """, nativeQuery = true)
+    int deleteAllByEmailInIdOrder(@Param("email") String email);
 
     /** 이메일 인증과 재설정 기록을 각 계약 만료시각으로 멱등 정리한다. (SPEC §6.5, 결정-57) */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-            DELETE FROM email_verification
-            WHERE consumed_at IS NOT NULL
-               OR (purpose = 'SIGNUP'
-                   AND verified_at IS NULL
-                   AND expires_at <= :cutoff)
-               OR (purpose = 'SIGNUP'
-                   AND verified_at IS NOT NULL
-                   AND verified_at <= :verifiedCutoff)
-               OR (purpose = 'PASSWORD_RESET'
-                   AND expires_at <= :cutoff)
+            WITH expired AS MATERIALIZED (
+                SELECT id
+                FROM email_verification
+                WHERE consumed_at IS NOT NULL
+                   OR (purpose = 'SIGNUP'
+                       AND verified_at IS NULL
+                       AND expires_at <= :cutoff)
+                   OR (purpose = 'SIGNUP'
+                       AND verified_at IS NOT NULL
+                       AND verified_at <= :verifiedCutoff)
+                   OR (purpose = 'PASSWORD_RESET'
+                       AND expires_at <= :cutoff)
+                ORDER BY id
+                FOR UPDATE
+            )
+            DELETE FROM email_verification verification
+            USING expired
+            WHERE verification.id = expired.id
             """, nativeQuery = true)
     int deleteExpired(
             @Param("cutoff") java.time.Instant cutoff,

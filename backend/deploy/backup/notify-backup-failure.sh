@@ -2,7 +2,7 @@
 set -eu
 
 failed_unit="${1:-runninggu-postgres-backup.service}"
-message="런닝구 PostgreSQL 백업 실패: unit=${failed_unit}"
+message="런닝구 PostgreSQL 백업·WAL 보호 작업 실패: unit=${failed_unit}"
 
 logger --tag runninggu-backup-alert -- "$message"
 

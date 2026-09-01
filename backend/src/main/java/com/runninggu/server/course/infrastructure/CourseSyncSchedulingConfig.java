@@ -2,6 +2,7 @@ package com.runninggu.server.course.infrastructure;
 
 import com.runninggu.server.course.application.CourseSyncService;
 import java.time.Clock;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +29,7 @@ public class CourseSyncSchedulingConfig {
 
     @Bean
     public CourseSyncScheduler courseSyncScheduler(
+            @Qualifier("courseSyncTaskScheduler")
             ThreadPoolTaskScheduler courseSyncTaskScheduler,
             CourseSyncService syncService,
             CourseSyncProperties properties,

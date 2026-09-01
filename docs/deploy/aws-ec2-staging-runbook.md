@@ -292,9 +292,13 @@ sudo docker compose \
   -f compose.yaml \
   -f compose.ec2.yaml \
   exec -T --user postgres postgres pgbackrest --stanza=runninggu check
+
+sudo /bin/sh deploy/backup/check-wal-archive.sh
 ```
 
-`pgbackrest version`은 저장소가 고정한 `2.55.1`이어야 한다.
+`pgbackrest version`은 저장소가 고정한 `2.55.1`이어야 한다. PostgreSQL 기동부터 stanza 생성
+사이에는 archive 명령이 실패할 수 있으므로 애플리케이션과 감시 timer를 아직 시작하지 않는다.
+최초 `check`와 `check-wal-archive.sh`가 모두 성공한 뒤에만 다음 단계로 진행한다.
 
 GraphHopper 첫 그래프와 SRTM 캐시 생성은 수분 이상 걸릴 수 있다. 로그와 메모리를 별도로 본다.
 
@@ -357,8 +361,9 @@ sudo ln -sfn \
 
 ## 10. systemd 설치와 최초 Flyway·Importer
 
-백엔드·Importer와 백업 service·timer·실패 알림 unit을 설치한다. Importer와 백업 service는
-one-shot이며 직접 enable하지 않는다. 백업 timer만 §16 검증 뒤 enable한다.
+백엔드·Importer와 백업·WAL 감시 service·timer·실패 알림 unit을 설치한다. Importer와 두
+service는 one-shot이며 직접 enable하지 않는다. §8의 최초 archive 검증이 끝났으므로 WAL 감시
+timer는 이 절에서 켜고, 백업 timer만 §16의 실제 백업 검증 뒤 enable한다.
 
 ```bash
 sudo install -m 0644 \
@@ -374,6 +379,12 @@ sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-backup.timer \
   /etc/systemd/system/runninggu-postgres-backup.timer
 sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-wal-archive-check.service \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.service
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-postgres-wal-archive-check.timer \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.timer
+sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-backup-alert@.service \
   /etc/systemd/system/runninggu-backup-alert@.service
 sudo systemctl daemon-reload
@@ -382,7 +393,14 @@ sudo systemd-analyze verify \
   /etc/systemd/system/runninggu-backend.service \
   /etc/systemd/system/runninggu-postgres-backup.service \
   /etc/systemd/system/runninggu-postgres-backup.timer \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.service \
+  /etc/systemd/system/runninggu-postgres-wal-archive-check.timer \
   /etc/systemd/system/runninggu-backup-alert@.service
+
+sudo systemctl start runninggu-postgres-wal-archive-check.service
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
+sudo systemctl enable --now runninggu-postgres-wal-archive-check.timer
+sudo systemctl list-timers runninggu-postgres-wal-archive-check.timer --no-pager
 ```
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
@@ -604,9 +622,11 @@ archive_command = 'pgbackrest --stanza=runninggu archive-push %p'
 archive_timeout = '300s'
 ```
 
-stanza 생성과 최초 `check`는 §8에서 수행한다. timer는 매일 03:20 KST에 다음 순서로
-실행한다. 백업이나 `check`가 실패하면 service가 실패하고 `runninggu-backup-alert@.service`가
-SNS로 운영책임자에게 알린다.
+stanza 생성과 최초 `check`는 §8에서 수행한다. 백업 timer는 매일 03:20 KST에 다음 순서로
+실행한다. 별도 WAL 감시 timer는 10분마다 `pg_stat_archiver`의 마지막 실패가 이후 성공으로
+회복됐는지와 10분 넘게 `.ready` 상태인 segment가 있는지 확인한다. 백업·`check`·WAL 감시가
+실패하면 해당 service가 실패하고 `runninggu-backup-alert@.service`가 SNS로 운영책임자에게
+알린다.
 
 ```bash
 docker compose --env-file /etc/runninggu/compose.env \
@@ -622,7 +642,8 @@ docker compose --env-file /etc/runninggu/compose.env \
   exec -T --user postgres postgres pgbackrest --stanza=runninggu check
 ```
 
-실제 timer를 켜기 전에 같은 service를 수동 실행하고 백업 정보를 확인한다.
+백업 timer를 켜기 전에 백업 service를 수동 실행하고 백업 정보를 확인한다. WAL 감시는 §10에서
+수동 실행과 timer 활성화를 마쳤으므로 현재 상태를 함께 확인한다.
 
 ```bash
 sudo systemctl start runninggu-postgres-backup.service
@@ -631,7 +652,11 @@ sudo docker compose --env-file /etc/runninggu/compose.env \
   -f compose.yaml -f compose.ec2.yaml \
   exec -T --user postgres postgres pgbackrest --stanza=runninggu info --output=json
 sudo systemctl enable --now runninggu-postgres-backup.timer
-sudo systemctl list-timers runninggu-postgres-backup.timer --no-pager
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.timer
+sudo systemctl list-timers \
+  runninggu-postgres-backup.timer \
+  runninggu-postgres-wal-archive-check.timer \
+  --no-pager
 ```
 
 `pgbackrest info --output=json`의 마지막 성공 시각, backup label, WAL archive 범위만 운영 기록에

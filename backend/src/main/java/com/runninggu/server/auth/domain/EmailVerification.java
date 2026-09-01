@@ -57,6 +57,7 @@ public class EmailVerification {
     @Column(name = "verified_at")
     private Instant verifiedAt;
 
+    /** 결정-57 이전 소비 표시 행을 활성화하지 않고 정리하기 위한 legacy 호환 필드다. */
     @Column(name = "consumed_at")
     private Instant consumedAt;
 
@@ -137,11 +138,6 @@ public class EmailVerification {
 
     public void markVerified(Instant verifiedAt) {
         this.verifiedAt = verifiedAt;
-    }
-
-    /** 가입 트랜잭션 안에서 인증 자격을 한 번만 소비한다. (SPEC §4.2) */
-    public void markConsumed(Instant consumedAt) {
-        this.consumedAt = consumedAt;
     }
 
     public Long getId() {

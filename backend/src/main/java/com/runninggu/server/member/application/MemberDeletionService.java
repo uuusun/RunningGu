@@ -1,6 +1,5 @@
 package com.runninggu.server.member.application;
 
-import com.runninggu.server.auth.domain.EmailVerificationPurpose;
 import com.runninggu.server.auth.domain.LoginIdentity;
 import com.runninggu.server.auth.domain.LoginProvider;
 import com.runninggu.server.auth.infrastructure.AppUserRepository;
@@ -49,16 +48,10 @@ public class MemberDeletionService {
                 .orElseThrow(this::unauthorized);
         // LOGIN_IDENTITY → EMAIL_VERIFICATION → REFRESH_TOKEN 순서로 잠근다. (SPEC §6.5, 결정-57)
         if (identity.getProvider() == LoginProvider.EMAIL) {
-            emailVerificationRepository.findByEmailAndPurpose(
-                    identity.getProviderSubject(),
-                    EmailVerificationPurpose.SIGNUP);
-            emailVerificationRepository.findByEmailAndPurpose(
-                    identity.getProviderSubject(),
-                    EmailVerificationPurpose.PASSWORD_RESET);
-            emailVerificationRepository.deleteAllByEmail(identity.getProviderSubject());
-            emailVerificationRepository.flush();
+            emailVerificationRepository.deleteAllByEmailInIdOrder(
+                    identity.getProviderSubject());
         }
-        refreshTokenRepository.findAllByUser_Id(userId);
+        refreshTokenRepository.deleteAllByUserIdInIdOrder(userId);
         appUserRepository.deleteAllByIdInBatch(List.of(userId));
     }
 

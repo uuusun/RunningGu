@@ -42,6 +42,7 @@ public class AuthDataCleanupScheduler {
 
     /** 각 테이블은 독립 트랜잭션이라 한쪽 실패가 다른 정리를 막지 않는다. (SPEC §6.5, 결정-57) */
     @Scheduled(
+            scheduler = "authDataCleanupTaskScheduler",
             fixedDelayString = "${runninggu.auth.cleanup.interval:1h}",
             initialDelayString = "${runninggu.auth.cleanup.interval:1h}")
     public void cleanupHourly() {

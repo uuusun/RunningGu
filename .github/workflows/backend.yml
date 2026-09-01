@@ -99,6 +99,16 @@ jobs:
             config --format json > build-compose-recovery.json
           python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
 
+      - name: Validate backup monitoring assets
+        run: |
+          sh -n deploy/backup/notify-backup-failure.sh
+          sh -n deploy/backup/check-wal-archive.sh
+          systemd-analyze calendar '*:0/10' >/dev/null
+          grep -q '^OnFailure=runninggu-backup-alert@%n.service$' \
+            deploy/systemd/runninggu-postgres-wal-archive-check.service
+          grep -q '^OnCalendar=\*:0/10$' \
+            deploy/systemd/runninggu-postgres-wal-archive-check.timer
+
       - name: Test and prepare EC2 artifact
         run: ./gradlew clean test ec2Artifact --console=plain
 

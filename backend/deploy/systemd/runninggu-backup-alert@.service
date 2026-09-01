@@ -1,5 +1,5 @@
 [Unit]
-Description=런닝구 백업 실패 SNS 알림 (%i)
+Description=런닝구 PostgreSQL 백업·WAL 보호 작업 실패 SNS 알림 (%i)
 After=network-online.target
 Wants=network-online.target
 
