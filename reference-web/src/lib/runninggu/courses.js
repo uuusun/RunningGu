@@ -1,6 +1,6 @@
 // 두루누비 걷기 코스 — 사전 파싱된 좌표(durunubi_courses.json) 기반.
 //  ① 지역/거리/난이도 브라우징(browseCourses)
-//  ② 사용자 위치에서 가까운 코스를 원하는 길이로 잘라주는 위치 추천(sliceCoursesNear)
+//  ② 고른 출발지에서 가까운 코스를 원하는 길이로 잘라주는 추천(sliceCoursesNear)
 import RAW from '../../data/durunubi_courses.json'
 
 const LEVEL = { 1: '쉬움', 2: '보통', 3: '어려움' }
