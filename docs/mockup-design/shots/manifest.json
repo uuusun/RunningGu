@@ -193,7 +193,7 @@
     "name": "30-courses",
     "hash": "courses",
     "setup": "",
-    "label": "러닝 코스 · 내 주변",
+    "label": "러닝 코스 · 출발지 주변",
     "mode": "full",
     "w": 390,
     "h": 1635,
@@ -212,32 +212,12 @@
   {
     "name": "32-coursedetail",
     "hash": "courses",
-    "setup": "APP.openCourseDetail(false)",
+    "setup": "APP.openCourseDetail()",
     "label": "코스 상세",
     "mode": "frame",
     "w": 390,
     "h": 844,
     "file": "png/32-coursedetail.png"
-  },
-  {
-    "name": "33-run",
-    "hash": "run",
-    "setup": "",
-    "label": "GPS 기록 중",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/33-run.png"
-  },
-  {
-    "name": "34-runsum",
-    "hash": "runsum",
-    "setup": "",
-    "label": "러닝 요약",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/34-runsum.png"
   },
   {
     "name": "40-library",
@@ -340,16 +320,6 @@
     "file": "png/65-result-poi-swap.png"
   },
   {
-    "name": "66-courses-locating",
-    "hash": "courses",
-    "setup": "APP.dbgCourses('locating')",
-    "label": "러닝 코스 · 위치 확인 중",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/66-courses-locating.png"
-  },
-  {
     "name": "67-courses-nostart",
     "hash": "courses",
     "setup": "APP.dbgCourses('nostart')",
@@ -388,16 +358,6 @@
     "w": 390,
     "h": 844,
     "file": "png/70-library-empty.png"
-  },
-  {
-    "name": "71-coursedetail-ran",
-    "hash": "courses",
-    "setup": "APP.openCourseDetail(true)",
-    "label": "코스 상세 · 뛴 기록",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/71-coursedetail-ran.png"
   },
   {
     "name": "80-signup-1-agreed",
@@ -612,7 +572,7 @@
   {
     "name": "17-coursedetail-saved",
     "hash": "courses",
-    "setup": "APP.openCourseDetail(false);APP.saveCourse()",
+    "setup": "APP.openCourseDetail();APP.saveCourse()",
     "label": "코스 상세 · 보관함에 저장",
     "mode": "frame",
     "w": 390,
@@ -642,7 +602,7 @@
   {
     "name": "74-guest-course",
     "hash": "courses",
-    "setup": "APP.doGuest();APP.openCourseDetail(false);APP.saveCourse()",
+    "setup": "APP.doGuest();APP.openCourseDetail();APP.saveCourse()",
     "label": "게스트 · 코스 저장 시도 (로그인 유도)",
     "mode": "frame",
     "w": 390,
@@ -680,16 +640,6 @@
     "file": "png/101-confirm-course.png"
   },
   {
-    "name": "102-confirm-run",
-    "hash": "library-course",
-    "setup": "APP.askDelete('run')",
-    "label": "확인 · 러닝 기록 삭제",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/102-confirm-run.png"
-  },
-  {
     "name": "103-confirm-quit",
     "hash": "account",
     "setup": "APP.askDelete('quit')",
@@ -698,16 +648,6 @@
     "w": 390,
     "h": 844,
     "file": "png/103-confirm-quit.png"
-  },
-  {
-    "name": "104-confirm-runsave",
-    "hash": "runsum",
-    "setup": "APP.askDelete('runsave')",
-    "label": "확인 · 기록 저장 전 취소",
-    "mode": "frame",
-    "w": 390,
-    "h": 844,
-    "file": "png/104-confirm-runsave.png"
   },
   {
     "name": "110-home-loading",

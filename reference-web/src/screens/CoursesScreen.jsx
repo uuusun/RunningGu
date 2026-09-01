@@ -37,21 +37,11 @@ export default function CoursesScreen() {
 function NearMode() {
   const [loc, setLoc] = useState(null)         // { lat, lng, label }
   const [targetKm, setTargetKm] = useState(5)
-  const [locating, setLocating] = useState(true)
   const [selId, setSelId] = useState(null)
   const [q, setQ] = useState('')
   const [hits, setHits] = useState(null)       // 검색 결과 후보
   const [spots, setSpots] = useState([])       // 도시 보강: 카카오 걷기 좋은 곳
 
-  const useGps = () => {
-    if (!navigator.geolocation) { setLocating(false); return }
-    setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setLoc({ lat: p.coords.latitude, lng: p.coords.longitude, label: '현재 위치' }); setLocating(false); setSelId(null); setHits(null) },
-      () => setLocating(false), { timeout: 6000 },
-    )
-  }
-  useEffect(() => { useGps() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = async () => {
     if (!q.trim()) return
@@ -98,9 +88,8 @@ function NearMode() {
           <button className="chip outline-ink" style={{ flex: 'none', marginLeft: 'auto', padding: '6px 14px' }} onClick={runSearch}>검색</button>
         </label>
       </div>
-      {/* 출발지 칩: 내 위치 + 프리셋 */}
+      {/* 출발지 칩: 프리셋 — 기기 위치는 쓰지 않는다 (SPEC 결정-56 · 이슈 #215) */}
       <div className="chip-row scr" style={{ flex: 'none', paddingTop: 0 }}>
-        <button className="chip outline-ink" onClick={useGps}><Icon name="route" size={14} stroke={2.2} />내 위치</button>
         {PRESETS.map((p) => (
           <button key={p.label} className={`chip ${loc?.label === p.label ? 'active' : ''}`}
             onClick={() => { setLoc({ ...p }); setSelId(null); setHits(null) }}>{p.label}</button>
@@ -129,8 +118,8 @@ function NearMode() {
 
         {!loc && (
           <div className="empty">
-            <div className="e-title">{locating ? '위치를 확인하는 중…' : '출발지를 정해주세요.'}</div>
-            <div>내 위치 허용 · 출발지 검색 · 프리셋 중 하나를 고르면 두루누비 왕복 코스를 짜드려요.</div>
+            <div className="e-title">출발지를 정해주세요.</div>
+            <div>출발지 검색이나 프리셋 중 하나를 고르면 두루누비 왕복 코스를 짜드려요.</div>
           </div>
         )}
 

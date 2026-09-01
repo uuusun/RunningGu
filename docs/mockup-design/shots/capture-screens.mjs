@@ -1,9 +1,11 @@
 import { chromium } from 'playwright';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs';
 import path from 'path';
 
-const MOCKUP = 'C:/git/RunningGu/docs/mockup-design/런닝구-목업-v2.html';
+/* 이 스크립트 위치에서 찾는다. 절대경로를 박아 두면 그 PC 에서만 돈다 — 실제로
+   `C:/git/RunningGu/...` 가 박혀 있어 다른 기기에서는 ERR_FILE_NOT_FOUND 였다 (#215). */
+const MOCKUP = fileURLToPath(new URL('../런닝구-목업-v2.html', import.meta.url));
 const OUT = './png';   // 캡처는 곧바로 png/ 에 떨어진다 (예전엔 임시폴더에 찍고 손으로 옮겼다)
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -29,11 +31,9 @@ const SHOTS = [
   ['23-result',           'result',         '', '동선 결과'],
   ['24-result-edit',      'result-edit',    '', '동선 결과 · 편집 모드'],
   ['25-result-poi',       'result-poi',     '', '동선 결과 · POI 추가 시트'],
-  ['30-courses',          'courses',        '', '러닝 코스 · 내 주변'],
+  ['30-courses',          'courses',        '', '러닝 코스 · 출발지 주변'],
   ['31-courses-region',   'courses-region', '', '러닝 코스 · 지역별'],
-  ['32-coursedetail',     'courses',        "APP.openCourseDetail(false)", '코스 상세'],
-  ['33-run',              'run',            '', 'GPS 기록 중'],
-  ['34-runsum',           'runsum',         '', '러닝 요약'],
+  ['32-coursedetail',     'courses',        "APP.openCourseDetail()", '코스 상세'],
   ['40-library',          'library',        '', '보관함 · 동선'],
   ['41-library-course',   'library-course', '', '보관함 · 러닝코스'],
   ['42-library-fav',      'library-fav',    '', '보관함 · 찜한 대회'],
@@ -46,12 +46,10 @@ const SHOTS = [
   ['63-w3-loading',       'w3',      "APP.dbgW3('loading')",        '위저드 3 · 숙소 로딩'],
   ['64-result-empty',     'result',  "APP.dbgResult('empty')",      '동선 결과 · 빈 상태'],
   ['65-result-poi-swap',  'result',  "APP.openSwap(1,'관광지')",     '동선 결과 · POI 교체 시트'],
-  ['66-courses-locating', 'courses', "APP.dbgCourses('locating')",  '러닝 코스 · 위치 확인 중'],
   ['67-courses-nostart',  'courses', "APP.dbgCourses('nostart')",   '러닝 코스 · 출발지 없음'],
   ['68-courses-nocourse', 'courses', "APP.dbgCourses('nocourse')",  '러닝 코스 · 코스 0'],
   ['69-courses-none',     'courses', "APP.dbgCourses('none')",      '러닝 코스 · 결과 0건'],
   ['70-library-empty',    'library', "APP.dbgLib('empty')",         '보관함 · 빈 상태'],
-  ['71-coursedetail-ran', 'courses', "APP.openCourseDetail(true)",  '코스 상세 · 뛴 기록'],
 
   // ── 사용자가 눌러서 도달하는 상태 ───────────────────────────
   ['80-signup-1-agreed',   'signup-1', "APP.toggleAllAgree()",              '회원가입 1 · 전체 동의 (다음 활성)'],
@@ -89,18 +87,16 @@ const SHOTS = [
 
   // ── 피드백 반영 · 필수 보완 ─────────────────────────────────
   ['16-account',           'account', '',                                   '내 정보 · 계정 관리'],
-  ['17-coursedetail-saved','courses', "APP.openCourseDetail(false);APP.saveCourse()", '코스 상세 · 보관함에 저장'],
+  ['17-coursedetail-saved','courses', "APP.openCourseDetail();APP.saveCourse()", '코스 상세 · 보관함에 저장'],
   ['72-guest-fav',         'calendar',"APP.doGuest();APP.go('calendar');APP.toggleFav('sejong')", '게스트 · 찜 시도 (로그인 유도)'],
   ['73-guest-route',       'result',  "APP.doGuest();APP.go('result');APP.saveRoute()",           '게스트 · 동선 저장 시도 (로그인 유도)'],
-  ['74-guest-course',      'courses', "APP.doGuest();APP.openCourseDetail(false);APP.saveCourse()", '게스트 · 코스 저장 시도 (로그인 유도)'],
+  ['74-guest-course',      'courses', "APP.doGuest();APP.openCourseDetail();APP.saveCourse()", '게스트 · 코스 저장 시도 (로그인 유도)'],
   ['75-login-return',      'result',  "APP.doGuest();APP.go('result');APP.saveRoute();APP.goLoginFromGuest();APP.doLogin()", '로그인 후 원래 화면 복귀'],
 
   // ── 피드백 반영 · 삭제·탈퇴 확인 모달 ───────────────────────
   ['100-confirm-route',    'library',       "APP.askDelete('route')",   '확인 · 동선 삭제'],
   ['101-confirm-course',   'library-course',"APP.askDelete('course')",  '확인 · 저장 코스 삭제'],
-  ['102-confirm-run',      'library-course',"APP.askDelete('run')",     '확인 · 러닝 기록 삭제'],
   ['103-confirm-quit',     'account',       "APP.askDelete('quit')",    '확인 · 회원 탈퇴'],
-  ['104-confirm-runsave',  'runsum',        "APP.askDelete('runsave')", '확인 · 기록 저장 전 취소'],
 
   // ── 피드백 반영 · 홈 영역별 상태 ────────────────────────────
   ['110-home-loading',     'home', "APP.dbgHome('loading')",  '홈 · 마감 임박 로딩'],

@@ -52,10 +52,10 @@ const SECTIONS = [
     ]
   },
   {
-    id: 'courses', title: '[러닝 코스 · GPS 기록]', fill: '#F8F5FF',
-    note: '코스 상세에서 기록을 시작하면 심연(deep) 지면의 GPS 화면으로 전환되고, 종료 시 요약으로 넘어간다. 두루누비 코스가 없는 수도권은 걷기 좋은 곳이 기본 화면이 되며, 경로 없이 바로 기록을 시작한다.',
+    id: 'courses', title: '[러닝 코스]', fill: '#F8F5FF',
+    note: '출발지를 검색·프리셋으로 고르면 그 좌표를 기준으로 코스를 찾는다. 두루누비 코스가 없는 수도권은 걷기 좋은 곳이 기본 화면이 된다. 기기 위치는 쓰지 않는다(결정-56).',
     rows: [
-      ['30-courses', '32-coursedetail', '33-run', '34-runsum'],
+      ['30-courses', '32-coursedetail'],
       ['31-courses-region', '140-courses-seoul']
     ]
   },
@@ -78,7 +78,7 @@ const SECTIONS = [
     id: 'confirm', title: '[되돌릴 수 없는 동작 · 확인]', fill: '#FFF0F3',
     note: '삭제·탈퇴처럼 복구가 어려운 동작 앞에 확인 모달을 세운다. [취소]와 [삭제]/[탈퇴] 두 갈래.',
     rows: [
-      ['100-confirm-route', '101-confirm-course', '102-confirm-run', '103-confirm-quit', '104-confirm-runsave']
+      ['100-confirm-route', '101-confirm-course', '103-confirm-quit']
     ]
   },
   {
@@ -97,8 +97,8 @@ const SECTIONS = [
     note: '목업의 STATE 디버그 레일로만 도달하는 예외 상태. 각 캡션 앞부분이 원래 소속 화면이다.',
     rows: [
       ['60-login-error', '61-detail-loading', '62-detail-empty', '63-w3-loading'],
-      ['64-result-empty', '65-result-poi-swap', '70-library-empty', '71-coursedetail-ran'],
-      ['66-courses-locating', '67-courses-nostart', '68-courses-nocourse', '69-courses-none']
+      ['64-result-empty', '65-result-poi-swap', '70-library-empty'],
+      ['67-courses-nostart', '68-courses-nocourse', '69-courses-none']
     ]
   },
   {
@@ -159,10 +159,6 @@ const CONNECTORS = [
   ['30-courses', '32-coursedetail', '코스 선택'],
   ['30-courses', '31-courses-region', '지역 탭'],
   ['30-courses', '140-courses-seoul', '출발지 · 서울시청'],
-  ['140-courses-seoul', '33-run', '여기서 뛰기'],
-  ['32-coursedetail', '33-run', '기록 시작'],
-  ['33-run', '34-runsum', '종료'],
-  ['34-runsum', '40-library', '기록 저장'],
 
   // 보관함 내부
   ['40-library', '41-library-course', '코스 탭'],
@@ -171,7 +167,6 @@ const CONNECTORS = [
   // ── 피드백 1 · 보관함 카드에서 상세 화면으로 되돌아 나간다 ──
   ['40-library', '23-result', '동선 카드 선택'],
   ['41-library-course', '32-coursedetail', '저장 코스 선택'],
-  ['41-library-course', '71-coursedetail-ran', '러닝 기록 선택'],
   ['42-library-fav', '15-detail', '찜한 대회 선택'],
 
   // ── 피드백 2 · 코스 저장 ──
@@ -198,8 +193,6 @@ const CONNECTORS = [
   // ── 피드백 5 · 삭제 · 탈퇴 확인 ──
   ['40-library', '100-confirm-route', '동선 삭제'],
   ['41-library-course', '101-confirm-course', '코스 삭제'],
-  ['41-library-course', '102-confirm-run', '기록 삭제'],
-  ['34-runsum', '104-confirm-runsave', '저장 안 하고 나가기'],
   ['100-confirm-route', '70-library-empty', '삭제'],
 
   // ── 피드백 1~3 · 오류에서 되돌아오기 ──
