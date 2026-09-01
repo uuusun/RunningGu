@@ -171,9 +171,10 @@ fun AccountScreen(
     // 되돌릴 수 없는 조작을 처음부터 다시 시작해야 한다 (§2-2)
     state.withdraw?.let { edit ->
         WithdrawDialog(
-            // 재인증 수단이 가입 경로를 따라간다(§2-2) — EMAIL 은 비밀번호, KAKAO 는
-            // SDK 가 방금 발급한 토큰이다. 화면이 다른 것은 **입력칸의 유무**뿐이다.
-            emailAccount = state.profile?.loginProvider == LoginProvider.EMAIL,
+            // **가입 경로를 명시적으로 가른다.** `== EMAIL` 로 판정하면 프로필이
+            // null 일 때도 false 라 카카오로 읽힌다 — EMAIL 계정이 비밀번호 칸 없이
+            // 카카오 SDK 재인증을 시작한다(#238 리뷰). 되돌릴 수 없는 조작이라 더 그렇다.
+            mode = withdrawMode(state.profile?.loginProvider),
             saving = edit.saving,
             error = edit.error,
             serverDone = edit.serverDone,
@@ -359,9 +360,40 @@ private fun PasswordDialog(
     )
 }
 
+/**
+ * 탈퇴 재인증을 **무엇으로 할지.** (§2-2 · #238 리뷰)
+ *
+ * `loginProvider` 를 그대로 쓰지 않고 한 겹 두는 이유는, **모르는 값과 없는 값을
+ * 갈라 막아야** 하기 때문이다. `== EMAIL` 같은 판정은 null 을 조용히 "카카오" 로
+ * 만들어 버린다.
+ */
+enum class WithdrawMode {
+    /** EMAIL 가입 — 현재 비밀번호를 받는다. */
+    PASSWORD,
+
+    /** KAKAO 가입 — SDK 가 방금 발급한 토큰으로 확인한다. 받을 값이 없다. */
+    KAKAO,
+
+    /**
+     * 가입 경로를 모른다. **막는다.**
+     *
+     * 프로필이 아직 안 왔거나 세션이 끊겨 사라진 경우다. 되돌릴 수 없는 조작이라
+     * 짐작으로 진행하지 않는다 — 어느 쪽으로 틀려도 사용자가 의도하지 않은 재인증이
+     * 시작된다.
+     */
+    BLOCKED,
+}
+
+/** [WithdrawMode] 판정. 화면 밖에서 고정할 수 있게 순수 함수로 둔다. */
+fun withdrawMode(provider: LoginProvider?): WithdrawMode = when (provider) {
+    LoginProvider.EMAIL -> WithdrawMode.PASSWORD
+    LoginProvider.KAKAO -> WithdrawMode.KAKAO
+    null -> WithdrawMode.BLOCKED
+}
+
 @Composable
 private fun WithdrawDialog(
-    emailAccount: Boolean,
+    mode: WithdrawMode,
     saving: Boolean,
     error: String?,
     serverDone: Boolean,
@@ -391,7 +423,7 @@ private fun WithdrawDialog(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (emailAccount && !serverDone) {
+                if (mode == WithdrawMode.PASSWORD && !serverDone) {
                     Spacer(Modifier.height(12.dp))
                     // 탈퇴 전 재인증 (SPEC §4.13 · D-23 · §2-2).
                     PasswordField(
@@ -400,7 +432,7 @@ private fun WithdrawDialog(
                         label = "비밀번호 확인",
                         enabled = !saving,
                     )
-                } else if (!serverDone) {
+                } else if (mode == WithdrawMode.KAKAO && !serverDone) {
                     // 카카오는 **SDK 가 방금 발급한** 토큰으로 재인증한다(§2-2). 비밀번호를
                     // 다시 묻는 것과 같은 자리라, [탈퇴] 를 누르면 카카오로 한 번 더 확인한다
                     Spacer(Modifier.height(12.dp))
@@ -408,6 +440,14 @@ private fun WithdrawDialog(
                         text = "카카오로 한 번 더 확인해요.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (!serverDone) {
+                    // 가입 경로를 모른다 — 짐작으로 재인증을 시작하지 않는다(#238 리뷰)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "계정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
                 error?.let { message ->
@@ -422,13 +462,17 @@ private fun WithdrawDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (emailAccount || serverDone) onConfirm(password) else onConfirmKakao() },
+                onClick = {
+                    if (mode == WithdrawMode.KAKAO && !serverDone) onConfirmKakao() else onConfirm(password)
+                },
                 enabled = when {
                     saving -> false
                     // 비밀번호는 이미 확인됐다. 다시 묻지 않는다
                     serverDone -> true
+                    // 가입 경로를 모르면 **누를 수 없다** (#238 리뷰)
+                    mode == WithdrawMode.BLOCKED -> false
                     // 카카오는 여기서 받을 값이 없다 — 누르면 SDK 가 본인 확인을 한다
-                    !emailAccount -> true
+                    mode == WithdrawMode.KAKAO -> true
                     else -> password.isNotEmpty()
                 },
             ) {

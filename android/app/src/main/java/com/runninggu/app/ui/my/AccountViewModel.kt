@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** 카카오 재인증이 SDK 단계에서 실패했다. 서버까지 못 간 것이라 탈퇴는 그대로다. */
+private const val KAKAO_REAUTH_FAILED = "카카오 확인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요."
+
 /**
  * 계정 관리의 UI 계약. (SPEC §4.13 정보 수정 · D-22 · #59 단일 로그인 수단)
  *
@@ -114,9 +117,6 @@ data class WithdrawEdit(
  * 따지지 않고 세션을 통째로 갈아끼운다. 그래서 낙관적 갱신도, 롤백도 없다 — **서버가
  * 답하기 전에는 화면이 움직이지 않는다.** 되돌릴 것이 없으니 되돌리다 틀릴 일도 없다.
  */
-/** 카카오 재인증이 SDK 단계에서 실패했다. 서버까지 못 간 것이라 탈퇴는 그대로다. */
-private const val KAKAO_REAUTH_FAILED = "카카오 확인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요."
-
 class AccountViewModel(
     private val repository: AuthRepository = ServiceLocator.authRepository,
     private val memberRepository: MemberRepository = ServiceLocator.memberRepository,
