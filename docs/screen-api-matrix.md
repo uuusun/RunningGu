@@ -109,8 +109,8 @@ Compose 화면
 | ID | 플로우 화면 | 목표 route | 최신 Android | 전달값 | 로그인 | 상태 |
 |---|---|---|---|---|---|---|
 | A0 | 앱 시작·세션 확인 | 별도 route 없음(Startup Gate) | 시작 화면 `home`, 인증 그래프 없음 | 세션 | 선택 | 시스템 Splash + `core-splashscreen`, 세션에 따라 로그인/홈. **`GET /api/me` 검증이 끝나야 시작 화면을 고른다**(#99) — 그동안은 로딩만 보인다(제한 3초). `Expired`는 홈을 열지 않고 곧장 로그인, `Unknown`(네트워크·5xx)은 세션을 지킨 채 홈을 열고 첫 `401`을 `TokenAuthenticator`가 정리 |
-| A1 | 로그인 | `login` | `login` | 복귀 목적 route | 불필요 | 현재 구현 · 서버 연결. **카카오 로그인만 미구현** — 버튼이 "준비 중" 안내만 띄운다(AP-02 · #108) |
-| A2 | 회원가입 4단계 | `signup` 내부 step | `signup` 내부 step | 카카오 신규면 SDK token/profile | 불필요 | 현재 구현 · 서버 연결(중복 확인 D-30 · 이메일 인증). 카카오 신규 가입 경로는 A1 과 함께 미구현 |
+| A1 | 로그인 | `login` | `login` | 복귀 목적 route | 불필요 | 현재 구현 · 서버 연결. **카카오 로그인도 붙었다**(#216) — `KakaoAuthClient` 가 SDK 토큰을 받아 `POST /api/auth/kakao` 로 보낸다. 남은 것은 릴리스 키 해시뿐이다(AP-02 · #108) |
+| A2 | 회원가입 4단계 | `signup` 내부 step | `signup` 내부 step | 카카오 신규면 SDK token/profile | 불필요 | 현재 구현 · 서버 연결(중복 확인 D-30 · 이메일 인증). 카카오 신규 가입 경로도 A1 과 함께 붙었다(#216 · `POST /api/auth/kakao/signup`) |
 | A3 | 비밀번호 찾기 | `reset` | `reset` | 없음 | 불필요 | 현재 구현 · 서버 연결. 새 비밀번호 설정은 앱이 아니라 웹(WEB-R1)이다 🔒 |
 | WEB-R1 | 새 비밀번호 설정 | 웹 `/reset-password?token=` | Android route 아님 | reset token | 불필요 | SPEC 확정 |
 | S1 | 홈 | `home` | `home` | 없음 | 선택 | 현재 구현 |
@@ -127,7 +127,7 @@ Compose 화면
 | S10 | 보관함 | 내부 `my`, UI 라벨 `보관함` | `my` placeholder | 선택 segment | 필요 | route 현재 구현 |
 | M1 | 내 정보·계정 관리 | `account` 제안 | 미구현 | 없음 | 필요 | 플로우 확정 |
 
-`현재 구현`은 route와 UI 존재 여부를 뜻하며 백엔드 연결 완료를 뜻하지 않는다. 최신 `develop`의 S1~S4는 아직 `SampleData`·화면 상태를 사용하는 구간이 있고, 이 표의 API는 Repository/Retrofit 연결 목표 계약이다.
+`현재 구현`은 route와 UI 존재 여부를 뜻하며 백엔드 연결 완료를 뜻하지 않는다. **S1~S4의 `SampleData` 구간은 없어졌다** — 홈·캘린더·상세·위저드가 모두 서버 대회를 본다(#140). `ui/sample/SampleData.kt` 는 남아 있지만 화면에서 참조하지 않는다.
 
 ### 기본 흐름
 
