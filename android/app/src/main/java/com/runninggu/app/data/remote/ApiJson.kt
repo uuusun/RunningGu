@@ -19,10 +19,23 @@ import java.time.format.DateTimeParseException
  * - `ignoreUnknownKeys` — 서버가 필드를 **추가**해도 앱이 안 깨진다. 계약상 추가는 호환 변경이다
  * - `explicitNulls = false` — 명세가 "다른 종류의 항목에서 null 로 채우지 않고 생략한다" 고 못박았다
  * - `coerceInputValues` 는 쓰지 않는다 — 모르는 enum 을 조용히 기본값으로 바꾸면 계약 위반을 못 잡는다
+ * - `encodeDefaults = true` — **기본값과 같다는 이유로 필드를 빼지 않는다** (이슈 #245)
+ *
+ * 마지막 항목이 실제로 저장을 깨뜨렸다. kotlinx 는 기본값이 `false` 라, 값이 기본값과 같으면
+ * 본문에서 통째로 뺀다. 그런데 우리 DTO 는 **응답을 편하게 읽으려고** 기본값을 달아 둔 것이지
+ * "안 보내도 되는 값" 이라는 뜻이 아니다. `BlockDto.blockType` 이 그랬다 — 기본값이 `"USER"`
+ * 라서 USER 블록에서는 통째로 빠졌고, 서버 `SaveItineraryRequest.BlockRequest.blockType` 은
+ * `@NotBlank` 라 400 이 났다. RACE 블록만 기본값과 달라서 실려 나갔다.
+ *
+ * `explicitNulls = false` 는 그대로 둔다. **null 을 빼는 것과 기본값을 빼는 것은 다른 얘기다** —
+ * 전자는 명세가 요구하는 생략이고, 후자는 앱이 제 편의로 단 기본값 때문에 계약 필드가 사라지는
+ * 것이다. 둘을 같이 두면 PATCH 계열(`UpdateNicknameRequest` 등)의 "안 보낸 값은 안 고친다" 도
+ * 그대로 지켜진다 — 그쪽은 nullable 이라 여전히 빠진다.
  */
 val ApiJson: Json = Json {
     ignoreUnknownKeys = true
     explicitNulls = false
+    encodeDefaults = true
     isLenient = false
     serializersModule = SerializersModule {
         contextual(LocalDate::class, LocalDateSerializer)
