@@ -54,6 +54,21 @@ data class ResultUiState(
     val canRetry: Boolean = true,
     /** 저장 CTA 의 진행·결과. (SPEC §4.10 · §5-2) */
     val save: SaveItineraryState = SaveItineraryState.Idle,
+    /**
+     * 저장된 동선을 되살린 것이면 그 id. 생성 경로에서는 null 이다. (§5-5 · #213)
+     *
+     * 화면 모양은 두 경로가 같지만 **무엇으로 채웠는지**는 알아야 한다 — 되살린
+     * 동선에는 "대회가 바뀌었다" 안내가 붙을 수 있다.
+     */
+    val restoredItineraryId: Long? = null,
+    /**
+     * 저장한 뒤 대회가 바뀌었다. (§5-3 · §5-5)
+     *
+     * **일정 표시는 저장 시점 snapshot 그대로 둔다.** 최신 대회로 갈아 끼우면 사용자가
+     * 저장해 둔 것과 다른 것을 보게 된다 — 바뀐 사실만 알리고 다시 만들지는 사용자가
+     * 정한다.
+     */
+    val needsRegeneration: Boolean = false,
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 
