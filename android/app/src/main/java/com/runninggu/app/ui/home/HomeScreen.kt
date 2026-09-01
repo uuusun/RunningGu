@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -472,10 +473,19 @@ private fun ClosingSoonCard(
                 )
             }
             Spacer(Modifier.height(11.dp))
+            // **제목 자리를 두 줄로 고정한다.** `LazyRow` 의 카드는 내용만큼 자라서,
+            // 대회명이 한 줄인 카드와 두 줄인 카드의 높이가 달라진다 — 나란히 놓이는
+            // 레일이라 그 차이가 그대로 보인다. 폭(200.dp)만 맞추고 높이를 안 맞춘 탓이다.
+            //
+            // 높이를 통째로 박지 않는 이유는 **글자 크기 설정**이다. 사용자가 시스템
+            // 글꼴을 키우면 고정 높이는 글자를 잘라 먹지만, 줄 수로 잡으면 카드가 함께 큰다.
             Text(
                 text = race.name,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(6.dp))
             Text(
