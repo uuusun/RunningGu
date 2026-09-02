@@ -14,6 +14,7 @@ import com.runninggu.app.data.repository.SavedCoursePage
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.remote.ProblemDetail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -194,7 +195,31 @@ class SaveCourseTest {
     }
 
     @Test
-    fun `그 밖의 실패는 다시 시도하라고 알린다`() = runTest(dispatcher) {
+    fun `서버가 거절하면 서버가 준 문구를 낸다`() = runTest(dispatcher) {
+        // 예전에는 `Network` 가 아닌 모든 실패가 한 문구로 뭉개져, 화면만 보고는 서버가
+        // 거절한 것인지 앱 안에서 깨진 것인지 알 수 없었다 (이슈 #252)
+        val saved = RecordingSavedCourses(
+            error = ApiException.Http(
+                status = 400,
+                code = ApiErrorCode.VALIDATION_FAILED,
+                problem = ProblemDetail(title = "요청 값이 올바르지 않습니다.", code = "VALIDATION_FAILED"),
+            ),
+        )
+        val viewModel = loaded(viewModel(saved = saved))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+
+        val done = viewModel.uiState.value.save as SaveCourseState.Done
+        assertEquals("요청 값이 올바르지 않습니다.", done.message)
+        assertTrue(done.failed)
+    }
+
+    @Test
+    fun `서버 문구가 없으면 code 라도 남긴다`() = runTest(dispatcher) {
+        // 프록시가 HTML 오류 페이지를 주면 `problem` 이 null 이다(`httpErrorOf`).
+        // 아무 단서 없이 뭉개는 것보다 코드가 보이는 편이 낫다
         val saved = RecordingSavedCourses(
             error = ApiException.Http(500, ApiErrorCode.INTERNAL_SERVER_ERROR, null),
         )
@@ -205,8 +230,26 @@ class SaveCourseTest {
         advanceUntilIdle()
 
         val done = viewModel.uiState.value.save as SaveCourseState.Done
-        assertEquals("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.", done.message)
+        assertEquals("저장하지 못했어요. (INTERNAL_SERVER_ERROR)", done.message)
         assertTrue(done.failed)
+    }
+
+    @Test
+    fun `계약 밖 실패에도 저장 버튼이 굳지 않는다`() = runTest(dispatcher) {
+        // S7 은 #214 리뷰에서 이 갈래를 넣었는데 S8 에는 없었다 (이슈 #252 를 보다 찾음).
+        // `ApiException` 이 아닌 것이 올라오면 코루틴이 죽어 `Saving` 이 그대로 남는다
+        val saved = RecordingSavedCourses(error = IllegalStateException("계약 밖"))
+        val viewModel = loaded(viewModel(saved = saved))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+
+        val done = viewModel.uiState.value.save as SaveCourseState.Done
+        assertEquals("앱에서 저장을 마치지 못했어요. 다시 시도해 주세요.", done.message)
+        assertTrue(done.failed)
+        // 굳지 않았다 — 같은 코스를 다시 누를 수 있다
+        assertTrue(viewModel.uiState.value.canSave)
     }
 
     @Test
@@ -411,7 +454,8 @@ private class StubCourseRepository(private val items: List<NearbyItem>) : Course
 /** 무엇을 저장하라고 시켰는지 적어 두는 가짜. */
 private class RecordingSavedCourses(
     private val result: SaveCourseResult? = SaveCourseResult(id = 1L, created = true),
-    private val error: ApiException? = null,
+    /** `ApiException` 이 아닌 것도 넣는다 — 계약 밖 실패를 재현하려고. */
+    private val error: Throwable? = null,
     /** 주면 이걸 풀어 줄 때까지 응답을 붙든다 — "보내는 중" 을 관찰하려고. */
     private val gate: CompletableDeferred<Unit>? = null,
 ) : SavedCourseRepository {
