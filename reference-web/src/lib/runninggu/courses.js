@@ -1,6 +1,6 @@
 // 두루누비 걷기 코스 — 사전 파싱된 좌표(durunubi_courses.json) 기반.
 //  ① 지역/거리/난이도 브라우징(browseCourses)
-//  ② 사용자 위치에서 가까운 코스를 원하는 길이로 잘라주는 위치 추천(sliceCoursesNear)
+//  ② 고른 출발지에서 가까운 코스를 원하는 길이로 잘라주는 추천(sliceCoursesNear)
 import RAW from '../../data/durunubi_courses.json'
 
 const LEVEL = { 1: '쉬움', 2: '보통', 3: '어려움' }
@@ -58,7 +58,7 @@ function sliceSegment(points, cum, startIdx, targetM) {
 
 // ── 위치 기반 코스 자르기 ──
 //  (lat,lng) 반경 radiusKm 안을 지나는 코스를 찾아, 가까운 지점부터 lengthKm 구간을 잘라 반환.
-//  가까운 순 정렬. 장거리 트레일도 '내 근처 Lkm'로 축약돼 나온다.
+//  가까운 순 정렬. 장거리 트레일도 '출발지 주변 Lkm'로 축약돼 나온다.
 export function sliceCoursesNear({ lat, lng, lengthKm = 5, radiusKm = 5, limit = 20 }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return []
   const targetM = lengthKm * 1000
@@ -76,7 +76,7 @@ export function sliceCoursesNear({ lat, lng, lengthKm = 5, radiusKm = 5, limit =
       sigun: c.sigun,
       levelLabel: c.levelLabel,
       fullDistKm: c.distKm,
-      accessM: Math.round(near.distM),          // 내 위치 → 코스 진입점 거리
+      accessM: Math.round(near.distM),          // 출발지 → 코스 진입점 거리
       segKm: Math.round((seg.distM / 1000) * 10) / 10, // 잘라낸 구간 길이
       segPoints: seg.points,
     })
