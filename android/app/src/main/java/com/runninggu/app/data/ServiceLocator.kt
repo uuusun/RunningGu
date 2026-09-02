@@ -160,8 +160,10 @@ object ServiceLocator {
      * #174 · #182 로 섰다. 새 비밀번호 설정 화면은 앱이 아니라 서버가 서빙하는
      * 웹 페이지라(§4.3 🔒), 앱은 `auth/password/reset` 을 부르지 않는다.
      *
-     * 카카오(`auth/kakao`·`auth/kakao/signup`)는 서버에 섰지만 **부르는 화면이
-     * 아직 없다** — 로그인 버튼이 "준비 중" 안내만 띄운다(AP-02 · 이슈 #108).
+     * **카카오(`auth/kakao`·`auth/kakao/signup`)도 화면이 붙었다.** `ui/auth/KakaoAuthClient`
+     * 가 SDK 토큰을 받아 오고 `LoginViewModel` 이 `kakaoLogin` 을 부른다(#216). 가입자 탈퇴도
+     * 이어졌다(#238). 남은 것은 **릴리스 키 해시**뿐이다 — 디버그 키 해시는 등록돼 있어 개발
+     * 빌드에서는 동작하고, 업로드 키·Google 앱 서명 키는 AP-02 · 이슈 #108 에 걸려 있다.
      */
     val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi, tokenApi) }
 
