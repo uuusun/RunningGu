@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.runninggu.app.ui.common.EmptyState
@@ -83,6 +84,11 @@ fun WizardContestGate(
                 EmptyState(title = view.title, description = view.description, modifier = modifier)
             }
 
-        is WizardContestView.Ready -> content(view.race)
+        // **`modifier` 를 여기서도 걸어야 한다.** Loading·Failed 에만 걸고 Ready 에서
+        // 흘리면, 화면이 넘긴 `Modifier.padding(innerPadding)` 이 **정상 경로에서만**
+        // 사라진다 — Scaffold 의 앱바·하단바 인셋이 없어져서 내용이 앱바 뒤로 숨고
+        // 화면 아래로 뻗는다. S6 숙소 목록이 스크롤되지 않던 것이 이것이었다(#263):
+        // `LazyColumn` 의 뷰포트가 화면 밖까지 늘어나 자기가 넉넉하다고 판단했다.
+        is WizardContestView.Ready -> Box(modifier) { content(view.race) }
     }
 }
