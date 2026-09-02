@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "artifactId": "gh11-korea-20260901-2ff6731b181a-e8455015b02c",
+  "manifestSha256": "17fbee518da5a5e59d463fa3a09331c0c19c5ae0d7f6043fd8c60efaa236c69a",
+  "buildInputSha256": "2ff6731b181ac6f6c32efa9ad84129dbd75925c7c47e21156638fd8c57240c95"
+}
