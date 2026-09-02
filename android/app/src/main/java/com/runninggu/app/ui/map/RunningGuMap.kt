@@ -96,8 +96,11 @@ fun RunningGuMap(
                 else -> Unit
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
 
+        // **`start()` 가 `addObserver` 보다 먼저다.** 순서를 바꾸면 NPE 가 난다 —
+        // `addObserver` 는 지금 상태까지를 그 자리에서 따라잡히므로, 이미 RESUMED 인
+        // 화면에 들어오면 `ON_RESUME` 이 **동기로** 날아온다. 그러면 `start()` 가 아직
+        // 렌더러를 만들기 전에 `mapView.resume()` 이 불린다(#104 · AP-03).
         mapView.start(
             object : MapLifeCycleCallback() {
                 override fun onMapDestroy() {
@@ -119,6 +122,8 @@ fun RunningGuMap(
                 }
             },
         )
+
+        lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
