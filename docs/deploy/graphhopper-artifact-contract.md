@@ -62,16 +62,25 @@ DB 백업의 7일 PITR 보존과 graph artifact의 2세대 롤백 보존을 한 
 
 ## 3. builder 재현 계약
 
-PR 2는 저장소에 다음 진입점을 제공해야 한다. 경로와 이름을 바꾸면 이 문서를 같은 PR에서
-수정한다.
+PR 2는 저장소에 다음 진입점·고정 입력·공통 구현을 제공해야 한다. 경로와 이름을 바꾸면 이 문서를
+같은 PR에서 수정한다.
 
 ```text
 scripts/osm/import/
 ├── Dockerfile
+├── ImportConfigNormalizer.java
+├── artifact_contract.py
 ├── build-graph.sh
 ├── build-graph.ps1
+├── graphhopper-import.yml
+├── normalize-import-config.sh
 ├── package-graph.sh
+├── run-builder.sh
+├── test_artifact_contract.py
 └── verify-artifact.sh
+
+backend/graphhopper/
+└── graphhopper-server.yml
 
 backend/deploy/graphhopper/
 ├── install-graph-artifact.sh
@@ -188,7 +197,11 @@ gh11-korea-<PBF 기준일>-<build_input_sha256 앞 12자리>-<graph_files_sha256
 | archive SHA-256·size | manifest와 `SHA256SUMS` | 다운로드 직후 두 source 및 실제 파일을 비교 |
 | 생성 시각·생성 주체 | 없음 | 형식 검증 후 감사 기록만 남기며 합격값과 비교하지 않음 |
 
-import 영향 설정 hash에는 최소한 `datareader.file`의 논리 입력, `import.osm.*`,
+import 영향 설정의 정규화 hash 원본은 운영 builder 입력인
+`scripts/osm/import/graphhopper-import.yml`이다. 로컬 PoC 설정
+`backend/graphhopper/graphhopper.yml`과 운영 조회 설정
+`backend/graphhopper/graphhopper-server.yml`은 이 hash의 입력이 아니다. hash에는 최소한
+`datareader.file`의 논리 입력, `import.osm.*`,
 `graph.encoded_values`, `profiles`, `profiles_ch`, `profiles_lm`, `prepare.*`,
 `graph.elevation.*`, 별도 custom model 파일 내용이 포함된다. `server:`의 port·`bind_host`·logging은
 제외한다. allowlist key를 읽어 key 정렬·UTF-8·공백 없는 canonical JSON으로 만든 뒤 hash하며,
