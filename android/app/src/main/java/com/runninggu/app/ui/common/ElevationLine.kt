@@ -28,7 +28,8 @@ import kotlin.math.sin
  * 코스 고도 API가 아직 없으므로 [seed]로 결정적인 능선을 만든다 — 같은 대회는 항상 같은
  * 모양이라 목록을 다시 그려도 흔들리지 않는다.
  *
- * @param profile **0..1 로 정규화한** 높이. 미터 원값을 그대로 넘기면 안 된다 — `1f - v` 가
+ * @param profile **0..1 로 정규화한** 높이. 미터 원값을 그대로 넘기면 안 된다 —
+ *  [elevationUnitProfile] 로 옮겨서 넘긴다. `1f - v` 가
  *  음수가 되어 캔버스 밖에 그려진다. 실제 고도 배열을 쓰는 쪽에서 최소·최대로 나눠 넘긴다.
  */
 @Composable
@@ -100,3 +101,27 @@ private fun generateProfile(seed: Int, count: Int): List<Float> {
 }
 
 private fun fract(v: Float): Float = v - floor(v)
+
+/**
+ * 고도 배열(m)을 [ElevationLine] 이 받는 `0..1` 로 옮긴다.
+ *
+ * **코스 안에서의 상대 높이**만 그린다 — 해발이 아니라 오르내림을 보여주는 그래프라,
+ * 최저점을 0 최고점을 1 로 편다. 평지(최저=최고)는 나눗셈이 0 이 되므로 가운데 선으로 둔다.
+ *
+ * **[ElevationLine] 옆에 둔다.** 원래 `CourseDetailScreen` 안에만 있었고, S8 목록
+ * (`CourseScreen`)은 그런 게 있는 줄 모르고 미터 원값을 그대로 넘겼다 — 그래서 경로
+ * 카드의 그래프가 빈 박스로 남았다(#268). 계약을 지키는 함수는 계약을 만든 쪽에 있어야
+ * 다음 사람이 찾는다.
+ */
+fun elevationUnitProfile(profileM: List<Int>): List<Float>? {
+    // 두 점 미만이면 선이 아니다 — 그릴 것이 없으니 seed 로 만든 장식 곡선에 맡긴다
+    if (profileM.size < 2) return null
+    val min = profileM.min()
+    val max = profileM.max()
+    if (max == min) return List(profileM.size) { FLAT_LEVEL }
+    val span = (max - min).toFloat()
+    return profileM.map { (it - min) / span }
+}
+
+/** 오르내림이 없는 코스의 선 높이. 바닥에 붙이면 그래프가 없는 것처럼 보인다. */
+private const val FLAT_LEVEL = 0.5f

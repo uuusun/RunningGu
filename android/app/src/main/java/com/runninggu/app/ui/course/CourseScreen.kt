@@ -49,6 +49,7 @@ import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.ui.common.Attributions
 import com.runninggu.app.ui.common.ElevationLine
+import com.runninggu.app.ui.common.elevationUnitProfile
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -422,7 +423,10 @@ private fun NearbyRow(
                         ElevationLine(
                             seed = item.routeId.hashCode(),
                             closed = false,
-                            profile = item.elevationProfileM.map { it.toFloat() },
+                            // **미터 원값을 그대로 넘기면 안 된다** — `ElevationLine` 은
+                            // 0..1 을 받는다. 원값을 주면 `1f - v` 가 음수가 되어 캔버스
+                            // 밖에 그려지고 빈 박스만 남는다(#268)
+                            profile = elevationUnitProfile(item.elevationProfileM),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(28.dp),
