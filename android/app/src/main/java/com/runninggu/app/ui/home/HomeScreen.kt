@@ -29,10 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -91,7 +91,8 @@ fun HomeScreen(
     onRaceClick: (String) -> Unit = {},
     onStartWizard: (String) -> Unit = {},
     onOpenCalendar: () -> Unit = {},
-    onOpenCourses: () -> Unit = {},
+    onOpenCourseMap: () -> Unit = {},
+    onOpenCourseRegions: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -107,7 +108,8 @@ fun HomeScreen(
         onRaceClick = onRaceClick,
         onStartWizard = onStartWizard,
         onOpenCalendar = onOpenCalendar,
-        onOpenCourses = onOpenCourses,
+        onOpenCourseMap = onOpenCourseMap,
+        onOpenCourseRegions = onOpenCourseRegions,
         modifier = modifier,
     )
 }
@@ -123,7 +125,8 @@ private fun HomeContent(
     onRaceClick: (String) -> Unit,
     onStartWizard: (String) -> Unit,
     onOpenCalendar: () -> Unit,
-    onOpenCourses: () -> Unit,
+    onOpenCourseMap: () -> Unit,
+    onOpenCourseRegions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -159,8 +162,11 @@ private fun HomeContent(
             ) {
                 QuickActionRow(
                     onCalendar = onOpenCalendar,
-                    onMap = onOpenCourses,
-                    onCourse = onOpenCourses,
+                    // [지도]와 [코스]는 **같은 S8 의 다른 탭**이다 (SPEC §4.4-2 · 목업
+                    // v2 L967-968). 예전에는 둘 다 기본 탭으로 보내서, 다르게 생긴
+                    // 버튼 두 개가 같은 화면을 열었다
+                    onMap = onOpenCourseMap,
+                    onCourse = onOpenCourseRegions,
                     // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
                     onTour = {
                         scope.launch {
@@ -381,8 +387,11 @@ private fun QuickActionRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             QuickAction("달력", Icons.Filled.DateRange, onCalendar)
+            // 지도는 핀, 코스는 목록이다. 둘 다 핀(`LocationOn`·`Place`)이던 때는
+            // 아이콘만 봐서는 어디로 가는지 구분되지 않았다 — 실제로 가는 곳도 같았다.
+            // 목업의 `map`·`route` 심볼은 `material-icons-core` 48개에 없다
             QuickAction("지도", Icons.Filled.LocationOn, onMap)
-            QuickAction("코스", Icons.Filled.Place, onCourse)
+            QuickAction("코스", Icons.AutoMirrored.Filled.List, onCourse)
             QuickAction("관광", Icons.Filled.Face, onTour)
         }
     }

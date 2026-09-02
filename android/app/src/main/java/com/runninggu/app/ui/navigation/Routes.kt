@@ -60,6 +60,23 @@ object Routes {
     /** 캘린더 검색어 인자. 홈에서 검색 실행 시 넘어온다. (SPEC §4.4-1) */
     const val ARG_QUERY = "q"
 
+    /**
+     * S8 을 어느 탭으로 열지. (SPEC §4.4-2)
+     *
+     * 홈 퀵바의 **지도**와 **코스**가 같은 S8 의 다른 탭으로 간다 — 지도는 출발지 주변
+     * (지도가 그려지는 탭), 코스는 지역별 목록이다. 목업도 `goCoursesTab('near')` ·
+     * `goCoursesTab('region')` 으로 갈라 보낸다(목업 v2 L967-968).
+     *
+     * **좌표와 달리 route 에 실어도 되는 값이다.** S7 연계의 출발지는 백스택에 사용자
+     * 위치가 남지 않도록 [com.runninggu.app.ui.course.CourseLaunchContext] 로 넘기지만
+     * (매핑표 D-15 · AGENTS 8장), 탭 이름은 감출 것이 없다. 인자를 붙이지 않고 열면
+     * 기본 탭(출발지 주변)이다 — 하단 탭바와 다른 화면들이 그대로 `courses` 로 온다.
+     */
+    const val ARG_COURSE_TAB = "tab"
+
+    /** 지역별 탭 값. [ARG_COURSE_TAB] 이 이 값일 때만 갈아탄다. */
+    const val COURSE_TAB_REGION = "region"
+
     /** S3 대회 상세. 대회 id를 경로에 실어 넘긴다. (SPEC §2.2 · §4.6) */
     const val ARG_RACE_ID = "raceId"
     const val RACE_DETAIL_PATTERN = "raceDetail/{$ARG_RACE_ID}"
@@ -106,6 +123,12 @@ object Routes {
 
     /** 선택 인자를 포함한 캘린더 route 패턴. */
     const val CALENDAR_PATTERN = "$CALENDAR?$ARG_QUERY={$ARG_QUERY}"
+
+    /** 선택 인자를 포함한 러닝코스 route 패턴. */
+    const val COURSES_PATTERN = "$COURSES?$ARG_COURSE_TAB={$ARG_COURSE_TAB}"
+
+    /** 지역별 탭을 펴 둔 채로 S8 을 여는 route. 홈 퀵바의 [코스] 가 쓴다. */
+    fun coursesByRegion(): String = "$COURSES?$ARG_COURSE_TAB=$COURSE_TAB_REGION"
 
     /** 검색어를 실어 캘린더로 이동할 때 쓰는 route. */
     fun calendarWithQuery(query: String): String =
