@@ -10,6 +10,8 @@ import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.ui.SAVE_FAILED_OUTSIDE_CONTRACT
+import com.runninggu.app.ui.apiFailureLogger
+import com.runninggu.app.ui.diagnostic
 import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.ServiceLocator
@@ -231,6 +233,10 @@ class CourseViewModel(
                     else -> SaveCourseState.Done("이미 저장한 코스예요.")
                 }
             } catch (e: ApiException) {
+                // **화면에는 `title`, 로그에는 `status`·`code`·`traceId`** (이슈 #252 · #254 리뷰).
+                // 정상 problem+json 은 둘을 함께 주는데 화면 문구만 쓰면 `code` 가 앱에서
+                // 사라진다 — 서버 로그와 이어 볼 끈이 그것뿐이다
+                apiFailureLogger("코스 저장 실패 — ${e.diagnostic()}")
                 // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
                 if (e is ApiException.Http && e.needsLogin) SaveCourseState.NeedsLogin
                 else SaveCourseState.Done(message = e.saveMessage(), failed = true)
@@ -245,6 +251,7 @@ class CourseViewModel(
                 //
                 // 문구는 `saveMessage()` 의 어느 갈래와도 겹치지 않는다 — 겹치면 화면만
                 // 보고 서버 거절과 앱 안의 실패를 못 가린다
+                apiFailureLogger("코스 저장 실패 — 계약 밖: ${e.javaClass.simpleName}")
                 SaveCourseState.Done(message = SAVE_FAILED_OUTSIDE_CONTRACT, failed = true)
             }
             // 기다리는 사이 세션이 바뀌었으면 남의 결과다. 다만 두 가지를 지킨다.
@@ -497,10 +504,15 @@ internal fun ApiException.nearbyMessage(): String = when {
  * 면 "요청 값이 올바르지 않습니다." 가 온다(백엔드 `ErrorCode`). 앱이 한 문구로 뭉개면
  * `400` 과 `500` 이 화면에서 같아진다.
  *
- * **`title` 이 없으면 `code` 를 보여준다.** 프록시가 HTML 오류 페이지를 돌려주는 경우가
- * 있어(`httpErrorOf` KDoc) 그때는 `problem` 이 null 이다. 사용자에게 코드를 보이는 건
- * 좋지 않지만, **아무 단서 없이 뭉개는 것보다는 낫다** — 서버가 문구를 주는 한 사용자
- * 눈에는 안 띈다. 매핑표 §10 에 올릴 만한 자리면 그때 문구를 정하면 된다.
+ * **`title` 이 없으면 상태 코드를 보여준다.** 프록시가 HTML 오류 페이지를 돌려주는 경우가
+ * 있어(`httpErrorOf` KDoc) 그때는 `problem` 이 null 이다.
+ *
+ * 처음에는 `code` 를 보여줬는데 **그 자리에서는 늘 `UNKNOWN` 이라 아무 말도 아니었다** —
+ * `problem` 이 null 이면 `ApiErrorCode.from(null)` 이 `UNKNOWN` 을 주기 때문이다(#254
+ * 리뷰). 실제로 `httpErrorOf(502, "<html>…")` 를 태워 보면 `502 UNKNOWN` 이 나온다.
+ * 상태 코드는 그 자리에서도 뜻이 남는다.
+ *
+ * **`code` 는 화면이 아니라 로그로 간다** — [com.runninggu.app.ui.diagnostic] 참고.
  *
  * **`Malformed` 는 "다시 시도" 라고 하지 않는다.** 이건 **성공 응답을 못 읽은** 것이라
  * (`apiCall` 의 `SerializationException` 갈래) 서버에는 이미 저장돼 있을 수 있다.
@@ -508,7 +520,7 @@ internal fun ApiException.nearbyMessage(): String = when {
  */
 internal fun ApiException.saveMessage(): String = when (this) {
     is ApiException.Network -> "네트워크에 연결할 수 없어요."
-    is ApiException.Http -> userMessage ?: "저장하지 못했어요. (${code.name})"
+    is ApiException.Http -> userMessage ?: "저장하지 못했어요. (서버 응답 $status)"
     is ApiException.Malformed -> "저장은 됐을 수 있는데 결과를 확인하지 못했어요. 마이에서 확인해 주세요."
 }
 

@@ -29,6 +29,8 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.PoiRepository
 import com.runninggu.app.ui.SAVE_FAILED_OUTSIDE_CONTRACT
+import com.runninggu.app.ui.apiFailureLogger
+import com.runninggu.app.ui.diagnostic
 import com.runninggu.app.ui.course.saveMessage
 
 /**
@@ -166,6 +168,8 @@ class ResultViewModel(
                     },
                 )
             } catch (e: ApiException) {
+                // **화면에는 `title`, 로그에는 `status`·`code`·`traceId`** (이슈 #252 · #254 리뷰)
+                apiFailureLogger("동선 저장 실패 — ${e.diagnostic()}")
                 // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
                 if (e is ApiException.Http && e.needsLogin) SaveItineraryState.NeedsLogin
                 else SaveItineraryState.Failed(e.saveMessage())
@@ -181,6 +185,7 @@ class ResultViewModel(
                 // 예전에는 이 줄과 `saveMessage()` 의 기본 문구가 같아서, 화면만 보고는
                 // 서버가 거절한 것인지 앱 안에서 깨진 것인지 알 수 없었다. #245 를 사흘
                 // 동안 못 찾은 이유가 그것이다
+                apiFailureLogger("동선 저장 실패 — 계약 밖: ${e.javaClass.simpleName}")
                 SaveItineraryState.Failed(SAVE_FAILED_OUTSIDE_CONTRACT)
             }
             // **`NeedsLogin` 은 통과시킨다.** 세대가 오르는 흔한 이유가 바로 "세션이

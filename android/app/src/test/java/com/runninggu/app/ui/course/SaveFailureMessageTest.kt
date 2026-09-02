@@ -2,8 +2,9 @@ package com.runninggu.app.ui.course
 
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
-import com.runninggu.app.data.remote.ProblemDetail
+import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.ui.SAVE_FAILED_OUTSIDE_CONTRACT
+import com.runninggu.app.ui.diagnostic
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -26,27 +27,85 @@ import java.io.IOException
  */
 class SaveFailureMessageTest {
 
-    private fun http(code: ApiErrorCode, title: String?, status: Int = 400) = ApiException.Http(
-        status = status,
-        code = code,
-        problem = title?.let { ProblemDetail(title = it, code = code.name) },
-    )
+    /**
+     * **실제 변환 경로로 만든다.** `ApiException.Http` 를 손으로 조립하면 파서를 건너뛰어,
+     * 현실에 없는 조합(본문이 없는데 `code` 는 구체적)으로 테스트하게 된다(#254 리뷰).
+     */
+    private fun failure(status: Int, body: String?) = httpErrorOf(status, body)
+
+    /** 서버가 실제로 내려주는 problem+json. `title` 과 `code` 가 **함께** 온다. */
+    private fun problemJson(
+        code: String,
+        title: String,
+        traceId: String = "9f2c1ab34d",
+        errors: String = "",
+    ) = """
+        {"type":"about:blank","title":"$title","status":400,
+         "detail":"save rejected","instance":"/api/itineraries",
+         "code":"$code","traceId":"$traceId"$errors}
+    """.trimIndent()
 
     @Test
     fun `서버가 거절하면 서버가 준 문구를 낸다`() {
         // 왜 거절했는지는 서버만 안다. 백엔드 `ErrorCode` 가 code 마다 한국어 title 을 준다
-        val message = http(ApiErrorCode.VALIDATION_FAILED, "요청 값이 올바르지 않습니다.").saveMessage()
+        val failure = failure(400, problemJson("VALIDATION_FAILED", "요청 값이 올바르지 않습니다."))
 
-        assertEquals("요청 값이 올바르지 않습니다.", message)
+        assertEquals("요청 값이 올바르지 않습니다.", failure.saveMessage())
     }
 
     @Test
-    fun `서버 문구가 없으면 code 라도 남긴다`() {
-        // 프록시가 HTML 오류 페이지를 주면 `problem` 이 null 이다 (`httpErrorOf` KDoc).
-        // 사용자에게 코드를 보이는 건 좋지 않지만 아무 단서 없이 뭉개는 것보다 낫다
-        val message = http(ApiErrorCode.INTERNAL_SERVER_ERROR, null, status = 500).saveMessage()
+    fun `title 과 code 가 함께 와도 code 가 사라지지 않는다`() {
+        // **#254 리뷰의 본체다.** 정상 problem+json 은 둘을 함께 준다. 화면은 `title` 만
+        // 쓰므로, `code` 와 `traceId` 가 로그로 안 가면 앱에서 통째로 사라진다 —
+        // 서버 로그와 이어 볼 끈이 그것뿐이다
+        val failure = failure(
+            400,
+            problemJson(
+                code = "VALIDATION_FAILED",
+                title = "요청 값이 올바르지 않습니다.",
+                traceId = "9f2c1ab34d",
+                errors = ""","errors":[{"field":"days[0].blocks[0].blockType","reason":"must not be blank"}]""",
+            ),
+        )
 
-        assertEquals("저장하지 못했어요. (INTERNAL_SERVER_ERROR)", message)
+        assertEquals("요청 값이 올바르지 않습니다.", failure.saveMessage())
+
+        val diagnostic = failure.diagnostic()
+        assertTrue("code 가 없다: $diagnostic", diagnostic.contains("VALIDATION_FAILED"))
+        assertTrue("traceId 가 없다: $diagnostic", diagnostic.contains("9f2c1ab34d"))
+        assertTrue("status 가 없다: $diagnostic", diagnostic.contains("400"))
+        // #245 를 사흘 만에 찾게 한 그 필드다. 이름만 있으면 어디가 문제인지 바로 안다
+        assertTrue("필드 이름이 없다: $diagnostic", diagnostic.contains("blockType"))
+    }
+
+    @Test
+    fun `진단에 사용자가 넣은 값이 섞일 자리를 남기지 않는다`() {
+        // `detail` 과 `errors[].reason` 은 담지 않는다 — 서버가 거절 사유에 입력값을
+        // 되비출 여지가 있고, 로그에 남기면 안 되는 것 목록과 부딪힌다 (AGENTS 8장)
+        val diagnostic = failure(
+            400,
+            problemJson(
+                code = "VALIDATION_FAILED",
+                title = "요청 값이 올바르지 않습니다.",
+                errors = ""","errors":[{"field":"nickname","reason":"must not be blank"}]""",
+            ),
+        ).diagnostic()
+
+        assertTrue("detail 이 섞였다: $diagnostic", !diagnostic.contains("save rejected"))
+        assertTrue("reason 이 섞였다: $diagnostic", !diagnostic.contains("must not be blank"))
+    }
+
+    @Test
+    fun `problem 이 아닌 본문이면 상태 코드로 말한다`() {
+        // 프록시가 HTML 오류 페이지를 주면 `problem` 이 null 이고, 그때 `code` 는
+        // **늘 `UNKNOWN`** 이라 화면에 적어도 아무 말이 아니다 (#254 리뷰).
+        // 실제 변환 경로로 확인한다 — 손으로 조립하면 이 사실이 안 드러난다
+        val failure = failure(502, "<html><body>502 Bad Gateway</body></html>")
+
+        assertEquals(ApiErrorCode.UNKNOWN, failure.code)
+        assertEquals("저장하지 못했어요. (서버 응답 502)", failure.saveMessage())
+        // 화면에서 사라진 것은 로그에 남는다
+        assertTrue(failure.diagnostic().contains("502"))
     }
 
     @Test
@@ -70,8 +129,8 @@ class SaveFailureMessageTest {
     fun `계약 밖 실패는 서버 거절과 다른 문구다`() {
         // **이 테스트가 #252 의 본체다.** 넷이 서로 겹치면 화면만 보고 원인을 못 가린다
         val messages = listOf(
-            http(ApiErrorCode.VALIDATION_FAILED, "요청 값이 올바르지 않습니다.").saveMessage(),
-            http(ApiErrorCode.INTERNAL_SERVER_ERROR, null, status = 500).saveMessage(),
+            failure(400, problemJson("VALIDATION_FAILED", "요청 값이 올바르지 않습니다.")).saveMessage(),
+            failure(502, "<html>502</html>").saveMessage(),
             ApiException.Network(IOException("offline")).saveMessage(),
             ApiException.Malformed(RuntimeException("bad json")).saveMessage(),
             SAVE_FAILED_OUTSIDE_CONTRACT,
@@ -87,7 +146,7 @@ class SaveFailureMessageTest {
         assertNotEquals(
             "계약 밖 문구가 서버 거절 문구와 같아졌다",
             SAVE_FAILED_OUTSIDE_CONTRACT,
-            http(ApiErrorCode.INTERNAL_SERVER_ERROR, null, status = 500).saveMessage(),
+            failure(502, "<html>502</html>").saveMessage(),
         )
     }
 }

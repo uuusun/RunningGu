@@ -9,6 +9,7 @@ import com.runninggu.app.data.local.DataStoreSessionPersistence
 import com.runninggu.app.ui.auth.KakaoAuthAvailability
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.ui.apiFailureLogger
 import com.runninggu.app.ui.map.MapAvailability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,10 @@ class RunningGuApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 저장 실패의 개발자용 신원(status·code·traceId)을 logcat 으로 흘린다 (이슈 #252).
+        // 화면에는 서버가 준 `title` 만 뜨므로 `code` 는 여기서만 보인다.
+        // 단위 테스트는 Application 을 안 띄워 기본 no-op 그대로다
+        apiFailureLogger = { Log.w(TAG, it) }
         FavoriteStore.bind(appScope)
         // 저장된 세션을 올린다. 시작 화면이 SessionStore.restored 를 기다린다 (SPEC §2.2)
         SessionStore.bind(

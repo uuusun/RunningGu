@@ -14,7 +14,8 @@ import com.runninggu.app.data.repository.SavedCoursePage
 import com.runninggu.app.data.repository.SavedCourseRepository
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
-import com.runninggu.app.data.remote.ProblemDetail
+import com.runninggu.app.data.remote.httpErrorOf
+import com.runninggu.app.ui.apiFailureLogger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -197,12 +198,12 @@ class SaveCourseTest {
     @Test
     fun `서버가 거절하면 서버가 준 문구를 낸다`() = runTest(dispatcher) {
         // 예전에는 `Network` 가 아닌 모든 실패가 한 문구로 뭉개져, 화면만 보고는 서버가
-        // 거절한 것인지 앱 안에서 깨진 것인지 알 수 없었다 (이슈 #252)
+        // 거절한 것인지 앱 안에서 깨진 것인지 알 수 없었다 (이슈 #252).
+        // **실제 변환 경로로 만든다** — 손으로 조립하면 파서를 건너뛴다 (#254 리뷰)
         val saved = RecordingSavedCourses(
-            error = ApiException.Http(
-                status = 400,
-                code = ApiErrorCode.VALIDATION_FAILED,
-                problem = ProblemDetail(title = "요청 값이 올바르지 않습니다.", code = "VALIDATION_FAILED"),
+            error = httpErrorOf(
+                400,
+                """{"title":"요청 값이 올바르지 않습니다.","status":400,"code":"VALIDATION_FAILED"}""",
             ),
         )
         val viewModel = loaded(viewModel(saved = saved))
@@ -217,11 +218,11 @@ class SaveCourseTest {
     }
 
     @Test
-    fun `서버 문구가 없으면 code 라도 남긴다`() = runTest(dispatcher) {
-        // 프록시가 HTML 오류 페이지를 주면 `problem` 이 null 이다(`httpErrorOf`).
-        // 아무 단서 없이 뭉개는 것보다 코드가 보이는 편이 낫다
+    fun `problem 이 아닌 본문이면 상태 코드로 말한다`() = runTest(dispatcher) {
+        // 프록시가 HTML 오류 페이지를 주면 `problem` 이 null 이고 code 는 늘 UNKNOWN 이라,
+        // 화면에 code 를 적어도 아무 말이 아니다 (#254 리뷰)
         val saved = RecordingSavedCourses(
-            error = ApiException.Http(500, ApiErrorCode.INTERNAL_SERVER_ERROR, null),
+            error = httpErrorOf(502, "<html><body>502 Bad Gateway</body></html>"),
         )
         val viewModel = loaded(viewModel(saved = saved))
 
@@ -230,8 +231,42 @@ class SaveCourseTest {
         advanceUntilIdle()
 
         val done = viewModel.uiState.value.save as SaveCourseState.Done
-        assertEquals("저장하지 못했어요. (INTERNAL_SERVER_ERROR)", done.message)
+        assertEquals("저장하지 못했어요. (서버 응답 502)", done.message)
         assertTrue(done.failed)
+    }
+
+    @Test
+    fun `화면에 안 뜨는 code 를 로그가 받는다`() = runTest(dispatcher) {
+        // #252 완료 조건 2 — "서버가 code 를 줬으면 어디서든 보일 것".
+        // 화면은 `title` 만 쓰므로 `code`·`traceId` 는 여기서만 남는다 (#254 리뷰)
+        val lines = mutableListOf<String>()
+        val original = apiFailureLogger
+        apiFailureLogger = { lines += it }
+        try {
+            val saved = RecordingSavedCourses(
+                error = httpErrorOf(
+                    400,
+                    """{"title":"요청 값이 올바르지 않습니다.","status":400,
+                        "code":"VALIDATION_FAILED","traceId":"9f2c1ab34d"}""",
+                ),
+            )
+            val viewModel = loaded(viewModel(saved = saved))
+            viewModel.onItemSelect(route("r-1"))
+            viewModel.onSaveCourse()
+            advanceUntilIdle()
+
+            // 화면에는 서버 문구만
+            assertEquals(
+                "요청 값이 올바르지 않습니다.",
+                (viewModel.uiState.value.save as SaveCourseState.Done).message,
+            )
+            // 로그에는 신원이
+            val logged = lines.single()
+            assertTrue("code 가 없다: $logged", logged.contains("VALIDATION_FAILED"))
+            assertTrue("traceId 가 없다: $logged", logged.contains("9f2c1ab34d"))
+        } finally {
+            apiFailureLogger = original
+        }
     }
 
     @Test
