@@ -306,6 +306,13 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.okhttp)
+
+    // 축제·대회 사진. SPEC §7 권장 라이브러리 · §4.6 이 인근 축제 카드에 지정해 둔 것이다.
+    // 우리 서버가 준 URL 로 정적 이미지를 받을 뿐이라 AGENTS 2장-3(외부 API 직접 호출
+    // 금지)에 걸리지 않는다 — 키가 들어가지 않는다 (#247 민지님 승인)
+    implementation(libs.coil.compose)
+    // OkHttp 로 받는다. 앱에 이미 있는 것을 쓰고 Coil 이 자기 네트워크 스택을 또 들이지 않는다
+    implementation(libs.coil.network.okhttp)
     debugImplementation(libs.okhttp.logging.interceptor)
 
     testImplementation(libs.kotlinx.coroutines.test)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.runninggu.app.ui.model.FestivalSummary
 
 /**
@@ -160,10 +163,17 @@ private fun FestivalCard(
 }
 
 /**
- * 사진 자리. **지금은 placeholder 만 그린다.**
+ * 사진 자리. KTO `firstimage` 를 Coil 로 받는다. (명세 §4-1)
  *
- * 축제마다 다른 색을 준다 — 같은 색이면 카드가 한 덩어리로 보여서 좌우로 넘길 수 있다는
- * 것 자체가 안 보인다. `id` 해시로 고르므로 같은 축제는 늘 같은 색이다.
+ * **`imageUrl` 이 없거나 못 받으면 placeholder 가 남는다.** 명세가 nullable 로 두고
+ * *"없으면 앱이 기본 placeholder 를 표시한다"* 고 정해 둔 계약이다. 그래서 사진을
+ * [Box] 위에 얹기만 하고 바탕은 늘 깔아 둔다 — 로딩 중에도 회색 구멍이 안 생긴다.
+ *
+ * 축제마다 바탕색이 다른 것은, 사진이 없는 카드가 여러 장일 때 한 덩어리로 보이지 않게
+ * 하려는 것이다. `id` 해시로 고르므로 같은 축제는 늘 같은 색이다.
+ *
+ * **`crossfade` 를 켜지 않는다.** 캐러셀을 넘길 때마다 카드가 깜빡이면 스크롤이 더
+ * 어수선해 보인다. 캐시에서 바로 나오는 경우가 대부분이라 얻는 것도 적다.
  */
 @Composable
 private fun FestivalImage(festival: FestivalSummary, modifier: Modifier = Modifier) {
@@ -172,6 +182,16 @@ private fun FestivalImage(festival: FestivalSummary, modifier: Modifier = Modifi
             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .background(placeholderBrush(festival.id)),
     ) {
+        if (festival.imageUrl != null) {
+            AsyncImage(
+                model = festival.imageUrl,
+                // 사진 자체는 장식이다 — 축제 이름·기간을 카드가 이미 읽어 준다
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+
         if (festival.isOngoing) {
             Text(
                 text = "진행 중",
