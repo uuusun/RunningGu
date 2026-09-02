@@ -79,6 +79,11 @@ scripts/osm/import/
 ├── test_artifact_contract.py
 └── verify-artifact.sh
 
+scripts/osm/
+├── operational_load.py
+├── roundtrip_cases.py
+└── test_operational_load.py
+
 backend/graphhopper/
 └── graphhopper-server.yml
 
@@ -88,6 +93,12 @@ backend/deploy/graphhopper/
 
 backend/deploy/common/
 └── read-required-env.sh
+
+backend/deploy/validation/
+├── collect-runtime-metrics.sh
+├── summarize-runtime-metrics.py
+├── test-collect-runtime-metrics.sh
+└── test_summarize_runtime_metrics.py
 ```
 
 검증 로직을 세 군데에 복제하지 않는다. 책임 경계는 다음과 같다.
@@ -98,6 +109,9 @@ backend/deploy/common/
 | `install-graph-artifact.sh` | EC2 | release descriptor가 지정한 S3 세 파일을 임시 directory에 받고 `verify-artifact.sh`를 호출한 뒤 안전하게 압축 해제·재검증·최종 version directory rename까지만 수행 |
 | `verify-active-graph.sh` | EC2 | `current` 상대 symlink, checkout의 release descriptor, 활성 manifest와 graph tree를 대조하며 공통 hash 검증은 `verify-artifact.sh`에 위임. 다운로드·symlink 변경·서비스 시작은 하지 않음 |
 | `read-required-env.sh` | EC2 | dotenv를 shell로 실행하지 않고 요청받은 단일 `KEY=unquoted-value`를 정확히 한 줄만 읽음. 값 내부 `=`는 보존하고 줄 끝 CR은 제거하되 따옴표 값·누락·빈 값·중복 key는 실패하며 다른 secret을 자식 프로세스 환경으로 내보내지 않음 |
+| `operational_load.py` | EC2 | caps/all 고정 지점·거리에서 실제 백엔드와 같은 seed 0~15 직렬 batch를 고정 도착률·고정 동시성으로 실행. worker 포화는 대기 대신 missed start로 실패시키고 직접 요청·batch 지연시간을 기록 |
+| `collect-runtime-metrics.sh` | EC2 | 사전 지정한 시간 동안 host 메모리·swap counter·systemd 상태·container 자원을 5초 간격으로 비밀값 없이 기록. 부하 생성·합격 기준 변경·서비스 제어는 하지 않음 |
+| `summarize-runtime-metrics.py` | EC2 | 수집 표본 수·최저 `MemAvailable`·swap 증분·재시작·container OOM/상태를 계약 §9.2 기준으로 요약하고 기계 판정 가능한 항목이 모두 통과할 때만 종료 code 0 반환 |
 
 `runninggu-graphhopper-verify.service`와 GraphHopper 주 service의 `ExecStartPre`는 모두
 `verify-active-graph.sh`를 호출한다. systemd unit 안에 별도 hash 판정 로직을 넣지 않는다.
@@ -525,15 +539,20 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 ### 9.1 시험 시나리오
 
 1. cold boot와 GraphHopper 내부 스모크를 수행한다.
-2. `roundtrip.py --preset caps --zone all`을 한 번 실행해 warm-up한다.
-3. 같은 preset을 반복하는 30분 부하 중 수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
-4. 메모리·swap·GC·systemd `NRestarts`·container 상태를 5초 간격으로 기록하고,
-   verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각 기록한다.
+2. `roundtrip.py --preset caps --zone all`을 한 번 실행해 품질 회귀와 warm-up을 확인한다.
+3. 같은 caps/all 지점·거리와 실제 백엔드의 seed 0~15 직렬 호출을 사용하는
+   `operational_load.py`를 고정 batch 도착률·고정 동시성으로 30분 실행한다. worker 포화로 예정된
+   batch를 시작하지 못하면 기다려 부하를 낮추지 않고 missed start로 기록해 실패한다. 이 부하 중
+   수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
+4. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd `NRestarts`·container 상태를 5초
+   간격으로 기록한다. GraphHopper Docker local 로그와 Spring journal의 JVM unified GC 로그에서
+   readiness 이후 Full GC를 판정하고, verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각
+   기록한다.
 5. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
 6. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
 7. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
 
-8GiB와 4GiB 비교에서는 `roundtrip.py` 반복 횟수·요청률·동시성을 시험 전에 고정해 기록한다.
+8GiB와 4GiB 비교에서는 부하의 batch 도착률·동시성·seed 수를 시험 전에 고정해 기록한다.
 작은 instance에서 처리가 느려져 자동으로 요청 수가 줄어드는 closed-loop 결과를 같은 부하로
 간주하지 않는다.
 
@@ -545,7 +564,7 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 | 메모리 여유 | 모든 5초 표본에서 host `MemAvailable`이 전체 RAM의 20% 이상 |
 | swap | warm-up 뒤 `vmstat`의 swap-in·swap-out 지속 발생 0, swap 사용량 증가 없음 |
 | GC | readiness 이후 반복 Full GC 0건 |
-| GraphHopper 시간 | 모든 GraphHopper 직접 요청이 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. seed 16개 묶음의 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
+| GraphHopper 시간 | `operational_load.py`의 missed batch·실패 요청이 0이고 모든 GraphHopper 직접 요청이 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. 직접 요청과 seed 16개 묶음의 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
 | 회귀 | `--preset caps --zone all`의 기존 커버리지·거리·상승·차도·회전 상한 비회귀 |
 | 프로파일 | server graph에 `run`과 `run` LM만 존재하고 `foot` 없음 |
 | 백업 | 수동 full backup·pgBackRest check·WAL 감시 성공, 실패 알림 0건 |

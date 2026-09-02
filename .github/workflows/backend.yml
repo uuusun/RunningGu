@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "scripts/osm/**"
       - "SPEC.md"
       - "docs/files/런닝구_API_명세서.md"
       - "scripts/check_spec_drift.py"
@@ -12,6 +13,7 @@ on:
     branches: [develop, main]
     paths:
       - "backend/**"
+      - "scripts/osm/**"
       - "SPEC.md"
       - "docs/files/런닝구_API_명세서.md"
       - "scripts/check_spec_drift.py"
@@ -111,6 +113,17 @@ jobs:
             deploy/systemd/runninggu-postgres-wal-archive-check.service
           grep -q '^OnCalendar=\*:0/10$' \
             deploy/systemd/runninggu-postgres-wal-archive-check.timer
+
+      - name: Validate GraphHopper artifact and operational load tools
+        run: |
+          python3 ../scripts/osm/import/test_artifact_contract.py
+          python3 ../scripts/osm/test_operational_load.py
+          python3 deploy/validation/test_summarize_runtime_metrics.py
+          sh -n deploy/validation/collect-runtime-metrics.sh
+          sh -n deploy/validation/test-collect-runtime-metrics.sh
+          sh deploy/validation/test-collect-runtime-metrics.sh
+          grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' compose.ec2.yaml
+          grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' deploy/backend/start-backend.sh
 
       - name: Test and prepare EC2 artifact
         run: ./gradlew clean test ec2Artifact --console=plain

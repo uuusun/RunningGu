@@ -91,6 +91,32 @@ python <저장소>/scripts/osm/roundtrip.py --preset caps --zone all   # + 지�
 
 계단은 계약 상한이 아니라 **회귀 기준**(선택된 경로 ≤1%)으로만 확인한다.
 
+## 운영 사양 부하 시험
+
+`roundtrip.py --preset caps --zone all`은 품질 회귀와 warm-up에 사용한다. 8GiB·4GiB 사양 비교의
+30분 부하는 `operational_load.py`로 실행한다. 한 batch는 실제 백엔드와 같이 한 지점·한 목표
+거리에서 seed 16개를 직렬 호출하며, batch는 wall clock 기준 고정 도착률로 시작한다. 모든 worker가
+사용 중이면 기다려 부하를 낮추지 않고 `missedBatchStarts`로 기록해 시험을 실패시킨다.
+
+아래 `<고정_batch_rate>`와 `<고정_concurrency>`는 8GiB 시험 전에 팀 기록으로 확정하며 4GiB까지
+같은 값을 사용한다. 결과 파일은 요청 본문이나 응답 경로를 보관하지 않고 고정 시험 지점 이름,
+HTTP status, 요청·seed batch 소요시간만 JSON Lines로 남긴다.
+
+```bash
+python3 scripts/osm/operational_load.py \
+  --duration-seconds 1800 \
+  --batches-per-minute '<고정_batch_rate>' \
+  --concurrency '<고정_concurrency>' \
+  --seeds 16 \
+  --timeout-seconds 5 \
+  --output "/opt/runninggu-validation/<시험_ID>/graphhopper-load.jsonl"
+```
+
+종료 code 0과 마지막 `summary.passed=true`가 모두 필요하다. `missedBatchStarts`, 실패 요청,
+5초 초과 요청이 하나라도 있으면 종료 code 1이다. `requestSeconds`와 `seedBatchSeconds`의
+p50·p95·max를 운영 기록에 옮긴다. 단순 `while roundtrip.py ...` 반복은 느린 instance에서
+자동으로 요청량이 줄어드는 closed-loop라 사양 비교에 사용하지 않는다.
+
 ## 물길 인덱스 (골목 회피 · 하천 유도 검증용)
 
 `--preset water` 는 전국 물길 인덱스가 필요하다. PBF 에서 한 번 만들면 된다.

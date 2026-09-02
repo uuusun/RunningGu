@@ -15,4 +15,5 @@ printf '%s\n' "$BACKEND_XMX" | grep -Eq '^[0-9]+[kKmMgG]$' || {
 exec /usr/bin/java \
   "-Xms$BACKEND_XMS" \
   "-Xmx$BACKEND_XMX" \
+  '-Xlog:gc*:stdout:time,uptime,level,tags' \
   -jar /opt/runninggu/current/runninggu-server.jar

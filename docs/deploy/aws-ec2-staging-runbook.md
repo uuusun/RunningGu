@@ -99,7 +99,9 @@ sudo apt-get install -y \
   git \
   curl \
   unzip \
-  dnsutils
+  dnsutils \
+  python3 \
+  python3-requests
 ```
 
 Docker Engine과 Compose plugin은 Docker의 Ubuntu 공식 저장소 절차로 설치한다. 편의 설치
@@ -135,6 +137,7 @@ sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu/repository
 sudo install -d -o root -g runninggu -m 0750 /opt/runninggu/releases
 sudo install -d -o root -g root -m 0755 /opt/runninggu-data
 sudo install -d -o root -g root -m 0755 /opt/runninggu-data/graph
+sudo install -d -o root -g runninggu -m 0770 /opt/runninggu-validation
 sudo install -d -o root -g runninggu -m 0750 /etc/runninggu
 ```
 
@@ -682,6 +685,122 @@ sudo certbot renew --dry-run --run-deploy-hooks
 dry-run 성공과 deploy hook의 `nginx -t`, reload 성공을 모두 확인한다.
 
 ## 15. 외부 스모크·재부팅 검증
+
+### 15.1 고정 부하·5초 자원·GC 기록
+
+먼저 품질 회귀와 JVM warm-up을 한 번 수행한다. 이 결과는 30분 부하 시간에 포함하지 않는다.
+
+```bash
+cd /opt/runninggu/repository
+python3 scripts/osm/roundtrip.py --preset caps --zone all
+```
+
+시험 전에 batch 도착률과 동시성을 운영 기록에 확정한다. 이 값은 8GiB와 4GiB에서 같아야 하며
+아래 placeholder를 채우지 않은 명령은 실행하지 않는다. `operational_load.py`의 한 batch는 실제
+백엔드와 같이 한 지점·한 목표 거리의 seed 0~15를 직렬 호출한다. worker 포화로 예정 시각에
+batch를 시작하지 못하면 기다려 요청량을 줄이지 않고 missed start로 남겨 실패한다.
+
+첫 SSM session에서 5초 자원 수집기와 30분 부하를 실행한다.
+
+```bash
+RUN_ID='<8g-baseline-YYYYMMDD-HHMM>'
+BATCHES_PER_MINUTE='<사전_확정값>'
+CONCURRENCY='<사전_확정값>'
+
+sudo install -d -o root -g runninggu -m 0770 \
+  "/opt/runninggu-validation/$RUN_ID"
+
+TEST_STARTED_AT=$(date --iso-8601=seconds)
+printf '%s\n' "$TEST_STARTED_AT" \
+  | sudo tee "/opt/runninggu-validation/$RUN_ID/started-at.txt" >/dev/null
+
+sudo /bin/sh \
+  /opt/runninggu/repository/backend/deploy/validation/collect-runtime-metrics.sh \
+  --duration-seconds 1800 \
+  --interval-seconds 5 \
+  --output "/opt/runninggu-validation/$RUN_ID/runtime-metrics.log" &
+METRICS_PID=$!
+
+sudo -u runninggu python3 \
+  /opt/runninggu/repository/scripts/osm/operational_load.py \
+  --duration-seconds 1800 \
+  --batches-per-minute "$BATCHES_PER_MINUTE" \
+  --concurrency "$CONCURRENCY" \
+  --seeds 16 \
+  --timeout-seconds 5 \
+  --output "/opt/runninggu-validation/$RUN_ID/graphhopper-load.jsonl"
+LOAD_EXIT=$?
+
+wait "$METRICS_PID"
+test "$LOAD_EXIT" -eq 0
+tail -n 1 "/opt/runninggu-validation/$RUN_ID/graphhopper-load.jsonl"
+
+sudo python3 \
+  /opt/runninggu/repository/backend/deploy/validation/summarize-runtime-metrics.py \
+  --metrics "/opt/runninggu-validation/$RUN_ID/runtime-metrics.log" \
+  --output "/opt/runninggu-validation/$RUN_ID/runtime-summary.json"
+```
+
+둘째 SSM session에서는 부하 중 수동 full backup을 한 번 실행한다.
+
+```bash
+sudo systemctl start runninggu-postgres-backup.service
+sudo systemctl status --no-pager runninggu-postgres-backup.service
+```
+
+같은 session에서 부하 시작 후 서로 다른 세 시점(예: 5분·15분·25분)에 WAL 검사를 실행한다.
+
+```bash
+sudo systemctl start runninggu-postgres-wal-archive-check.service
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
+```
+
+부하 종료 뒤 `graphhopper-load.jsonl` 마지막 summary의 `passed=true`, `missedBatchStarts=0`,
+`failedDirectRequests=0`, `requestsOverTimeout=0`을 확인하고 직접 요청과 seed batch의 p50·p95·max를
+기록한다. `runtime-summary.json`도 `passed=true`여야 한다. 이 요약기는 표본 누락,
+`MemAvailable` 20% 미만, warm-up 뒤 swap counter·사용량 증가, systemd 재시작, container
+OOM·비정상 상태를 실패시킨다.
+
+GraphHopper와 Spring Boot는 운영 시작 명령에 JVM unified GC 로그를 켠다. 시험 시작 뒤 Full GC를
+다음 두 기준 저장소에서 확인한다. readiness 이후 반복 Full GC가 있으면 실패다.
+
+```bash
+TEST_STARTED_AT=$(sudo cat "/opt/runninggu-validation/$RUN_ID/started-at.txt")
+
+cd /opt/runninggu/repository/backend
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  logs --since "$TEST_STARTED_AT" graphhopper \
+  | grep -E 'Pause Full|Full GC' || true
+
+sudo journalctl \
+  -u runninggu-backend.service \
+  --since "$TEST_STARTED_AT" \
+  --no-pager \
+  | grep -E 'Pause Full|Full GC' || true
+```
+
+정상 부하 OOM 여부도 같은 시간 범위에서 확인한다.
+
+```bash
+sudo journalctl -k --since "$TEST_STARTED_AT" --no-pager \
+  | grep -Ei 'oom|out of memory|killed process' || true
+
+cd /opt/runninggu/repository/backend
+graphhopper_container=$(sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  ps -q graphhopper)
+sudo docker inspect "$graphhopper_container" \
+  --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}} Status={{.State.Status}}'
+```
+
+### 15.2 외부 스모크·재부팅
 
 외부 HTTPS에서 기존 API를 확인한다.
 

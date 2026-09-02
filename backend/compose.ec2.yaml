@@ -32,6 +32,8 @@ services:
     command:
       - -Xms${GRAPHHOPPER_XMS:?GRAPHHOPPER_XMS를 설정해야 합니다}
       - -Xmx${GRAPHHOPPER_XMX:?GRAPHHOPPER_XMX를 설정해야 합니다}
+      # §9.2의 readiness 이후 반복 Full GC 0건을 Docker local 로그에서 판정한다.
+      - -Xlog:gc*:stdout:time,uptime,level,tags
       - -jar
       - /opt/graphhopper/graphhopper-web.jar
       - server
