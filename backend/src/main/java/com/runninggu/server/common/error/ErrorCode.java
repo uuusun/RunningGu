@@ -13,6 +13,7 @@ public enum ErrorCode {
     CURRENT_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다."),
     INVALID_TRAVEL_PERIOD(HttpStatus.BAD_REQUEST, "여행 기간이 올바르지 않습니다."),
     AGREEMENT_REQUIRED(HttpStatus.BAD_REQUEST, "필수 약관 동의가 필요합니다."),
+    AGE_REQUIREMENT_NOT_MET(HttpStatus.BAD_REQUEST, "만 14세 이상만 가입할 수 있습니다."),
     INVALID_CODE(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."),
     CODE_EXPIRED(HttpStatus.BAD_REQUEST, "인증 코드가 만료됐습니다."),
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호를 확인해 주세요."),

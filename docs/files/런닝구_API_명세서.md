@@ -154,7 +154,7 @@ SMTP는 공급자 독립 Spring Mail로 연결하고 인증·STARTTLS를 필수�
 }
 ```
 `201` — 응답은 1-6 로그인과 동일(가입 완료 → "시작하기 → 홈" 목업 플로우에 맞춰 **자동 로그인** 🔧).
-검증: `ageOver14` 누락·자료형 오류는 `400 VALIDATION_FAILED`, `false`는 `400 AGE_REQUIREMENT_NOT_MET`("만 14세 이상만 가입할 수 있습니다.")이며 회원·동의·토큰을 만들기 전에 거부한다. 활성 인증 행이 있으나 미인증이면 `403 EMAIL_NOT_VERIFIED`, 인증 완료 후 가입 가능 기간 30분이 지났거나 인증 행이 없으면 `400 CODE_EXPIRED`다. 만료는 정리 작업 실행 여부와 관계없이 서버 요청 시각으로 판정한다. 비밀번호는 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒, 필수 동의 2종은 `400 AGREEMENT_REQUIRED`, 유니크 충돌은 `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`다.
+검증: `ageOver14` 누락·자료형 오류는 `400 VALIDATION_FAILED`, `false`는 `400 AGE_REQUIREMENT_NOT_MET`("만 14세 이상만 가입할 수 있습니다.")이며 회원·동의·토큰을 만들기 전에 거부한다. 요청 구조·자료형 검증을 통과한 뒤에는 `ageOver14=false`를 비밀번호·필수 약관·이메일 인증 상태·중복보다 먼저 거부한다. 활성 인증 행이 있으나 미인증이면 `403 EMAIL_NOT_VERIFIED`, 인증 완료 후 가입 가능 기간 30분이 지났거나 인증 행이 없으면 `400 CODE_EXPIRED`다. 만료는 정리 작업 실행 여부와 관계없이 서버 요청 시각으로 판정한다. 비밀번호는 8자 이상 영문+숫자이면서 UTF-8 기준 최대 72바이트(`400 INVALID_PASSWORD`) 🔒, 필수 동의 2종은 `400 AGREEMENT_REQUIRED`, 유니크 충돌은 `409 EMAIL_DUPLICATED / NICKNAME_DUPLICATED`다.
 
 앱은 가입 응답의 `CODE_EXPIRED`를 일반 실패 문구로 끝내지 않고 `mustResend=true`로 전환해
 A2에서 인증 코드 재발송·재인증을 안내한다. 같은 가입 버튼만 반복하게 두지 않으며 이 분기는
