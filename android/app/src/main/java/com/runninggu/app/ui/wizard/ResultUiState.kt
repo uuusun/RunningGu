@@ -70,6 +70,26 @@ data class ResultUiState(
      */
     val needsRegeneration: Boolean = false,
 ) {
+    /**
+     * 이 화면이 편집·저장을 여는가. **복원(S7-R)은 P0 에서 닫는다.** (이슈 #213)
+     *
+     * 저장된 동선을 고치는 것을 `POST /api/itineraries` 로 통째 저장하면 안 된다 —
+     * 서버가 저장할 때마다 **현재 canonical 대회로 RACE 블록을 재구성**하기 때문이다(§5-2).
+     * USER 장소 하나만 고쳐도 저장 snapshot 의 대회 정보가 말없이 바뀌고, 대회 날짜가
+     * 여행 기간 밖으로 옮겨졌으면 편집 저장 자체가 `INVALID_TRAVEL_PERIOD` 로 실패한다.
+     *
+     * 저장 후 편집은 §5-7~5-10 블록 API 로 가야 한다 — 저장 snapshot 의 RACE 를 지키면서
+     * USER 블록만 고치려고 둔 계약이다. 그건 연산 4개마다 낙관적 갱신·롤백 규칙을 정해야
+     * 하는 별도 작업이라 이 PR 에 담지 않았다.
+     *
+     * **화면에 리터럴로 두지 않고 상태에 둔 이유가 테스트다.** Composable 안의 `false` 는
+     * 단위 테스트가 못 본다 — 여기 있으면 규칙이 깨졌을 때 테스트가 잡는다.
+     *
+     * 블록마다 따로 있는 `ItineraryEdits.canEdit`(대회 블록은 못 고친다)와 다른 층이다.
+     * 이건 **화면 전체**가 편집을 여는가다.
+     */
+    val editingEnabled: Boolean get() = restoredItineraryId == null
+
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 
     val days: List<ItineraryDay>

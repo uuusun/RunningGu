@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -222,4 +223,30 @@ class RestoreItineraryTest {
         note = "",
         blocks = blocks.toList(),
     )
+
+    @Test
+    fun `복원하면 편집과 저장이 닫힌다`() = runTest(dispatcher) {
+        // **P0 에서 저장 후 편집은 블록 API 로 간다** (§5-7~5-10 · #213).
+        // `POST /api/itineraries` 로 통째 저장하면 서버가 현재 canonical 대회로 RACE 를
+        // 재구성해(§5-2), USER 장소 하나만 고쳐도 저장 snapshot 의 대회가 말없이 바뀐다.
+        // 그 길이 화면에 열려 있으면 안 된다
+        val viewModel = ResultViewModel(repository = FakeDetailRepository(detail = detail()))
+        viewModel.restore(42L)
+        advanceUntilIdle()
+
+        assertEquals(ResultUiState.Phase.CONTENT, viewModel.uiState.value.phase)
+        assertFalse(
+            "복원 화면에서 편집·저장이 열렸다 — A 경로로 통째 저장된다",
+            viewModel.uiState.value.editingEnabled,
+        )
+    }
+
+    @Test
+    fun `생성 경로는 편집과 저장을 그대로 연다`() {
+        // **반대쪽도 고정한다.** 안 그러면 `editingEnabled` 를 늘 false 로 만들어도 위
+        // 테스트가 통과한다 — 그러면 S7 에서 저장 자체를 못 하게 된다
+        assertTrue(ResultUiState().editingEnabled)
+        assertFalse(ResultUiState(restoredItineraryId = 42L).editingEnabled)
+    }
+
 }

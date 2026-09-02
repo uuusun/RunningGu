@@ -120,7 +120,7 @@ Compose 화면
 | S5 | 종목·취향 | wizard 그래프의 `taste` | 미구현 | 공유 WizardUiState | 불필요 | 플로우 확정 |
 | S6 | 숙소 선택 | wizard 그래프의 `stay` | 미구현 | 공유 WizardUiState | 불필요 | 플로우 확정 |
 | S7 | 새 동선 결과 | wizard 그래프의 `result` | 동일 | 생성 DTO | 저장 시 필요 | 현재 구현 · 생성·저장 서버 연결(§5-1 · §5-2). 게스트는 저장에서 modal |
-| S7-R | 저장 동선 상세 | `itinerary/{itineraryId}` 또는 result 재사용 | 미구현 | `itineraryId` | 필요 | **결정 필요** |
+| S7-R | 저장 동선 상세 | `itinerary/{itineraryId}` | 현재 구현 | `itineraryId` | 필요 | 🔒확정(#213) — route 를 따로 두고 **S7 본문(`ResultScreen`)을 재사용**한다. 위저드 그래프 밖이다: 복원은 S4 를 지나오지 않아 그래프 스코프 ViewModel 이 기본값으로 살아나면 `planConfirmed` 가드가 S4 로 되돌린다(#192). **P0 에서는 읽기 전용** — 저장 후 편집은 아래 4행(§5-7~5-10)이 맡고 아직 앱에 없다 |
 | S8 | 러닝코스 | `courses` | `courses` | 선택 출발지·목표 거리 | 선택 | 현재 구현 placeholder |
 | S8-D | 코스 상세 | `courseDetail/near`, `courseDetail/saved/{savedCourseId}` | 미구현 | sealed `CourseDetailKey` | 조회별 상이 | near snapshot은 SavedStateHandle/그래프 상태. `ran` route 는 없다(결정-56) |
 | S9 | 커뮤니티 | 만들지 않음 | 없음 | 해당 없음 | 해당 없음 | 범위 제외 |
@@ -293,6 +293,10 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체 |
 | 저장 후 삭제 | DELETE `.../blocks/{blockId}` | 204 | PostgreSQL | RACE는 409 |
 | 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409 |
+
+**저장 후 편집 4행은 서버에 구현돼 있고 앱은 아직 안 쓴다** 🔒확정(#213). S7-R 은 P0 에서 읽기 전용이다.
+
+한때 앱이 로컬 편집 후 `POST /api/itineraries` 로 통째 저장하는 안(A)을 검토했으나 **폐기했다.** 그 API 는 저장된 트리를 덮어쓰는 것이 아니라 **호출할 때마다 현재 canonical 대회로 RACE 블록을 재구성**한다(§5-2). 그래서 A 로 가면 USER 장소 하나만 고쳐도 저장 snapshot 의 대회 정보가 말없이 바뀌고, `needsRegeneration` → 명시적 재생성 → `PUT` 흐름을 우회하며, 대회 날짜가 여행 기간 밖으로 옮겨진 경우에는 단순 편집 저장도 `INVALID_TRAVEL_PERIOD` 로 실패한다. §5-7~5-10 은 **저장 snapshot 의 RACE 를 지키면서 USER 블록만 바꾸려고** 둔 계약이므로 저장 후 편집은 이쪽이 맞다.
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
 | Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
 | 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |

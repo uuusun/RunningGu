@@ -140,6 +140,7 @@ fun ResultScreen(
         onSaved = onSaved,
         onLoginRequest = onLoginRequest,
         viewModel = viewModel,
+        title = "추천 동선",
         modifier = modifier,
     ) { inner, content ->
         // 대회를 실는 동안의 로딩·오류를 가린다. 넘겨받는 `RaceSummary` 는 본문이 쓰지
@@ -183,6 +184,7 @@ fun SavedItineraryScreen(
         onSaved = onSaved,
         onLoginRequest = onLoginRequest,
         viewModel = viewModel,
+        title = "저장한 동선",
         modifier = modifier,
     ) { inner, content ->
         Box(inner) { content() }
@@ -213,6 +215,8 @@ private fun ResultContent(
     /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
     onLoginRequest: () -> Unit,
     viewModel: ResultViewModel,
+    /** 앱바 제목. 생성과 복원이 같은 본문을 쓰지만 사용자에게는 다른 화면이다. */
+    title: String,
     modifier: Modifier = Modifier,
     gate: @Composable (Modifier, @Composable () -> Unit) -> Unit,
 ) {
@@ -244,7 +248,7 @@ private fun ResultContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("추천 동선", style = MaterialTheme.typography.titleMedium) },
+                title = { Text(title, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
@@ -253,7 +257,8 @@ private fun ResultContent(
             )
         },
         bottomBar = {
-            if (state.phase == ResultUiState.Phase.CONTENT) {
+            // 복원 화면에는 저장 바가 없다 — 누를 수 있으면 A 경로로 통째 저장된다 (#213)
+            if (state.phase == ResultUiState.Phase.CONTENT && state.editingEnabled) {
                 SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
             }
         },
@@ -284,6 +289,7 @@ private fun ResultContent(
                     onCardClick = viewModel::onCardClick,
                     onCardCentered = viewModel::onCardCentered,
                     onOpenCourses = { onOpenCourses(state.courseTargetKm) },
+                    editingEnabled = state.editingEnabled,
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
                     onMoveBlock = viewModel::onMoveBlock,
@@ -309,6 +315,8 @@ private fun ResultContent(
 @Composable
 private fun Content(
     state: ResultUiState,
+    /** 화면 전체가 편집을 여는가. 복원(S7-R)은 P0 에서 false 다 (#213). */
+    editingEnabled: Boolean,
     onDaySelect: (Int) -> Unit,
     onPinClick: (String) -> Unit,
     onCardClick: (String) -> Unit,
@@ -438,7 +446,8 @@ private fun Content(
                     DayHeader(
                         label = day.label,
                         isEditing = state.isEditing,
-                        onToggleEdit = onToggleEdit,
+                        // 복원 화면에는 [편집] 이 없다 — 눌러 봐야 저장할 길이 없다 (#213)
+                        onToggleEdit = if (editingEnabled) onToggleEdit else null,
                     )
                     Spacer(Modifier.height(10.dp))
                 }
@@ -587,7 +596,7 @@ private fun RecoveryDot() {
 
 /** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
 @Composable
-private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: () -> Unit) {
+private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -598,8 +607,11 @@ private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: () -> Uni
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
-        TextButton(onClick = onToggleEdit) {
-            Text(if (isEditing) "완료" else "편집")
+        // 편집을 못 여는 화면에서는 버튼 자체를 안 그린다. 흐리게 두면 "왜 안 눌리지" 가 된다
+        onToggleEdit?.let {
+            TextButton(onClick = it) {
+                Text(if (isEditing) "완료" else "편집")
+            }
         }
     }
 }
