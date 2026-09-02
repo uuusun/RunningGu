@@ -69,6 +69,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PR의 임시 merge commit이 아니라 실제 배포·검증할 branch HEAD를 고정한다.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-java@v4
         with:
@@ -146,9 +149,11 @@ jobs:
           grep -q "status=NO_OP" ../reports/importer-smoke/second.log
 
       - name: Record artifact identity and checksums
+        env:
+          RELEASE_GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           printf 'git_commit=%s\nworkflow_run_id=%s\n' \
-            "$GITHUB_SHA" "$GITHUB_RUN_ID" \
+            "$RELEASE_GIT_COMMIT" "$GITHUB_RUN_ID" \
             > build/ec2-artifact/release-manifest.txt
           cd build/ec2-artifact
           sha256sum \
@@ -161,7 +166,7 @@ jobs:
       - name: Upload EC2 deployment artifact
         uses: actions/upload-artifact@v4
         with:
-          name: runninggu-backend-${{ github.sha }}
+          name: runninggu-backend-${{ github.event.pull_request.head.sha || github.sha }}
           path: backend/build/ec2-artifact/
           if-no-files-found: error
           retention-days: 30
