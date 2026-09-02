@@ -532,14 +532,11 @@ private fun FestivalSection(
     modifier: Modifier = Modifier,
 ) {
     FestivalSectionFrame(modifier = modifier) {
-        LazyRow(
+        // 사진 카드 캐러셀 — 탭하면 그 카드만 커진다 (#247 · §4.4-4)
+        FestivalCarousel(
+            festivals = festivals,
             contentPadding = PaddingValues(horizontal = ScreenPadding),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(festivals, key = { it.id }) { festival ->
-                FestivalCard(festival = festival)
-            }
-        }
+        )
         Spacer(Modifier.height(10.dp))
         // 출처 표기는 한국관광공사 고정. (NFR-7)
         Text(
@@ -551,46 +548,6 @@ private fun FestivalSection(
     }
 }
 
-@Composable
-private fun FestivalCard(
-    festival: FestivalSummary,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.width(200.dp),
-        shape = RoundedCornerShape(16.dp),
-        // 목업 .railcard — 흰 바탕 + 옅은 테두리 + 얕은 그림자.
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            if (festival.isOngoing) {
-                Text(
-                    text = "진행 중",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape)
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-                Spacer(Modifier.height(9.dp))
-            }
-            Text(
-                text = festival.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = festivalPeriodAndRegion(festival.period, festival.region),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 /** 지역을 제공하지 않은 축제는 구분점 없이 기간만 표시한다. (API 명세 §4-1) */
 internal fun festivalPeriodAndRegion(period: String, region: String): String =
