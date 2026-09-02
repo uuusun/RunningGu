@@ -9,7 +9,7 @@ import com.runninggu.app.data.repository.FestivalRepository
 import com.runninggu.app.ui.common.SectionState
 import com.runninggu.app.ui.model.toFestivalSummary
 import com.runninggu.app.ui.model.toRaceSummary
-import com.runninggu.app.ui.userMessageOrDefault
+import com.runninggu.app.ui.sectionMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,7 +65,7 @@ class HomeViewModel(
                     .map { it.contest.toRaceSummary() }
                     .toSectionState()
             } catch (e: ApiException) {
-                SectionState.Error(e.userMessageOrDefault())
+                SectionState.Error(e.sectionMessage())
             }
             _uiState.update { it.copy(closingSoon = next) }
         }
@@ -87,7 +87,7 @@ class HomeViewModel(
             val next = try {
                 festivalRepository.list().map { it.toFestivalSummary() }.toSectionState()
             } catch (e: ApiException) {
-                SectionState.Error(e.userMessageOrDefault())
+                SectionState.Error(e.sectionMessage())
             }
             _uiState.update { it.copy(festivals = next) }
         }
