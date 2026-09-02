@@ -63,3 +63,36 @@
 # 29개만 골라 남기면 그 안의 멤버가 사라지는 경우를 다시 쫓아야 하고, 그 실패는 전부
 # 실기기에서만 보인다.
 -keep class com.kakao.vectormap.** { *; }
+
+
+# ── 카카오 로그인 SDK 의 모델을 남긴다 ──────────────────────────────────
+#
+# **지도만 막고 로그인은 뚫려 있었다.** 위 vectormap 규칙을 넣을 때 `com.kakao.sdk.**`
+# (로그인)은 consumer rule 이 있을 것으로 보고 넘어갔는데, 릴리스 설치본을 에뮬레이터에
+# 올리자 **앱이 뜨자마자 죽었다.**
+#
+#   FATAL EXCEPTION: zz1 Dispatcher
+#   java.lang.Error: java.lang.NoSuchFieldException: TokenNotFound
+#       at java.lang.Class.getField(Class.java:1604)
+#       at ow.<init>(r8-map-id-…:7)
+#
+# `mapping.txt` 로 되돌리면 이렇다.
+#
+#   ow  → com.kakao.sdk.common.model.ClientError
+#   c1  → com.kakao.sdk.auth.network.AccessTokenInterceptor
+#   rb1 → com.kakao.sdk.network.KakaoAgentInterceptor
+#
+# 토큰이 없을 때 `AccessTokenInterceptor` 가 `ClientError` 를 만드는데, 그 생성자가
+# **enum 상수를 이름 문자열로 찾는다**(`ClientErrorCause.TokenNotFound`). R8 이 상수
+# 이름을 바꾸면 `getField` 가 못 찾는다.
+#
+# 우리 코드도 이 enum 을 직접 본다 — `KakaoAuthClient` 가 `ClientErrorCause.Cancelled`
+# 로 "사용자가 취소한 것" 과 "실패한 것" 을 가른다. 그 분기가 통째로 죽는 자리다.
+#
+# **enum 상수는 필드다.** 그래서 클래스만 남기는 것으로는 부족하고 필드 이름을 지켜야 한다.
+# 카카오 공식 가이드가 요구하는 범위(`**.model.*`)를 그대로 쓴다 — 어느 모델이 리플렉션을
+# 쓰는지 우리가 하나씩 가려낼 수 없고, 틀리면 **릴리스에서만** 죽는다.
+-keep class com.kakao.sdk.**.model.* { <fields>; }
+
+# 카카오 SDK 는 Gson 으로 응답을 읽는다. TypeAdapter 구현이 지워지면 파싱이 죽는다.
+-keep class * extends com.google.gson.TypeAdapter
