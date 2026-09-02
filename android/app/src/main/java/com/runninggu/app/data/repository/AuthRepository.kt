@@ -4,6 +4,7 @@ import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.data.remote.ApiException
 import kotlinx.coroutines.delay
 
@@ -87,6 +88,7 @@ interface AuthRepository {
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession>
 
     /**
@@ -114,6 +116,7 @@ interface AuthRepository {
         kakaoAccessToken: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> =
         throw UnsupportedOperationException("이 구현은 카카오 가입을 하지 않는다 (§1-8)")
 
@@ -221,9 +224,12 @@ object FakeAuthRepository : AuthRepository {
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> {
         delay(NETWORK_DELAY_MS)
         offlineOrNull<AuthSession>(email)?.let { return it }
+        // 스텁도 서버와 같은 자리에서 막는다 — 가짜로 돌릴 때만 통과하면 화면이 거짓말을 한다
+        if (!ageOver14) return Result.failure(httpErrorOf(400, null))
         return Result.success(fakeSession(email, nickname, marketingAgreed))
     }
 

@@ -389,6 +389,7 @@ private class FakeSignupRepository(private val signupFailure: Throwable) : AuthR
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = Result.failure(signupFailure)
 
     override suspend fun sendSignupCode(email: String): Result<Unit> {
@@ -405,6 +406,7 @@ private class FakeSignupRepository(private val signupFailure: Throwable) : AuthR
         kakaoAccessToken: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = unused()
 
     override suspend fun kakaoLogin(kakaoAccessToken: String): Result<KakaoLoginOutcome> = unused()

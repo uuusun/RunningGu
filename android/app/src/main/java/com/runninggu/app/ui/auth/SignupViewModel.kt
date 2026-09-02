@@ -73,6 +73,15 @@ data class SignupUiState(
     val privacyAgreed: Boolean = false,
     val marketingAgreed: Boolean = false,
 
+    /**
+     * 만 14세 이상 확인. **전체 동의와 별개다** (SPEC §4.2-1 · 결정-58).
+     *
+     * [allAgreed] 에 넣지 않는다 — 명세가 "전체 동의로 자동 선택하지 않는다" 고 못
+     * 박았다. 반면 [canProceedAgree] 에는 넣는다. 필수 항목이라 이걸 안 켜면 다음
+     * 단계로 못 간다.
+     */
+    val ageOver14: Boolean = false,
+
     // 2단계 — 정보 입력
     val email: String = "",
     val password: String = "",
@@ -114,7 +123,7 @@ data class SignupUiState(
     val allAgreed: Boolean get() = tosAgreed && privacyAgreed && marketingAgreed
 
     /** 필수 2종 동의. 미동의면 진행 불가(SPEC §4.2-1). */
-    val canProceedAgree: Boolean get() = tosAgreed && privacyAgreed
+    val canProceedAgree: Boolean get() = tosAgreed && privacyAgreed && ageOver14
 
     val isEmailValid: Boolean get() = AuthValidation.isEmailValid(email)
     val isPasswordValid: Boolean get() = passwordIssue == null
@@ -182,6 +191,9 @@ class SignupViewModel(
     fun onToggleTos() = _uiState.update { it.copy(tosAgreed = !it.tosAgreed) }
     fun onTogglePrivacy() = _uiState.update { it.copy(privacyAgreed = !it.privacyAgreed) }
     fun onToggleMarketing() = _uiState.update { it.copy(marketingAgreed = !it.marketingAgreed) }
+
+    /** 만 14세 이상 확인. [onToggleAll] 이 건드리지 않는다 (SPEC §4.2-1). */
+    fun onToggleAgeOver14() = _uiState.update { it.copy(ageOver14 = !it.ageOver14) }
 
     fun onAgreeNext() {
         if (_uiState.value.canProceedAgree) {
@@ -351,6 +363,7 @@ class SignupViewModel(
                 password = state.password,
                 nickname = state.nickname.trim(),
                 marketingAgreed = state.marketingAgreed,
+                ageOver14 = state.ageOver14,
             ).fold(
                 onSuccess = { session ->
                     // 201 = 자동 로그인 (명세 §1-5). 응답의 user 를 그대로 쓴다.
@@ -454,6 +467,7 @@ class SignupViewModel(
                 kakaoAccessToken = token,
                 nickname = state.nickname.trim(),
                 marketingAgreed = state.marketingAgreed,
+                ageOver14 = state.ageOver14,
             ).fold(
                 onSuccess = { session ->
                     SessionStore.signIn(
