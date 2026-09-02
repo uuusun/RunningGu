@@ -187,33 +187,42 @@ fun RunningGuNavHost(
                 navArgument(Routes.ARG_ITINERARY_ID) { type = NavType.LongType },
             ),
         ) { entry ->
-            val itineraryId = entry.arguments?.getLong(Routes.ARG_ITINERARY_ID) ?: 0L
-            SavedItineraryScreen(
-                itineraryId = itineraryId,
-                onBack = { navController.popBackStack() },
-                // 저장된 동선의 조건을 바꾸는 것은 **새로 만드는 것**이다. 대회를 다시
-                // 골라야 하므로 캘린더로 보낸다 — 위저드는 raceId 로 시작한다
-                onChangeConditions = { navController.navigate(Routes.CALENDAR) },
-                onOpenCourses = { targetKm ->
-                    navController.navigate(Routes.COURSES)
-                    CourseLaunchContext.set(
-                        navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
-                        stay = null,
-                        targetKm = targetKm,
-                    )
-                },
-                onSaved = { message ->
-                    // 같은 키면 교체다(§5-2) — 저장하면 이 동선이 갱신되고 마이로 돌아간다
-                    navController.popBackStack()
-                    ItinerarySavedNotice.set(
-                        navController.getBackStackEntry(Routes.MY).savedStateHandle,
-                        message,
-                    )
-                },
-                onLoginRequest = { navController.navigate(Routes.authGraph(Routes.RETURN_BACK)) },
-                viewModel = viewModel(),
-                modifier = Modifier.statusBarsPadding(),
-            )
+            // **인자가 없으면 아무 데도 안 보낸다** (#257 리뷰). `LongType` 필수 인자라
+            // null 이 될 일은 없지만, 기본값 `0L` 로 떨어뜨리면 `GET /api/itineraries/0`
+            // 을 불러 404 를 받는다 — 화면에는 "동선을 못 불러왔다" 로 보이고 진짜 원인
+            // (인자 유실)은 어디에도 안 남는다. 위 `onItineraryClick` 의 `toLongOrNull()`
+            // 과 같은 결이다
+            val itineraryId = entry.arguments?.getLong(Routes.ARG_ITINERARY_ID)
+            if (itineraryId != null) {
+                SavedItineraryScreen(
+                    itineraryId = itineraryId,
+                    onBack = { navController.popBackStack() },
+                    // 저장된 동선의 조건을 바꾸는 것은 **새로 만드는 것**이다. 대회를 다시
+                    // 골라야 하므로 캘린더로 보낸다 — 위저드는 raceId 로 시작한다
+                    onChangeConditions = { navController.navigate(Routes.CALENDAR) },
+                    onOpenCourses = { targetKm ->
+                        navController.navigate(Routes.COURSES)
+                        CourseLaunchContext.set(
+                            navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
+                            stay = null,
+                            targetKm = targetKm,
+                        )
+                    },
+                    onSaved = { message ->
+                        // 같은 키면 교체다(§5-2) — 저장하면 이 동선이 갱신되고 마이로 돌아간다
+                        navController.popBackStack()
+                        ItinerarySavedNotice.set(
+                            navController.getBackStackEntry(Routes.MY).savedStateHandle,
+                            message,
+                        )
+                    },
+                    onLoginRequest = {
+                        navController.navigate(Routes.authGraph(Routes.RETURN_BACK))
+                    },
+                    viewModel = viewModel(),
+                    modifier = Modifier.statusBarsPadding(),
+                )
+            }
         }
 
         // 계정 관리 — 마이 설정에서 여는 별도 화면 (SPEC §4.13 · D-22).
