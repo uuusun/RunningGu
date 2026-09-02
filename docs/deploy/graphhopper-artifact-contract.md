@@ -263,6 +263,9 @@ artifact 계약은 EC2 staging·production 배포에 적용한다. 로컬 기능
 있다. 이 경로는 빠른 개발 편의를 위한 것이며 다음 제한을 둔다.
 
 - 로컬 `latest` PBF와 자동 import 결과를 운영 artifact로 승격하지 않는다.
+- 비교용 `foot`을 포함한 `backend/graphhopper/graphhopper.yml`은 로컬 개발·PoC 전용으로 유지할 수
+  있다. 운영 builder·server 설정은 이 파일을 import 입력으로 사용하지 않고 `run` profile과 `run`
+  LM만 포함한다.
 - 로컬 graph directory는 `/data/graph-cache`, 운영 graph는 `/data/graph/current`를 사용하고
   Compose override와 server 설정을 분리한다.
 - 로컬 named volume의 존재나 로컬 기동 성공을 builder 재현·EC2 합격 근거로 사용하지 않는다.
@@ -543,4 +546,5 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 | PR 2 | builder·manifest·설치·검증·GraphHopper systemd 단일 소유·Docker local 로그 단일화·exit 0/137 재시작·로컬/EC2 Compose 분리·구 named volume 전환·heap 환경변수화·Spring 재시작 정책 구현 | 검증 시간 포함 8GiB §9.2 정상 부하와 §9.3 별도 안전 시험 통과 |
 | PR 3(선택) | LM 제거 실험 | 독립 benchmark에서 시간·커버리지 계약 통과할 때만 채택 |
 
-LM 제거는 PR 2에 넣지 않는다. `foot` 제거와 `run` LM 유지는 PR 2 범위다.
+`run` LM 제거는 PR 2에 넣지 않는다. 운영 builder·server 설정에서 `foot`을 제외하고 `run` LM을
+유지하는 것은 PR 2 범위다. §5.1의 로컬 개발·PoC 비교 설정에서 `foot`을 제거한다는 뜻이 아니다.

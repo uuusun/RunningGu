@@ -85,9 +85,9 @@ Content-Type은 `application/problem+json`. Bean Validation 오류는 `errors[]`
 | 정책 | 값 |
 |---|---|
 | 접근 | Spring Boot만 내부 HTTP로 호출, GraphHopper 포트 외부 비공개 |
-| 타임아웃 | 경로 후보 16건 전체 3초 🔧, 초과 시 `OSM` degraded 처리 |
+| 타임아웃 | GraphHopper 직접 요청 read timeout 5초, 초과 시 `OSM` degraded 처리. seed 16개 묶음은 p50·p95·max를 기록하되 별도 총 3초 상한을 두지 않음 |
 | 기동 | readiness 완료 전 OSM 생성 비활성, Spring Boot 기동과 분리 |
-| 그래프 | 고정 GraphHopper+대한민국 PBF로 배포 단계에서 생성, 그래프 약 514MB+SRTM 캐시를 영속 볼륨에서 재사용 |
+| 그래프 | 저장소 고정 builder가 날짜 고정 대한민국 PBF+SRTM으로 버전별 graph artifact를 생성. EC2는 검증된 graph만 설치·재사용하고 PBF·SRTM cache는 설치·mount하지 않음 |
 | 품질 | 거리 75~125%·상승 <50m/km·실거리 가중 차도 ≤10%·실제 방향 전환 ≤6회/km를 모두 만족한 후보만 허용, 상한 완화 금지 |
 | 장애 | 다른 경로·장소가 있으면 `200`+`degradedSources`, 표시 항목도 없으면 `503 COURSE_SOURCES_UNAVAILABLE` |
 | 저장 | OSM 원천 그래프는 DB에 복제하지 않고 생성 경로 snapshot만 사용자 저장 시 PostgreSQL에 보관 |
@@ -930,7 +930,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 9. KorService1 금지 — HTTP 500(폐기).
 10. 키 격리 🔒 — KTO·카카오 REST 키는 서버 환경변수 전용, 저장소·앱 포함 금지(NFR-14).
 11. GraphHopper `round_trip`은 목표보다 길게 나올 수 있다 — 목표의 0.78배 요청+seed 16개 후보 필터를 생략하지 않는다(SPEC §5.8).
-12. OSM way에는 고도가 거의 없다 — `graph.elevation.provider=srtm`과 영속 SRTM 캐시 없이 난이도를 계산하지 않는다.
+12. OSM way에는 고도가 거의 없다 — builder가 `graph.elevation.provider=srtm`으로 SRTM 고도를 포함한 3D graph artifact를 만들고, EC2 server는 SRTM cache 없이 검증된 artifact를 읽는다.
 13. 기본 `foot` 프로파일은 큰 도로 보도를 우선할 수 있다 — P0 운영은 러닝 가중치 `run` 프로파일만 사용한다.
 14. OSM/GraphHopper는 서버 내부 원천이다 — 앱 직호출·OSM 그래프 번들을 금지하고 `© OpenStreetMap contributors`를 응답 출처에 포함한다.
 15. `road_class` path detail의 `fromRef/toRef`는 응답 좌표 인덱스다 — `toRef-fromRef`를 차도 거리로 계산하지 말고 각 구간의 폴리라인 실거리를 합산한다. AP-25 착수 전 PR #32 `--preset filter`를 이 방식으로 재실행한다.

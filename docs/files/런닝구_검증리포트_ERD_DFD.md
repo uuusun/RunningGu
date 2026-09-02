@@ -74,7 +74,7 @@
 | 축제·숙소·POI·걷기 스팟 | Caffeine TTL | 외부 응답을 영구 마스터로 복제하지 않음 |
 | 두루누비 최신 메타 | Caffeine 24시간 + 마지막 성공 fallback | 쿼터·장애 격리 |
 | 큐레이션 GPX | 버전 관리 서버 리소스 + 앱 축약 번들 | 경로·고도·라이선스 메타의 기준 |
-| OSM 그래프·SRTM | GraphHopper 영속 볼륨 | 배포 단계 생성 후 재기동 시 재사용 |
+| OSM graph artifact | EC2 version directory + `current` 상대 symlink | 외부 builder가 PBF·SRTM으로 생성하고 EC2 server가 검증 후 재사용 |
 | OSM 생성 경로 | 요청 중 임시 DTO | 코스 마스터·지역 목록에 적재하지 않음 |
 
 OSM 생성 결과는 사용자가 저장했을 때만 `SAVED_COURSE` snapshot으로 PostgreSQL에 남는다. 별도 `OSM_ROUTE`·`COURSE_MASTER` 테이블을 이번 ERD에 추가하지 않는다.
