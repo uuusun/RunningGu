@@ -36,7 +36,7 @@ end
 
 subgraph ROUTING["서버 내부 라우팅 — 외부 포트 비공개"]
   GH["GraphHopper 별도 프로세스<br/>run 프로파일 · seed 16개<br/>거리·상승·차도·회전 상한"]
-  OSMGRAPH[("대한민국 OSM 그래프 + SRTM<br/>배포 단계 생성 · 영속 볼륨 재사용")]
+  OSMGRAPH[("대한민국 OSM 3D graph artifact<br/>외부 builder 생성 · EC2 검증/재사용")]
 end
 
 subgraph LIVEEXT["실시간 외부 시스템"]

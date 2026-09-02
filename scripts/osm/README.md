@@ -4,7 +4,10 @@
 8km 내 0건). OpenStreetMap 보행로를 GraphHopper 로 라우팅해 코스를 **생성**할 수 있는지 검증한
 기록이다. 결과는 [`docs/osm-routing-poc.md`](../../docs/osm-routing-poc.md).
 
-**아직 도입 결정 전이다.** 이 폴더는 재현용이며 앱·서버 빌드와 무관하다.
+GraphHopper 도입은 SPEC 결정-42로 확정됐지만, 이 폴더의 명령과 `graphhopper.yml`은 PoC 재현·비교
+전용이다. 운영 builder·manifest·배포 계약은
+[`docs/deploy/graphhopper-artifact-contract.md`](../../docs/deploy/graphhopper-artifact-contract.md)를
+따르며 PR 2 구현 전에는 이 명령으로 운영 artifact를 만들지 않는다.
 
 ## 준비물
 
@@ -36,6 +39,8 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)      # Windows 는 JDK 21 경�
 python <저장소>/scripts/osm/roundtrip.py --preset metro
 ```
 
+`latest` PBF는 PoC 편의용이다. 운영 builder는 날짜가 고정된 PBF URL과 SHA-256만 입력으로 받는다.
+
 ## 계약 상한 회귀 (AP-25 테스트 기준)
 
 `--preset caps` 는 SPEC §5.8 품질 상한 네 개를 그대로 적용해 커버리지와 **탈락 사유**를 낸다.
@@ -59,7 +64,7 @@ python <저장소>/scripts/osm/roundtrip.py --preset water --waterways data/wate
 ```
 
 산출물은 10.8MB(물길 16,736개 · 44,442km)이고 빌드에 18~70초 걸린다. 조회는 격자라
-지점당 1.5ms 다. 운영에서는 그래프 캐시와 같이 배포 단계에서 만들어 영속 볼륨에 둔다.
+지점당 1.5ms 다. 운영에 채택하면 EC2에서 만들지 않고 builder 입력·manifest·artifact에 포함한다.
 
 ## 프로파일 두 개
 

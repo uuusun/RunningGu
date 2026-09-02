@@ -19,7 +19,7 @@ Compose 화면
      ├─ PostgreSQL 서버 SSOT
      ├─ 한국관광공사·두루누비 REST API
      ├─ 카카오 REST API
-     └─ GraphHopper 내부 프로세스 ← 대한민국 OSM PBF + SRTM
+     └─ GraphHopper server-only 내부 프로세스 ← 검증된 버전별 graph artifact
 
 기기 내부
   ├─ DataStore: 세션 토큰·게스트 여부·설정
@@ -52,7 +52,7 @@ Compose 화면
 | `KTO_LIVE` | 한국관광공사 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
 | `KAKAO_LIVE` | 카카오 REST API를 런타임에 서버가 프록시 | 원천 영구 저장 없음, TTL 캐시만 |
 | `KTO_SYNC_GPX` | 두루누비 최신 메타 동기화 + GPX 경로 결합 | 버전 번들에서 시작한 서버 메모리 불변 snapshot. 성공한 전체 동기화만 원자 교체, PostgreSQL 복제 없음 |
-| `OSM_GRAPH` | 서버 내부 GraphHopper가 OSM+SRTM으로 순환 경로 생성 | 원천 그래프는 영속 캐시, 응답은 임시 DTO·사용자 저장 시 snapshot만 보관 |
+| `OSM_GRAPH` | 서버 내부 GraphHopper가 외부 builder의 OSM+SRTM 기반 graph artifact로 순환 경로 생성 | 원천 graph는 EC2 version directory artifact, 응답은 임시 DTO·사용자 저장 시 snapshot만 보관 |
 | `LOCAL_STATE` | 화면·ViewModel 메모리 상태 | 저장하지 않음 |
 | `LOCAL_CACHE` | Room·DataStore | 제한적 로컬 보관 |
 | `ANDROID_SDK` | 지도·카카오 로그인 등 Android SDK | 기능별 최소 상태만 보관 |. **위치 SDK 는 없다**(결정-56)
@@ -95,7 +95,7 @@ Compose 화면
 | S6 숙소 | 주변 숙소·검색 결과 | POI DTO | `KAKAO_LIVE`, KTO 숙박 폴백 | 영구 저장 없음 | 서버 5분 캐시 |
 | S7 새 동선 | recovery, days, blocks | 생성 DTO | 서버 규칙 엔진 + KTO/카카오 POI | 저장 전 없음 | Result ViewModel 임시 DTO |
 | S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | Room 읽기 캐시 |
-| S8 출발지 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 GraphHopper 그래프 캐시, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
+| S8 출발지 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 검증된 GraphHopper graph artifact, OSM 응답은 저장 전 임시 | GPX 축약 폴백·Room·서버 TTL 캐시 |
 | S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 버전 번들에서 시작해 최신 전체 KTO 메타를 결합한 서버 메모리 snapshot | Room 읽기 캐시 |
 | S10 보관함 | 동선·저장 코스·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | Room 읽기 캐시 |
 | M1 계정 관리 | 프로필·약관·가입 로그인 방식 | JSON DTO | `SERVER_DB` | USER·IDENTITY(1:1)·AGREEMENT | 세션만 DataStore |
@@ -487,7 +487,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | DB-05 / SPEC 결정-46 | 승인된 full snapshot에서 source 2회 연속 누락 시 비활성. 실패·부분 snapshot은 미반영, 재등장은 즉시 복구, canonical은 활성 source가 없을 때만 비활성. 공개 탐색 제외·참조 상세 유지 |
 | SPEC 결정-48 | 다중 원천은 정상 수용. 최대 source 겹침 동률 또는 기존 canonical 하나를 둘 이상의 새 canonical이 승계하려는 충돌이면 Importer가 snapshot 전체를 거부하고 기존 참조·누락 상태·적용 이력을 유지 |
 | SPEC 결정-41 | 새 동선은 백엔드 `POST /itineraries/generate`가 단독 생성. 앱 엔진은 운영 화면에 연결하지 않음 |
-| SPEC 결정-42(08-19 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. 서버 내부 별도 프로세스, 적격 큐레이션 0건 fallback 1건. 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제 |
+| SPEC 결정-42(09-01 배포 개정) | OSM/GraphHopper 도시 경로 생성을 P0에 포함. import는 저장소 고정 builder가 EC2 밖에서 수행하고 EC2는 검증된 graph artifact를 쓰는 server-only 별도 프로세스로 운영한다. 적격 큐레이션 0건이면 fallback 1건을 생성하며 난이도 칩·EventType 기본값은 제거하고 HARD·거리·실거리 차도·실제 회전 상한을 서버가 강제한다 |
 | SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
 | SPEC 결정-55 | 이메일 로그인은 IP별 모든 요청 30회/고정 1분과 정규화 이메일별 실패 5회/고정 1분을 함께 제한한다. 초과는 `429 RATE_LIMITED`, 성공은 이메일 창만 초기화한다. 존재하지 않는 이메일도 dummy BCrypt 비교 후 동일한 `401 LOGIN_FAILED`를 반환한다 |
 | SPEC 결정-56 | 자동 위치 추정을 제품에서 전부 없앤다. 위치 권한·`FusedLocationProvider`·`play-services-location` 을 두지 않고 Wi-Fi AP·기지국 Cell-ID·BLE·IP GeoIP 로 위치를 추정하지 않는다. 출발지는 검색·프리셋·S7 숙소 좌표뿐이며 `/api/courses/near` 의 `lat/lng` 에 기기 유래 좌표를 넣는 경로를 두지 않는다. R1·R2·`ran`·`/api/runs/**` 는 구현하지 않는다. 서버 요청 IP 기반 횟수 제한은 위치 추정이 아니므로 유지하되 지역 변환·저장·추천 사용은 하지 않는다 (D-25 대체 · 이슈 #215) |
