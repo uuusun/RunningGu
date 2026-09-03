@@ -122,6 +122,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -281,8 +282,21 @@ tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
     dependsOn("processDebugManifest", "processReleaseManifest")
 }
 
+/**
+ * Room 스키마를 파일로 내보낸다. (AP-05 · 이슈 #105)
+ *
+ * **내보낸 JSON 을 커밋한다.** 마이그레이션을 쓰려면 이전 버전 스키마가 저장소에 있어야
+ * 하고, 리뷰에서 테이블 변경이 diff 로 보인다. 다음 PR 에서 계정 캐시 세 개가 들어올 때
+ * 무엇이 바뀌는지 여기서 갈린다.
+ */
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.kakao.maps)
     // A1 카카오 로그인 (AP-08 · §4.1 · §1-7). 로그인만 쓰므로 v2-user 하나면 된다
     implementation(libs.kakao.user)

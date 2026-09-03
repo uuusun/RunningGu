@@ -4,7 +4,11 @@ import com.runninggu.app.data.repository.RemoteItineraryRepository
 import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.data.remote.ItineraryApi
 import com.runninggu.app.data.local.AuthTokens
+import android.content.Context
 import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.local.cache.ContestCache
+import com.runninggu.app.data.local.cache.RoomContestCache
+import com.runninggu.app.data.local.cache.RunningGuDatabase
 import com.runninggu.app.data.remote.ApiClient
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.RefreshOutcome
@@ -167,8 +171,38 @@ object ServiceLocator {
      */
     val authRepository: AuthRepository by lazy { RemoteAuthRepository(authApi, tokenApi) }
 
-    /** 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다. */
-    val contestRepository: ContestRepository by lazy { RemoteContestRepository(contestApi) }
+    /**
+     * 오프라인 폴백을 켤 Context. [RunningGuApplication] 이 시작할 때 한 번 넘긴다.
+     *
+     * **안 넘어와도 앱은 돈다** — 캐시만 없는 상태가 되고 서버만 본다. 단위 테스트가
+     * `ServiceLocator` 를 건드릴 때가 그 경우다. 키가 없으면 그 기능만 끄는 다른 자리와
+     * 같은 방식이다(카카오 SDK · NFR-1·3).
+     */
+    private var appContext: Context? = null
+
+    /** 앱 시작에서 한 번 부른다. 저장소를 처음 꺼내기 전이어야 폴백이 붙는다. */
+    fun bind(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * 대회 읽기 캐시. (AP-05 · SPEC §6.1 · 이슈 #105)
+     *
+     * **첫 조회 때 파일을 연다** — 앱 시작을 늦추지 않으려고 `lazy` 다.
+     */
+    private val contestCache: ContestCache? by lazy {
+        appContext?.let { RoomContestCache(RunningGuDatabase.open(it).contestCache()) }
+    }
+
+    /**
+     * 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다.
+     *
+     * 성공한 대회 응답은 `cached_contest` 에 남고 **연결이 안 될 때만** 되살아난다.
+     * 그전에는 오프라인에서 홈·캘린더·상세가 전부 오류였다.
+     */
+    val contestRepository: ContestRepository by lazy {
+        RemoteContestRepository(contestApi, contestCache)
+    }
     /**
      * S8 러닝코스. (API 명세 §6)
      *
