@@ -43,6 +43,8 @@ java \
 
 test -d /work/output/graph
 test ! -e /work/output/graph/gh.lock
+python3 /opt/runninggu/import/normalize_graph_metadata.py \
+  --graph-dir /work/output/graph
 
 /opt/runninggu/import/package-graph.sh \
   --graph-dir /work/output/graph \

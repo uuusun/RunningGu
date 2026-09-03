@@ -27,6 +27,7 @@ COPY --chmod=0555 scripts/osm/import/run-builder.sh /opt/runninggu/import/run-bu
 COPY --chmod=0555 scripts/osm/import/package-graph.sh /opt/runninggu/import/package-graph.sh
 COPY --chmod=0555 scripts/osm/import/verify-artifact.sh /opt/runninggu/import/verify-artifact.sh
 COPY --chmod=0444 scripts/osm/import/artifact_contract.py /opt/runninggu/import/artifact_contract.py
+COPY --chmod=0444 scripts/osm/import/normalize_graph_metadata.py /opt/runninggu/import/normalize_graph_metadata.py
 COPY --chmod=0444 scripts/osm/import/graphhopper-import.yml /opt/runninggu/import/graphhopper-import.yml
 COPY --chmod=0555 scripts/osm/import/normalize-import-config.sh /opt/runninggu/import/normalize-import-config.sh
 

@@ -74,9 +74,11 @@ scripts/osm/import/
 ├── build-graph.ps1
 ├── graphhopper-import.yml
 ├── normalize-import-config.sh
+├── normalize_graph_metadata.py
 ├── package-graph.sh
 ├── run-builder.sh
 ├── test_artifact_contract.py
+├── test_normalize_graph_metadata.py
 └── verify-artifact.sh
 
 scripts/osm/
@@ -108,6 +110,7 @@ backend/deploy/validation/
 | 진입점 | 실행 위치 | 단일 책임 |
 |---|---|---|
 | `verify-artifact.sh` | builder·EC2 | 로컬 bundle 또는 압축 해제 tree의 manifest 형식·canonical hash·archive 안전성을 검증하는 순수 검증기. 네트워크·설치·symlink·서비스 제어는 하지 않음 |
+| `normalize_graph_metadata.py` | builder | GraphHopper가 `properties`·`properties.txt`에 기록한 import·LM 실행 시각만 `SOURCE_DATE_EPOCH` 값으로 길이 보존 정규화. PBF data date와 graph payload는 바꾸지 않으며 필수 key가 없거나 중복이면 실패 |
 | `install-graph-artifact.sh` | EC2 | release descriptor가 지정한 S3 세 파일을 임시 directory에 받고 `verify-artifact.sh`를 호출한 뒤 안전하게 압축 해제·재검증·최종 version directory rename까지만 수행 |
 | `verify-active-graph.sh` | EC2 | `current` 상대 symlink, checkout의 release descriptor, 활성 manifest와 graph tree를 대조하며 공통 hash 검증은 `verify-artifact.sh`에 위임. 다운로드·symlink 변경·서비스 시작은 하지 않음 |
 | `read-required-env.sh` | EC2 | dotenv를 shell로 실행하지 않고 요청받은 단일 `KEY=unquoted-value`를 정확히 한 줄만 읽음. 값 내부 `=`는 보존하고 줄 끝 CR은 제거하되 따옴표 값·누락·빈 값·중복 key는 실패하며 다른 secret을 자식 프로세스 환경으로 내보내지 않음 |
@@ -261,6 +264,12 @@ SRTM과 graph file 목록 hash는 POSIX 상대경로의 UTF-8 byte 오름차순�
 들어간 immutable graph payload만이며 설치 시 옆에 두는 `graph-manifest.json`과 GraphHopper가
 런타임에 생성·삭제하는 `gh.lock`은 제외한다. 그 밖의 예상하지 못한 파일이 활성 tree에 있으면
 검증을 실패시킨다.
+
+GraphHopper 11은 같은 입력으로 import해도 `properties`와 `properties.txt`의
+`datareader.import.date`·`prepare.lm.date.run`에 실제 실행 시각을 기록한다. builder는 package와
+`graph.filesSha256` 계산 전에 두 값을 `1970-01-01T00:00:00Z`로 정규화한다. 두 파일의 해당 key가
+각각 정확히 한 번 존재하지 않으면 artifact를 만들지 않는다. `datareader.data.date`는 PBF에 들어
+있는 원천 시각이므로 바꾸지 않는다.
 
 ### 4.2 release descriptor
 

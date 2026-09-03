@@ -118,6 +118,7 @@ jobs:
       - name: Validate GraphHopper artifact and operational load tools
         run: |
           python3 ../scripts/osm/import/test_artifact_contract.py
+          python3 ../scripts/osm/import/test_normalize_graph_metadata.py
           python3 ../scripts/osm/test_operational_load.py
           python3 ../scripts/osm/test_roundtrip_evidence.py
           python3 deploy/validation/test_summarize_runtime_metrics.py
