@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.listKey
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -218,12 +219,11 @@ private fun StayRow(item: PoiItem, selected: Boolean, onSelect: () -> Unit) {
 /** CTA. 숙소를 골랐는지에 따라 문구가 갈린다. (SPEC §4.9) */
 @Composable
 private fun StayCta(hasStay: Boolean, onClick: () -> Unit) {
-    Surface(shadowElevation = 8.dp) {
+    BottomActionBar {
         Button(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .height(52.dp),
         ) {
             Text(
