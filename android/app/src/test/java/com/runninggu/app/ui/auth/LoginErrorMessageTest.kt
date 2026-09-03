@@ -99,6 +99,7 @@ private class FailingAuthRepository(private val failure: Throwable) : AuthReposi
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = unused()
     override suspend fun requestPasswordReset(email: String): Result<Unit> = unused()
     override suspend fun logout(refreshToken: String): Result<Unit> = unused()

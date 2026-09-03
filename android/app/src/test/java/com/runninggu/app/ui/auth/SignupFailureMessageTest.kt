@@ -108,6 +108,24 @@ class SignupFailureMessageTest {
     }
 
     @Test
+    fun `만 14세 확인 없이 오면 앞 단계로 돌려보낸다`() = runTest(dispatcher) {
+        val viewModel = submit(
+            ApiException.Http(status = 400, code = ApiErrorCode.AGE_REQUIREMENT_NOT_MET, problem = null),
+        )
+        advanceUntilIdle()
+        viewModel.onCodeChange("123456")
+        viewModel.onVerify()
+        advanceUntilIdle()
+
+        // VERIFY 에는 확인란이 없다. "다시 시도" 로 적으면 같은 400 만 반복된다
+        assertEquals(
+            "만 14세 이상만 가입할 수 있어요. [뒤로] 를 눌러 확인해 주세요.",
+            viewModel.uiState.value.errorMessage,
+        )
+        assertNull(SessionStore.session.value)
+    }
+
+    @Test
     fun `인증이 풀렸으면 재발송 길을 연다`() = runTest(dispatcher) {
         val viewModel = submit(
             ApiException.Http(status = 403, code = ApiErrorCode.EMAIL_NOT_VERIFIED, problem = null),
@@ -389,6 +407,7 @@ private class FakeSignupRepository(private val signupFailure: Throwable) : AuthR
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = Result.failure(signupFailure)
 
     override suspend fun sendSignupCode(email: String): Result<Unit> {
@@ -405,6 +424,7 @@ private class FakeSignupRepository(private val signupFailure: Throwable) : AuthR
         kakaoAccessToken: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = unused()
 
     override suspend fun kakaoLogin(kakaoAccessToken: String): Result<KakaoLoginOutcome> = unused()

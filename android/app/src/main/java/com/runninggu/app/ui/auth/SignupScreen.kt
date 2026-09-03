@@ -160,6 +160,29 @@ private fun AgreeStep(state: SignupUiState, viewModel: SignupViewModel) {
         }
     }
 
+    Spacer(Modifier.height(12.dp))
+
+    // **동의 묶음 밖에 둔다.** §4.2-1 이 "전체 동의 밖의 별도 필수 항목" 으로 못 박았고
+    // [전체 동의] 로 자동 선택하지 않는다(결정-58). 같은 Surface 안에 넣으면 줄 하나가
+    // 더 있는 것으로 보여, 전체 동의를 눌렀는데 왜 안 켜지는지 알 수 없다.
+    //
+    // **동의가 아니라 확인이다.** 약관에 동의하는 것이 아니라 "나는 만 14세 이상이다" 를
+    // 스스로 밝히는 것이라 문구도 `동의` 가 아닌 `확인` 이다. 생년월일은 받지 않는다 —
+    // 서버 DB 에 나이 컬럼을 두지 않기로 했다(결정-58).
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+            AgreeRow(
+                label = "(필수) 만 14세 이상입니다",
+                checked = state.ageOver14,
+                onToggle = viewModel::onToggleAgeOver14,
+            )
+        }
+    }
+
     Spacer(Modifier.height(24.dp))
     CtaButton(text = "다음", enabled = state.canProceedAgree, onClick = viewModel::onAgreeNext)
 

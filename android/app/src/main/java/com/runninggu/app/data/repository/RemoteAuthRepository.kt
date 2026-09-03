@@ -66,6 +66,7 @@ class RemoteAuthRepository(
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = call {
         api.signup(
             SignupRequestDto(
@@ -78,6 +79,7 @@ class RemoteAuthRepository(
                     privacy = true,
                     marketing = marketingAgreed,
                 ),
+                ageOver14 = ageOver14,
             ),
         ).toSession()
     }
@@ -106,6 +108,7 @@ class RemoteAuthRepository(
         kakaoAccessToken: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = call {
         api.kakaoSignup(
             KakaoSignupRequestDto(
@@ -117,6 +120,7 @@ class RemoteAuthRepository(
                     privacy = true,
                     marketing = marketingAgreed,
                 ),
+                ageOver14 = ageOver14,
             ),
         ).toSession()
     }
