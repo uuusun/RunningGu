@@ -286,20 +286,20 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | `provider` 포함 장소 snapshot 후보, `placeId/fetchedAt/cachedAt` 없음 | 시트 Loading/Empty/Error |
 | 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서 | ResultUiState | RACE 편집 UI 미노출 |
 | 새 동선 저장 | `POST /api/itineraries` | 편집된 전체 DTO→201 id 또는 200 replaced | PostgreSQL | 게스트 modal, 성공→보관함 |
-| 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | Room cache | RACE는 저장 당시 값 유지. 변경 시 안내/재생성 CTA, 403/404/Error |
+| 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | Room cache | RACE는 저장 당시 값 유지. 변경 시 안내(P0) · 재생성 CTA(후속 §5-7~5-10), 403/404/Error |
 | 변경 대회 재생성 | `POST /api/itineraries/generate` | 최신 canonical 기준 입력 | 저장 전 임시 DTO | "직접 고친 장소는 사라져요" 확인 뒤 호출, 기존 저장본 유지 |
 | 재생성 최종 교체 | `PUT /api/itineraries/{id}` | 새 편집 DTO→200 same id/replaced | PostgreSQL | 저장 성공 시에만 기존 트리 교체, USER 편집 자동 병합 없음 |
 | 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지 |
 | 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체 |
 | 저장 후 삭제 | DELETE `.../blocks/{blockId}` | 204 | PostgreSQL | RACE는 409 |
 | 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409 |
+| Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
+| Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
+| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
 
 **저장 후 편집 4행은 서버에 구현돼 있고 앱은 아직 안 쓴다** 🔒확정(#213). S7-R 은 P0 에서 읽기 전용이다.
 
 한때 앱이 로컬 편집 후 `POST /api/itineraries` 로 통째 저장하는 안(A)을 검토했으나 **폐기했다.** 그 API 는 저장된 트리를 덮어쓰는 것이 아니라 **호출할 때마다 현재 canonical 대회로 RACE 블록을 재구성**한다(§5-2). 그래서 A 로 가면 USER 장소 하나만 고쳐도 저장 snapshot 의 대회 정보가 말없이 바뀌고, `needsRegeneration` → 명시적 재생성 → `PUT` 흐름을 우회하며, 대회 날짜가 여행 기간 밖으로 옮겨진 경우에는 단순 편집 저장도 `INVALID_TRAVEL_PERIOD` 로 실패한다. §5-7~5-10 은 **저장 snapshot 의 RACE 를 지키면서 USER 블록만 바꾸려고** 둔 계약이므로 저장 후 편집은 이쪽이 맞다.
-| Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
-| Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
-| 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
 
 ---
 
@@ -350,7 +350,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 |---|---|---|---|
 | 프로필 | `GET /api/me` | id,email(`string|null`),nickname,loginProvider,agreements | `email=null`이면 이메일 행·placeholder 없이 숨김. 401/Error |
 | 동선 목록 | `GET /api/itineraries` | id,title,region(snapshot),contestName(current),event,recovery,기간,placeCount,active,needsRegeneration,createdAt | 변경 시 "대회 변경" 배지, 비활성도 유지, Loading/Empty/Error/offline |
-| 동선 열기 | `GET /api/itineraries/{id}` | snapshot 트리 + current contest + needsRegeneration | S7-R, 변경 안내·재생성 CTA |
+| 동선 열기 | `GET /api/itineraries/{id}` | snapshot 트리 + current contest + needsRegeneration | S7-R, 변경 안내(P0) · 재생성 CTA(후속 §5-7~5-10) |
 | 동선 삭제 | `DELETE /api/itineraries/{id}` | 204 | 확인 modal, 실패 시 유지 |
 | 저장 코스 | `GET /api/me/courses` | saved projection | Loading/Empty/Error |
 | 코스 삭제 | `DELETE /api/me/courses/{id}` | 204 | 확인 modal |
