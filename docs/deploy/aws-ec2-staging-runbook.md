@@ -671,6 +671,27 @@ curl --fail --silent --show-error \
   'https://staging-api.runninggu.store/api/contests?size=1'
 ```
 
+GraphHopper 인스턴스 사양 시험은 계약 §9.1의 두 요청 세트를 먼저 고정한다. EC2에서 처음 실행하기
+전에 동일한 graph artifact와 server image로 로컬 운영 호환 container를 띄우고 다음 근거를 release
+evidence에 남긴다.
+
+1. `roundtrip.py --preset caps --zone all` 전체 지점·거리·seed별 HTTP status와 셀별 품질 상한 통과
+   후보 수
+2. 위 결과에서 HTTP 200·비어 있지 않은 `paths`가 확인된 정상 직접 요청의 exact
+   `point`·`round_trip.distance`·`round_trip.seed`·요청 옵션 목록
+3. graph artifact ID·server image digest·실행 명령·시작/종료 시각
+
+정상 직접 요청 목록은 로컬 회귀 기준선에서 합격한 모든 지점·거리 셀을 최소 하나씩 포함한다.
+EC2 결과를 본 뒤 실패한 요청을 목록에서 빼거나 다른 seed로 교체하지 않는다. artifact·image·profile
+또는 요청 옵션이 바뀌면 로컬 고정부터 다시 수행한다.
+
+30분 메모리·처리량 부하는 정상 직접 요청 세트만 고정 도착률로 반복한다. 이 세트에서는 모든 요청이
+5초 안에 HTTP 200과 비어 있지 않은 `paths`를 반환해야 하며 `no valid point` 400도 예외 없이 시험
+실패다. 별도로 전체 `caps/all` 회귀를 실행해 개별 400을 라우팅 실패로 집계하고, 로컬에서 합격한
+지점·거리 셀이 EC2에서도 seed 16개 중 품질 상한 통과 경로를 하나 이상 유지하는지 확인한다.
+`no valid point`를 성공으로 기록하거나 실패 건수에서 빼지 않되, 그 응답만으로 OOM이나 instance
+부족이라고 판정하지 않는다. OOM·5xx·timeout·재시작과 라우팅 실패 수를 분리해 결과에 남긴다.
+
 다음도 확인한다.
 
 - HTTP가 HTTPS로 redirect되는가
@@ -704,8 +725,9 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
    Compose에서 중복되면 계약 §7의 wrapper 적용 뒤 다시 통과해야 한다.
 
 인스턴스 크기 판정은 [`graphhopper-artifact-contract.md` §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의
-30분 부하·백업·OOM·GC·swap·재부팅 기준을 사용한다. 8GiB 한 번 통과를 4GiB 승인 근거로 쓰지
-않으며 4GiB는 같은 시나리오를 3회 연속 통과해야 한다.
+고정 정상 요청 30분 부하, 전체 라우팅 회귀, 백업·OOM·GC·swap·재부팅 기준을 모두 사용한다.
+8GiB 한 번 통과를 4GiB 승인 근거로 쓰지 않으며 4GiB는 같은 요청 목록·요청률·동시성과 전체
+시나리오를 3회 연속 통과해야 한다.
 
 ## 16. 백업·복구
 
