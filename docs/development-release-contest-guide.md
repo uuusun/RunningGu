@@ -376,6 +376,10 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 
 ### 7.5 배포·롤백 절차
 
+머지 전 8GiB 검증에는 [GraphHopper artifact 계약 §11.1](deploy/graphhopper-artifact-contract.md#111-머지-전-staging-검증용-백엔드-묶음)의
+PR head 전용 CI 묶음을 staging에서만 사용한다. 정식 릴리스·`main` 변경·자동 배포를 뜻하지 않는다.
+머지 후에는 통합 commit의 CI 묶음을 다시 만들며 PR 검증용 묶음을 이름만 바꿔 승격하지 않는다.
+
 1. 릴리스 후보 커밋에서 Android·백엔드 전체 테스트를 실행한다.
 2. 백엔드 JAR·데이터 snapshot·GraphHopper graph artifact의 SHA-256, Git commit 또는 builder
    digest, 환경 이름을 릴리스 기록에 남긴다.

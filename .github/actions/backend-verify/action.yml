@@ -1,0 +1,95 @@
+name: 백엔드 공통 검증
+description: 통합 커밋과 PR head에 동일한 검사·빌드·Importer 스모크를 적용한다
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "21"
+
+    - uses: gradle/actions/setup-gradle@v4
+
+    - name: Prepare Gradle wrapper
+      shell: bash
+      working-directory: backend
+      run: chmod +x gradlew
+
+    - name: Install Playwright Chromium
+      shell: bash
+      working-directory: backend
+      run: ./gradlew playwright --args="install --with-deps chromium" --console=plain
+
+    - name: Validate EC2 Compose model
+      env:
+        DB_PASSWORD: compose-config-check
+        PGBACKREST_S3_BUCKET: runninggu-compose-check
+        PGBACKREST_S3_KMS_KEY_ID: arn:aws:kms:ap-northeast-2:000000000000:key/compose-check
+        PGBACKREST_S3_ROLE: runninggu-compose-check
+        # Compose 보간 검증용 값이며 운영 heap 후보값이 아니다.
+        GRAPHHOPPER_XMS: 1g
+        GRAPHHOPPER_XMX: 1g
+      shell: bash
+      working-directory: backend
+      run: |
+        docker compose \
+          --profile routing \
+          -f compose.yaml \
+          -f compose.ec2.yaml \
+          config --format json > build-compose-ec2.json
+        python3 -c 'import json; d=json.load(open("build-compose-ec2.json", encoding="utf-8")); s=d["services"]["postgres"]; p=s["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0]["host_ip"]=="127.0.0.1" and p[0]["target"]==5432, p; assert len(g)==1 and g[0]["host_ip"]=="127.0.0.1" and g[0]["target"]==8989, g; assert s["restart"]=="unless-stopped"; assert s["logging"]["driver"]=="local"; assert d["services"]["graphhopper"]["logging"]["driver"]=="local"; assert "archive_mode=on" in s["command"]; assert "archive_timeout=300s" in s["command"]; assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
+        docker compose \
+          -f compose.recovery.yaml \
+          config --format json > build-compose-recovery.json
+        python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
+
+    - name: Validate backup monitoring assets
+      shell: bash
+      working-directory: backend
+      run: |
+        sh -n deploy/backup/notify-backup-failure.sh
+        sh -n deploy/backup/check-wal-archive.sh
+        systemd-analyze calendar '*:0/10' >/dev/null
+        grep -q '^OnFailure=runninggu-backup-alert@%n.service$' \
+          deploy/systemd/runninggu-postgres-wal-archive-check.service
+        grep -q '^OnCalendar=\*:0/10$' \
+          deploy/systemd/runninggu-postgres-wal-archive-check.timer
+
+    - name: Validate GraphHopper artifact and operational load tools
+      shell: bash
+      working-directory: backend
+      run: |
+        python3 deploy/ci/test_package_pr_artifact.py
+        python3 ../scripts/osm/import/test_artifact_contract.py
+        python3 ../scripts/osm/import/test_normalize_graph_metadata.py
+        python3 ../scripts/osm/test_operational_load.py
+        python3 ../scripts/osm/test_roundtrip_evidence.py
+        python3 deploy/validation/test_summarize_runtime_metrics.py
+        sh -n deploy/validation/collect-runtime-metrics.sh
+        sh -n deploy/validation/test-collect-runtime-metrics.sh
+        sh deploy/validation/test-collect-runtime-metrics.sh
+        grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' compose.ec2.yaml
+        grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' deploy/backend/start-backend.sh
+
+    - name: Test and prepare EC2 artifact
+      shell: bash
+      working-directory: backend
+      run: ./gradlew clean test ec2Artifact --console=plain
+
+    - name: Smoke test executable Importer JAR
+      shell: bash
+      env:
+        DB_URL: jdbc:postgresql://127.0.0.1:5432/runninggu_import_smoke
+        DB_USERNAME: runninggu
+        DB_PASSWORD: importer-smoke-password
+        COURSE_SYNC_ENABLED: "false"
+      working-directory: backend
+      run: |
+        mkdir -p build/reports/importer-smoke
+        cd build/ec2-artifact
+        java -jar runninggu-contest-import.jar \
+          2>&1 | tee ../reports/importer-smoke/first.log
+        java -jar runninggu-contest-import.jar \
+          2>&1 | tee ../reports/importer-smoke/second.log
+        grep -q "status=APPLIED" ../reports/importer-smoke/first.log
+        grep -q "status=NO_OP" ../reports/importer-smoke/second.log

@@ -653,6 +653,40 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 
 ## 11. PR 분리
 
+### 11.1 머지 전 staging 검증용 백엔드 묶음
+
+PR 2의 8GiB 완료 조건을 머지 전에 검증하기 위해, 같은 저장소에서 `develop`을 대상으로 연 PR은
+GitHub Actions에 `pr-validation` 백엔드 묶음을 보관할 수 있다. 기존 PR synthetic merge 검사는
+유지하며, 그 검사와 SPEC 검사가 성공한 뒤 별도 job이 event에 고정된 PR head SHA를 checkout해
+동일한 공통 검사·테스트·빌드·Importer 스모크를 다시 수행한다. 두 job은
+`.github/actions/backend-verify/action.yml`의 공통 단계를 사용한다. fork PR은 묶음을 만들지 않는다.
+
+이 묶음의 이름은 `runninggu-backend-pr<PR번호>-<head SHA>-<run ID>-<attempt>`다. 기존 서버 JAR,
+Importer JAR, 대회 snapshot, `SHA256SUMS`, `release-manifest.txt`만 포함하며 graph archive는 넣지 않는다.
+보관 기간은 기존 통합 묶음과 같은 30일이다. CI는 AWS 자격 증명이나 배포 권한을 갖지 않으며
+묶음 생성은 EC2 배포·PR 승인·머지·정식 릴리스가 아니다.
+
+`release-manifest.txt`는 UTF-8 `key=value` 행과 마지막 LF를 사용한다. 검증용 필드는 다음 순서다.
+
+1. `git_commit`: 실제 checkout HEAD이며 event의 PR head SHA와 같아야 함
+2. `workflow_run_id`, `workflow_run_attempt`: 양의 정수
+3. `artifact_kind=pr-validation`, `allowed_environment=staging`
+4. `pull_request_number`: 양의 정수
+5. `head_commit`: `git_commit`과 같은 40자리 lowercase SHA
+6. `base_commit`: 해당 event의 PR base SHA
+7. `integration_test_commit`: 앞선 통합 검사 job이 실제로 checkout한 synthetic merge SHA
+
+생성기는 checkout SHA 불일치, 잘못된 식별자, 필수 payload 누락·예상하지 않은 파일·symlink를 거부하고 세 payload와
+manifest의 실제 bytes에 대한 SHA-256을 기록한다. `github.sha`를 PR head로 간주해 라벨만 바꾸지 않는다.
+배포 담당자는 성공한 CI run·attempt·PR head를 확인하고 `SHA256SUMS`, manifest, 배포 요청 SHA,
+EC2 checkout HEAD가 일치할 때만 staging에 설치한다. PR head가 바뀌었다면 이전 묶음을 새 검증에 쓰지 않는다.
+
+production에는 `pr-validation` 묶음을 사용하지 않는다. 머지 후에는 통합된 commit의 기존 push CI
+묶음을 새로 생성한다. 검증용 묶음을 이름만 바꿔 승격하지 않으며, 테스트한 코드·설정·graph가 변경되면
+해당 운영 검증을 다시 수행한다. `main`은 기존 Git 컨벤션대로 정식 릴리스 때만 변경한다.
+
+### 11.2 PR별 완료 조건
+
 | PR | 범위 | 완료 조건 |
 |---|---|---|
 | PR 1 | 이 계약, SPEC §8.4, 상위 배포 가이드, EC2 실행서 동기화 | 팀 결정과 문서 충돌 없음 |

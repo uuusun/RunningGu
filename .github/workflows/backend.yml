@@ -9,6 +9,7 @@ on:
       - "docs/files/런닝구_API_명세서.md"
       - "scripts/check_spec_drift.py"
       - ".github/workflows/backend.yml"
+      - ".github/actions/backend-verify/**"
   push:
     branches: [develop, main]
     paths:
@@ -18,6 +19,7 @@ on:
       - "docs/files/런닝구_API_명세서.md"
       - "scripts/check_spec_drift.py"
       - ".github/workflows/backend.yml"
+      - ".github/actions/backend-verify/**"
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -47,6 +49,8 @@ jobs:
 
   test:
     name: Unit, integration, and bootJar
+    outputs:
+      integration_commit: ${{ steps.identity.outputs.commit }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -68,85 +72,17 @@ jobs:
         working-directory: backend
 
     steps:
-      # PR은 GitHub의 synthetic merge commit을 검사하고, push는 해당 commit 자체를 검사한다.
+      # PR은 synthetic merge, push는 해당 commit 자체를 검사한다.
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          persist-credentials: false
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: 실제 검사 커밋 기록
+        id: identity
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare Gradle wrapper
-        run: chmod +x gradlew
-
-      - name: Install Playwright Chromium
-        run: ./gradlew playwright --args="install --with-deps chromium" --console=plain
-
-      - name: Validate EC2 Compose model
-        env:
-          DB_PASSWORD: compose-config-check
-          PGBACKREST_S3_BUCKET: runninggu-compose-check
-          PGBACKREST_S3_KMS_KEY_ID: arn:aws:kms:ap-northeast-2:000000000000:key/compose-check
-          PGBACKREST_S3_ROLE: runninggu-compose-check
-          # Compose 보간 검증용 값이며 운영 heap 후보값이 아니다.
-          GRAPHHOPPER_XMS: 1g
-          GRAPHHOPPER_XMX: 1g
-        run: |
-          docker compose \
-            --profile routing \
-            -f compose.yaml \
-            -f compose.ec2.yaml \
-            config --format json > build-compose-ec2.json
-          python3 -c 'import json; d=json.load(open("build-compose-ec2.json", encoding="utf-8")); s=d["services"]["postgres"]; p=s["ports"]; g=d["services"]["graphhopper"]["ports"]; assert len(p)==1 and p[0]["host_ip"]=="127.0.0.1" and p[0]["target"]==5432, p; assert len(g)==1 and g[0]["host_ip"]=="127.0.0.1" and g[0]["target"]==8989, g; assert s["restart"]=="unless-stopped"; assert s["logging"]["driver"]=="local"; assert d["services"]["graphhopper"]["logging"]["driver"]=="local"; assert "archive_mode=on" in s["command"]; assert "archive_timeout=300s" in s["command"]; assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
-          docker compose \
-            -f compose.recovery.yaml \
-            config --format json > build-compose-recovery.json
-          python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
-
-      - name: Validate backup monitoring assets
-        run: |
-          sh -n deploy/backup/notify-backup-failure.sh
-          sh -n deploy/backup/check-wal-archive.sh
-          systemd-analyze calendar '*:0/10' >/dev/null
-          grep -q '^OnFailure=runninggu-backup-alert@%n.service$' \
-            deploy/systemd/runninggu-postgres-wal-archive-check.service
-          grep -q '^OnCalendar=\*:0/10$' \
-            deploy/systemd/runninggu-postgres-wal-archive-check.timer
-
-      - name: Validate GraphHopper artifact and operational load tools
-        run: |
-          python3 ../scripts/osm/import/test_artifact_contract.py
-          python3 ../scripts/osm/import/test_normalize_graph_metadata.py
-          python3 ../scripts/osm/test_operational_load.py
-          python3 ../scripts/osm/test_roundtrip_evidence.py
-          python3 deploy/validation/test_summarize_runtime_metrics.py
-          sh -n deploy/validation/collect-runtime-metrics.sh
-          sh -n deploy/validation/test-collect-runtime-metrics.sh
-          sh deploy/validation/test-collect-runtime-metrics.sh
-          grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' compose.ec2.yaml
-          grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' deploy/backend/start-backend.sh
-
-      - name: Test and prepare EC2 artifact
-        run: ./gradlew clean test ec2Artifact --console=plain
-
-      - name: Smoke test executable Importer JAR
-        shell: bash
-        env:
-          DB_URL: jdbc:postgresql://127.0.0.1:5432/runninggu_import_smoke
-          DB_USERNAME: runninggu
-          DB_PASSWORD: importer-smoke-password
-          COURSE_SYNC_ENABLED: "false"
-        run: |
-          mkdir -p build/reports/importer-smoke
-          cd build/ec2-artifact
-          java -jar runninggu-contest-import.jar \
-            2>&1 | tee ../reports/importer-smoke/first.log
-          java -jar runninggu-contest-import.jar \
-            2>&1 | tee ../reports/importer-smoke/second.log
-          grep -q "status=APPLIED" ../reports/importer-smoke/first.log
-          grep -q "status=NO_OP" ../reports/importer-smoke/second.log
+      - name: 백엔드 공통 검사와 빌드
+        uses: ./.github/actions/backend-verify
 
       - name: Record artifact identity and checksums
         if: github.event_name == 'push'
@@ -178,5 +114,72 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-report
+          path: backend/build/reports/tests/test/
+          retention-days: 7
+
+  pr-candidate:
+    name: PR 검증용 백엔드 묶음
+    needs: [spec-drift, test]
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.base.ref == 'develop' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10
+        env:
+          POSTGRES_DB: runninggu_import_smoke
+          POSTGRES_USER: runninggu
+          POSTGRES_PASSWORD: importer-smoke-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U runninggu -d runninggu_import_smoke"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      # 통합 검사와 별개로, 실제 EC2 checkout에 사용할 PR head 자체를 검사한다.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: 백엔드 공통 검사와 빌드
+        uses: ./.github/actions/backend-verify
+
+      - name: staging 전용 출처와 checksum 기록
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          INTEGRATION_COMMIT: ${{ needs.test.outputs.integration_commit }}
+        run: |
+          python3 deploy/ci/package-pr-artifact.py \
+            --repository .. --output build/ec2-artifact \
+            --expected-head "$PR_HEAD" --base-commit "$PR_BASE" \
+            --integration-commit "$INTEGRATION_COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --pr-number "$PR_NUMBER"
+
+      # AWS 권한·비밀값은 주입하지 않는다. 보관과 배포는 별도 절차다.
+      - name: PR 검증용 묶음 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: runninggu-backend-pr${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/build/ec2-artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: PR head 실패 리포트
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pr-candidate-test-report
           path: backend/build/reports/tests/test/
           retention-days: 7

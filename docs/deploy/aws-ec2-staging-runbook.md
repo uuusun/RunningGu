@@ -380,6 +380,19 @@ sudo /bin/sh deploy/backup/check-wal-archive.sh
 성공한 GitHub Actions run에서 exact commit의 artifact를 승인된 경로로 전달한다. GitHub token을
 명령 인자나 shell history에 넣지 않는다. EC2에서 압축을 푼 뒤 checksum부터 검증한다.
 
+PR #255처럼 머지 전 운영 검증이 완료 조건이면 같은 저장소의 `develop` 대상 PR에서 생성된
+`runninggu-backend-pr<PR번호>-<head SHA>-<run ID>-<attempt>`를 사용한다. 기존 통합 검사와 별도
+PR head 검사 모두 성공한 run이어야 하며, Actions에서 현재 PR head·run ID·attempt를 확인해 기록한다.
+`release-manifest.txt`의 `artifact_kind=pr-validation`, `allowed_environment=staging`,
+`git_commit=head_commit=<검증할 PR head SHA>`와 PR 번호가 모두 맞아야 한다. `base_commit`과
+`integration_test_commit`은 통합 검사 대상 추적용이며 EC2 checkout에는 `git_commit`을 사용한다.
+이는 staging 전용 경로이고 production 배포나 PR 승인·머지를 뜻하지 않는다. PR head가 갱신되면
+새 CI 묶음을 사용한다. 자세한 필드 계약은 [artifact 계약 §11.1](graphhopper-artifact-contract.md#111-머지-전-staging-검증용-백엔드-묶음)을 따른다.
+
+다운로드 후 아래 checksum 검증에 이어 manifest의 식별자를 배포 요청·GitHub CI와 대조하고,
+§6의 exact commit checkout과 일치시킨다. 머지 후 `develop`/`main` push 묶음은 기존 경로를 유지하며,
+검증용 묶음을 정식 묶음으로 이름만 바꿔 재사용하지 않는다.
+
 ```bash
 cd <artifact를_푼_임시_디렉터리>
 sha256sum -c SHA256SUMS
