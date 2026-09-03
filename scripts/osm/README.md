@@ -93,29 +93,52 @@ python <저장소>/scripts/osm/roundtrip.py --preset caps --zone all   # + 지�
 
 ## 운영 사양 부하 시험
 
-`roundtrip.py --preset caps --zone all`은 품질 회귀와 warm-up에 사용한다. 8GiB·4GiB 사양 비교의
-30분 부하는 `operational_load.py`로 실행한다. 한 batch는 실제 백엔드와 같이 한 지점·한 목표
-거리에서 seed 16개를 직렬 호출하며, batch는 wall clock 기준 고정 도착률로 시작한다. 모든 worker가
-사용 중이면 기다려 부하를 낮추지 않고 `missedBatchStarts`로 기록해 시험을 실패시킨다.
+먼저 EC2와 동일한 graph artifact·server image를 로컬 운영 호환 container로 실행한다. image digest는
+배포할 image의 content-addressed ID(`docker image inspect --format '{{.Id}}'`)를 사용한다. 아래 명령은
+전체 caps/all의 seed별 HTTP status·실패 분류·품질 판정과 합격 셀마다 정상 직접 요청 하나를 같은
+evidence JSON에 고정한다. `no valid point` 400은 실패로 기록하며 오류 원문과 경로 geometry는 남기지
+않는다.
 
-아래 `<고정_batch_rate>`와 `<고정_concurrency>`는 8GiB 시험 전에 팀 기록으로 확정하며 4GiB까지
+```bash
+python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id '<artifact_id>' \
+  --server-image-digest '<sha256:image_id>' \
+  --evidence '<release-evidence.json>'
+```
+
+이 파일과 실행 명령을 EC2 첫 결과를 보기 전에 release evidence로 고정한다. EC2에서는 새 결과
+파일을 만들면서 `--baseline '<release-evidence.json>'`을 추가한다. 로컬에서 성공한 직접 요청이
+실패하거나 로컬 합격 셀의 품질 상한 통과 경로가 0건이면 종료 code 1이다.
+
+8GiB·4GiB 사양 비교의 30분 부하는 `operational_load.py`로 실행한다. 이 도구는 evidence의
+`normalRequests`만 순서대로 반복하고 artifact ID와 server image digest가 현재 시험값과 다르면
+시작하지 않는다. 요청은 wall clock 기준 고정 도착률로 시작하며 모든 worker가 사용 중이면 기다려
+부하를 낮추지 않고 `missedRequestStarts`로 기록해 시험을 실패시킨다.
+
+아래 `<고정_request_rate>`와 `<고정_concurrency>`는 8GiB 시험 전에 팀 기록으로 확정하며 4GiB까지
 같은 값을 사용한다. 결과 파일은 요청 본문이나 응답 경로를 보관하지 않고 고정 시험 지점 이름,
-HTTP status, 요청·seed batch 소요시간만 JSON Lines로 남긴다.
+HTTP status, seed, 요청 소요시간과 실패 분류만 JSON Lines로 남긴다.
 
 ```bash
 python3 scripts/osm/operational_load.py \
+  --request-set '<release-evidence.json>' \
+  --artifact-id '<artifact_id>' \
+  --server-image-digest '<sha256:image_id>' \
   --duration-seconds 1800 \
-  --batches-per-minute '<고정_batch_rate>' \
+  --requests-per-minute '<고정_request_rate>' \
   --concurrency '<고정_concurrency>' \
-  --seeds 16 \
   --timeout-seconds 5 \
   --output "/opt/runninggu-validation/<시험_ID>/graphhopper-load.jsonl"
 ```
 
-종료 code 0과 마지막 `summary.passed=true`가 모두 필요하다. `missedBatchStarts`, 실패 요청,
-5초 초과 요청이 하나라도 있으면 종료 code 1이다. `requestSeconds`와 `seedBatchSeconds`의
-p50·p95·max를 운영 기록에 옮긴다. 단순 `while roundtrip.py ...` 반복은 느린 instance에서
-자동으로 요청량이 줄어드는 closed-loop라 사양 비교에 사용하지 않는다.
+종료 code 0과 마지막 `summary.passed=true`가 모두 필요하다. `missedRequestStarts`,
+`failedDirectRequests`, `requestsOverTimeout`이 하나라도 있으면 종료 code 1이다.
+`noValidPointResponses`는 실패 요청의 부분집합으로 별도 기록되며 성공으로 바뀌지 않는다.
+`requestSeconds`의 p50·p95·max를 운영 기록에 옮긴다. 단순 `while roundtrip.py ...` 반복은 느린
+instance에서 자동으로 요청량이 줄어드는 closed-loop라 사양 비교에 사용하지 않는다.
 
 ## 물길 인덱스 (골목 회피 · 하천 유도 검증용)
 

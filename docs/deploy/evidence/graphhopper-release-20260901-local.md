@@ -1,7 +1,7 @@
 # GraphHopper 2026-09-01 release — 로컬 생성·검증 기록
 
 > 상태: **EC2 사양 미승인**. 이 문서는 날짜 고정 입력, clean commit builder, artifact 계약,
-> 로컬 server·회귀·부하 도구 검증만 기록한다. 8GiB §9.2와 hard-limit §9.3 결과로 사용하지 않는다.
+> 로컬 server·회귀와 도구 검증만 기록한다. 8GiB §9.2와 hard-limit §9.3 결과로 사용하지 않는다.
 
 ## 입력과 builder
 
@@ -48,7 +48,9 @@ gitignore 경로에만 보관한다.
 - 정상 종료 후 활성 tree 재검증: 성공
 - SIGKILL 후 활성 tree 재검증: 성공
 
-15초 도구 스모크는 batch 도착률 60/min, concurrency 2, seed 16으로 실행했다.
+아래 15초 결과는 계약 #282 반영 전의 구 batch 도구를 도착률 60/min, concurrency 2, seed 16으로
+실행한 기록이다. 실제 graph에 고정 도착률을 주고 실패 종료 code를 확인한 과거 근거로만 보존하며,
+현재 §9.1의 고정 정상 직접 요청 세트나 §9.2 합격 증거로 재사용하지 않는다.
 
 | 항목 | 결과 |
 |---|---|
@@ -64,7 +66,8 @@ gitignore 경로에만 보관한다.
 
 ## 코드 검증
 
-- `scripts/osm/test_operational_load.py`: 6개 통과
+- `scripts/osm/test_operational_load.py`: 현재 고정 정상 요청 계약 11개 통과
+- `scripts/osm/test_roundtrip_evidence.py`: 회귀 evidence·`no valid point` 분류 3개 통과
 - `scripts/osm/import/test_artifact_contract.py`: 9개 통과
 - `backend/deploy/validation/test_summarize_runtime_metrics.py`: 2개 통과
 - `backend/deploy/validation/test-collect-runtime-metrics.sh`: Linux Alpine 통과
@@ -77,7 +80,8 @@ gitignore 경로에만 보관한다.
 
 - 비공개 S3·KMS·IAM 생성과 세 파일 업로드
 - exact release commit의 CI backend artifact 설치
-- 8GiB heap 후보와 batch 도착률·동시성 팀 확정
+- 동일 artifact·server image로 현재 `roundtrip.py --evidence` 로컬 기준선 생성
+- 8GiB heap 후보와 정상 직접 요청 도착률·동시성 팀 확정
 - 8GiB 30분 부하·백업·WAL·GC·재부팅 §9.2
 - 실측 hard limit 확정과 격리된 §9.3
 - 4GiB를 선택하려면 같은 전체 시나리오 3회 연속 통과

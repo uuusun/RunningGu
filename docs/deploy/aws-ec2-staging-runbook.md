@@ -688,24 +688,61 @@ dry-run 성공과 deploy hook의 `nginx -t`, reload 성공을 모두 확인한�
 
 ### 15.1 고정 부하·5초 자원·GC 기록
 
-먼저 품질 회귀와 JVM warm-up을 한 번 수행한다. 이 결과는 30분 부하 시간에 포함하지 않는다.
+EC2 첫 실행 전에 같은 artifact·server image를 로컬 운영 호환 container로 띄운다. 활성 artifact
+ID와 배포할 image의 content-addressed ID를 넣어 전체 회귀 기준선과 정상 직접 요청 세트를 release
+evidence에 고정한다. 이 파일은 첫 EC2 결과를 본 뒤 수정하지 않는다.
+
+```bash
+cd '<로컬_repository>'
+ARTIFACT_ID='<활성_artifact_id>'
+SERVER_IMAGE='<배포할_GraphHopper_image>'
+SERVER_IMAGE_DIGEST=$(docker image inspect --format '{{.Id}}' "$SERVER_IMAGE")
+BASELINE="docs/deploy/evidence/graphhopper-routing-${ARTIFACT_ID}.json"
+
+python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
+  --evidence "$BASELINE"
+```
+
+동일한 evidence 파일이 배포 commit에 포함된 뒤 EC2에서 전체 회귀와 JVM warm-up을 수행한다. 로컬
+성공 요청이나 셀 커버리지가 후퇴하면 30분 부하를 시작하지 않는다. 아래 현재 결과 파일은 실행마다
+새 경로를 사용한다.
 
 ```bash
 cd /opt/runninggu/repository
-python3 scripts/osm/roundtrip.py --preset caps --zone all
+ARTIFACT_ID='<활성_artifact_id>'
+SERVER_IMAGE='<배포한_GraphHopper_image>'
+SERVER_IMAGE_DIGEST=$(sudo docker image inspect --format '{{.Id}}' "$SERVER_IMAGE")
+BASELINE="docs/deploy/evidence/graphhopper-routing-${ARTIFACT_ID}.json"
+sudo install -d -o root -g runninggu -m 0770 /opt/runninggu-validation
+
+sudo -u runninggu python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
+  --evidence "/opt/runninggu-validation/${ARTIFACT_ID}-ec2-routing.json" \
+  --baseline "$BASELINE"
 ```
 
-시험 전에 batch 도착률과 동시성을 운영 기록에 확정한다. 이 값은 8GiB와 4GiB에서 같아야 하며
-아래 placeholder를 채우지 않은 명령은 실행하지 않는다. `operational_load.py`의 한 batch는 실제
-백엔드와 같이 한 지점·한 목표 거리의 seed 0~15를 직렬 호출한다. worker 포화로 예정 시각에
-batch를 시작하지 못하면 기다려 요청량을 줄이지 않고 missed start로 남겨 실패한다.
+시험 전에 정상 직접 요청 도착률과 동시성을 운영 기록에 확정한다. 이 값과 요청 세트는 8GiB와
+4GiB에서 같아야 하며 아래 placeholder를 채우지 않은 명령은 실행하지 않는다. worker 포화로 예정
+시각에 직접 요청을 시작하지 못하면 기다려 요청량을 줄이지 않고 missed start로 남겨 실패한다.
 
 첫 SSM session에서 5초 자원 수집기와 30분 부하를 실행한다.
 
 ```bash
 RUN_ID='<8g-baseline-YYYYMMDD-HHMM>'
-BATCHES_PER_MINUTE='<사전_확정값>'
+REQUESTS_PER_MINUTE='<사전_확정값>'
 CONCURRENCY='<사전_확정값>'
+test -n "$ARTIFACT_ID"
+test -n "$SERVER_IMAGE_DIGEST"
+test -f "/opt/runninggu/repository/$BASELINE"
 
 sudo install -d -o root -g runninggu -m 0770 \
   "/opt/runninggu-validation/$RUN_ID"
@@ -723,10 +760,12 @@ METRICS_PID=$!
 
 sudo -u runninggu python3 \
   /opt/runninggu/repository/scripts/osm/operational_load.py \
+  --request-set "/opt/runninggu/repository/$BASELINE" \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
   --duration-seconds 1800 \
-  --batches-per-minute "$BATCHES_PER_MINUTE" \
+  --requests-per-minute "$REQUESTS_PER_MINUTE" \
   --concurrency "$CONCURRENCY" \
-  --seeds 16 \
   --timeout-seconds 5 \
   --output "/opt/runninggu-validation/$RUN_ID/graphhopper-load.jsonl"
 LOAD_EXIT=$?
@@ -755,9 +794,10 @@ sudo systemctl start runninggu-postgres-wal-archive-check.service
 sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
 ```
 
-부하 종료 뒤 `graphhopper-load.jsonl` 마지막 summary의 `passed=true`, `missedBatchStarts=0`,
-`failedDirectRequests=0`, `requestsOverTimeout=0`을 확인하고 직접 요청과 seed batch의 p50·p95·max를
-기록한다. `runtime-summary.json`도 `passed=true`여야 한다. 이 요약기는 표본 누락,
+부하 종료 뒤 `graphhopper-load.jsonl` 마지막 summary의 `passed=true`, `missedRequestStarts=0`,
+`failedDirectRequests=0`, `noValidPointResponses=0`, `requestsOverTimeout=0`을 확인하고 직접 요청의
+p50·p95·max를 기록한다. `noValidPointResponses`는 `failedDirectRequests`의 부분집합이며 성공으로
+세지 않는다. `runtime-summary.json`도 `passed=true`여야 한다. 이 요약기는 표본 누락,
 `MemAvailable` 20% 미만, warm-up 뒤 swap counter·사용량 증가, systemd 재시작, container
 OOM·비정상 상태를 실패시킨다.
 
@@ -809,27 +849,6 @@ curl --fail --silent --show-error \
   --output /dev/null \
   'https://staging-api.runninggu.store/api/contests?size=1'
 ```
-
-GraphHopper 인스턴스 사양 시험은 계약 §9.1의 두 요청 세트를 먼저 고정한다. EC2에서 처음 실행하기
-전에 동일한 graph artifact와 server image로 로컬 운영 호환 container를 띄우고 다음 근거를 release
-evidence에 남긴다.
-
-1. `roundtrip.py --preset caps --zone all` 전체 지점·거리·seed별 HTTP status와 셀별 품질 상한 통과
-   후보 수
-2. 위 결과에서 HTTP 200·비어 있지 않은 `paths`가 확인된 정상 직접 요청의 exact
-   `point`·`round_trip.distance`·`round_trip.seed`·요청 옵션 목록
-3. graph artifact ID·server image digest·실행 명령·시작/종료 시각
-
-정상 직접 요청 목록은 로컬 회귀 기준선에서 합격한 모든 지점·거리 셀을 최소 하나씩 포함한다.
-EC2 결과를 본 뒤 실패한 요청을 목록에서 빼거나 다른 seed로 교체하지 않는다. artifact·image·profile
-또는 요청 옵션이 바뀌면 로컬 고정부터 다시 수행한다.
-
-30분 메모리·처리량 부하는 정상 직접 요청 세트만 고정 도착률로 반복한다. 이 세트에서는 모든 요청이
-5초 안에 HTTP 200과 비어 있지 않은 `paths`를 반환해야 하며 `no valid point` 400도 예외 없이 시험
-실패다. 별도로 전체 `caps/all` 회귀를 실행해 개별 400을 라우팅 실패로 집계하고, 로컬에서 합격한
-지점·거리 셀이 EC2에서도 seed 16개 중 품질 상한 통과 경로를 하나 이상 유지하는지 확인한다.
-`no valid point`를 성공으로 기록하거나 실패 건수에서 빼지 않되, 그 응답만으로 OOM이나 instance
-부족이라고 판정하지 않는다. OOM·5xx·timeout·재시작과 라우팅 실패 수를 분리해 결과에 남긴다.
 
 다음도 확인한다.
 
@@ -1103,6 +1122,6 @@ GraphHopper graph rollback은 §17.1과 같은 stop → 직전 상대 symlink �
 - Flyway·Importer·앱·GraphHopper·SMTP 스모크 결과
 - certbot 자동 갱신 dry-run
 - DB 백업과 실제 복원 리허설
-- 8GiB 재부팅 자동 복구와 30분 메모리·백업 동시 부하 합격 기록
-- 4GiB를 사용한다면 같은 시나리오 3회 연속 합격 기록
+- 8GiB 재부팅 자동 복구, 로컬 고정 정상 요청의 30분 메모리·백업 동시 부하, 전체 라우팅 회귀 합격 기록
+- 4GiB를 사용한다면 같은 요청 목록·도착률·동시성과 시나리오의 3회 연속 합격 기록
 - Android 스테이징 `BASE_URL` E2E

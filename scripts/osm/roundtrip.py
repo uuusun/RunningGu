@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import argparse
 import collections
+import json
 import math
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -26,6 +28,7 @@ import requests
 from roundtrip_cases import DISTANCE_CORRECTION, FILTER_KMS, LOCAL, METRO
 
 BASE = "http://127.0.0.1:8989"
+NO_VALID_POINT_PREFIX = "Could not find a valid point after "
 
 #: 러닝에 좋은 길. 보행로·산책로·자전거도로 계열.
 GOOD = {"footway", "path", "pedestrian", "cycleway", "track"}
@@ -66,20 +69,77 @@ def meters(a: list[float], b: list[float]) -> float:
     return 6371000 * 2 * math.asin(math.sqrt(h))
 
 
+def route_observation(
+        lat: float, lng: float, km: float, seed: int, profile: str) -> dict:
+    """직접 요청의 status와 실패 분류를 좌표·응답 본문 없이 남긴다."""
+    started = time.perf_counter()
+    try:
+        response = requests.get(
+            f"{BASE}/route",
+            params={
+                "point": f"{lat},{lng}", "profile": profile, "algorithm": "round_trip",
+                "round_trip.distance": int(km * 1000), "round_trip.seed": seed,
+                "points_encoded": "false", "elevation": "true",
+                "instructions": "true", "details": ["road_class"],
+            },
+            timeout=120,
+        )
+    except requests.RequestException as error:
+        return {
+            "seed": seed,
+            "status": None,
+            "elapsedSeconds": time.perf_counter() - started,
+            "errorType": type(error).__name__,
+            "candidate": None,
+        }
+
+    elapsed = time.perf_counter() - started
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if response.status_code != 200:
+        message = payload.get("message") if isinstance(payload, dict) else None
+        error_type = (
+            "NoValidPoint"
+            if response.status_code == 400
+            and isinstance(message, str)
+            and message.startswith(NO_VALID_POINT_PREFIX)
+            else f"Http{response.status_code}"
+        )
+        return {
+            "seed": seed,
+            "status": response.status_code,
+            "elapsedSeconds": elapsed,
+            "errorType": error_type,
+            "candidate": None,
+        }
+
+    try:
+        paths = payload.get("paths") if isinstance(payload, dict) else None
+        if not isinstance(paths, list) or not paths:
+            raise ValueError("paths가 비어 있습니다.")
+        candidate = _parse(paths[0], seed)
+    except (KeyError, TypeError, ValueError, IndexError):
+        return {
+            "seed": seed,
+            "status": response.status_code,
+            "elapsedSeconds": elapsed,
+            "errorType": "InvalidResponse",
+            "candidate": None,
+        }
+    return {
+        "seed": seed,
+        "status": response.status_code,
+        "elapsedSeconds": elapsed,
+        "errorType": None,
+        "candidate": candidate,
+    }
+
+
 def route(lat: float, lng: float, km: float, seed: int, profile: str) -> dict | None:
-    r = requests.get(
-        f"{BASE}/route",
-        params={
-            "point": f"{lat},{lng}", "profile": profile, "algorithm": "round_trip",
-            "round_trip.distance": int(km * 1000), "round_trip.seed": seed,
-            "points_encoded": "false", "elevation": "true",
-            "instructions": "true", "details": ["road_class"],
-        },
-        timeout=120,
-    )
-    if r.status_code != 200:
-        return None
-    return _parse(r.json()["paths"][0], seed)
+    return route_observation(lat, lng, km, seed, profile)["candidate"]
 
 
 def _parse(p: dict, seed: int) -> dict:
@@ -198,7 +258,30 @@ def cap_flags(c: dict, km: float) -> dict[str, bool]:
     }
 
 
-def caps_stats(seeds: int, zone: str) -> None:
+def observation_evidence(item: dict, target_km: float) -> dict:
+    candidate = item["candidate"]
+    return {
+        "seed": item["seed"],
+        "status": item["status"],
+        "elapsedSeconds": item["elapsedSeconds"],
+        "errorType": item["errorType"],
+        "eligible": bool(candidate and all(cap_flags(candidate, target_km).values())),
+        "metrics": None if not candidate else {
+            "routeKm": candidate["km"],
+            "gainPerKm": candidate["gain"] / max(candidate["km"], 0.1),
+            "roadPercent": candidate["road"],
+            "turnsPerKm": candidate["turns"] / max(candidate["km"], 0.1),
+            "stairPercent": candidate["stair"],
+        },
+    }
+
+
+def caps_stats(
+        seeds: int,
+        zone: str,
+        evidence_path: Path | None = None,
+        artifact_id: str | None = None,
+        server_image_digest: str | None = None) -> dict | None:
     """계약 상한을 그대로 적용한 커버리지와 **탈락 사유**.
 
     백엔드 회귀 기준으로 쓴다. 통과 0건인 지점은 어느 상한이 몇 개를 걸렀는지,
@@ -211,14 +294,38 @@ def caps_stats(seeds: int, zone: str) -> None:
         pts += [(n, a, b, "지방") for n, a, b in LOCAL]
 
     cells, misses = [], []
+    evidence_cells = []
+    normal_requests = []
     for nm, la, lo, z in pts:
         for km in FILTER_KMS:
-            cands = [route(la, lo, km * DISTANCE_CORRECTION, s, "run") for s in range(seeds)]
-            cands = [c for c in cands if c]
+            observations = [
+                route_observation(la, lo, km * DISTANCE_CORRECTION, seed, "run")
+                for seed in range(seeds)
+            ]
+            cands = [item["candidate"] for item in observations if item["candidate"]]
             ok = [c for c in cands if all(cap_flags(c, km).values())]
             cells.append((nm, z, km, cands, ok))
             if not ok:
                 misses.append((nm, z, km, cands))
+            evidence_cells.append({
+                "name": nm,
+                "zone": z,
+                "latitude": la,
+                "longitude": lo,
+                "targetKm": km,
+                "requests": [observation_evidence(item, km) for item in observations],
+            })
+            if ok:
+                selected = contract_pick(ok, km)
+                normal_requests.append({
+                    "name": nm,
+                    "zone": z,
+                    "latitude": la,
+                    "longitude": lo,
+                    "targetKm": km,
+                    "distanceM": int(km * 1_000 * DISTANCE_CORRECTION),
+                    "seed": selected["seed"],
+                })
 
     total = len(cells)
     passed = sum(1 for *_, ok in cells if ok)
@@ -263,9 +370,126 @@ def caps_stats(seeds: int, zone: str) -> None:
     picked = [contract_pick(ok, km) for _, _, km, _, ok in cells if ok]
     stairs = sorted(c["stair"] for c in picked)
     over = [c for c in picked if c["stair"] > STAIR_REGRESSION]
-    print(f"  0% 인 경로 {sum(1 for v in stairs if v == 0)}/{len(stairs)}"
-          f" · 중앙 {pct(stairs, 0.5):.2f}% · 최대 {stairs[-1]:.2f}%")
-    print(f"  기준 초과 {len(over)}건 — {'없음' if not over else '확인 필요'}")
+    if stairs:
+        print(f"  0% 인 경로 {sum(1 for v in stairs if v == 0)}/{len(stairs)}"
+              f" · 중앙 {pct(stairs, 0.5):.2f}% · 최대 {stairs[-1]:.2f}%")
+        print(f"  기준 초과 {len(over)}건 — {'없음' if not over else '확인 필요'}")
+    else:
+        print("  선택 가능한 경로 0건 — 확인 필요")
+
+    if evidence_path is not None:
+        evidence = {
+            "schemaVersion": 1,
+            "artifactId": artifact_id,
+            "serverImageDigest": server_image_digest,
+            "profile": "run",
+            "requestOptions": {
+                "algorithm": "round_trip",
+                "pointsEncoded": False,
+                "elevation": True,
+                "instructions": True,
+                "details": ["road_class"],
+            },
+            "seedCount": seeds,
+            "cells": evidence_cells,
+            "normalRequests": normal_requests,
+            "summary": {
+                "cellCount": len(cells),
+                "eligibleCellCount": len(normal_requests),
+                "directRequestCount": sum(
+                    len(cell["requests"]) for cell in evidence_cells
+                ),
+                "noValidPointCount": sum(
+                    item["errorType"] == "NoValidPoint"
+                    for cell in evidence_cells
+                    for item in cell["requests"]
+                ),
+            },
+        }
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        with evidence_path.open("x", encoding="utf-8", newline="\n") as output:
+            json.dump(evidence, output, ensure_ascii=False, indent=2)
+            output.write("\n")
+        print(f"\n회귀 기준선·정상 직접 요청 세트: {evidence_path}")
+        return evidence
+    return None
+
+
+def load_evidence(path: Path) -> dict:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("회귀 기준선 JSON을 읽을 수 없습니다.") from error
+    if not isinstance(payload, dict) or payload.get("schemaVersion") != 1:
+        raise ValueError("회귀 기준선 schemaVersion은 1이어야 합니다.")
+    if not isinstance(payload.get("cells"), list):
+        raise ValueError("회귀 기준선 cells가 배열이 아닙니다.")
+    return payload
+
+
+def compare_evidence(baseline: dict, current: dict) -> list[str]:
+    """로컬 성공 요청과 셀 커버리지가 EC2에서 후퇴했는지 대조한다."""
+    errors = []
+    for field in (
+            "artifactId", "serverImageDigest", "profile", "requestOptions", "seedCount"):
+        if baseline.get(field) != current.get(field):
+            errors.append(f"{field}가 로컬 기준선과 다릅니다.")
+
+    def cells_by_key(payload: dict) -> dict[tuple[str, int], dict]:
+        return {
+            (cell["name"], cell["targetKm"]): cell
+            for cell in payload.get("cells", [])
+            if isinstance(cell, dict) and "name" in cell and "targetKm" in cell
+        }
+
+    baseline_cells = cells_by_key(baseline)
+    current_cells = cells_by_key(current)
+    if baseline_cells.keys() != current_cells.keys():
+        errors.append("지점·거리 셀 목록이 로컬 기준선과 다릅니다.")
+
+    for key in sorted(baseline_cells.keys() & current_cells.keys()):
+        baseline_cell = baseline_cells[key]
+        current_cell = current_cells[key]
+        for field in ("zone", "latitude", "longitude", "targetKm"):
+            if baseline_cell.get(field) != current_cell.get(field):
+                errors.append(f"{key[0]} {key[1]}km의 {field}가 기준선과 다릅니다.")
+        baseline_requests = {
+            item.get("seed"): item
+            for item in baseline_cell.get("requests", [])
+            if isinstance(item, dict)
+        }
+        current_requests = {
+            item.get("seed"): item
+            for item in current_cell.get("requests", [])
+            if isinstance(item, dict)
+        }
+        if baseline_requests.keys() != current_requests.keys():
+            errors.append(f"{key[0]} {key[1]}km seed 목록이 기준선과 다릅니다.")
+            continue
+        for seed, baseline_request in baseline_requests.items():
+            current_request = current_requests[seed]
+            if baseline_request.get("status") == 200 and baseline_request.get("errorType") is None:
+                if current_request.get("status") != 200 or current_request.get("errorType") is not None:
+                    errors.append(
+                        f"{key[0]} {key[1]}km seed {seed}의 로컬 성공 직접 요청이 실패했습니다."
+                    )
+        if any(item.get("eligible") is True for item in baseline_requests.values()):
+            if not any(item.get("eligible") is True for item in current_requests.values()):
+                errors.append(f"{key[0]} {key[1]}km의 품질 상한 통과 경로가 0건입니다.")
+
+    baseline_eligible = sum(
+        any(item.get("eligible") is True for item in cell.get("requests", []))
+        for cell in baseline_cells.values()
+    )
+    current_eligible = sum(
+        any(item.get("eligible") is True for item in cell.get("requests", []))
+        for cell in current_cells.values()
+    )
+    if current_eligible < baseline_eligible:
+        errors.append(
+            f"합격 지점·거리 셀이 {baseline_eligible}건에서 {current_eligible}건으로 감소했습니다."
+        )
+    return errors
 
 
 # ── 골목 회피 · 하천 유도 ──────────────────────────────────────
@@ -497,7 +721,23 @@ def main() -> int:
     ap.add_argument("--km", type=float, default=5)
     ap.add_argument("--profile", default="run", choices=("run", "foot"))
     ap.add_argument("--seeds", type=int, default=16)
+    ap.add_argument("--evidence", type=Path,
+                    help="caps/all 회귀 기준선과 정상 직접 요청 세트를 새 JSON 파일로 기록")
+    ap.add_argument("--baseline", type=Path,
+                    help="--evidence 결과를 로컬 회귀 기준선과 대조")
+    ap.add_argument("--artifact-id",
+                    help="--evidence에 기록할 활성 graph artifact ID")
+    ap.add_argument("--server-image-digest",
+                    help="--evidence에 기록할 GraphHopper server image digest")
     args = ap.parse_args()
+
+    if args.evidence is not None:
+        if args.preset != "caps" or args.zone != "all" or args.seeds != 16:
+            ap.error("--evidence는 --preset caps --zone all --seeds 16에서만 사용합니다.")
+        if not args.artifact_id or not args.server_image_digest:
+            ap.error("--evidence에는 --artifact-id와 --server-image-digest가 필요합니다.")
+    if args.baseline is not None and args.evidence is None:
+        ap.error("--baseline에는 현재 결과를 쓸 --evidence가 필요합니다.")
 
     try:
         requests.get(f"{BASE}/health", timeout=5)
@@ -535,7 +775,26 @@ def main() -> int:
         filter_stats(args.profile, args.seeds)
 
     elif args.preset == "caps":
-        caps_stats(args.seeds, args.zone)
+        evidence = caps_stats(
+            args.seeds,
+            args.zone,
+            args.evidence,
+            args.artifact_id,
+            args.server_image_digest,
+        )
+        if args.baseline is not None:
+            try:
+                baseline = load_evidence(args.baseline)
+            except ValueError as error:
+                print(f"회귀 기준선 검증 실패: {error}", file=sys.stderr)
+                return 2
+            errors = compare_evidence(baseline, evidence)
+            if errors:
+                print("\n로컬 회귀 기준선 대비 실패:", file=sys.stderr)
+                for error in errors:
+                    print(f"- {error}", file=sys.stderr)
+                return 1
+            print("\n로컬 회귀 기준선 대비 비회귀: PASS")
 
     elif args.preset == "water":
         water_stats(args.seeds, args.waterways)

@@ -123,8 +123,11 @@ backend/deploy/validation/
 수, 지점·거리 셀별 좌표와 seed별 status·실패 분류·품질 상한 통과 여부·경로 품질 수치,
 `normalRequests`를 가진다. 응답 geometry와 GraphHopper 오류 원문은 저장하지 않는다.
 `normalRequests`의 각 항목은 지점명·권역·고정 시험 좌표·목표거리·GraphHopper 요청거리·seed를
-가지며 `operational_load.py`는 이 목록만 소비한다. schema를 바꾸면 producer와 consumer, 이 문서와
-실행서를 같은 PR에서 함께 바꾼다.
+가지며 `operational_load.py`는 이 목록만 소비한다. 소비자는 실행 전에 caps/all 고정 fixture의 모든
+지점·거리 셀과 seed 0..15 결과가 남아 있는지, 합격한 각 셀에서 실제 합격 seed가 정확히 하나씩
+`normalRequests`에 선택됐는지 확인한다. 따라서 결과를 본 뒤 셀이나 실패 요청을 함께 삭제한 파일도
+부하 입력으로 받지 않는다. schema를 바꾸면 producer와 consumer, 이 문서와 실행서를 같은 PR에서
+함께 바꾼다.
 설치기와 활성 검증기는 `compose.env` 전체를 `source`하지 않고 `read-required-env.sh`로 각자 필요한
 `GRAPHHOPPER_*` key만 읽는다. 운영 `compose.env`는 `KEY=unquoted-value` 형식만 사용하고 값 전체를
 작은따옴표나 큰따옴표로 감싸지 않는다. parser는 Windows 편집기에서 생길 수 있는 줄 끝 CR 하나만
