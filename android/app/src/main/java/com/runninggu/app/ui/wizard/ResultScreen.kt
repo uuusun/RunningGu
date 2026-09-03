@@ -313,6 +313,21 @@ private fun Content(
             .collect { blockId -> blockId?.let(onCardCentered) }
     }
 
+    // **지도를 목록 밖에 둔다.** 안에 있으면 스크롤과 함께 위로 밀려 사라진다 — 아래
+    // 타임라인을 훑는 동안 "지금 보는 장소가 어디쯤인가" 를 볼 수 없다. §4.10 의
+    // 지도↔타임라인 동기화는 **지도가 보이는 동안** 의미가 있다(#208).
+    //
+    // 목록 안의 `item(key = "map")` 이었던 것을 위로 뺐다. 동기화는 `visibleItemsInfo` 의
+    // **key** 로 카드를 찾으므로(269 · 303행) 항목이 하나 빠져도 영향이 없다.
+    Column(Modifier.fillMaxWidth()) {
+    // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
+    // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
+    // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
+    DayMap(
+        state = state,
+        onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
+    )
+
     LazyColumn(
         state = listState,
         modifier = Modifier
@@ -328,16 +343,6 @@ private fun Content(
                 }
             },
     ) {
-        // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
-        item(key = "map") {
-            // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
-            // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
-            DayMap(
-                state = state,
-                onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
-            )
-        }
-
         item(key = "summary") {
             Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                 state.result?.recovery?.let {
@@ -422,6 +427,7 @@ private fun Content(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
     }
 }
 
