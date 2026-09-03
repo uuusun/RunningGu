@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.runninggu.app.ui.model.FestivalSummary
+import kotlinx.coroutines.launch
 
 /**
  * 홈 축제 캐러셀. 좌우로 넘기고, 궁금한 것을 누르면 그 카드만 커진다. (이슈 #247 · SPEC §4.4-4)
@@ -58,14 +61,15 @@ import com.runninggu.app.ui.model.FestivalSummary
  * 튜닝으로 좁혀지는 문제가 아니라 한 자리를 둘이 쓰려던 것이었다. 반면 여기는 위에
  * 겹치는 것이 없어 탭·스크롤·확대가 다 된다. **§4.4-4 가 애초에 캐러셀로 정해 둔 자리다.**
  *
- * ## 이미지는 아직 안 붙는다
+ * ## 사진은 KTO 가 https 로 준다
  *
- * [FestivalSummary.imageUrl] 을 받지만 지금은 그리지 않는다. Coil 이 #247 에서 승인됐는데
- * KTO `firstimage` 가 `http://` 라 `targetSdk 36` 의 cleartext 차단에 걸린다 — 서버가
- * https 로 정규화해 주는 것이 선행 조건이다.
+ * [FestivalSummary.imageUrl] 을 Coil 로 받는다. #247 은 KTO `firstimage` 가 `http://` 라
+ * `targetSdk 36` 의 cleartext 차단에 걸린다고 봤는데, **실제 응답은 전부 https 였다** —
+ * 홈 축제 20건 · 인근 축제 22건 모두. 근거였던 API 명세서 431행 예시가 낡은 것이었다.
  *
- * 그때까지도 화면은 성립해야 한다. 명세 §4-1 이 *"`imageUrl` 은 nullable 이며 없으면 앱이
- * 기본 placeholder 를 표시한다"* 고 정해 두었으므로 **없을 때의 모습은 임시가 아니라 계약**이다.
+ * 그래도 **없을 때의 모습이 있어야 한다.** 명세 §4-1 이 `imageUrl` 을 nullable 로 두고
+ * *"없으면 앱이 기본 placeholder 를 표시한다"* 고 정했으므로, 사진을 바탕 위에 얹기만
+ * 하고 바탕은 늘 깔아 둔다.
  */
 @Composable
 fun FestivalCarousel(
@@ -75,8 +79,11 @@ fun FestivalCarousel(
 ) {
     // 펼친 카드. 한 번 더 누르면 접힌다 — 닫을 다른 방법을 따로 만들지 않아도 된다
     var expandedId by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LazyRow(
+        state = listState,
         modifier = modifier,
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -86,7 +93,24 @@ fun FestivalCarousel(
                 festival = festival,
                 expanded = festival.id == expandedId,
                 onClick = {
-                    expandedId = if (festival.id == expandedId) null else festival.id
+                    val opening = festival.id != expandedId
+                    expandedId = if (opening) festival.id else null
+                    // **고른 카드를 가운데로 끌어온다** (#262 후속). 오른쪽 끝에 반쯤
+                    // 걸린 카드를 눌렀을 때가 문제다 — 제자리에서 커지기만 하면 커진
+                    // 만큼 더 화면 밖으로 나가서, 확대했는데 오히려 덜 보인다.
+                    //
+                    // `animateScrollToItem` 의 `scrollOffset` 은 **뷰포트 왼쪽 기준**이라
+                    // 음수를 주면 그만큼 오른쪽으로 밀린다. 펼친 카드 폭의 절반만큼
+                    // 밀면 가운데에 선다.
+                    if (opening) {
+                        scope.launch {
+                            listState.animateScrollToItem(
+                                index = festivals.indexOfFirst { it.id == festival.id }
+                                    .coerceAtLeast(0),
+                                scrollOffset = -CENTER_OFFSET_PX,
+                            )
+                        }
+                    }
                 },
             )
         }
@@ -125,7 +149,7 @@ private fun FestivalCard(
                 contentDescription = buildString {
                     append(festival.name)
                     if (festival.isOngoing) append(", 진행 중")
-                    append(", ").append(festival.period).append(' ').append(festival.region)
+                    append(", ").append(festivalPeriodAndRegion(festival.period, festival.region))
                     append(if (expanded) ", 펼침" else ", 눌러서 크게 보기")
                 }
             },
@@ -154,7 +178,10 @@ private fun FestivalCard(
             )
             Spacer6()
             Text(
-                text = "${festival.period} · ${festival.region}",
+                // **직접 이어 붙이지 않는다.** 지역이 빈 축제가 있어서
+                // (§4-1 — `addr1` 로 17개 시도를 못 가리면 `region: ""` 로 유지) 그대로
+                // 이으면 "08.01~08.09 · " 로 끝이 잘려 보인다 (#262 리뷰)
+                text = festivalPeriodAndRegion(festival.period, festival.region),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -230,3 +257,12 @@ private val EXPANDED_WIDTH: Dp = 300.dp
 
 private val COLLAPSED_IMAGE: Dp = 116.dp
 private val EXPANDED_IMAGE: Dp = 186.dp
+
+/**
+ * 펼친 카드를 가운데로 보내는 밀림값(px).
+ *
+ * `LazyRow` 는 dp 를 안 받으므로 대략치를 쓴다 — 화면 폭이 기기마다 달라 정확히 가운데를
+ * 맞추려면 `BoxWithConstraints` 로 폭을 재야 하는데, **완전히 정확할 필요가 없다.**
+ * 오른쪽 끝에 걸린 카드가 화면 안으로 들어오면 목적은 이룬다.
+ */
+private const val CENTER_OFFSET_PX = 220

@@ -212,8 +212,8 @@ Compose 화면
 | 달력·지도·코스·관광 아이콘 | Navigation/scroll | 지도=`courses` · 코스=`courses?tab=region` | 없음 | LOCAL_STATE | **지도와 코스는 같은 S8 의 다른 탭**(SPEC §4.4-2) — 지도는 [출발지 주변], 코스는 [지역별]. 탭은 좌표와 달리 route 인자로 넘긴다(감출 값이 아니다 · D-15 대비). 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
-| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
-| 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 축제 카드 탭 | 로컬 상태 | 없음 | 없음 | LOCAL_STATE | **제자리 확대**(카드 200→300dp · 사진 116→186dp) + 고른 카드를 가운데로 스크롤. 화면 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
 
 홈 마감 임박은 4건으로 확정했다(D-03). 홈 축제는 사용자 위치를 받지 않는 전국 월간 목록이다(D-04).

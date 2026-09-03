@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -43,11 +44,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
@@ -441,13 +444,22 @@ private fun NearbyFestivalSection(
 @Composable
 private fun FestivalRow(festival: NearbyFestival) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // TODO(AP-19): imageUrl을 Coil로 로딩한다. 지금은 자리만 잡아둔다.
+        // KTO `firstimage`. **없으면 빈 자리를 그대로 둔다** — 명세 §8.3 이 nullable 로
+        // 두었고, 사진 하나 없다고 축제를 목록에서 빼지 않는다(§3-5).
         Surface(
             modifier = Modifier.size(56.dp),
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
-            Box(Modifier.background(Color.Transparent))
+            if (festival.imageUrl != null) {
+                AsyncImage(
+                    model = festival.imageUrl,
+                    // 축제 이름·기간·거리를 옆에서 이미 읽어 준다 — 사진은 장식이다
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
