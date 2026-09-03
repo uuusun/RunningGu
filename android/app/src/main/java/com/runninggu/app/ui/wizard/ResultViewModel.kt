@@ -137,9 +137,11 @@ class ResultViewModel(
      * 막는다 — 회전이나 재진입으로 `LaunchedEffect` 가 다시 도는 경우다([generate] 와
      * 같은 이유).
      */
-    fun restore(itineraryId: Long) {
+    fun restore(itineraryId: Long, force: Boolean = false) {
         val current = _uiState.value
-        if (current.restoredItineraryId == itineraryId &&
+        // [다시 시도] 는 같은 id 로 다시 부르는 것이라 위 가드에 걸린다. `force` 로 넘긴다
+        if (!force &&
+            current.restoredItineraryId == itineraryId &&
             current.phase in setOf(ResultUiState.Phase.LOADING, ResultUiState.Phase.CONTENT)
         ) {
             return
@@ -194,6 +196,14 @@ class ResultViewModel(
 
     /** 오류 상태의 [다시 시도]. 같은 입력으로 재요청한다. (SPEC §4.10) */
     fun retry() {
+        // **복원으로 들어온 화면은 다시 생성하면 안 된다** (#257 리뷰).
+        // 복원에는 `lastRequest` 가 없어서 예전에는 [다시 시도] 가 아무 일도 안 했다 —
+        // 오류 화면에 버튼만 있고 눌러도 그대로였다.
+        val restoredId = _uiState.value.restoredItineraryId
+        if (restoredId != null) {
+            restore(restoredId, force = true)
+            return
+        }
         lastRequest?.let(::send)
     }
 

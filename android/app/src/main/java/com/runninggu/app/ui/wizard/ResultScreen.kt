@@ -431,6 +431,15 @@ private fun Content(
                     RecoveryBadge(label = it.label, text = it.note)
                 }
 
+                // **대회가 바뀐 저장 동선은 그렇다고 말한다** (#257 리뷰 · 매핑표 S7-R).
+                // 안 알리면 저장해 둔 일정이 최신 대회와 어긋난 채로 정상처럼 보인다.
+                // 재생성 CTA 는 P0 밖이라(저장 후 편집이 블록 API 로 가야 한다 · #213)
+                // **알리는 것까지만** 한다 — 못 고치는 버튼을 두는 것보다 낫다
+                if (state.needsRegeneration) {
+                    Spacer(Modifier.height(16.dp))
+                    ContestChangedNotice()
+                }
+
                 Spacer(Modifier.height(16.dp))
                 SummaryRow(title = state.title, placeCount = state.placeCount)
 
@@ -513,6 +522,41 @@ private fun Content(
 }
 
 /** 회복 배지. `noHard` 종목에만 나온다. (SPEC §4.10 · §5.6-6) */
+/**
+ * 저장한 뒤 대회 정보가 바뀌었다는 안내. (§5-3 · §5-5 · 매핑표 S7-R)
+ *
+ * **일정은 저장 시점 그대로 둔다.** 최신 대회로 갈아 끼우면 사용자가 저장해 둔 것과 다른
+ * 것을 보게 된다 — 바뀐 사실만 알리고 다시 만들지는 사용자가 정한다.
+ *
+ * **재생성 CTA 는 P0 에 없다.** 그건 `POST /itineraries/generate` 로 새로 만들고
+ * `PUT /itineraries/{id}` 로 교체하는 흐름인데, 저장 후 편집 자체가 아직 앱에 없다(#213).
+ * 누르면 아무 일도 안 하는 버튼을 두느니 **안내만 정확히 하는 편**이 낫다.
+ */
+@Composable
+private fun ContestChangedNotice() {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = "대회 정보가 바뀌었어요",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "저장한 일정은 그대로 두었어요. 날짜·장소가 달라졌을 수 있으니 " +
+                    "대회 상세에서 확인해 주세요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
 @Composable
 private fun RecoveryBadge(label: String, text: String) {
     Surface(

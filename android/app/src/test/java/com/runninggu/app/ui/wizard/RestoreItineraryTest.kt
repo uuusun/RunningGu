@@ -249,4 +249,36 @@ class RestoreItineraryTest {
         assertFalse(ResultUiState(restoredItineraryId = 42L).editingEnabled)
     }
 
+
+    @Test
+    fun `복원 오류에서 다시 시도하면 그 동선을 다시 조회한다`() = runTest(dispatcher) {
+        // **예전에는 아무 일도 안 했다** (#257 리뷰). `retry()` 가 생성 경로의
+        // `lastRequest` 만 다시 보내는데 복원 진입에는 그게 없다 — 오류 화면에 버튼만
+        // 있고 눌러도 그대로였다
+        val repo = FakeDetailRepository(failure = IOException("boom"))
+        val viewModel = ResultViewModel(repository = repo)
+        viewModel.restore(42L)
+        advanceUntilIdle()
+        assertEquals(ResultUiState.Phase.ERROR, viewModel.uiState.value.phase)
+        assertEquals(1, repo.detailCalls)
+
+        viewModel.retry()
+        advanceUntilIdle()
+
+        assertEquals(2, repo.detailCalls)
+    }
+
+    @Test
+    fun `대회가 바뀌었으면 상태가 그것을 들고 있다`() = runTest(dispatcher) {
+        // 화면이 이 값으로 안내를 띄운다. 안 알리면 저장해 둔 일정이 최신 대회와
+        // 어긋난 채로 정상처럼 보인다 (매핑표 S7-R)
+        val viewModel = ResultViewModel(
+            repository = FakeDetailRepository(detail = detail(needsRegeneration = true)),
+        )
+        viewModel.restore(42L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.needsRegeneration)
+    }
+
 }
