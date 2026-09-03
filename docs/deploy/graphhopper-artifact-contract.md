@@ -479,16 +479,40 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 
 시작 heap과 hard limit 후보값은 측정하며 바꿀 수 있지만 다음 합격 기준은 측정 전에 고정한다.
 
-### 9.1 시험 시나리오
+### 9.1 시험 시나리오와 요청 세트
 
-1. cold boot와 GraphHopper 내부 스모크를 수행한다.
-2. `roundtrip.py --preset caps --zone all`을 한 번 실행해 warm-up한다.
-3. 같은 preset을 반복하는 30분 부하 중 수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
-4. 메모리·swap·GC·systemd `NRestarts`·container 상태를 5초 간격으로 기록하고,
+라우팅 품질 회귀와 인스턴스 메모리·처리량 판정을 같은 성공률로 섞지 않는다. GraphHopper
+`/route` 한 번을 **직접 요청**, 같은 지점·목표거리에서 seed를 순회한 결과를 **지점·거리 셀**로
+부른다. HTTP 400 `Could not find a valid point after ... tries`는 GraphHopper가 해당 seed의 내부
+경유점을 routable edge에 snap하지 못한 **직접 요청 실패**다. 이를 성공으로 바꾸거나 실패 건수에서
+빼지 않는다. 다만 응답을 정상 부하 OOM·timeout·HTTP 5xx와 같은 인프라 장애로 분류하지도 않는다.
+
+EC2 첫 실행 전에 동일한 graph artifact·server image·profile·요청 옵션으로 로컬 운영 호환
+container에서 다음 두 결과를 고정한다.
+
+- **회귀 기준선**: `roundtrip.py --preset caps --zone all`의 전체 지점·거리·seed별 status와
+  지점·거리 셀별 품질 상한 통과 후보 수를 release evidence에 남긴다. 개별 `no valid point` 400은
+  실패로 집계하되, 셀 합격은 16개 seed 중 품질 상한을 통과한 경로가 하나 이상인지로 판정한다.
+- **정상 직접 요청 세트**: 회귀 기준선에서 HTTP 200과 비어 있지 않은 `paths`가 확인된 고정
+  `point`·`round_trip.distance`·`round_trip.seed` 조합만 부하 입력으로 사용한다. 회귀 기준선에서
+  합격한 모든 지점·거리 셀을 최소 한 조합으로 포함하고, exact 목록·GraphHopper 요청 옵션·artifact
+  ID·server image digest를 release evidence에 고정한다.
+
+정상 직접 요청 세트는 첫 EC2 결과를 본 뒤 실패 조합을 빼거나 성공 조합으로 교체하지 않는다.
+artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 기준선과 세트를 새로 고정하고 EC2
+시험도 처음부터 다시 한다. 정상 직접 요청 세트는 메모리·처리량 판정용이고, 전체 회귀 기준선은
+라우팅 커버리지 판정용이다. 어느 한쪽 결과를 다른 쪽의 합격 근거로 대신하지 않는다.
+
+1. 위 로컬 회귀 기준선과 정상 직접 요청 세트를 고정한다.
+2. cold boot와 GraphHopper 내부 스모크를 수행한다.
+3. `roundtrip.py --preset caps --zone all`을 한 번 실행해 warm-up하고 로컬 회귀 기준선과 대조한다.
+4. 정상 직접 요청 세트를 고정 도착률로 반복하는 30분 부하 중 수동 전체 백업 1회와 WAL 감시
+   3회를 실행한다.
+5. 메모리·swap·GC·systemd `NRestarts`·container 상태를 5초 간격으로 기록하고,
    verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각 기록한다.
-5. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
-6. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
-7. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
+6. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
+7. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
+8. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
 
 8GiB와 4GiB 비교에서는 `roundtrip.py` 반복 횟수·요청률·동시성을 시험 전에 고정해 기록한다.
 작은 instance에서 처리가 느려져 자동으로 요청 수가 줄어드는 closed-loop 결과를 같은 부하로
@@ -502,8 +526,9 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 | 메모리 여유 | 모든 5초 표본에서 host `MemAvailable`이 전체 RAM의 20% 이상 |
 | swap | warm-up 뒤 `vmstat`의 swap-in·swap-out 지속 발생 0, swap 사용량 증가 없음 |
 | GC | readiness 이후 반복 Full GC 0건 |
-| GraphHopper 시간 | 모든 GraphHopper 직접 요청이 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. seed 16개 묶음의 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
-| 회귀 | `--preset caps --zone all`의 기존 커버리지·거리·상승·차도·회전 상한 비회귀 |
+| GraphHopper 직접 요청 | §9.1의 정상 직접 요청 세트가 모두 HTTP 200·비어 있지 않은 `paths`로 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. `no valid point`를 포함한 4xx, 5xx, 빈 `paths`, timeout은 모두 실패. 직접 요청 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
+| 라우팅 회귀 | `--preset caps --zone all`의 모든 직접 요청 status와 `no valid point` 건수를 기록. 로컬 기준선에서 합격한 지점·거리 셀은 EC2에서도 16개 seed 중 품질 상한 통과 경로가 하나 이상이어야 하며 기존 커버리지·거리·상승·차도·회전 상한이 비회귀. 기준선에서 성공한 동일 요청이 EC2에서 400이 되거나 합격 셀의 모든 seed가 실패하면 불합격 |
+| 실패 분류 | `no valid point` 400은 직접 요청·라우팅 실패이며 성공 수에 넣지 않음. 다만 이 응답만으로 OOM·instance 부족으로 판정하지 않고 OOM·5xx·timeout·재시작 지표와 분리 기록. 그 밖의 4xx는 요청·profile·배포 설정 오류로 분류해 불합격 |
 | 프로파일 | server graph에 `run`과 `run` LM만 존재하고 `foot` 없음 |
 | 백업 | 수동 full backup·pgBackRest check·WAL 감시 성공, 실패 알림 0건 |
 | 재부팅 | import 로그 0건, 기존 artifact 재사용. 배포는 verify oneshot 시작, 재부팅은 GraphHopper unit activation 시작부터 검증 시간을 포함해 2분 안에 GraphHopper·Spring readiness 성공 |
@@ -513,6 +538,11 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 맞춰 낮추지 않는다. 시험 명령·시작/종료 시각·instance type·heap·hard limit·artifact ID를 결과와
 함께 남긴다. graph hash 검증 시간을 줄여 보이려고 시험 직전 page cache를 인위적으로 데우거나
 비우지 않는다.
+
+이 절은 인스턴스 사양과 GraphHopper 직접 요청의 시험 계약이다. Spring Boot가 특정 seed 실패 뒤
+다음 seed를 계속 호출할지, 일부 후보로 정상·degraded 결과를 반환할지는 제품 동작 계약이므로 이
+문서에서 바꾸지 않는다. 해당 동작을 변경하려면 `SPEC.md`·API 계약과 백엔드 테스트를 별도 PR에서
+먼저 합의한다.
 
 ### 9.3 hard-limit fault-isolation — instance 합격과 별도
 
