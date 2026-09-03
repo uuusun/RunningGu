@@ -87,6 +87,7 @@ import com.runninggu.app.ui.map.RunningGuMap
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -1237,30 +1238,27 @@ private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
  */
 @Composable
 private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
-    Surface(shadowElevation = 8.dp) {
-        Column(
-            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+    BottomActionBar {
+        Button(
+            onClick = onSave,
+            enabled = canSave,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
         ) {
-            Button(
-                onClick = onSave,
-                enabled = canSave,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                Text(
-                    text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            if (save is SaveItineraryState.Failed) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = save.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            Text(
+                text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        // 실패 문구는 **같은 바 안에** 둔다. 바깥에 두면 그림자 경계 위로 떠서 다른 층처럼 보인다
+        if (save is SaveItineraryState.Failed) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = save.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

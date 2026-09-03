@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.model.listKey
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -132,7 +133,12 @@ fun StayScreen(
             }
 
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxSize()) {
+            // **`fillMaxSize` 가 아니라 `weight(1f)` 다.** `Column` 안에서 `fillMaxSize` 는
+            // "남은 높이" 가 아니라 **부모가 준 최대 높이**를 그대로 가져간다. 위의 제목·
+            // 검색창이 이미 자리를 쓴 뒤라 이 Box 는 화면 밖까지 뻗고, 그 안의 `LazyColumn`
+            // 은 자기가 넉넉하다고 판단해 **스크롤을 만들지 않는다** — 목록이 화면 아래로
+            // 잘려 나가고 손가락을 움직여도 아무 일도 안 일어난다.
+            Box(Modifier.fillMaxWidth().weight(1f)) {
                 when (state.phase) {
                     StayUiState.Phase.LOADING -> LoadingState("숙소를 찾는 중…")
 
@@ -213,12 +219,11 @@ private fun StayRow(item: PoiItem, selected: Boolean, onSelect: () -> Unit) {
 /** CTA. 숙소를 골랐는지에 따라 문구가 갈린다. (SPEC §4.9) */
 @Composable
 private fun StayCta(hasStay: Boolean, onClick: () -> Unit) {
-    Surface(shadowElevation = 8.dp) {
+    BottomActionBar {
         Button(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .height(52.dp),
         ) {
             Text(

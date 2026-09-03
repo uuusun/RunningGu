@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runninggu.app.domain.RegistrationStatus
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -470,13 +471,12 @@ private fun FestivalRow(festival: NearbyFestival) {
 /** 하단 고정 CTA — "이 대회로 동선 만들기" → S4. (SPEC §4.6) */
 @Composable
 private fun StartWizardBar(onClick: () -> Unit, enabled: Boolean = true) {
-    Surface(shadowElevation = 8.dp) {
+    BottomActionBar {
         Button(
             onClick = onClick,
             enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .height(52.dp),
         ) {
             Text("이 대회로 동선 만들기", style = MaterialTheme.typography.titleMedium)
