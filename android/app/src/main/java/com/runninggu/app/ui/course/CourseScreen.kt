@@ -341,7 +341,15 @@ private fun CourseMap(state: CourseUiState) {
                 detail = "걷기 스팟은 아래 목록에서 볼 수 있어요.",
             )
 
-            else -> MapNotice(title = "지도", detail = null)
+            // **출발지를 정하기 전에도 지도를 띄운다.** 예전에는 회색 판에 "지도" 라는
+            // 글자만 있어서 **기능이 없는 것처럼** 보였다. 그릴 것이 없을 뿐 지도는
+            // 있다 — 빈 장면을 주면 카카오맵이 기본 카메라로 뜬다.
+            //
+            // SDK 초기화가 안 됐으면 `RunningGuMap` 이 자기 안내로 바꿔 그린다(#162).
+            else -> RunningGuMap(
+                scene = MapScene(),
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
