@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.httpErrorOf
@@ -112,7 +113,7 @@ class SaveFailureMessageTest {
     fun `네트워크가 끊긴 것은 따로 말한다`() {
         val message = ApiException.Network(IOException("offline")).saveMessage()
 
-        assertEquals("네트워크에 연결할 수 없어요.", message)
+        assertEquals(OFFLINE, message)
     }
 
     @Test

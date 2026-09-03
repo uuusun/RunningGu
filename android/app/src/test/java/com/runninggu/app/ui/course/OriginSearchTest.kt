@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import org.junit.Assert.assertEquals
@@ -28,6 +29,6 @@ class OriginSearchTest {
         val network = ApiException.Network(java.io.IOException("boom")).searchMessage()
 
         assertEquals("그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요.", noResult)
-        assertEquals("네트워크에 연결할 수 없어요.", network)
+        assertEquals(OFFLINE, network)
     }
 }

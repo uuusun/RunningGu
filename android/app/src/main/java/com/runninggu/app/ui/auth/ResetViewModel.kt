@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.apiErrorCode
@@ -64,7 +65,7 @@ class ResetViewModel(
      * §4.3-1 의 비노출은 여기서도 지켜진다.
      */
     private fun Throwable.resetFailureMessage(): String = when {
-        isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        isNetworkFailure() -> OFFLINE
         apiErrorCode() == ApiErrorCode.SEND_COOLDOWN ->
             "조금 전에 보냈어요. 메일함을 확인하고, 없으면 1분 뒤에 다시 시도해 주세요."
         else -> "메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."

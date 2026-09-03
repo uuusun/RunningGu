@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.AuthRepository
@@ -87,7 +88,7 @@ class ResetRequestTest {
         val state = submit(repository)
 
         assertFalse(state.sent)
-        assertEquals("네트워크에 연결되지 않았어요. 연결을 확인해 주세요.", state.errorMessage)
+        assertEquals(OFFLINE, state.errorMessage)
     }
 
     @Test
