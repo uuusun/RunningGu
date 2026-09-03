@@ -1,8 +1,10 @@
 package com.runninggu.app.ui.home
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.Festival
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.data.repository.ClosingSoon
 import com.runninggu.app.data.repository.ContestFilter
 import com.runninggu.app.data.repository.ContestPage
@@ -94,6 +96,51 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `축제 오류 문구가 없으면 화면 기본 문구에 맡긴다`() = runTest(dispatcher) {
+        // **#260 이 났던 자리는 함수가 아니라 ViewModel 이 어느 함수를 부르는가였다**
+        // (#272 리뷰). `sectionMessage()` 만 따로 부르는 테스트는 호출부를
+        // `userMessageOrDefault()` 로 되돌려도 초록불이다.
+        //
+        // 프록시가 HTML 오류 페이지를 주면 problem 이 null 이라 서버 문구가 없다.
+        // 그때 null 이어야 화면의 "축제 정보를 불러오지 못했어요" 가 산다
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = listOf(closingSoon(1, LocalDate.of(2026, 9, 1)))),
+            StubFestivalRepository(failure = httpErrorOf(502, "<html>502</html>")),
+        )
+        advanceUntilIdle()
+
+        assertNull((viewModel.uiState.value.festivals as SectionState.Error).message)
+    }
+
+    @Test
+    fun `마감 임박 오류도 같은 규칙이다`() = runTest(dispatcher) {
+        // 두 영역이 같은 헬퍼를 쓰는지 본다 — 한쪽만 고치면 나머지가 남는다
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(failure = httpErrorOf(500, null)),
+            StubFestivalRepository(festivals = listOf(festival())),
+        )
+        advanceUntilIdle()
+
+        assertNull((viewModel.uiState.value.closingSoon as SectionState.Error).message)
+    }
+
+    @Test
+    fun `네트워크가 끊기면 그 문구는 ViewModel 이 채운다`() = runTest(dispatcher) {
+        // 반대쪽도 고정한다. 전부 null 로 만들어도 위 두 개가 통과하기 때문이다 —
+        // 그러면 연결 문제일 때 "축제 정보를 불러오지 못했어요" 만 나온다
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = listOf(closingSoon(1, LocalDate.of(2026, 9, 1)))),
+            StubFestivalRepository(failure = ApiException.Network(java.io.IOException("끊김"))),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            OFFLINE,
+            (viewModel.uiState.value.festivals as SectionState.Error).message,
+        )
+    }
+
+    @Test
     fun `마감 임박이 죽어도 축제는 남는다`() = runTest(dispatcher) {
         val viewModel = HomeViewModel(
             RecordingContestRepository(failure = ApiException.Network(java.io.IOException("끊김"))),
@@ -160,7 +207,7 @@ class HomeViewModelTest {
 /** 넘겨받은 `limit` 을 기록하는 가짜 저장소. 홈은 [ContestRepository.closingSoon] 만 쓴다. */
 private class RecordingContestRepository(
     private val closingSoon: List<ClosingSoon> = emptyList(),
-    private val failure: ApiException? = null,
+    private val failure: Throwable? = null,
 ) : ContestRepository {
 
     var lastLimit: Int? = null
@@ -190,7 +237,7 @@ private class RecordingContestRepository(
 
 private class StubFestivalRepository(
     private val festivals: List<Festival> = emptyList(),
-    private val failure: ApiException? = null,
+    private val failure: Throwable? = null,
 ) : FestivalRepository {
 
     override suspend fun list(yearMonth: YearMonth?, size: Int): List<Festival> {

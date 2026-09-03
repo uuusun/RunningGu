@@ -31,6 +31,9 @@ class RunningGuApplication : Application() {
         // 화면에는 서버가 준 `title` 만 뜨므로 `code` 는 여기서만 보인다.
         // 단위 테스트는 Application 을 안 띄워 기본 no-op 그대로다
         apiFailureLogger = { Log.w(TAG, it) }
+        // 오프라인 폴백(`cached_contest`)을 켠다. **저장소를 처음 꺼내기 전에** 불러야
+        // 한다 — 늦게 부르면 캐시 없는 저장소가 이미 만들어져 있다 (이슈 #105)
+        ServiceLocator.bind(this)
         FavoriteStore.bind(appScope)
         // 저장된 세션을 올린다. 시작 화면이 SessionStore.restored 를 기다린다 (SPEC §2.2)
         SessionStore.bind(
