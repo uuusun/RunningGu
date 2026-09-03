@@ -4,7 +4,6 @@ import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.remote.ApiErrorCode
-import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.data.remote.ApiException
 import kotlinx.coroutines.delay
 
@@ -228,8 +227,12 @@ object FakeAuthRepository : AuthRepository {
     ): Result<AuthSession> {
         delay(NETWORK_DELAY_MS)
         offlineOrNull<AuthSession>(email)?.let { return it }
-        // 스텁도 서버와 같은 자리에서 막는다 — 가짜로 돌릴 때만 통과하면 화면이 거짓말을 한다
-        if (!ageOver14) return Result.failure(httpErrorOf(400, null))
+        // 스텁도 서버와 같은 자리에서 막는다 — 가짜로 돌릴 때만 통과하면 화면이 거짓말을 한다.
+        //
+        // **코드까지 서버와 맞춘다.** `problem` 이 null 인 400 을 주면 앱에서 `UNKNOWN` 으로
+        // 떨어져, 데모로 돌릴 때는 "가입에 실패했어요" 만 나오고 진짜 서버에서만 제 문구가
+        // 나온다 — 가짜가 화면을 다르게 만들면 스텁을 둘 이유가 없다 (#264 리뷰)
+        if (!ageOver14) return failure(400, ApiErrorCode.AGE_REQUIREMENT_NOT_MET)
         return Result.success(fakeSession(email, nickname, marketingAgreed))
     }
 

@@ -448,6 +448,11 @@ class SignupViewModel(
         cause.apiErrorCode() == ApiErrorCode.AGREEMENT_REQUIRED ->
             "필수 약관에 동의해야 가입할 수 있어요."
 
+        // **다시 눌러서는 안 풀린다.** A2 의 확인란을 지나쳐 온 요청이라 앞 단계로 돌아가야
+        // 한다 — 일반 문구로 두면 사용자가 같은 버튼만 누른다 (명세 오류표 894행)
+        cause.apiErrorCode() == ApiErrorCode.AGE_REQUIREMENT_NOT_MET ->
+            "만 14세 이상만 가입할 수 있어요. [뒤로] 를 눌러 확인해 주세요."
+
         else -> "가입에 실패했어요. 다시 시도해 주세요."
     }
 
@@ -492,6 +497,7 @@ class SignupViewModel(
      * |---|---|
      * | `409 KAKAO_ACCOUNT_DUPLICATED` | **이미 가입돼 있다.** A1 로 돌아가 로그인한다 |
      * | `401 INVALID_KAKAO_TOKEN` | 닉네임 고르는 사이 토큰이 만료됐다. **A1 부터 다시** 한다 |
+     * | `400 AGE_REQUIREMENT_NOT_MET` | 만 14세 확인 없이 왔다. **확인란으로 돌아간다** |
      *
      * 둘 다 **같은 버튼으로는 영영 안 풀린다.** 서버가 중복 시 자동 로그인을 시켜 주지
      * 않기로 했으므로(§1-8), 뭉뚱그리면 사용자가 A2 에 갇힌 채 같은 버튼만 누른다.
@@ -503,6 +509,9 @@ class SignupViewModel(
             "이미 가입된 카카오 계정이에요. 로그인 화면에서 [카카오로 시작하기]를 눌러 주세요."
         ApiErrorCode.INVALID_KAKAO_TOKEN ->
             "카카오 인증이 만료됐어요. 로그인 화면에서 다시 시작해 주세요."
+        // 카카오도 같은 검증을 한다. 서버는 **외부 호출보다 먼저** 막는다(명세 §1-8)
+        ApiErrorCode.AGE_REQUIREMENT_NOT_MET ->
+            "만 14세 이상만 가입할 수 있어요."
         else -> if (isNetworkFailure()) {
             "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
         } else {

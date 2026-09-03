@@ -1,11 +1,14 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiJson
+import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.remote.dto.AgreementsRequestDto
 import com.runninggu.app.data.remote.dto.KakaoSignupRequestDto
 import com.runninggu.app.data.remote.dto.SignupRequestDto
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +27,8 @@ import org.junit.Test
  * 1. 요청 본문에 `ageOver14` 가 **최상위로** 실린다 — `agreements` 안이 아니다
  * 2. **전체 동의가 이 값을 건드리지 않는다** — 명세가 "전체 동의로 자동 선택하지 않는다"
  * 3. 확인하지 않으면 **다음 단계로 못 간다**
+ * 4. 그래도 `false` 가 서버까지 가면 **거절 사유가 화면에 그대로 도착한다** —
+ *    스텁도 서버와 같은 코드를 준다
  *
  * # 망가뜨리면 이것만 실패한다
  * ```
@@ -39,6 +44,9 @@ import org.junit.Test
  *
  * ③ SignupRequestDto 의 ageOver14 를 agreements 안으로 옮긴다  →  1개 실패
  *      이메일 가입 요청은 ageOver14 를 최상위로 싣는다 FAILED
+ *
+ * ④ FakeAuthRepository 를 httpErrorOf(400, null) 로 되돌린다  →  1개 실패
+ *      스텁도 서버와 같은 오류 코드를 준다 FAILED
  * ```
  */
 class AgeOver14Test {
@@ -121,5 +129,21 @@ class AgeOver14Test {
 
         vm.onToggleAgeOver14()
         assertTrue("셋을 다 켜면 넘어간다", vm.uiState.value.canProceedAgree)
+    }
+
+    @Test
+    fun `스텁도 서버와 같은 오류 코드를 준다`() = runBlocking {
+        // 예전에는 `httpErrorOf(400, null)` 이라 앱에서 `UNKNOWN` 으로 떨어졌다.
+        // 그러면 **데모로 돌릴 때만 "가입에 실패했어요" 가 나오고** 진짜 서버에서만
+        // 제 문구가 나온다 — 가짜가 화면을 다르게 만들면 스텁을 둘 이유가 없다(#264 리뷰).
+        val failure = com.runninggu.app.data.repository.FakeAuthRepository.signup(
+            email = "runner@test.com",
+            password = "run4life1",
+            nickname = "김러너",
+            marketingAgreed = false,
+            ageOver14 = false,
+        ).exceptionOrNull()
+
+        assertEquals(ApiErrorCode.AGE_REQUIREMENT_NOT_MET, failure?.apiErrorCode())
     }
 }
