@@ -151,7 +151,7 @@ class KakaoAuthContractTest {
             ),
         )
 
-        val session = repository(api).kakaoSignup("T", "민지", marketingAgreed = true).getOrThrow()
+        val session = repository(api).kakaoSignup("T", "민지", marketingAgreed = true, ageOver14 = true).getOrThrow()
 
         assertEquals("A2", session.tokens.accessToken)
         assertEquals(LoginProvider.KAKAO, session.profile.loginProvider)
@@ -167,7 +167,7 @@ class KakaoAuthContractTest {
             ),
         )
 
-        repository(api).kakaoSignup("T", "  민지  ", marketingAgreed = false)
+        repository(api).kakaoSignup("T", "  민지  ", marketingAgreed = false, ageOver14 = true)
 
         val sent = requireNotNull(api.sentSignup)
         assertTrue(sent.agreements.tos)
@@ -193,6 +193,7 @@ class KakaoAuthContractTest {
                 password: String,
                 nickname: String,
                 marketingAgreed: Boolean,
+        ageOver14: Boolean,
             ) = TODO()
             override suspend fun requestPasswordReset(email: String) = TODO()
             override suspend fun logout(refreshToken: String) = TODO()

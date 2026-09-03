@@ -15,6 +15,20 @@ enum class ApiErrorCode {
     CURRENT_PASSWORD_MISMATCH,
     INVALID_TRAVEL_PERIOD,
     AGREEMENT_REQUIRED,
+
+    /**
+     * 가입 요청의 `ageOver14` 가 `false` 다. (§1-5 · §1-8 · 명세 오류표 894행 · 결정-58)
+     *
+     * **화면이 막았어야 하는 것이 서버까지 온 경우다.** A2 의 만 14세 확인은 필수라
+     * `canProceedAgree` 가 이미 막지만, 그 앞을 지나쳐 온 요청(구버전 앱·계약 위반)은
+     * 여기서 갈린다.
+     *
+     * `UNKNOWN` 으로 떨어뜨리면 "가입에 실패했어요" 만 나와서, 사용자는 무엇이 문제인지
+     * 모른 채 같은 버튼을 누른다 — 이 갈래에서는 **다시 눌러도 영영 안 풀린다.**
+     *
+     * 누락·자료형 오류는 이 코드가 아니라 `VALIDATION_FAILED` 다(§1-5).
+     */
+    AGE_REQUIREMENT_NOT_MET,
     INVALID_CODE,
     CODE_EXPIRED,
     INVALID_RESET_TOKEN,

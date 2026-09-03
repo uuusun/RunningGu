@@ -109,8 +109,8 @@ Compose 화면
 | ID | 플로우 화면 | 목표 route | 최신 Android | 전달값 | 로그인 | 상태 |
 |---|---|---|---|---|---|---|
 | A0 | 앱 시작·세션 확인 | 별도 route 없음(Startup Gate) | 시작 화면 `home`, 인증 그래프 없음 | 세션 | 선택 | 시스템 Splash + `core-splashscreen`, 세션에 따라 로그인/홈. **`GET /api/me` 검증이 끝나야 시작 화면을 고른다**(#99) — 그동안은 로딩만 보인다(제한 3초). `Expired`는 홈을 열지 않고 곧장 로그인, `Unknown`(네트워크·5xx)은 세션을 지킨 채 홈을 열고 첫 `401`을 `TokenAuthenticator`가 정리 |
-| A1 | 로그인 | `login` | `login` | 복귀 목적 route | 불필요 | 현재 구현 · 서버 연결. **카카오 로그인만 미구현** — 버튼이 "준비 중" 안내만 띄운다(AP-02 · #108) |
-| A2 | 회원가입 4단계 | `signup` 내부 step | `signup` 내부 step | 카카오 신규면 SDK token/profile | 불필요 | 현재 구현 · 서버 연결(중복 확인 D-30 · 이메일 인증). 카카오 신규 가입 경로는 A1 과 함께 미구현 |
+| A1 | 로그인 | `login` | `login` | 복귀 목적 route | 불필요 | 현재 구현 · 서버 연결. **카카오 로그인 포함**(§1-7 · #216) — SDK 가 받은 액세스 토큰을 서버에 넘기면 기존 가입자는 홈, 미가입자는 A2 로 간다. 톡이 없거나 톡 로그인이 실패하면 웹 계정 로그인으로 넘어가고, **취소는 실패가 아니라 아무 일도 하지 않는다**. 릴리스 키 해시 등록은 AP-02 · #108 |
+| A2 | 회원가입 4단계 | `signup` 내부 step | `signup` 내부 step | 카카오 신규면 SDK token/profile | 불필요 | 현재 구현 · 서버 연결(중복 확인 D-30 · 이메일 인증). **카카오 신규 가입은 닉네임만 받고 인증 단계를 건너뛴다**(§1-8 · #216) — 카카오가 이미 확인한 계정이라 이메일·비밀번호가 없다 |
 | A3 | 비밀번호 찾기 | `reset` | `reset` | 없음 | 불필요 | 현재 구현 · 서버 연결. 새 비밀번호 설정은 앱이 아니라 웹(WEB-R1)이다 🔒 |
 | WEB-R1 | 새 비밀번호 설정 | 웹 `/reset-password?token=` | Android route 아님 | reset token | 불필요 | SPEC 확정 |
 | S1 | 홈 | `home` | `home` | 없음 | 선택 | 현재 구현 |
@@ -127,7 +127,7 @@ Compose 화면
 | S10 | 보관함 | 내부 `my`, UI 라벨 `보관함` | `my` placeholder | 선택 segment | 필요 | route 현재 구현 |
 | M1 | 내 정보·계정 관리 | `account` 제안 | 미구현 | 없음 | 필요 | 플로우 확정 |
 
-`현재 구현`은 route와 UI 존재 여부를 뜻하며 백엔드 연결 완료를 뜻하지 않는다. 최신 `develop`의 S1~S4는 아직 `SampleData`·화면 상태를 사용하는 구간이 있고, 이 표의 API는 Repository/Retrofit 연결 목표 계약이다.
+최신 `develop`의 S1~S4는 서버를 본다(#140) — `SampleData` 참조는 주석에만 남아 있다. 이 표의 API 는 Repository/Retrofit 연결 계약이며, `미구현` 으로 적힌 행은 아직 목표다.
 
 ### 기본 흐름
 
@@ -212,8 +212,8 @@ Compose 화면
 | 달력·지도·코스·관광 아이콘 | Navigation/scroll | 지도=`courses` · 코스=`courses?tab=region` | 없음 | LOCAL_STATE | **지도와 코스는 같은 S8 의 다른 탭**(SPEC §4.4-2) — 지도는 [출발지 주변], 코스는 [지역별]. 탭은 좌표와 달리 route 인자로 넘긴다(감출 값이 아니다 · D-15 대비). 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
-| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 표시 전용 — 카드 탭·상세 route 없음**(D-05). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
-| 축제 카드 | P0 표시 전용 | 없음 | 없음 | 없음 | 플로우에 상세 이동 없음 |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 축제 카드 탭 | 로컬 상태 | 없음 | 없음 | LOCAL_STATE | **제자리 확대**(카드 200→300dp · 사진 116→186dp) + 고른 카드를 가운데로 스크롤. 화면 이동 없음 |
 | 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
 
 홈 마감 임박은 4건으로 확정했다(D-03). 홈 축제는 사용자 위치를 받지 않는 전국 월간 목록이다(D-04).

@@ -4,9 +4,11 @@ import MapView from '../map/MapView.jsx'
 import { browseCourses, buildRouteNear, courseRegions, geocodePlace, searchWalkSpots } from '../lib/runninggu/index.js'
 
 // 러닝코스(M4) — 두루누비 걷기 코스(코리아둘레길).
-//  · 내 주변: 사용자 위치에서 가까운 코스를 원하는 길이로 잘라 추천 + 지도 표시
+//  · 출발지 주변: 사용자가 고른 출발지에서 가까운 코스를 원하는 길이로 잘라 추천 + 지도 표시
 //  · 지역별: 시·도로 전체 코스 브라우징
-// 코스가 실제로 있는 해안·수도권 프리셋(GPS 대체/데모용).
+// 출발지 프리셋. 코스가 실제로 있는 해안·수도권으로 골랐다.
+// **폴백이 아니라 기본 경험이다** — 기기 위치를 안 쓰기로 했으므로(결정-56),
+// 출발지는 검색과 이 프리셋으로만 정한다.
 const PRESETS = [
   { label: '부산 해운대', lat: 35.1587, lng: 129.1604 },
   { label: '여수', lat: 34.7604, lng: 127.6622 },
@@ -24,7 +26,7 @@ export default function CoursesScreen() {
       </div>
       <div style={{ padding: '0 22px 12px', flex: 'none' }}>
         <div className="toggle" role="tablist">
-          <button className={`opt ${mode === 'near' ? 'active' : ''}`} onClick={() => setMode('near')}>내 주변</button>
+          <button className={`opt ${mode === 'near' ? 'active' : ''}`} onClick={() => setMode('near')}>출발지 주변</button>
           <button className={`opt ${mode === 'browse' ? 'active' : ''}`} onClick={() => setMode('browse')}>지역별</button>
         </div>
       </div>
@@ -33,7 +35,7 @@ export default function CoursesScreen() {
   )
 }
 
-// ── 내 주변: 지도 기반 코스 빌더 (출발지 + 목표거리 → 두루누비 왕복 경로) ──
+// ── 출발지 주변: 지도 기반 코스 빌더 (출발지 + 목표거리 → 두루누비 왕복 경로) ──
 function NearMode() {
   const [loc, setLoc] = useState(null)         // { lat, lng, label }
   const [targetKm, setTargetKm] = useState(5)

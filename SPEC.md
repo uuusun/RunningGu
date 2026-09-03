@@ -564,7 +564,8 @@ favoriteContest { userId, contestId, savedAt }                               // 
 
 - `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
 - `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
-- **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)만 둔다. 서버 ID·버전·`cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
+- **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)만 둔다. 서버 ID와 `cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
+- `cachedAt`은 **앱이 마지막 성공 응답을 저장한 시각**이다. 서버가 준 값이 아니다 — P0 API 계약에 `ETag`·`Last-Modified` 조건부 요청이 없어서 서버가 주는 버전 자체가 없다. 그래서 초안에 있던 "버전" 보존을 뺐다. 조건부 요청을 넣기로 하면 응답 헤더·재검증·`304` 동작을 계약으로 먼저 확정한 뒤 컬럼을 더한다(이슈 #105, 2026-09-03).
 - 저장 코스의 `pathPolyline`은 **고도를 제외한 2D Google Encoded Polyline precision 5(E5)** 다. 서버는 이를 위도·경도 순서의 E5 좌표열로 복원하고, 연속 중복 좌표만 제거해 진행 순서를 유지한다. canonical geometry는 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 저장 코스 `elevationProfileM`은 정수 미터 배열이며 순서를 보존하고 최대 100개, 미보유 시 `[]`다. PostgreSQL `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`로 저장하고 DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증한다. 검색·정렬에는 사용하지 않고 `routeFingerprint`에서도 제외한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 서버는 저장 시 실제 경로 원천의 검증 완료 attribution 완성 문구를 `attributions` snapshot으로 확정한다. PostgreSQL은 `JSONB NOT NULL DEFAULT '[]'`로 보존하며, 상세 API만 `List<String>`으로 반환한다. 클라이언트 입력과 이후 라이선스 문구 변경은 기존 값에 반영하지 않고, attribution은 geometry 기반 `routeFingerprint` 계산에서도 제외한다 🔒확정(결정-44).
@@ -863,13 +864,15 @@ app/src/main/java/com/runninggu/app/
 > **08-24 기준으로 그 여섯은 모두 화면이 섰다.** S5~S7 위저드(`ui/wizard`) · S8 러닝코스
 > (`ui/course`) · 인증 A1~A3(`ui/auth`) · S10 마이(`ui/my`) 가 다 있고, 홈 · 캘린더 · 상세 ·
 > 저장 코스 · 지역별 코스는 서버에 붙었다(AP-14). **다만 화면이 섰다는 것과 쓸 수 있다는 것은
-> 다르다** — 남은 것은 아래 둘이다.
+> 다르다** — 그때 남았던 둘은 **09-01 기준으로 둘 다 닫혔다.**
 >
-> - **위저드(S4~S8)에 서버 대회로 못 들어간다.** `WizardViewModel.start()` 가 아직
->   `SampleData` 를 보는데 홈은 서버 대회의 숫자 id 를 넘긴다. 계약은 `contestPhase` 로
->   확정됐고 선행 작업이 남아 있다(이슈 #140)
-> - **카카오 로그인 미구현.** 버튼은 있으나 "준비 중" 안내만 띄운다. 서버(`/api/auth/kakao`)는
->   섰고 앱은 네이티브 키·키 해시 등록(AP-02 · 이슈 #108)에 걸려 있다
+> - ~~위저드(S4~S8)에 서버 대회로 못 들어간다~~ → **들어간다.** `WizardViewModel.start()` 는
+>   더 이상 `SampleData` 를 보지 않고 넘어온 canonical id 로 `GET /api/contests/{id}` 를
+>   부른다(이슈 #140). 홈의 `[이 대회로 동선 만들기]` 에서 S4 → S5 → S7 결과까지 이어진다
+> - ~~카카오 로그인 미구현~~ → **붙었다.** `ui/auth/KakaoAuthClient` 가 서고 `LoginViewModel`
+>   이 `kakaoLogin` 을 부른다(#216). 카카오 가입자 탈퇴도 붙었다(#238).
+>   **남은 것은 릴리스 키 해시뿐이다** — 디버그 키 해시는 등록돼 있어 개발 빌드에서는 동작하고,
+>   업로드 키·Google 앱 서명 키 해시 등록이 AP-02 · 이슈 #108 에 걸려 있다
 >
 > A3 비밀번호 재설정은 서버에 붙였다 — 새 비밀번호 설정은 앱이 아니라 서버가 서빙하는
 > 웹 페이지가 담당한다(§4.3 🔒).

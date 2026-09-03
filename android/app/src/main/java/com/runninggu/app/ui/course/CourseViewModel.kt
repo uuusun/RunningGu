@@ -9,12 +9,16 @@ import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.ui.SAVE_FAILED_OUTSIDE_CONTRACT
+import com.runninggu.app.ui.apiFailureLogger
+import com.runninggu.app.ui.diagnostic
 import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.GeocodeRepository
 import com.runninggu.app.data.repository.SavedCourseRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -242,9 +246,26 @@ class CourseViewModel(
                     else -> SaveCourseState.Done("이미 저장한 코스예요.")
                 }
             } catch (e: ApiException) {
+                // **화면에는 `title`, 로그에는 `status`·`code`·`traceId`** (이슈 #252 · #254 리뷰).
+                // 정상 problem+json 은 둘을 함께 주는데 화면 문구만 쓰면 `code` 가 앱에서
+                // 사라진다 — 서버 로그와 이어 볼 끈이 그것뿐이다
+                apiFailureLogger("코스 저장 실패 — ${e.diagnostic()}")
                 // 게스트는 문구가 아니라 모달이다 — 로그인은 화면을 옮겨야 끝나는 일이다
                 if (e is ApiException.Http && e.needsLogin) SaveCourseState.NeedsLogin
                 else SaveCourseState.Done(message = e.saveMessage(), failed = true)
+            } catch (e: CancellationException) {
+                // 취소는 실패가 아니다. 여기서 삼키면 코루틴 취소가 끊긴다
+                throw e
+            } catch (e: Throwable) {
+                // **S7 에 있는 것이 여기엔 없었다** (이슈 #252 를 보다 찾음). `ApiException`
+                // 이 아닌 것이 올라오면 코루틴이 죽어 `save` 가 `Saving` 인 채로 남는다 —
+                // `canSave` 가 계속 false 라 [저장] 이 "저장 중…" 에 굳고, 같은 코스를 다시
+                // 눌러도 안 풀린다. S7 은 #214 리뷰에서 같은 이유로 이 갈래를 넣었다.
+                //
+                // 문구는 `saveMessage()` 의 어느 갈래와도 겹치지 않는다 — 겹치면 화면만
+                // 보고 서버 거절과 앱 안의 실패를 못 가린다
+                apiFailureLogger("코스 저장 실패 — 계약 밖: ${e.javaClass.simpleName}")
+                SaveCourseState.Done(message = SAVE_FAILED_OUTSIDE_CONTRACT, failed = true)
             }
             // 기다리는 사이 세션이 바뀌었으면 남의 결과다. 다만 두 가지를 지킨다.
             //
@@ -475,13 +496,48 @@ internal fun ApiException.nearbyMessage(): String = when {
 }
 
 /**
- * 저장 실패 문구. (API 명세 §7-A)
+ * 저장 실패 문구. (API 명세 §7-A · §0-3)
  *
  * **게스트(`401`)는 여기로 오지 않는다** — 모달이라 문구가 따로 없다.
+ *
+ * ## 세 갈래를 가른다 (이슈 #252)
+ *
+ * 예전에는 `Network` 가 아닌 **모든 실패**가 "저장하지 못했어요. 잠시 뒤 다시 시도해
+ * 주세요." 하나로 떨어졌다. 그런데 그 문구는 `ResultViewModel.onSave()` 의 마지막
+ * `catch (e: Throwable)` 이 내는 것과 **글자 하나까지 같았다.** 그래서 화면만 보고는
+ * "서버가 거절했다" 와 "앱 안에서 깨졌다" 를 가릴 수 없었다.
+ *
+ * 실제로 그것 때문에 이슈 #245 를 사흘 동안 엉뚱한 데서 찾았다. 평범한 `400` 이었는데
+ * 직렬화 오류로 읽고 매퍼를 뒤졌다(원인은 #251).
+ *
+ * | 무엇 | 문구 | 사용자가 할 일 |
+ * |---|---|---|
+ * | [ApiException.Network] | 네트워크 | 연결을 고치고 다시 |
+ * | [ApiException.Http] | **서버가 준 `title`** | 거절 사유에 따라 다르다 |
+ * | [ApiException.Malformed] | 결과를 확인 못 함 | 다시 누르지 말고 마이에서 확인 |
+ *
+ * **`Http` 는 서버 문구를 그대로 낸다.** 왜 거절했는지는 서버만 안다 — `VALIDATION_FAILED`
+ * 면 "요청 값이 올바르지 않습니다." 가 온다(백엔드 `ErrorCode`). 앱이 한 문구로 뭉개면
+ * `400` 과 `500` 이 화면에서 같아진다.
+ *
+ * **`title` 이 없으면 상태 코드를 보여준다.** 프록시가 HTML 오류 페이지를 돌려주는 경우가
+ * 있어(`httpErrorOf` KDoc) 그때는 `problem` 이 null 이다.
+ *
+ * 처음에는 `code` 를 보여줬는데 **그 자리에서는 늘 `UNKNOWN` 이라 아무 말도 아니었다** —
+ * `problem` 이 null 이면 `ApiErrorCode.from(null)` 이 `UNKNOWN` 을 주기 때문이다(#254
+ * 리뷰). 실제로 `httpErrorOf(502, "<html>…")` 를 태워 보면 `502 UNKNOWN` 이 나온다.
+ * 상태 코드는 그 자리에서도 뜻이 남는다.
+ *
+ * **`code` 는 화면이 아니라 로그로 간다** — [com.runninggu.app.ui.diagnostic] 참고.
+ *
+ * **`Malformed` 는 "다시 시도" 라고 하지 않는다.** 이건 **성공 응답을 못 읽은** 것이라
+ * (`apiCall` 의 `SerializationException` 갈래) 서버에는 이미 저장돼 있을 수 있다.
+ * 다시 누르라고 하면 사용자가 두 번 저장한다.
  */
 internal fun ApiException.saveMessage(): String = when (this) {
     is ApiException.Network -> "네트워크에 연결할 수 없어요."
-    else -> "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    is ApiException.Http -> userMessage ?: "저장하지 못했어요. (서버 응답 $status)"
+    is ApiException.Malformed -> "저장은 됐을 수 있는데 결과를 확인하지 못했어요. 마이에서 확인해 주세요."
 }
 
 /**

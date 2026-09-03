@@ -116,6 +116,7 @@ class AuthContractTest {
             password = "run4life1",
             nickname = "김러너",
             agreements = AgreementsRequestDto(tos = true, privacy = true, marketing = false),
+            ageOver14 = true
         )
 
         val json = ApiJson.encodeToString(body)

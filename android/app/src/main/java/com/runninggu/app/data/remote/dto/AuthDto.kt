@@ -42,6 +42,17 @@ data class SignupRequestDto(
     val password: String,
     val nickname: String,
     val agreements: AgreementsRequestDto,
+    /**
+     * 만 14세 이상 확인. **최상위 필수 필드다** (SPEC §4.2-1 · 결정-58).
+     *
+     * `agreements` 안에 넣지 않는다 — 명세가 **"전체 동의 밖의 별도 필수 항목"** 으로
+     * 못 박았고, 서버도 최상위에서 받는다. 누락은 `400 VALIDATION_FAILED`,
+     * `false` 는 `400 AGE_REQUIREMENT_NOT_MET` 이다.
+     *
+     * **기본값을 두지 않는다.** `true` 로 메우면 앱이 사용자에게 묻지도 않고 만 14세
+     * 이상이라고 대신 답하는 것이 된다.
+     */
+    val ageOver14: Boolean,
 )
 
 /** `POST /auth/login` 요청. (§1-6) */
@@ -104,6 +115,8 @@ data class KakaoSignupRequestDto(
     val kakaoAccessToken: String,
     val nickname: String,
     val agreements: AgreementsRequestDto,
+    /** 만 14세 이상 확인. 이메일 가입과 같은 계약이다 (SPEC §4.2-1 · 결정-58). */
+    val ageOver14: Boolean,
 )
 
 /** `POST /auth/logout` 요청. 해당 리프레시만 revoke 한다. (§1-10) */

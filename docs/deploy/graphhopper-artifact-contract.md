@@ -81,8 +81,10 @@ scripts/osm/import/
 
 scripts/osm/
 ├── operational_load.py
+├── roundtrip.py
 ├── roundtrip_cases.py
-└── test_operational_load.py
+├── test_operational_load.py
+└── test_roundtrip_evidence.py
 
 backend/graphhopper/
 └── graphhopper-server.yml
@@ -109,12 +111,20 @@ backend/deploy/validation/
 | `install-graph-artifact.sh` | EC2 | release descriptor가 지정한 S3 세 파일을 임시 directory에 받고 `verify-artifact.sh`를 호출한 뒤 안전하게 압축 해제·재검증·최종 version directory rename까지만 수행 |
 | `verify-active-graph.sh` | EC2 | `current` 상대 symlink, checkout의 release descriptor, 활성 manifest와 graph tree를 대조하며 공통 hash 검증은 `verify-artifact.sh`에 위임. 다운로드·symlink 변경·서비스 시작은 하지 않음 |
 | `read-required-env.sh` | EC2 | dotenv를 shell로 실행하지 않고 요청받은 단일 `KEY=unquoted-value`를 정확히 한 줄만 읽음. 값 내부 `=`는 보존하고 줄 끝 CR은 제거하되 따옴표 값·누락·빈 값·중복 key는 실패하며 다른 secret을 자식 프로세스 환경으로 내보내지 않음 |
-| `operational_load.py` | EC2 | caps/all 고정 지점·거리에서 실제 백엔드와 같은 seed 0~15 직렬 batch를 고정 도착률·고정 동시성으로 실행. worker 포화는 대기 대신 missed start로 실패시키고 직접 요청·batch 지연시간을 기록 |
+| `roundtrip.py --evidence` | 로컬·EC2 | caps/all의 모든 지점·거리·seed status와 품질 지표를 기록하고, 로컬 합격 셀마다 고정 정상 직접 요청 하나를 선택. EC2에서는 `--baseline`으로 로컬 성공 요청과 셀 커버리지 비회귀를 검사 |
+| `operational_load.py` | EC2 | 로컬 evidence의 정상 직접 요청 세트를 artifact ID·server image digest와 대조한 뒤 고정 직접 요청 도착률·고정 동시성으로 실행. worker 포화는 대기 대신 missed start로 실패시키고 `no valid point`를 포함한 모든 실패 요청을 기록 |
 | `collect-runtime-metrics.sh` | EC2 | 사전 지정한 시간 동안 host 메모리·swap counter·systemd 상태·container 자원을 5초 간격으로 비밀값 없이 기록. 부하 생성·합격 기준 변경·서비스 제어는 하지 않음 |
 | `summarize-runtime-metrics.py` | EC2 | 수집 표본 수·최저 `MemAvailable`·swap 증분·재시작·container OOM/상태를 계약 §9.2 기준으로 요약하고 기계 판정 가능한 항목이 모두 통과할 때만 종료 code 0 반환 |
 
 `runninggu-graphhopper-verify.service`와 GraphHopper 주 service의 `ExecStartPre`는 모두
 `verify-active-graph.sh`를 호출한다. systemd unit 안에 별도 hash 판정 로직을 넣지 않는다.
+
+`roundtrip.py --evidence`의 JSON `schemaVersion=1`은 artifact ID·server image digest·profile·seed
+수, 지점·거리 셀별 좌표와 seed별 status·실패 분류·품질 상한 통과 여부·경로 품질 수치,
+`normalRequests`를 가진다. 응답 geometry와 GraphHopper 오류 원문은 저장하지 않는다.
+`normalRequests`의 각 항목은 지점명·권역·고정 시험 좌표·목표거리·GraphHopper 요청거리·seed를
+가지며 `operational_load.py`는 이 목록만 소비한다. schema를 바꾸면 producer와 consumer, 이 문서와
+실행서를 같은 PR에서 함께 바꾼다.
 설치기와 활성 검증기는 `compose.env` 전체를 `source`하지 않고 `read-required-env.sh`로 각자 필요한
 `GRAPHHOPPER_*` key만 읽는다. 운영 `compose.env`는 `KEY=unquoted-value` 형식만 사용하고 값 전체를
 작은따옴표나 큰따옴표로 감싸지 않는다. parser는 Windows 편집기에서 생길 수 있는 줄 끝 CR 하나만
@@ -536,23 +546,45 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 
 시작 heap과 hard limit 후보값은 측정하며 바꿀 수 있지만 다음 합격 기준은 측정 전에 고정한다.
 
-### 9.1 시험 시나리오
+### 9.1 시험 시나리오와 요청 세트
 
-1. cold boot와 GraphHopper 내부 스모크를 수행한다.
-2. `roundtrip.py --preset caps --zone all`을 한 번 실행해 품질 회귀와 warm-up을 확인한다.
-3. 같은 caps/all 지점·거리와 실제 백엔드의 seed 0~15 직렬 호출을 사용하는
-   `operational_load.py`를 고정 batch 도착률·고정 동시성으로 30분 실행한다. worker 포화로 예정된
-   batch를 시작하지 못하면 기다려 부하를 낮추지 않고 missed start로 기록해 실패한다. 이 부하 중
-   수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
-4. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd `NRestarts`·container 상태를 5초
+라우팅 품질 회귀와 인스턴스 메모리·처리량 판정을 같은 성공률로 섞지 않는다. GraphHopper
+`/route` 한 번을 **직접 요청**, 같은 지점·목표거리에서 seed를 순회한 결과를 **지점·거리 셀**로
+부른다. HTTP 400 `Could not find a valid point after ... tries`는 GraphHopper가 해당 seed의 내부
+경유점을 routable edge에 snap하지 못한 **직접 요청 실패**다. 이를 성공으로 바꾸거나 실패 건수에서
+빼지 않는다. 다만 응답을 정상 부하 OOM·timeout·HTTP 5xx와 같은 인프라 장애로 분류하지도 않는다.
+
+EC2 첫 실행 전에 동일한 graph artifact·server image·profile·요청 옵션으로 로컬 운영 호환
+container에서 다음 두 결과를 고정한다.
+
+- **회귀 기준선**: `roundtrip.py --preset caps --zone all`의 전체 지점·거리·seed별 status와
+  지점·거리 셀별 품질 상한 통과 후보 수를 release evidence에 남긴다. 개별 `no valid point` 400은
+  실패로 집계하되, 셀 합격은 16개 seed 중 품질 상한을 통과한 경로가 하나 이상인지로 판정한다.
+- **정상 직접 요청 세트**: 회귀 기준선에서 HTTP 200과 비어 있지 않은 `paths`가 확인된 고정
+  `point`·`round_trip.distance`·`round_trip.seed` 조합만 부하 입력으로 사용한다. 회귀 기준선에서
+  합격한 모든 지점·거리 셀을 최소 한 조합으로 포함하고, exact 목록·GraphHopper 요청 옵션·artifact
+  ID·server image digest를 release evidence에 고정한다.
+
+정상 직접 요청 세트는 첫 EC2 결과를 본 뒤 실패 조합을 빼거나 성공 조합으로 교체하지 않는다.
+artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 기준선과 세트를 새로 고정하고 EC2
+시험도 처음부터 다시 한다. 정상 직접 요청 세트는 메모리·처리량 판정용이고, 전체 회귀 기준선은
+라우팅 커버리지 판정용이다. 어느 한쪽 결과를 다른 쪽의 합격 근거로 대신하지 않는다.
+
+1. 위 로컬 회귀 기준선과 정상 직접 요청 세트를 고정한다.
+2. cold boot와 GraphHopper 내부 스모크를 수행한다.
+3. `roundtrip.py --preset caps --zone all`을 한 번 실행해 warm-up하고 로컬 회귀 기준선과 대조한다.
+4. 정상 직접 요청 세트를 읽는 `operational_load.py`를 고정 직접 요청 도착률·고정 동시성으로 30분
+   실행한다. worker 포화로 예정된 직접 요청을 시작하지 못하면 기다려 부하를 낮추지 않고 missed
+   start로 기록해 실패한다. 이 부하 중 수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
+5. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd `NRestarts`·container 상태를 5초
    간격으로 기록한다. GraphHopper Docker local 로그와 Spring journal의 JVM unified GC 로그에서
    readiness 이후 Full GC를 판정하고, verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각
    기록한다.
-5. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
-6. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
-7. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
+6. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
+7. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
+8. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
 
-8GiB와 4GiB 비교에서는 부하의 batch 도착률·동시성·seed 수를 시험 전에 고정해 기록한다.
+8GiB와 4GiB 비교에서는 정상 직접 요청 목록·직접 요청 도착률·동시성을 시험 전에 고정해 기록한다.
 작은 instance에서 처리가 느려져 자동으로 요청 수가 줄어드는 closed-loop 결과를 같은 부하로
 간주하지 않는다.
 
@@ -564,8 +596,9 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 | 메모리 여유 | 모든 5초 표본에서 host `MemAvailable`이 전체 RAM의 20% 이상 |
 | swap | warm-up 뒤 `vmstat`의 swap-in·swap-out 지속 발생 0, swap 사용량 증가 없음 |
 | GC | readiness 이후 반복 Full GC 0건 |
-| GraphHopper 시간 | `operational_load.py`의 missed batch·실패 요청이 0이고 모든 GraphHopper 직접 요청이 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. 직접 요청과 seed 16개 묶음의 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
-| 회귀 | `--preset caps --zone all`의 기존 커버리지·거리·상승·차도·회전 상한 비회귀 |
+| GraphHopper 직접 요청 | `operational_load.py`의 missed start·실패 요청이 0이고 §9.1의 정상 직접 요청 세트가 모두 HTTP 200·비어 있지 않은 `paths`로 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. `no valid point`를 포함한 4xx, 5xx, 빈 `paths`, timeout은 모두 실패. 직접 요청 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
+| 라우팅 회귀 | `--preset caps --zone all`의 모든 직접 요청 status와 `no valid point` 건수를 기록. 로컬 기준선에서 합격한 지점·거리 셀은 EC2에서도 16개 seed 중 품질 상한 통과 경로가 하나 이상이어야 하며 기존 커버리지·거리·상승·차도·회전 상한이 비회귀. 기준선에서 성공한 동일 요청이 EC2에서 400이 되거나 합격 셀의 모든 seed가 실패하면 불합격 |
+| 실패 분류 | `no valid point` 400은 직접 요청·라우팅 실패이며 성공 수에 넣지 않음. 다만 이 응답만으로 OOM·instance 부족으로 판정하지 않고 OOM·5xx·timeout·재시작 지표와 분리 기록. 그 밖의 4xx는 요청·profile·배포 설정 오류로 분류해 불합격 |
 | 프로파일 | server graph에 `run`과 `run` LM만 존재하고 `foot` 없음 |
 | 백업 | 수동 full backup·pgBackRest check·WAL 감시 성공, 실패 알림 0건 |
 | 재부팅 | import 로그 0건, 기존 artifact 재사용. 배포는 verify oneshot 시작, 재부팅은 GraphHopper unit activation 시작부터 검증 시간을 포함해 2분 안에 GraphHopper·Spring readiness 성공 |
@@ -575,6 +608,11 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 맞춰 낮추지 않는다. 시험 명령·시작/종료 시각·instance type·heap·hard limit·artifact ID를 결과와
 함께 남긴다. graph hash 검증 시간을 줄여 보이려고 시험 직전 page cache를 인위적으로 데우거나
 비우지 않는다.
+
+이 절은 인스턴스 사양과 GraphHopper 직접 요청의 시험 계약이다. Spring Boot가 특정 seed 실패 뒤
+다음 seed를 계속 호출할지, 일부 후보로 정상·degraded 결과를 반환할지는 제품 동작 계약이므로 이
+문서에서 바꾸지 않는다. 해당 동작을 변경하려면 `SPEC.md`·API 계약과 백엔드 테스트를 별도 PR에서
+먼저 합의한다.
 
 ### 9.3 hard-limit fault-isolation — instance 합격과 별도
 
@@ -605,7 +643,7 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 | PR | 범위 | 완료 조건 |
 |---|---|---|
 | PR 1 | 이 계약, SPEC §8.4, 상위 배포 가이드, EC2 실행서 동기화 | 팀 결정과 문서 충돌 없음 |
-| PR 2 | builder·manifest·설치·검증·GraphHopper systemd 단일 소유·Docker local 로그 단일화·exit 0/137 재시작·로컬/EC2 Compose 분리·구 named volume 전환·heap 환경변수화·Spring 재시작 정책 구현 | 검증 시간 포함 8GiB §9.2 정상 부하와 §9.3 별도 안전 시험 통과 |
+| PR 2 | builder·manifest·설치·검증·GraphHopper systemd 단일 소유·Docker local 로그 단일화·exit 0/137 재시작·로컬/EC2 Compose 분리·구 named volume 전환·heap 환경변수화·Spring 재시작 정책·라우팅 evidence와 고정 정상 요청 부하 도구 구현 | 검증 시간 포함 8GiB §9.2 정상 부하와 §9.3 별도 안전 시험 통과 |
 | PR 3(선택) | LM 제거 실험 | 독립 benchmark에서 시간·커버리지 계약 통과할 때만 채택 |
 
 `run` LM 제거는 PR 2에 넣지 않는다. 운영 builder·server 설정에서 `foot`을 제외하고 `run` LM을

@@ -87,6 +87,7 @@ import com.runninggu.app.ui.map.RunningGuMap
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -312,113 +313,128 @@ private fun Content(
             .collect { blockId -> blockId?.let(onCardCentered) }
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(openedBlockId) {
-                if (openedBlockId == null) return@pointerInput
-                awaitPointerEventScope {
-                    // Final 패스라 버튼(clickable)이 이미 가져간 터치는 보이지 않는다 —
-                    // 열린 행의 [삭제]를 누른 것까지 닫아버리면 삭제가 실행되지 않는다.
-                    // 아무도 가져가지 않은 터치 = 빈 곳·다른 행·스크롤이므로 그때 닫는다.
-                    awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Final)
-                    openedBlockId = null
-                }
-            },
-    ) {
+    // **지도를 목록 밖에 둔다.** 안에 있으면 스크롤과 함께 위로 밀려 사라진다 — 아래
+    // 타임라인을 훑는 동안 "지금 보는 장소가 어디쯤인가" 를 볼 수 없다. §4.10 의
+    // 지도↔타임라인 동기화는 **지도가 보이는 동안** 의미가 있다(#208).
+    //
+    // 목록 안의 `item(key = "map")` 과 `item(key = "summary")` 였던 것을 위로 뺐다.
+    // 그래서 **`TIMELINE_FIRST_ITEM_INDEX` 도 4 → 3 → 2 로 같이 내려왔다.**
+    //
+    // 두 방향이 서로 다르게 만들어져 있다 — 카드→지도는 `visibleItemsInfo` 를 `key` 로
+    // 훑어 인덱스와 무관하지만(303행), **지도→카드는 인덱스를 쓴다**(274행). 한쪽만 보고
+    // "안 깨진다" 고 판단하기 쉬운 자리다(#277 리뷰).
+    Column(Modifier.fillMaxWidth()) {
         // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
-        item(key = "map") {
-            // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
-            // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
-            DayMap(
-                state = state,
-                onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
-            )
-        }
+        // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
+        // 없는 것보다 처음부터 반응이 없는 편이 낫다 (SPEC §4.10)
+        DayMap(
+            state = state,
+            onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
+        )
 
-        item(key = "summary") {
-            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                state.result?.recovery?.let {
-                    Spacer(Modifier.height(16.dp))
-                    RecoveryBadge(label = it.label, text = it.note)
-                }
-
+        // **날짜 탭도 지도와 같이 고정한다.** 날짜를 바꾸면 지도와 아래 목록이 같이 바뀌는데,
+        // 탭이 목록을 따라 흘러가면 카드를 몇 개 내린 뒤에는 **바뀐 지도를 보면서 날짜를 다시
+        // 고를 수가 없다.** 위로 되감아야 한다.
+        //
+        // 회복 배지와 요약도 같이 올린다. 탭만 빼내면 화면 순서가
+        // `지도 → 탭 → 배지 → 요약 → D+1` 이 되어, 여행 전체를 말하는 두 줄이
+        // 날짜를 고른 뒤에 나온다.
+        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+            state.result?.recovery?.let {
                 Spacer(Modifier.height(16.dp))
-                SummaryRow(title = state.title, placeCount = state.placeCount)
-
-                Spacer(Modifier.height(14.dp))
-                DayTabs(state = state, onSelect = onDaySelect)
+                RecoveryBadge(label = it.label, text = it.note)
             }
+
+            Spacer(Modifier.height(16.dp))
+            SummaryRow(title = state.title, placeCount = state.placeCount)
+
+            Spacer(Modifier.height(14.dp))
+            DayTabs(state = state, onSelect = onDaySelect)
         }
 
-        if (day != null) {
-            item(key = "dayHeader") {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(openedBlockId) {
+                    if (openedBlockId == null) return@pointerInput
+                    awaitPointerEventScope {
+                        // Final 패스라 버튼(clickable)이 이미 가져간 터치는 보이지 않는다 —
+                        // 열린 행의 [삭제]를 누른 것까지 닫아버리면 삭제가 실행되지 않는다.
+                        // 아무도 가져가지 않은 터치 = 빈 곳·다른 행·스크롤이므로 그때 닫는다.
+                        awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Final)
+                        openedBlockId = null
+                    }
+                },
+        ) {
+            if (day != null) {
+                item(key = "dayHeader") {
+                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                        Spacer(Modifier.height(18.dp))
+                        DayHeader(
+                            label = day.label,
+                            isEditing = state.isEditing,
+                            onToggleEdit = onToggleEdit,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
+                }
+
+                if (state.isEditing) {
+                    // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
+                    // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
+                    // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
+                    item(key = "editList") {
+                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                            EditNotice()
+                            Spacer(Modifier.height(10.dp))
+                            EditList(
+                                day = day,
+                                openedId = openedBlockId,
+                                onOpenedChange = { openedBlockId = it },
+                                onRemove = onRemoveBlock,
+                                onMove = onMoveBlock,
+                                onReplace = onReplaceBlock,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            AddPlaceButton(onClick = onAddPlace)
+                        }
+                    }
+                } else {
+                    item(key = "dayNote") {
+                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                            DayNote(day.note)
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+
+                    // **조회 타임라인만 행 단위 item 이다.** 이래야 `layoutInfo.visibleItemsInfo` 가
+                    // "지금 보이는 카드" 를 돌려준다 — §4.10 의 중앙 밴드 자동 활성이 서는 조건이다.
+                    itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
+                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                            TimelineRow(
+                                number = index + 1,
+                                block = block,
+                                active = block.id == state.activeBlockId,
+                                onClick = { onCardClick(block.id) },
+                            )
+                            // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
+                            // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
+                            if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
+                        }
+                    }
+                }
+            }
+
+            item(key = "footer") {
                 Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                    Spacer(Modifier.height(18.dp))
-                    DayHeader(
-                        label = day.label,
-                        isEditing = state.isEditing,
-                        onToggleEdit = onToggleEdit,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
-
-            if (state.isEditing) {
-                // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
-                // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
-                // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
-                item(key = "editList") {
-                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                        EditNotice()
-                        Spacer(Modifier.height(10.dp))
-                        EditList(
-                            day = day,
-                            openedId = openedBlockId,
-                            onOpenedChange = { openedBlockId = it },
-                            onRemove = onRemoveBlock,
-                            onMove = onMoveBlock,
-                            onReplace = onReplaceBlock,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        AddPlaceButton(onClick = onAddPlace)
+                    // 연계 카드는 조회 모드에만 둔다 (SPEC §4.10 — "조회 모드 하단 연계 카드").
+                    if (!state.isEditing) {
+                        Spacer(Modifier.height(20.dp))
+                        CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
                     }
+                    Spacer(Modifier.height(24.dp))
                 }
-            } else {
-                item(key = "dayNote") {
-                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                        DayNote(day.note)
-                        Spacer(Modifier.height(12.dp))
-                    }
-                }
-
-                // **조회 타임라인만 행 단위 item 이다.** 이래야 `layoutInfo.visibleItemsInfo` 가
-                // "지금 보이는 카드" 를 돌려준다 — §4.10 의 중앙 밴드 자동 활성이 서는 조건이다.
-                itemsIndexed(day.blocks, key = { _, block -> block.id }) { index, block ->
-                    Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                        TimelineRow(
-                            number = index + 1,
-                            block = block,
-                            active = block.id == state.activeBlockId,
-                            onClick = { onCardClick(block.id) },
-                        )
-                        // 예전 `Arrangement.spacedBy` 는 **사이에만** 넣었다. 마지막 뒤에도
-                        // 붙이면 연계 카드 위 여백이 20 → 30dp 가 된다 (#210 리뷰).
-                        if (index < day.blocks.lastIndex) Spacer(Modifier.height(TIMELINE_ROW_GAP))
-                    }
-                }
-            }
-        }
-
-        item(key = "footer") {
-            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                // 연계 카드는 조회 모드에만 둔다 (SPEC §4.10 — "조회 모드 하단 연계 카드").
-                if (!state.isEditing) {
-                    Spacer(Modifier.height(20.dp))
-                    CourseLinkCard(targetKm = state.courseTargetKm, onClick = onOpenCourses)
-                }
-                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -852,13 +868,19 @@ private val TIMELINE_ROW_GAP = 10.dp
 /**
  * 조회 모드 타임라인 **첫 카드의 item 인덱스**. (SPEC §4.10 · #208 리뷰)
  *
- * 카드 위에 `map` · `summary` · `dayHeader` · `dayNote` 넷이 있다. 뒤 셋은 `day != null`
- * 안에 있지만 **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 넷이 항상 선다.
+ * 카드 위에 `dayHeader` · `dayNote` **둘**이 있다. 둘 다 `day != null` 안에 있지만
+ * **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 둘이 항상 선다.
+ *
+ * **넷 → 셋 → 둘로 두 번 내려왔다.** 처음에는 `map` 이 목록의 첫 item 이었고, 다음에는
+ * `summary`(회복 배지 · 요약 · 날짜 탭)가 있었다. 상단 고정으로 하나씩 빼면서 줄었다.
+ * 첫 번째 때는 이 상수를 안 따라 내려서 핀을 누르면 **한 칸 아래 카드**로 스크롤됐다 —
+ * 아래 KDoc 이 예고한 그대로였고, 리뷰에서 잡혔다(#277 리뷰).
  *
  * [Content] 의 item 을 늘리거나 줄이면 **여기도 같이 고쳐야 한다.** 어긋나도 조용하다 —
- * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다.
+ * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다. **단위 테스트가 안 닿는다** — Compose 화면이고
+ * `private const` 라 밖에서 볼 수 없다. 기기에서 핀을 눌러 보는 수밖에 없다.
  */
-private const val TIMELINE_FIRST_ITEM_INDEX = 4
+private const val TIMELINE_FIRST_ITEM_INDEX = 2
 
 /** 왼쪽 스와이프로 드러나는 삭제 버튼의 폭. */
 private val DELETE_REVEAL_WIDTH = 84.dp
@@ -1237,30 +1259,27 @@ private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
  */
 @Composable
 private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
-    Surface(shadowElevation = 8.dp) {
-        Column(
-            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+    BottomActionBar {
+        Button(
+            onClick = onSave,
+            enabled = canSave,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
         ) {
-            Button(
-                onClick = onSave,
-                enabled = canSave,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                Text(
-                    text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            if (save is SaveItineraryState.Failed) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = save.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            Text(
+                text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        // 실패 문구는 **같은 바 안에** 둔다. 바깥에 두면 그림자 경계 위로 떠서 다른 층처럼 보인다
+        if (save is SaveItineraryState.Failed) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = save.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
