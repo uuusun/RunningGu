@@ -240,7 +240,7 @@ Compose 화면
 | 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복 |
 | 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | active일 때만 호출. 본문과 독립 Loading/Empty/502/504. `409 CONTEST_LOCATION_UNAVAILABLE` = **재시도 버튼 없는 별도 오류**("인근 축제를 확인할 수 없어요") — 좌표는 재시도로 생기지 않는다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null이면 버튼 숨김 |
-| 공유 | Android 공유 | 대회 요약·URL | 저장 없음 | P1/AP-17 |
+| 공유 | Android 공유 시트(`ACTION_SEND`) | `EXTRA_TEXT`=대회명·`MM.dd 요일 HH:mm`·장소·열리는 공식 주소, `EXTRA_SUBJECT`=대회명 | 저장 없음 | **P0**(#279). `createChooser` 로 매번 고르게 한다. `state.race == null` 이면 비활성. 링크는 `openableWebUrl` 을 통과한 것만 — 화면 [공식 페이지 ↗] 와 같은 기준. 카톡 전용 카드(썸네일·버튼)는 P1/AP-17 |
 | 동선 만들기 | S4 이동 | contestId | WizardUiState | 좌표 null 또는 active=false면 CTA 비활성, 좌표 전용 안내 UX는 P1 |
 
 ---
