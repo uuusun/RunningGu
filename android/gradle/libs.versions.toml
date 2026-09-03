@@ -1,4 +1,5 @@
 [versions]
+coil = "3.3.0"
 datastore = "1.1.7"
 kotlinxCoroutines = "1.9.0"
 kakaoMaps = "2.12.8"
@@ -25,6 +26,8 @@ room = "2.8.4"
 ksp = "2.3.11"
 
 [libraries]
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

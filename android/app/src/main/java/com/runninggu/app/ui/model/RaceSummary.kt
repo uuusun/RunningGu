@@ -128,6 +128,14 @@ data class FestivalSummary(
     val region: String,
     val period: String,
     val isOngoing: Boolean,
+    /**
+     * KTO `firstimage`. **없을 수 있다** — 명세 §4-1 이 nullable 로 두고
+     * *"없으면 앱이 기본 placeholder 를 표시한다"* 고 정해 두었다.
+     *
+     * 서버가 준 것을 그대로 들고 있는다. 앱이 스킴을 고치거나 크기를 붙이지 않는다 —
+     * 원천 URL 을 손대기 시작하면 어느 쪽이 틀렸는지 추적이 안 된다.
+     */
+    val imageUrl: String? = null,
 )
 
 /** 필터에 쓰는 종목. (SPEC §4.5 · 결정-12) */
