@@ -114,7 +114,7 @@ backend/deploy/validation/
 | `roundtrip.py --evidence` | 로컬·EC2 | caps/all의 모든 지점·거리·seed status와 품질 지표를 기록하고, 로컬 합격 셀마다 고정 정상 직접 요청 하나를 선택. EC2에서는 `--baseline`으로 로컬 성공 요청과 셀 커버리지 비회귀를 검사 |
 | `operational_load.py` | EC2 | 로컬 evidence의 정상 직접 요청 세트를 artifact ID·server image digest와 대조한 뒤 고정 직접 요청 도착률·고정 동시성으로 실행. worker 포화는 대기 대신 missed start로 실패시키고 `no valid point`를 포함한 모든 실패 요청을 기록 |
 | `collect-runtime-metrics.sh` | EC2 | 사전 지정한 시간 동안 host 메모리·swap counter·systemd 상태·container 자원을 5초 간격으로 비밀값 없이 기록. 부하 생성·합격 기준 변경·서비스 제어는 하지 않음 |
-| `summarize-runtime-metrics.py` | EC2 | 수집 표본 수·최저 `MemAvailable`·swap 증분·재시작·container OOM/상태를 계약 §9.2 기준으로 요약하고 기계 판정 가능한 항목이 모두 통과할 때만 종료 code 0 반환 |
+| `summarize-runtime-metrics.py` | EC2 | 수집 표본 수·최저 `MemAvailable`·swap 증분, 필수 systemd service의 표본별 `active/running`·`NRestarts`, 필수 container의 표본별 존재·상태·OOM·`restart_count`를 계약 §9.2 기준으로 요약하고 기계 판정 가능한 항목이 모두 통과할 때만 종료 code 0 반환 |
 
 `runninggu-graphhopper-verify.service`와 GraphHopper 주 service의 `ExecStartPre`는 모두
 `verify-active-graph.sh`를 호출한다. systemd unit 안에 별도 hash 판정 로직을 넣지 않는다.
@@ -579,7 +579,8 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 4. 정상 직접 요청 세트를 읽는 `operational_load.py`를 고정 직접 요청 도착률·고정 동시성으로 30분
    실행한다. worker 포화로 예정된 직접 요청을 시작하지 못하면 기다려 부하를 낮추지 않고 missed
    start로 기록해 실패한다. 이 부하 중 수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
-5. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd `NRestarts`·container 상태를 5초
+5. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd 상태·`NRestarts`·container
+   상태·`restart_count`를 5초
    간격으로 기록한다. GraphHopper Docker local 로그와 Spring journal의 JVM unified GC 로그에서
    readiness 이후 Full GC를 판정하고, verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각
    기록한다.

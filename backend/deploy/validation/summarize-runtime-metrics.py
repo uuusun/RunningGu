@@ -12,6 +12,11 @@ from pathlib import Path
 
 
 KEY_VALUE = re.compile(r"(?P<key>[a-zA-Z_]+)=(?P<value>[^ ]+)")
+EXPECTED_SYSTEMD_SERVICES = (
+    "runninggu-backend.service",
+    "runninggu-graphhopper.service",
+)
+EXPECTED_CONTAINERS = ("graphhopper", "postgres")
 
 
 def values(line: str) -> dict[str, str]:
@@ -20,39 +25,142 @@ def values(line: str) -> dict[str, str]:
 
 def summarize(lines: list[str]) -> dict[str, object]:
     headers: dict[str, str] = {}
-    samples: list[dict[str, str]] = []
-    systemd: dict[str, list[int]] = {}
-    oom_killed = 0
-    unhealthy_containers = 0
+    sample_groups: list[dict[str, object]] = []
+    current_group: dict[str, object] | None = None
+    malformed_observations = 0
 
     for line in lines:
         if line.startswith("duration_seconds="):
             headers.update(values(line))
         elif line.startswith("sample sequence="):
-            samples.append(values(line))
+            if current_group is not None:
+                malformed_observations += 1
+            current_group = {
+                "sample": values(line),
+                "systemd": {},
+                "containers": {},
+            }
         elif line.startswith("systemd service="):
             item = values(line)
-            service = item.get("service", "unknown")
-            systemd.setdefault(service, []).append(int(item.get("NRestarts", "0")))
+            service = item.get("service")
+            if current_group is None or not service:
+                malformed_observations += 1
+                continue
+            systemd = current_group["systemd"]
+            assert isinstance(systemd, dict)
+            if service in systemd:
+                malformed_observations += 1
+            else:
+                systemd[service] = item
         elif line.startswith("container service="):
             item = values(line)
-            if item.get("oom_killed") == "true":
-                oom_killed += 1
-            if item.get("present") != "true" or item.get("status") != "running":
-                unhealthy_containers += 1
+            service = item.get("service")
+            if current_group is None or not service:
+                malformed_observations += 1
+                continue
+            containers = current_group["containers"]
+            assert isinstance(containers, dict)
+            if service in containers:
+                malformed_observations += 1
+            else:
+                containers[service] = item
+        elif line.startswith("sample_end sequence="):
+            item = values(line)
+            if current_group is None:
+                malformed_observations += 1
+                continue
+            sample = current_group["sample"]
+            assert isinstance(sample, dict)
+            if item.get("sequence") != sample.get("sequence"):
+                malformed_observations += 1
+            sample_groups.append(current_group)
+            current_group = None
+
+    if current_group is not None:
+        malformed_observations += 1
 
     duration = int(headers.get("duration_seconds", "0"))
     interval = int(headers.get("interval_seconds", "0"))
     expected_samples = math.ceil(duration / interval) if duration > 0 and interval > 0 else 0
-    memory_percent = [float(item["mem_available_percent"]) for item in samples]
-    swap_used = [int(item["swap_used_kib"]) for item in samples]
-    pswpin = [int(item["pswpin"]) for item in samples]
-    pswpout = [int(item["pswpout"]) for item in samples]
-    restart_growth = {
-        service: max(counts) - min(counts)
-        for service, counts in systemd.items()
-        if counts
+    memory_percent: list[float] = []
+    swap_used: list[int] = []
+    pswpin: list[int] = []
+    pswpout: list[int] = []
+    invalid_sample_values = 0
+    systemd_observations: dict[str, list[dict[str, str]]] = {
+        service: [] for service in EXPECTED_SYSTEMD_SERVICES
     }
+    container_observations: dict[str, list[dict[str, str]]] = {
+        service: [] for service in EXPECTED_CONTAINERS
+    }
+
+    for group in sample_groups:
+        sample = group["sample"]
+        systemd = group["systemd"]
+        containers = group["containers"]
+        assert isinstance(sample, dict)
+        assert isinstance(systemd, dict)
+        assert isinstance(containers, dict)
+        try:
+            memory_percent.append(float(sample["mem_available_percent"]))
+            swap_used.append(int(sample["swap_used_kib"]))
+            pswpin.append(int(sample["pswpin"]))
+            pswpout.append(int(sample["pswpout"]))
+        except (KeyError, TypeError, ValueError):
+            invalid_sample_values += 1
+        for service in EXPECTED_SYSTEMD_SERVICES:
+            observation = systemd.get(service)
+            if isinstance(observation, dict):
+                systemd_observations[service].append(observation)
+        for service in EXPECTED_CONTAINERS:
+            observation = containers.get(service)
+            if isinstance(observation, dict):
+                container_observations[service].append(observation)
+
+    def restart_growth(observations: dict[str, list[dict[str, str]]], key: str) -> dict:
+        result = {}
+        for service, items in observations.items():
+            try:
+                counts = [int(item[key]) for item in items]
+            except (KeyError, TypeError, ValueError):
+                result[service] = None
+                continue
+            result[service] = max(counts) - min(counts) if counts else None
+        return result
+
+    systemd_restart_growth = restart_growth(systemd_observations, "NRestarts")
+    container_restart_growth = restart_growth(container_observations, "restart_count")
+    systemd_observation_counts = {
+        service: len(items) for service, items in systemd_observations.items()
+    }
+    container_observation_counts = {
+        service: len(items) for service, items in container_observations.items()
+    }
+    missing_systemd_service_samples = sum(
+        expected_samples - count
+        for count in systemd_observation_counts.values()
+        if count < expected_samples
+    )
+    missing_container_samples = sum(
+        expected_samples - count
+        for count in container_observation_counts.values()
+        if count < expected_samples
+    )
+    unhealthy_systemd_service_samples = sum(
+        item.get("ActiveState") != "active" or item.get("SubState") != "running"
+        for items in systemd_observations.values()
+        for item in items
+    )
+    oom_killed = sum(
+        item.get("oom_killed") == "true"
+        for items in container_observations.values()
+        for item in items
+    )
+    unhealthy_containers = sum(
+        item.get("present") != "true" or item.get("status") != "running"
+        for items in container_observations.values()
+        for item in items
+    )
 
     minimum_memory = min(memory_percent) if memory_percent else None
     maximum_swap_growth = (
@@ -62,24 +170,38 @@ def summarize(lines: list[str]) -> dict[str, object]:
     pswpout_growth = pswpout[-1] - pswpout[0] if pswpout else None
     passed = (
         expected_samples > 0
-        and len(samples) == expected_samples
+        and len(sample_groups) == expected_samples
+        and malformed_observations == 0
+        and invalid_sample_values == 0
         and minimum_memory is not None
         and minimum_memory >= 20.0
         and maximum_swap_growth == 0
         and pswpin_growth == 0
         and pswpout_growth == 0
+        and all(count == expected_samples for count in systemd_observation_counts.values())
+        and all(count == expected_samples for count in container_observation_counts.values())
+        and unhealthy_systemd_service_samples == 0
         and oom_killed == 0
         and unhealthy_containers == 0
-        and all(growth == 0 for growth in restart_growth.values())
+        and all(growth == 0 for growth in systemd_restart_growth.values())
+        and all(growth == 0 for growth in container_restart_growth.values())
     )
     return {
         "expectedSamples": expected_samples,
-        "actualSamples": len(samples),
+        "actualSamples": len(sample_groups),
+        "malformedObservations": malformed_observations,
+        "invalidSampleValues": invalid_sample_values,
         "minimumMemAvailablePercent": minimum_memory,
         "maximumSwapGrowthKiB": maximum_swap_growth,
         "pswpinGrowth": pswpin_growth,
         "pswpoutGrowth": pswpout_growth,
-        "systemdRestartGrowth": restart_growth,
+        "systemdObservationCounts": systemd_observation_counts,
+        "missingSystemdServiceSamples": missing_systemd_service_samples,
+        "unhealthySystemdServiceSamples": unhealthy_systemd_service_samples,
+        "systemdRestartGrowth": systemd_restart_growth,
+        "containerObservationCounts": container_observation_counts,
+        "missingContainerSamples": missing_container_samples,
+        "containerRestartGrowth": container_restart_growth,
         "oomKilledSamples": oom_killed,
         "unhealthyContainerSamples": unhealthy_containers,
         "passed": passed,

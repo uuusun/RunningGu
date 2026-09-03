@@ -49,6 +49,10 @@ swap은 RAM 대체재가 아니다. 지속적으로 사용되면 인스턴스를
 EC2에서 Gradle 테스트나 빌드를 실행하지 않는다. 백엔드 CI가 다음을 모두 통과한 동일 commit의
 `runninggu-backend-<Git SHA>` artifact만 배포한다.
 
+PR CI는 GitHub가 만든 base와 head의 synthetic merge commit을 시험하되 배포 artifact를 업로드하지
+않는다. 스테이징에 쓰는 artifact와 `release-manifest.txt`는 `develop` 또는 `main` push 실행에서만
+만들어 업로드하며, 이름과 manifest의 Git SHA는 그 push commit과 같아야 한다.
+
 1. Playwright Chromium 설치
 2. 단위·Testcontainers 통합·브라우저 테스트
 3. 서버 Boot JAR와 Importer Boot JAR 생성

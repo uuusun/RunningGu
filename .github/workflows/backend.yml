@@ -68,10 +68,8 @@ jobs:
         working-directory: backend
 
     steps:
+      # PR은 GitHub의 synthetic merge commit을 검사하고, push는 해당 commit 자체를 검사한다.
       - uses: actions/checkout@v4
-        with:
-          # PR의 임시 merge commit이 아니라 실제 배포·검증할 branch HEAD를 고정한다.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-java@v4
         with:
@@ -121,6 +119,7 @@ jobs:
         run: |
           python3 ../scripts/osm/import/test_artifact_contract.py
           python3 ../scripts/osm/test_operational_load.py
+          python3 ../scripts/osm/test_roundtrip_evidence.py
           python3 deploy/validation/test_summarize_runtime_metrics.py
           sh -n deploy/validation/collect-runtime-metrics.sh
           sh -n deploy/validation/test-collect-runtime-metrics.sh
@@ -149,8 +148,9 @@ jobs:
           grep -q "status=NO_OP" ../reports/importer-smoke/second.log
 
       - name: Record artifact identity and checksums
+        if: github.event_name == 'push'
         env:
-          RELEASE_GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          RELEASE_GIT_COMMIT: ${{ github.sha }}
         run: |
           printf 'git_commit=%s\nworkflow_run_id=%s\n' \
             "$RELEASE_GIT_COMMIT" "$GITHUB_RUN_ID" \
@@ -164,9 +164,10 @@ jobs:
             > SHA256SUMS
 
       - name: Upload EC2 deployment artifact
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: runninggu-backend-${{ github.event.pull_request.head.sha || github.sha }}
+          name: runninggu-backend-${{ github.sha }}
           path: backend/build/ec2-artifact/
           if-no-files-found: error
           retention-days: 30

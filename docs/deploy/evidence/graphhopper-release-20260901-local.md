@@ -69,7 +69,7 @@ gitignore 경로에만 보관한다.
 - `scripts/osm/test_operational_load.py`: 현재 고정 정상 요청 계약 11개 통과
 - `scripts/osm/test_roundtrip_evidence.py`: 회귀 evidence·`no valid point` 분류 3개 통과
 - `scripts/osm/import/test_artifact_contract.py`: 9개 통과
-- `backend/deploy/validation/test_summarize_runtime_metrics.py`: 2개 통과
+- `backend/deploy/validation/test_summarize_runtime_metrics.py`: 6개 통과
 - `backend/deploy/validation/test-collect-runtime-metrics.sh`: Linux Alpine 통과
 - 수정 shell 3개: ShellCheck 0건
 - EC2 Compose `config --quiet`: 성공

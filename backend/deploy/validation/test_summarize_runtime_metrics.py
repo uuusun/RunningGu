@@ -25,11 +25,13 @@ class RuntimeMetricsSummaryTest(unittest.TestCase):
             "systemd service=runninggu-graphhopper.service ActiveState=active SubState=running NRestarts=0",
             "container service=graphhopper present=true status=running oom_killed=false restart_count=0",
             "container service=postgres present=true status=running oom_killed=false restart_count=0",
+            "sample_end sequence=0",
             "sample sequence=1 mem_available_percent=25.000 swap_used_kib=0 pswpin=10 pswpout=20",
             "systemd service=runninggu-backend.service ActiveState=active SubState=running NRestarts=0",
             "systemd service=runninggu-graphhopper.service ActiveState=active SubState=running NRestarts=0",
             "container service=graphhopper present=true status=running oom_killed=false restart_count=0",
             "container service=postgres present=true status=running oom_killed=false restart_count=0",
+            "sample_end sequence=1",
         ]
 
     def test_passes_complete_stable_samples(self) -> None:
@@ -41,15 +43,15 @@ class RuntimeMetricsSummaryTest(unittest.TestCase):
 
     def test_fails_memory_swap_restart_oom_and_unhealthy_container(self) -> None:
         lines = self.passing_lines()
-        lines[7] = (
+        lines[8] = (
             "sample sequence=1 mem_available_percent=19.999 "
             "swap_used_kib=4 pswpin=11 pswpout=21"
         )
-        lines[9] = (
+        lines[10] = (
             "systemd service=runninggu-graphhopper.service "
             "ActiveState=active SubState=running NRestarts=1"
         )
-        lines[10] = (
+        lines[11] = (
             "container service=graphhopper present=true status=exited "
             "oom_killed=true restart_count=1"
         )
@@ -62,6 +64,57 @@ class RuntimeMetricsSummaryTest(unittest.TestCase):
         self.assertEqual(summary["systemdRestartGrowth"]["runninggu-graphhopper.service"], 1)
         self.assertEqual(summary["oomKilledSamples"], 1)
         self.assertEqual(summary["unhealthyContainerSamples"], 1)
+        self.assertFalse(summary["passed"])
+
+    def test_fails_inactive_systemd_service(self) -> None:
+        lines = self.passing_lines()
+        lines[4] = (
+            "systemd service=runninggu-graphhopper.service "
+            "ActiveState=inactive SubState=dead NRestarts=0"
+        )
+
+        summary = summary_module.summarize(lines)
+
+        self.assertEqual(summary["unhealthySystemdServiceSamples"], 1)
+        self.assertFalse(summary["passed"])
+
+    def test_fails_when_expected_systemd_service_is_missing(self) -> None:
+        lines = [
+            line for line in self.passing_lines()
+            if "service=runninggu-graphhopper.service" not in line
+        ]
+
+        summary = summary_module.summarize(lines)
+
+        self.assertEqual(summary["missingSystemdServiceSamples"], 2)
+        self.assertEqual(
+            summary["systemdObservationCounts"]["runninggu-graphhopper.service"],
+            0,
+        )
+        self.assertFalse(summary["passed"])
+
+    def test_fails_when_container_restart_count_increases(self) -> None:
+        lines = self.passing_lines()
+        lines[11] = (
+            "container service=graphhopper present=true status=running "
+            "oom_killed=false restart_count=1"
+        )
+
+        summary = summary_module.summarize(lines)
+
+        self.assertEqual(summary["containerRestartGrowth"]["graphhopper"], 1)
+        self.assertFalse(summary["passed"])
+
+    def test_fails_when_expected_container_observation_is_missing(self) -> None:
+        lines = [
+            line for line in self.passing_lines()
+            if "container service=postgres" not in line
+        ]
+
+        summary = summary_module.summarize(lines)
+
+        self.assertEqual(summary["missingContainerSamples"], 2)
+        self.assertEqual(summary["containerObservationCounts"]["postgres"], 0)
         self.assertFalse(summary["passed"])
 
 
