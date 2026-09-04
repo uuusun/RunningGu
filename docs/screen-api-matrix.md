@@ -321,6 +321,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
+| 걷기 스팟 선택 | 로컬 상태 | 없음 | LOCAL_STATE | **P0 는 출발지로 삼지 않는다** 🔒확정(#269). 선택 표시·지도 포커스만 바뀌고 재조회하지 않으며, `[저장]` 아래에 `걷기 스팟은 저장할 수 없어요. 지도에서 위치만 확인해 주세요.` 표시. 새 `OriginState` 갈래·출발지 이력·확인창 없음. 출발지 승격은 P1 별도 계약 |
 | 지역별 코스 선택 | `GET /api/courses/{courseId}` | courseId | 목록 필드 + pathPolyline + elevationProfileM + attributions | `courseDetail/curated/{courseId}` 로 이동(#280). **courseId 는 catalog 공개 안정키라 route 에 실어도 된다** — near snapshot 과 다른 점이다. 없는 id 는 `404 COURSE_NOT_FOUND` |
 
 ### S8-D 코스 상세
