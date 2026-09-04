@@ -1,7 +1,9 @@
 package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.local.cache.ContestCache
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
+import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.ContestApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.mapper.toDomain
@@ -75,25 +77,56 @@ data class ClosingSoon(
     val dDayApply: Int?,
 )
 
-/** 서버 구현. */
-class RemoteContestRepository(private val api: ContestApi) : ContestRepository {
+/**
+ * 서버 구현. 성공 응답을 [cache] 에 남기고, **연결이 안 될 때만** 그것을 되살린다.
+ * (SPEC §6.1 · §9.3 · 매핑표 S1·S3 오프라인 · 이슈 #105)
+ *
+ * ## 되살리는 조건이 네트워크 실패 하나인 이유
+ *
+ * 서버가 답을 준 것(`4xx`·`5xx`)은 **연결이 살아 있다는 뜻**이다. 그때 낡은 목록을 대신
+ * 그리면 사용자는 지금 서버가 말한 것과 다른 화면을 보게 되고, 무엇이 최신인지 알 방법이
+ * 없다. 폴백은 "볼 수 있는 게 아무것도 없을 때" 만 값어치가 있다.
+ *
+ * 캐시가 비어 있으면 **원래 오류를 그대로 던진다.** 빈 목록으로 바꾸면 "대회가 없다" 가
+ * 되어 사실과 다르다.
+ */
+class RemoteContestRepository(
+    private val api: ContestApi,
+    /** 없으면 폴백 없이 서버만 본다. 캐시를 안 쓰는 테스트가 이 상태다. */
+    private val cache: ContestCache? = null,
+) : ContestRepository {
 
-    override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage = apiCall {
-        val dto = api.list(
-            query = filter.query?.takeIf { it.isNotBlank() },
-            events = filter.events.map { it.toServerName() }.ifEmpty { null },
-            openOnly = filter.openOnly.takeIf { it },
-            regions = filter.regions.ifEmpty { null },
-            date = filter.date?.toString(),
-            cursor = cursor,
-            size = filter.size,
-        )
-        ContestPage(
-            contests = dto.items.map { it.toContest() },
-            nextCursor = dto.nextCursor,
-            hasNext = dto.hasNext,
-        )
-    }
+    override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage = withCacheFallback(
+        remote = {
+            val dto = api.list(
+                query = filter.query?.takeIf { it.isNotBlank() },
+                events = filter.events.map { it.toServerName() }.ifEmpty { null },
+                openOnly = filter.openOnly.takeIf { it },
+                regions = filter.regions.ifEmpty { null },
+                date = filter.date?.toString(),
+                cursor = cursor,
+                size = filter.size,
+            )
+            cache?.save(dto.items)
+            ContestPage(
+                contests = dto.items.map { it.toContest() },
+                nextCursor = dto.nextCursor,
+                hasNext = dto.hasNext,
+            )
+        },
+        cached = {
+            // **첫 장에서만 되살린다.** 다음 장을 캐시로 채우면 이미 본 대회가 다시 붙는다 —
+            // 커서는 서버 것이라 캐시가 어디에 이어 붙어야 할지 알 수 없다
+            if (cursor != null) {
+                null
+            } else {
+                cache?.list().orEmpty().takeIf { it.isNotEmpty() }?.let { cached ->
+                    // 오프라인 목록은 **더 볼 것이 없다.** 커서를 지어내면 [더 보기] 가 헛돈다
+                    ContestPage(contests = cached.map { it.toContest() }, nextCursor = null, hasNext = false)
+                }
+            }
+        },
+    )
 
     override suspend fun dailyCounts(year: Int, month: Int, filter: ContestFilter): Map<LocalDate, Int> =
         apiCall {
@@ -111,8 +144,30 @@ class RemoteContestRepository(private val api: ContestApi) : ContestRepository {
         api.closingSoon(limit).items.map { ClosingSoon(it.toContest(), it.dDayApply) }
     }
 
-    override suspend fun detail(id: Long): Contest = apiCall {
-        api.detail(id).toContest()
+    override suspend fun detail(id: Long): Contest = withCacheFallback(
+        remote = {
+            val dto = api.detail(id)
+            cache?.save(listOf(dto))
+            dto.toContest()
+        },
+        // 목록에서 한 번이라도 본 대회만 있다. 못 본 것은 폴백이 없다
+        cached = { cache?.byId(id)?.toContest() },
+    )
+
+    /**
+     * 서버를 부르고, **연결 자체가 안 됐을 때만** 캐시를 본다.
+     *
+     * [cached] 가 `null` 을 주면(캐시가 비었거나 되살릴 자리가 아니면) 원래 오류를 던진다.
+     * 목록·상세 말고 다른 조회에는 붙이지 않았다 — 캘린더 집계·마감임박은 SPEC §6.1 의
+     * 캐시 대상이 아니다.
+     */
+    private suspend fun <T> withCacheFallback(
+        remote: suspend () -> T,
+        cached: suspend () -> T?,
+    ): T = try {
+        apiCall { remote() }
+    } catch (e: ApiException.Network) {
+        cached() ?: throw e
     }
 
     override suspend fun festivals(id: Long): List<NearbyFestival> = apiCall {

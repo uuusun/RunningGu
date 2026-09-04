@@ -40,6 +40,7 @@ import com.runninggu.app.data.model.SavedCourseDetail
 import com.runninggu.app.domain.LatLng
 import com.runninggu.app.ui.common.Attributions
 import com.runninggu.app.ui.common.ElevationLine
+import com.runninggu.app.ui.common.elevationUnitProfile
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.map.MIN_ROUTE_POINTS
@@ -165,7 +166,7 @@ private fun Content(detail: SavedCourseDetail) {
                 seed = course.id.toInt(),
                 closed = false,
                 // 미터 원값을 그대로 넘기면 안 된다 — `ElevationLine` 은 0..1 을 받는다.
-                profile = normalized(detail.elevationProfileM),
+                profile = elevationUnitProfile(detail.elevationProfileM),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),
@@ -177,24 +178,6 @@ private fun Content(detail: SavedCourseDetail) {
         Spacer(Modifier.height(24.dp))
     }
 }
-
-/**
- * 고도 배열(m)을 `ElevationLine` 이 받는 0..1 로 옮긴다.
- *
- * **코스 안에서의 상대 높이**만 그린다 — 해발이 아니라 오르내림을 보여주는 그래프라,
- * 최저점을 0 최고점을 1 로 편다. 평지(최저=최고)는 나눗셈이 0 이 되므로 가운데 선으로 둔다.
- */
-internal fun normalized(profileM: List<Int>): List<Float>? {
-    if (profileM.size < 2) return null
-    val min = profileM.min()
-    val max = profileM.max()
-    if (max == min) return List(profileM.size) { FLAT_LEVEL }
-    val span = (max - min).toFloat()
-    return profileM.map { (it - min) / span }
-}
-
-/** 오르내림이 없는 코스의 선 높이. 바닥에 붙이면 그래프가 없는 것처럼 보인다. */
-private const val FLAT_LEVEL = 0.5f
 
 /** "{지역} · MM.DD 저장" — 지역이 없으면 저장일만. */
 private fun subtitleOf(course: SavedCourse): String {

@@ -92,6 +92,21 @@ class ApiContractTest {
     }
 
     @Test
+    fun `만 14세 미달 거절은 UNKNOWN 이 아니다`() {
+        // 서버는 `ageOver14=false` 에 `400 AGE_REQUIREMENT_NOT_MET` 을 준다
+        // (명세 오류표 894행 · §1-5 · §1-8 · 결정-58).
+        //
+        // `UNKNOWN` 으로 떨어지면 화면이 "가입에 실패했어요" 만 내고, 사용자는 **다시 눌러도
+        // 영영 안 풀리는 갈래**에서 같은 버튼을 계속 누른다.
+        assertEquals(
+            ApiErrorCode.AGE_REQUIREMENT_NOT_MET,
+            ApiErrorCode.from("AGE_REQUIREMENT_NOT_MET"),
+        )
+        // 누락·자료형 오류는 이 코드가 아니다 — 그쪽은 VALIDATION_FAILED 다(§1-5)
+        assertEquals(ApiErrorCode.UNKNOWN, ApiErrorCode.from("AGE_REQUIREMENT"))
+    }
+
+    @Test
     fun `모르는 코드는 UNKNOWN 으로 떨어진다`() {
         // 서버가 코드를 새로 추가해도 앱이 깨지면 안 된다
         assertEquals(ApiErrorCode.UNKNOWN, ApiErrorCode.from("SOMETHING_NEW"))

@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.ui.common.elevationUnitProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -15,7 +16,7 @@ class CourseDetailScreenTest {
 
     @Test
     fun `최저점은 0 최고점은 1 이 된다`() {
-        val result = normalized(listOf(100, 150, 200))
+        val result = elevationUnitProfile(listOf(100, 150, 200))
 
         assertEquals(listOf(0f, 0.5f, 1f), result)
     }
@@ -23,7 +24,7 @@ class CourseDetailScreenTest {
     @Test
     fun `해발이 높아도 0에서 1 사이로 들어온다`() {
         // 대관령 같은 코스는 값이 세 자리다. 그대로 넘어가면 화면이 깨진다.
-        val result = normalized(listOf(800, 900, 1010))!!
+        val result = elevationUnitProfile(listOf(800, 900, 1010))!!
 
         assertEquals(3, result.size)
         result.forEach { v ->
@@ -34,14 +35,14 @@ class CourseDetailScreenTest {
     @Test
     fun `평지는 가운데 높이로 편다`() {
         // 0 으로 나누면 NaN 이 되고, 바닥에 붙이면 그래프가 없는 것처럼 보인다.
-        val result = normalized(listOf(30, 30, 30))
+        val result = elevationUnitProfile(listOf(30, 30, 30))
 
         assertEquals(listOf(0.5f, 0.5f, 0.5f), result)
     }
 
     @Test
     fun `점이 모자라면 null 을 주고 시드 프로파일에 맡긴다`() {
-        assertNull(normalized(emptyList()))
-        assertNull(normalized(listOf(42)))
+        assertNull(elevationUnitProfile(emptyList()))
+        assertNull(elevationUnitProfile(listOf(42)))
     }
 }

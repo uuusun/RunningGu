@@ -195,6 +195,7 @@ private class FakeKakaoRepository(
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = unused()
     override suspend fun requestPasswordReset(email: String): Result<Unit> = unused()
 

@@ -94,6 +94,21 @@ class KakaoSignupErrorTest {
     }
 
     @Test
+    fun `만 14세 확인 없이 오면 확인란으로 돌려보낸다`() = runTest(dispatcher) {
+        // 카카오도 같은 검증을 받는다. 서버는 **외부 호출보다 먼저** 막는다(§1-8)
+        val viewModel = submit(
+            ApiException.Http(status = 400, code = ApiErrorCode.AGE_REQUIREMENT_NOT_MET, problem = null),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            "만 14세 이상만 가입할 수 있어요.",
+            viewModel.uiState.value.errorMessage,
+        )
+        assertNull(SessionStore.session.value)
+    }
+
+    @Test
     fun `네트워크 실패는 다시 눌러 볼 수 있다고 말한다`() = runTest(dispatcher) {
         val viewModel = submit(ApiException.Network(IOException("끊김")))
         advanceUntilIdle()
@@ -148,6 +163,7 @@ private class FakeKakaoSignupRepository(private val failure: Throwable) : AuthRe
         kakaoAccessToken: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = Result.failure(failure)
 
     override suspend fun kakaoLogin(kakaoAccessToken: String): Result<KakaoLoginOutcome> = unused()
@@ -162,6 +178,7 @@ private class FakeKakaoSignupRepository(private val failure: Throwable) : AuthRe
         password: String,
         nickname: String,
         marketingAgreed: Boolean,
+        ageOver14: Boolean,
     ): Result<AuthSession> = unused()
     override suspend fun requestPasswordReset(email: String): Result<Unit> = unused()
 

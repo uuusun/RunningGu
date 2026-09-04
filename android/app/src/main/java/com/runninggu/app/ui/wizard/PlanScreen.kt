@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.domain.TripPattern
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -179,13 +180,12 @@ private fun RangeSummary(state: WizardUiState) {
 /** 위저드 하단 고정 CTA. S4·S5 가 같이 쓴다. (SPEC §4.7 · §4.8) */
 @Composable
 internal fun NextBar(enabled: Boolean, onClick: () -> Unit) {
-    Surface(shadowElevation = 8.dp) {
+    BottomActionBar {
         Button(
             onClick = onClick,
             enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .height(52.dp),
         ) {
             Text("다음", style = MaterialTheme.typography.titleMedium)

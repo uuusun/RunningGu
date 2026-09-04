@@ -66,6 +66,7 @@ class SignupDuplicateCheckTest {
             password: String,
             nickname: String,
             marketingAgreed: Boolean,
+        ageOver14: Boolean,
         ): Result<AuthSession> = TODO()
         override suspend fun requestPasswordReset(email: String): Result<Unit> = TODO()
         override suspend fun logout(refreshToken: String): Result<Unit> = Result.success(Unit)
