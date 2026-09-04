@@ -113,6 +113,34 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `되살린 결과가 0건이어도 언제 것인지가 남는다`() = runTest(dispatcher) {
+        // **여기가 비면 마지막 성공본으로 접힌 화면과 방금 서버가 0건을 준 화면이
+        // 같아 보인다.** 0건은 드문 경우가 아니다 — 접수 종료 항목을 다 걸러내면
+        // 바로 이 상태고, 캐시가 하루쯤 묵으면 자연스럽게 일어난다 (#283 리뷰)
+        val saved = Instant.ofEpochMilli(1_700_000_000_000L)
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = emptyList(), cachedAt = saved),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value.closingSoon
+        assertTrue("정상 빈 상태여야 한다: $state", state is SectionState.Empty)
+        assertEquals(saved, state.cachedAt)
+    }
+
+    @Test
+    fun `서버가 준 0건에는 붙지 않는다`() = runTest(dispatcher) {
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = emptyList()),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.closingSoon.cachedAt)
+    }
+
+    @Test
     fun `축제가 죽어도 마감 임박은 남는다`() = runTest(dispatcher) {
         val viewModel = HomeViewModel(
             RecordingContestRepository(closingSoon = listOf(closingSoon(1, LocalDate.of(2026, 9, 1)))),
