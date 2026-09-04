@@ -36,6 +36,7 @@ public class EmailAuthController {
                 request.email(),
                 request.password(),
                 request.nickname(),
+                request.ageOver14(),
                 agreements.tos(),
                 agreements.privacy(),
                 agreements.marketing()));

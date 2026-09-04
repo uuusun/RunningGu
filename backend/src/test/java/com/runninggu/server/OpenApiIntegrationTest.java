@@ -112,6 +112,17 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.components.schemas.ResetPasswordRequest").exists())
                 .andExpect(jsonPath("$.components.schemas.ReauthRequest").exists())
                 .andExpect(jsonPath("$.components.schemas.ReauthResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.SignupRequest.properties.ageOver14.type")
+                        .value("boolean"))
+                .andExpect(jsonPath("$.components.schemas.SignupRequest.required"
+                                + "[?(@ == 'ageOver14')]")
+                        .isNotEmpty())
+                .andExpect(jsonPath(
+                                "$.components.schemas.KakaoSignupRequest.properties.ageOver14.type")
+                        .value("boolean"))
+                .andExpect(jsonPath("$.components.schemas.KakaoSignupRequest.required"
+                                + "[?(@ == 'ageOver14')]")
+                        .isNotEmpty())
                 .andExpect(jsonPath("$.components.schemas.CourseNearResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.CourseNearItemResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.AuthUserResponse.properties.email.type"
