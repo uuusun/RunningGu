@@ -490,6 +490,17 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
         ) {
             Text(if (state.save is SaveCourseState.Saving) "저장 중…" else "저장")
         }
+        // **왜 회색인지 적는다** (#269). 걷기 스팟은 P0 에서 저장 대상이 아닌데, 그 말이
+        // 없으면 사용자는 버튼이 고장난 줄 안다. 저장 결과가 떠 있을 때는 비켜 준다 —
+        // 방금 누른 것에 대한 답이 먼저다.
+        if (state.walkSpotPicked && state.save !is SaveCourseState.Done) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = WALK_SPOT_NOT_SAVABLE,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         val save = state.save
         if (save is SaveCourseState.Done) {
             Spacer(Modifier.height(6.dp))
@@ -662,3 +673,11 @@ private fun NoticeRow(message: String) {
     )
 }
 
+/**
+ * 걷기 스팟을 골랐을 때의 안내. (§4.11-4 · #269 결정)
+ *
+ * **상수로 두는 이유** — 문구가 결정문(#269)에 글자 그대로 적혀 있다. 화면에 직접 쓰면
+ * 테스트가 자기 사본과 비교하게 되어 갈려도 못 잡는다(#274 에서 겪은 자리다).
+ */
+internal const val WALK_SPOT_NOT_SAVABLE =
+    "걷기 스팟은 저장할 수 없어요. 지도에서 위치만 확인해 주세요."
