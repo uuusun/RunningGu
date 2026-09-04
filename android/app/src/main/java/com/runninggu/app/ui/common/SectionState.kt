@@ -39,8 +39,13 @@ sealed interface SectionState<out T> {
      *
      * 뭉뚱그리면 "없는 것" 과 "못 불러온 것" 이 같아 보여서, 사용자가 다시 시도해야 할
      * 상황인지 알 수 없다.
+     *
+     * **[Content] 와 같이 [origin] 을 든다.** 캐시로 되살렸는데 0건인 경우가 있기 때문이다 —
+     * 마지막 성공 응답이 0건이었거나, 접수 종료 항목을 다 걸러 0건이 된 경우다. 출처를
+     * 안 들면 **마지막 성공본으로 접힌 화면과 방금 서버가 0건을 준 화면이 같아 보인다**
+     * (#283 리뷰). 0건은 드문 경우가 아니다 — 캐시가 하루쯤 묵으면 자연스럽게 일어난다.
      */
-    data object Empty : SectionState<Nothing>
+    data class Empty(val origin: DataOrigin = DataOrigin.Server) : SectionState<Nothing>
 
     /** 네트워크·서버·외부 API 오류. 서버가 준 문구가 있으면 그것, 없으면 null. */
     data class Error(val message: String?) : SectionState<Nothing>
@@ -70,6 +75,22 @@ sealed interface DataOrigin {
     data class LocalCache(val cachedAt: java.time.Instant) : DataOrigin
 }
 
-/** 캐시로 그린 것이면 저장 시각, 아니면 null. 화면이 분기 없이 읽을 때 쓴다. */
+/**
+ * 캐시로 그린 것이면 저장 시각, 아니면 null. 화면이 분기 없이 읽을 때 쓴다.
+ *
+ * **[SectionState.Loading]·[SectionState.Error] 에는 출처를 두지 않았다.** 인터페이스에
+ * 기본값으로 얹으면 한 줄로 줄어들지만, 그러면 `Loading.origin` 이 `Server` 를 돌려주고
+ * 화면이 그걸 "서버에서 받았다" 로 읽을 수 있다. 그릴 값이 없는 상태에 출처를 물을 일은
+ * 없으므로 **애초에 물을 수 없게** 둔다 — 담지 않으면 쓸 수가 없다.
+ *
+ * `when` 이 sealed 를 다 덮으므로, 상태를 하나 더 만들면 여기서 컴파일이 막힌다.
+ */
 val <T> SectionState<T>.cachedAt: java.time.Instant?
-    get() = ((this as? SectionState.Content)?.origin as? DataOrigin.LocalCache)?.cachedAt
+    get() {
+        val origin = when (this) {
+            is SectionState.Content -> origin
+            is SectionState.Empty -> origin
+            SectionState.Loading, is SectionState.Error -> null
+        }
+        return (origin as? DataOrigin.LocalCache)?.cachedAt
+    }

@@ -113,10 +113,13 @@ class HomeViewModel(
 /**
  * 조회 결과를 영역 상태로. 빈 목록은 [SectionState.Empty] 다.
  *
+ * **빈 목록에도 출처를 넘긴다.** 캐시로 되살렸는데 0건이면 화면이 "언제 것" 을 말할 수
+ * 있어야 한다 — 여기서 떨어뜨리면 repository 가 준 `cachedAt` 이 사라진다(#283 리뷰).
+ *
  * **정상 0건과 오류를 섞지 않기 위해** 여기서 한 번만 판단한다 — 화면마다 `isEmpty()` 를
  * 따로 보면 어디선가 빠진다(API 명세 §0-3).
  */
 internal fun <T> List<T>.toSectionState(
     origin: DataOrigin = DataOrigin.Server,
 ): SectionState<List<T>> =
-    if (isEmpty()) SectionState.Empty else SectionState.Content(this, origin)
+    if (isEmpty()) SectionState.Empty(origin) else SectionState.Content(this, origin)
