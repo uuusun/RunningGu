@@ -63,6 +63,7 @@ import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
 import com.runninggu.app.ui.common.SectionState
+import com.runninggu.app.ui.common.cachedAt
 import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.registrationStatus
@@ -234,7 +235,15 @@ private fun <T> LazyListScope.section(
             ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)
         }
 
-        is SectionState.Content -> item { content(state.value) }
+        // **캐시로 그린 것이면 그렇다고 말한다** (매핑표 171행 · #276). 영역 단위로 붙이는
+        // 이유는 폴백도 영역 단위이기 때문이다 — 마감임박은 캐시에서 오고 축제는 오류일 수
+        // 있어서, 화면 위에 한 번 적으면 어느 쪽이 낡은 것인지 알 수 없다.
+        is SectionState.Content -> item {
+            state.cachedAt?.let {
+                CachedNotice(cachedAt = it, modifier = Modifier.padding(horizontal = ScreenPadding))
+            }
+            content(state.value)
+        }
     }
 }
 
