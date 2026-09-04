@@ -93,6 +93,32 @@ data class CourseDto(
 )
 
 /**
+ * 큐레이션 코스 상세. (`GET /api/courses/{courseId}` · #280 계약)
+ *
+ * 목록([CourseDto])에 경로가 없어 코스를 눌러도 갈 곳이 없던 것을 푸는 응답이다.
+ * 목록 필드에 `pathPolyline` · `elevationProfileM` · `attributions` 셋이 더 붙는다.
+ *
+ * **`pathPolyline` 은 원본 코스 전체 points 다** — `near` 처럼 목표 거리에 맞춰 자른
+ * 왕복이 아니다. 같은 `courseId` 라도 두 응답의 거리·시간·고도가 다른 것이 정상이다.
+ */
+@Serializable
+data class CourseDetailDto(
+    val courseId: String,
+    val courseName: String,
+    val sido: String? = null,
+    val sigun: String? = null,
+    val distanceKm: Double = 0.0,
+    val difficulty: String? = null,
+    val gainM: Int? = null,
+    val durationMin: Int? = null,
+    val dataSource: String? = null,
+    @Contextual val syncedAt: Instant? = null,
+    val pathPolyline: String = "",
+    val elevationProfileM: List<Int> = emptyList(),
+    val attributions: List<String> = emptyList(),
+)
+
+/**
  * 지역별 목록 응답. (§6-2 · API v2.7)
  *
  * 일반 [PageDto] 와 달리 **최상위에 `attributions` 가 붙는다** — 목록 하단 출처 한 줄에

@@ -3,6 +3,8 @@ package com.runninggu.app.data.remote.mapper
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.CourseSource
+import com.runninggu.app.data.model.CuratedCourseDetail
+import com.runninggu.app.data.remote.dto.CourseDetailDto
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
@@ -84,3 +86,29 @@ internal fun dataSourceOf(raw: String?): CourseDataSource? =
 
 private fun courseSourceOf(raw: String): CourseSource? =
     CourseSource.entries.firstOrNull { it.name == raw }
+
+/**
+ * 큐레이션 코스 상세. (#280 계약)
+ *
+ * **폴리라인은 원문을 그대로 들고 가면서 좌표도 같이 푼다.** 화면은 좌표를 쓰고, 원문은
+ * 서버에 되돌려 보낼 일이 있을 때 쓴다 — 풀었다 다시 묶으면 값이 달라진다(#62 · §7-A).
+ *
+ * 디코더는 깨진 입력에 예외를 던지지 않고 읽은 만큼만 돌려준다. 코스 상세가 통째로
+ * 안 열리는 것보다 낫기 때문이다(NFR-1·3 · #209 와 같은 판단).
+ */
+fun CourseDetailDto.toDomain(): CuratedCourseDetail = CuratedCourseDetail(
+    courseId = courseId,
+    courseName = courseName,
+    sido = sido,
+    sigun = sigun,
+    distanceKm = distanceKm,
+    difficulty = difficultyOf(difficulty),
+    gainM = gainM,
+    durationMin = durationMin,
+    dataSource = dataSourceOf(dataSource),
+    syncedAt = syncedAt,
+    pathPolyline = pathPolyline,
+    path = Polyline.decode(pathPolyline),
+    elevationProfileM = elevationProfileM,
+    attributions = attributions,
+)

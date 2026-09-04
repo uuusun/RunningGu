@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.CourseRegion
@@ -215,6 +216,10 @@ private class StubCourses(
     override suspend fun byRegion(region: String?, page: Int, size: Int) = CoursePage()
 
     override suspend fun regions(): List<CourseRegion> = emptyList()
+
+    // 이 테스트는 상세를 안 쓴다 — 불러야 할 곳이 있으면 그게 버그다 (#280)
+    override suspend fun detail(courseId: String): CuratedCourseDetail =
+        error("이 테스트는 상세를 부르지 않는다")
 }
 
 /** S8 조회만 보는 테스트라 저장은 부르지 않는다. */
