@@ -213,6 +213,7 @@ class LoginRateLimitApiIntegrationTest extends PostgreSqlContainerSupport {
                                 "email", email,
                                 "password", password,
                                 "nickname", nickname,
+                                "ageOver14", true,
                                 "agreements", Map.of(
                                         "tos", true,
                                         "privacy", true,
