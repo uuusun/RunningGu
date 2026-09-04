@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.repository.CourseRepository
-import com.runninggu.app.data.repository.FakeCourseRepository
+import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.ui.userMessageOrDefault
 import com.runninggu.app.ui.runCatchingUnlessCancelled
 import com.runninggu.app.data.remote.ApiException
@@ -24,7 +24,11 @@ import kotlinx.coroutines.launch
  * **빈 상태가 없다.** id 로 여는 화면이라 없는 id 는 `404` 이고 그건 오류다.
  */
 class CuratedCourseDetailViewModel(
-    private val repository: CourseRepository = FakeCourseRepository,
+    // **운영 기본값은 실제 저장소다.** 처음에 스텁을 기본값으로 뒀는데, 내비게이션이
+    // `viewModel()` 로 기본 생성하는 바람에 **실제 화면이 서버를 한 번도 안 불렀다**
+    // (#286 리뷰). 이 저장소의 다른 ViewModel 은 전부 `ServiceLocator` 를 기본값으로
+    // 쓴다 — 여기만 달랐다. 스텁은 테스트가 명시적으로 주입한다(AGENTS 2장-6).
+    private val repository: CourseRepository = ServiceLocator.courseRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CuratedCourseDetailUiState())
