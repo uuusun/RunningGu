@@ -581,6 +581,23 @@ unit·주 service의
 `compose.env`의 `GRAPHHOPPER_MEMORY_RESERVATION`·`GRAPHHOPPER_MEMORY_LIMIT`과 backend unit의
 `MemoryHigh`·`MemoryMax`를 관측값으로 함께 바꾸고 `daemon-reload` 후 전체 시험을 반복한다.
 
+양수 `GRAPHHOPPER_MEMORY_LIMIT`은 Compose의 `mem_limit`와 `memswap_limit`에 같은 값으로
+적용되어 GraphHopper container만 swap을 금지한다. baseline 값 0은 이 금지를 적용하지 않는다.
+호스트 swap을 끄거나 PostgreSQL의 메모리 정책을 바꾸지 않는다. 변경 전 private `compose.env`와
+backend unit을 접근 제한된 검증 디렉터리에 백업하고, 기존 release·graph·image를 보존한다.
+backend의 측정 상한은 `/etc/systemd/system/runninggu-backend.service.d/memory.conf`에
+`[Service]`, `MemoryHigh=...`, `MemoryMax=...`만 둔 drop-in으로 적용할 수 있다.
+기존 동명 drop-in이 있으면 덮어쓰지 말고 먼저 확인·백업한다. 실패 시 이번에 바꾼 env와 unit 또는
+drop-in만 원복한 뒤 `daemon-reload`하고 서비스를 복구한다. 다른 drop-in은 지우지 않는다.
+
+GraphHopper는 systemd로 중지·시작해 Compose가 변경된 container 설정을 반영하게 한다.
+`docker inspect`의 `HostConfig.MemoryReservation`, `Memory`, `MemorySwap`을 기록하고,
+`MemorySwap == Memory > 0`인지 확인한다. 해당 container PID의 `/proc/<PID>/cgroup` 경로로
+cgroup v2의 `memory.max`와 `memory.swap.max=0`을 직접 대조한다. backend는
+`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`로 적용값을 확인한다.
+후보값·기존값·실측 근거를 배포 증거에 남기고 같은 고정 요청 30분 부하·백업·재부팅·§9.3 격리를
+반복한다. 격리 시험의 reservation·memory·memory+swap은 실제 후보와 같아야 한다.
+
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
 

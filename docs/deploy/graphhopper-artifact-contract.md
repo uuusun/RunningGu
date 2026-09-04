@@ -535,6 +535,17 @@ GraphHopper container는 Docker의 별도 cgroup에 있으므로 주 systemd ser
 PR 2의 첫 8GiB baseline 설정은 GraphHopper `mem_reservation: 0`·`mem_limit: 0`, Spring Boot
 `MemoryHigh=infinity`·`MemoryMax=infinity`로 무제한을 명시한다. §9.3 합격 뒤에만 Compose env와
 exact systemd unit을 관측값으로 함께 바꾸고 다시 같은 검증을 수행한다.
+
+양수 hard limit을 적용할 때 GraphHopper의 `memswap_limit`(RAM+swap 합계)은 `mem_limit`와
+같은 `GRAPHHOPPER_MEMORY_LIMIT` 값으로 보간해 **이 container만 swap을 금지**한다.
+별도 swap 상한 환경변수를 두지 않는다. baseline의 두 값 `0`은 미설정 취급이므로 swap 금지를
+뜻하지 않는다. 호스트 전체 swap과 PostgreSQL의 기존 정책은 유지한다. Docker inspect의
+`HostConfig.MemorySwap == HostConfig.Memory > 0`과 실제 cgroup v2의 `memory.swap.max=0`을
+둘 다 확인하고 기록한다. §9.3에서도 운영 후보와 동일한 reservation·memory·memory+swap
+조합을 사용하며, 고의 OOM 유발용 heap만 일시적으로 높인다. 제한 적용 뒤 §9.1 전체 시험을
+다시 통과하기 전에는 후보를 운영 확정값으로 표시하지 않는다.
+([Docker memory-swap 계약](https://docs.docker.com/engine/containers/resource_constraints/#--memory-swap-details))
+
 PostgreSQL은 첫 격리 대상이 아니라 보호 대상이므로 최초 시험에는 hard limit을 두지 않고 peak와
 백업 working set을 reserve로 잡는다. 나중에 PostgreSQL hard limit을 추가한다면 OOM 재시작 loop와
 복구 정책을 같은 결정으로 검증한다.
@@ -629,7 +640,7 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 | 재부팅 | import 로그 0건, 기존 artifact 재사용. 배포는 verify oneshot 시작, 재부팅은 GraphHopper unit activation 시작부터 검증 시간을 포함해 2분 안에 GraphHopper·Spring readiness 성공 |
 | 로그 | GraphHopper runtime 기준 저장소는 Docker `local`이며 `docker compose logs graphhopper`로 검사. 주 service journal에는 container runtime stdout·stderr 0건이고 Compose·`ExecStartPre` 실패 이유만 남음. §7 wrapper가 실패 때 남긴 마지막 stderr에도 PBF 내용·AWS 자격 증명·사용자 정보가 없음 |
 
-`MemAvailable 20%`를 충족하려고 cache를 강제로 비우거나, swap을 끄거나, 시험 요청률을 결과에
+`MemAvailable 20%`를 충족하려고 cache를 강제로 비우거나, 호스트 swap을 끄거나, 시험 요청률을 결과에
 맞춰 낮추지 않는다. 시험 명령·시작/종료 시각·instance type·heap·hard limit·artifact ID를 결과와
 함께 남긴다. graph hash 검증 시간을 줄여 보이려고 시험 직전 page cache를 인위적으로 데우거나
 비우지 않는다.
@@ -645,7 +656,8 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 시험이 아니라, 측정 뒤 정한 GraphHopper Compose `mem_limit`를 운영에 켜도 장애가 host 전체로 번지지
 않는지 확인하는 안전 시험이다. hard limit 활성화 전 다음을 별도 기록으로 모두 통과한다.
 
-1. 격리된 시험 요청으로 GraphHopper만 의도적으로 cgroup OOM에 도달시킨다.
+1. §8.1의 운영 후보와 같은 reservation·memory·memory+swap 상한을 기록하고, 격리된 시험
+   환경에서 heap을 높여 GraphHopper만 의도적으로 cgroup OOM에 도달시킨다. 호스트 swap은 유지한다.
 2. `runninggu-graphhopper.service`의 start 시도가 10분 window에서 3회로 제한되어 무한 반복하지
    않고 최종 failed 상태와 GraphHopper 전용 알림을 남긴다.
 3. 같은 동안 PostgreSQL이 생존하고 `pgBackRest check`와 WAL 감시가 성공한다.

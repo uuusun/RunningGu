@@ -59,6 +59,7 @@ runs:
       shell: bash
       working-directory: backend
       run: |
+        python3 deploy/ci/test_compose_memory_policy.py
         python3 deploy/ci/test_package_pr_artifact.py
         python3 ../scripts/osm/import/test_artifact_contract.py
         python3 ../scripts/osm/import/test_normalize_graph_metadata.py
