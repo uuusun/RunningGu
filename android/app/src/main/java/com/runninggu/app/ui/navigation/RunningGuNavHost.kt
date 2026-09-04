@@ -35,6 +35,7 @@ import com.runninggu.app.ui.wizard.PlanScreen
 import com.runninggu.app.ui.wizard.PrefsScreen
 import com.runninggu.app.ui.wizard.ResultScreen
 import com.runninggu.app.ui.wizard.ResultViewModel
+import com.runninggu.app.ui.wizard.SavedItineraryScreen
 import com.runninggu.app.ui.wizard.StayScreen
 import com.runninggu.app.ui.wizard.StayViewModel
 import com.runninggu.app.ui.wizard.WizardViewModel
@@ -144,6 +145,12 @@ fun RunningGuNavHost(
                 onOpenAccount = { navController.navigate(Routes.ACCOUNT) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
                 onCourseClick = { id -> navController.navigate(Routes.courseDetailSaved(id)) },
+                // canonical id 가 숫자가 아니면 서버에 없는 것이다 — 삭제와 같은 판단으로
+                // 아무 데도 안 보낸다(`MyViewModel.onDeleteItinerary`). 목록에 그런 항목이
+                // 생기면 그건 이 자리가 아니라 매핑이 잘못된 것이다
+                onItineraryClick = { id ->
+                    id.toLongOrNull()?.let { navController.navigate(Routes.itinerary(it)) }
+                },
                 onBrowseRaces = { navController.navigate(Routes.CALENDAR) },
                 onBrowseCourses = { navController.navigate(Routes.COURSES) },
                 modifier = Modifier.statusBarsPadding(),
@@ -165,6 +172,61 @@ fun RunningGuNavHost(
                 viewModel = viewModel(factory = CourseDetailViewModel.factory(savedCourseId)),
                 modifier = Modifier.statusBarsPadding(),
             )
+        }
+
+        /**
+         * S7-R 저장 동선 상세. **위저드 그래프 밖이다.** (§5-5 · #213)
+         *
+         * 복원은 S4 를 지나오지 않아서, 위저드 그래프에 얹으면 그래프 스코프 ViewModel 이
+         * 기본값으로 살아나 `planConfirmed` 가드가 S4 로 되돌린다(#192). 편집 상태는 이
+         * 백스택 항목의 ViewModel 이 든다 — 다른 동선을 열면 다른 인스턴스다.
+         */
+        composable(
+            route = Routes.ITINERARY_PATTERN,
+            arguments = listOf(
+                navArgument(Routes.ARG_ITINERARY_ID) { type = NavType.LongType },
+            ),
+        ) { entry ->
+            // **인자가 없으면 아무 데도 안 보낸다** (#257 리뷰). `LongType` 필수 인자라
+            // null 이 될 일은 없지만, 기본값 `0L` 로 떨어뜨리면 `GET /api/itineraries/0`
+            // 을 불러 404 를 받는다 — 화면에는 "동선을 못 불러왔다" 로 보이고 진짜 원인
+            // (인자 유실)은 어디에도 안 남는다. 위 `onItineraryClick` 의 `toLongOrNull()`
+            // 과 같은 결이다
+            val itineraryId = entry.arguments?.getLong(Routes.ARG_ITINERARY_ID)
+            if (itineraryId != null) {
+                SavedItineraryScreen(
+                    itineraryId = itineraryId,
+                    onBack = { navController.popBackStack() },
+                    // 저장된 동선의 조건을 바꾸는 것은 **새로 만드는 것**이다. 대회를 다시
+                    // 골라야 하므로 캘린더로 보낸다 — 위저드는 raceId 로 시작한다
+                    onChangeConditions = { navController.navigate(Routes.CALENDAR) },
+                    // **저장해 둔 숙소를 출발지로 넘긴다** (#257 리뷰 · D-15). 예전에는
+                    // 여기서 `stay = null` 을 보내서, 생성 직후 S7 에서는 되던 숙소 연계가
+                    // **복원 화면에서만** 사라졌다 — 사용자는 같은 동선을 보면서 어제는
+                    // 되던 것이 오늘은 안 되는 것을 겪는다.
+                    onOpenCourses = { stay, targetKm ->
+                        navController.navigate(Routes.COURSES)
+                        CourseLaunchContext.set(
+                            navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
+                            stay = stay?.let { CourseLaunchContext.Stay(it.name, it.lat, it.lng) },
+                            targetKm = targetKm,
+                        )
+                    },
+                    onSaved = { message ->
+                        // 같은 키면 교체다(§5-2) — 저장하면 이 동선이 갱신되고 마이로 돌아간다
+                        navController.popBackStack()
+                        ItinerarySavedNotice.set(
+                            navController.getBackStackEntry(Routes.MY).savedStateHandle,
+                            message,
+                        )
+                    },
+                    onLoginRequest = {
+                        navController.navigate(Routes.authGraph(Routes.RETURN_BACK))
+                    },
+                    viewModel = viewModel(),
+                    modifier = Modifier.statusBarsPadding(),
+                )
+            }
         }
 
         // 계정 관리 — 마이 설정에서 여는 별도 화면 (SPEC §4.13 · D-22).
@@ -441,11 +503,14 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 // **띄운 뒤에 그 항목에 담는다.** 값이 S8 항목보다 오래 살지 않아야
                 // 연계가 끊겼을 때 다음 진입에 남지 않는다(#178 리뷰). 항목은 navigate 로
                 // 곧바로 쌓이고 화면 구성은 그다음이라, 여기서 담으면 ViewModel 이 읽는다
-                onOpenCourses = { targetKm ->
+                // 숙소는 **위저드 상태가 아니라 생성 응답 snapshot** 에서 온다(#257 리뷰).
+                // 위저드를 읽으면 프로세스가 죽었다 살아난 S7 에서 기본값(null)을 보내
+                // 여기서도 연계가 조용히 끊긴다 — #192 와 같은 뿌리다.
+                onOpenCourses = { stay, targetKm ->
                     navController.navigate(Routes.COURSES)
                     CourseLaunchContext.set(
                         handle = navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
-                        stay = wizardViewModel.uiState.value.stay,
+                        stay = stay?.let { CourseLaunchContext.Stay(it.name, it.lat, it.lng) },
                         targetKm = targetKm,
                     )
                 },

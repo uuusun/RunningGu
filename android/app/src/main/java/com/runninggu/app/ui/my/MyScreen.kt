@@ -65,6 +65,13 @@ fun MyScreen(
     onOpenAccount: () -> Unit,
     onRaceClick: (String) -> Unit,
     onCourseClick: (Long) -> Unit,
+    /**
+     * 저장 동선 카드 → S7-R. (§5-5 · #213)
+     *
+     * `SavedItinerary.id` 가 String 이라 그대로 넘긴다. 숫자로 바꾸는 것은 route 를
+     * 만드는 쪽이 한다 — 삭제(`onDeleteItinerary`)도 같은 자리에서 바꾼다.
+     */
+    onItineraryClick: (String) -> Unit,
     onBrowseRaces: () -> Unit,
     onBrowseCourses: () -> Unit,
     modifier: Modifier = Modifier,
@@ -119,6 +126,7 @@ fun MyScreen(
         when (state.segment) {
             MySegment.ITINERARY -> ItineraryList(
                 state = state.itineraries,
+                onItineraryClick = onItineraryClick,
                 onDelete = viewModel::onDeleteItinerary,
                 onBrowseRaces = onBrowseRaces,
                 onRetry = viewModel::loadItineraries,
@@ -251,6 +259,8 @@ private fun DeleteItineraryDialog(
 @Composable
 internal fun ItineraryList(
     state: SavedItinerariesState,
+    /** 카드 → S7-R. (§5-5 · #213) */
+    onItineraryClick: (String) -> Unit,
     onDelete: (String) -> Unit,
     onBrowseRaces: () -> Unit,
     onRetry: () -> Unit,
@@ -299,8 +309,10 @@ internal fun ItineraryList(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         state.itineraries.forEach { item ->
             Surface(
-                // TODO(AP-14): 탭 → 저장 상태 복원 → S7 (API 명세 §5-5 `GET /api/itineraries/{id}`,
-                //  D-14). `ItineraryApi` 에 상세 조회가 아직 없어서 미룬다 — 이 PR 은 목록·삭제까지다(#181).
+                // 탭 → 저장 상태 복원 → S7-R (§5-5 · D-14 · #213).
+                // **비활성 대회의 동선도 열린다** — 목록에서 안 지우기로 했으므로(§5-4)
+                // 열지도 못하게 하면 사용자가 지우거나 볼 방법이 없다
+                onClick = { onItineraryClick(item.id) },
                 color = MaterialTheme.colorScheme.surface,
                 shape = MaterialTheme.shapes.medium,
                 tonalElevation = 1.dp,
