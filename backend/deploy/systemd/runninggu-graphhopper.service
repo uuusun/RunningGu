@@ -1,0 +1,35 @@
+[Unit]
+Description=런닝구 GraphHopper server
+After=docker.service
+Requires=docker.service
+OnFailure=runninggu-graphhopper-alert@%n.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/runninggu/repository/backend
+ExecStartPre=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/verify-active-graph.sh
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/start-graphhopper-compose.sh
+ExecStop=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/stop-graphhopper-compose.sh
+Restart=always
+RestartSec=5
+TimeoutStartSec=60s
+# Compose의 container grace 30초보다 길어 stop 명령이 먼저 잘리지 않게 한다.
+TimeoutStopSec=45s
+RuntimeDirectory=runninggu-graphhopper
+RuntimeDirectoryMode=0750
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=0027
+
+StandardOutput=null
+StandardError=journal
+SyslogIdentifier=runninggu-graphhopper
+
+[Install]
+WantedBy=multi-user.target

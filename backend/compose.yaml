@@ -21,8 +21,16 @@ services:
 
   graphhopper:
     profiles: ["routing"]
+    image: ${GRAPHHOPPER_SERVER_IMAGE:-runninggu-graphhopper:11.0}
     build:
       context: ./graphhopper
+    command:
+      - -Xms${GRAPHHOPPER_XMS:-1g}
+      - -Xmx${GRAPHHOPPER_XMX:-6g}
+      - -jar
+      - /opt/graphhopper/graphhopper-web.jar
+      - server
+      - /opt/graphhopper/graphhopper-local.yml
     ports:
       - "127.0.0.1:${GRAPHHOPPER_PORT:-8989}:8989"
     volumes:

@@ -4,10 +4,48 @@
 8km 내 0건). OpenStreetMap 보행로를 GraphHopper 로 라우팅해 코스를 **생성**할 수 있는지 검증한
 기록이다. 결과는 [`docs/osm-routing-poc.md`](../../docs/osm-routing-poc.md).
 
-GraphHopper 도입은 SPEC 결정-42로 확정됐지만, 이 폴더의 명령과 `graphhopper.yml`은 PoC 재현·비교
-전용이다. 운영 builder·manifest·배포 계약은
+GraphHopper 도입은 SPEC 결정-42로 확정됐지만, 이 폴더 최상위의 명령과 `graphhopper.yml`은 PoC
+재현·비교 전용이다. 운영 builder·manifest·배포 계약은
 [`docs/deploy/graphhopper-artifact-contract.md`](../../docs/deploy/graphhopper-artifact-contract.md)를
-따르며 PR 2 구현 전에는 이 명령으로 운영 artifact를 만들지 않는다.
+따르며 운영 artifact는 `import/`의 고정 builder로만 만든다.
+
+## 운영 graph artifact builder
+
+먼저 날짜가 고정된 한국 PBF를 별도 경로에 받고, 배포 입력으로 승인할 SHA-256을 팀 기록에
+남긴다. `latest` URL이나 기존 작업 directory는 받지 않는다. 아래 두 명령은 host JDK를 쓰지 않고
+같은 `linux/amd64` builder image 안에서 GraphHopper `import`와 package·verify를 실행한다.
+
+macOS·Linux·WSL/Git Bash:
+
+```bash
+./scripts/osm/import/build-graph.sh \
+  --pbf /absolute/path/south-korea-2026-09-01.osm.pbf \
+  --pbf-date 2026-09-01 \
+  --pbf-sha256 '<64자리_lowercase_sha256>' \
+  --work-dir /absolute/path/runninggu-graph-build-20260901 \
+  --created-by '<팀_식별자>' \
+  --import-xms 1g \
+  --import-xmx 8g
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\osm\import\build-graph.ps1 `
+  -Pbf 'C:\graph-input\south-korea-2026-09-01.osm.pbf' `
+  -PbfDate '2026-09-01' `
+  -PbfSha256 '<64자리_lowercase_sha256>' `
+  -WorkDirectory 'C:\graph-build\runninggu-20260901' `
+  -CreatedBy '<팀_식별자>' `
+  -ImportXms '1g' `
+  -ImportXmx '8g'
+```
+
+출력의 `<work-dir>/artifacts/<artifact-id>/` 아래 세 파일만 비공개 S3의 계약 key에 업로드한다.
+`graph-release.example.json`을 복사해 실제 manifest hash와 build input hash를 채운
+`backend/graphhopper/graph-release.json`은 별도 리뷰를 받아야 하며, 비어 있는 예시를 배포하지
+않는다. 운영 PBF import에는 builder host가 8GiB보다 큰 메모리를 사용할 수 있지만 그 메모리는
+EC2 server 상시 사양과 무관하다.
 
 ## 준비물
 
@@ -52,6 +90,55 @@ python <저장소>/scripts/osm/roundtrip.py --preset caps --zone all   # + 지�
 ```
 
 계단은 계약 상한이 아니라 **회귀 기준**(선택된 경로 ≤1%)으로만 확인한다.
+
+## 운영 사양 부하 시험
+
+먼저 EC2와 동일한 graph artifact·server image를 로컬 운영 호환 container로 실행한다. image digest는
+배포할 image의 content-addressed ID(`docker image inspect --format '{{.Id}}'`)를 사용한다. 아래 명령은
+전체 caps/all의 seed별 HTTP status·실패 분류·품질 판정과 합격 셀마다 정상 직접 요청 하나를 같은
+evidence JSON에 고정한다. `no valid point` 400은 실패로 기록하며 오류 원문과 경로 geometry는 남기지
+않는다.
+
+```bash
+python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id '<artifact_id>' \
+  --server-image-digest '<sha256:image_id>' \
+  --evidence '<release-evidence.json>'
+```
+
+이 파일과 실행 명령을 EC2 첫 결과를 보기 전에 release evidence로 고정한다. EC2에서는 새 결과
+파일을 만들면서 `--baseline '<release-evidence.json>'`을 추가한다. 로컬에서 성공한 직접 요청이
+실패하거나 로컬 합격 셀의 품질 상한 통과 경로가 0건이면 종료 code 1이다.
+
+8GiB·4GiB 사양 비교의 30분 부하는 `operational_load.py`로 실행한다. 이 도구는 evidence의
+`normalRequests`만 순서대로 반복하고 artifact ID와 server image digest가 현재 시험값과 다르면
+시작하지 않는다. 요청은 wall clock 기준 고정 도착률로 시작하며 모든 worker가 사용 중이면 기다려
+부하를 낮추지 않고 `missedRequestStarts`로 기록해 시험을 실패시킨다.
+
+아래 `<고정_request_rate>`와 `<고정_concurrency>`는 8GiB 시험 전에 팀 기록으로 확정하며 4GiB까지
+같은 값을 사용한다. 결과 파일은 요청 본문이나 응답 경로를 보관하지 않고 고정 시험 지점 이름,
+HTTP status, seed, 요청 소요시간과 실패 분류만 JSON Lines로 남긴다.
+
+```bash
+python3 scripts/osm/operational_load.py \
+  --request-set '<release-evidence.json>' \
+  --artifact-id '<artifact_id>' \
+  --server-image-digest '<sha256:image_id>' \
+  --duration-seconds 1800 \
+  --requests-per-minute '<고정_request_rate>' \
+  --concurrency '<고정_concurrency>' \
+  --timeout-seconds 5 \
+  --output "/opt/runninggu-validation/<시험_ID>/graphhopper-load.jsonl"
+```
+
+종료 code 0과 마지막 `summary.passed=true`가 모두 필요하다. `missedRequestStarts`,
+`failedDirectRequests`, `requestsOverTimeout`이 하나라도 있으면 종료 code 1이다.
+`noValidPointResponses`는 실패 요청의 부분집합으로 별도 기록되며 성공으로 바뀌지 않는다.
+`requestSeconds`의 p50·p95·max를 운영 기록에 옮긴다. 단순 `while roundtrip.py ...` 반복은 느린
+instance에서 자동으로 요청량이 줄어드는 closed-loop라 사양 비교에 사용하지 않는다.
 
 ## 물길 인덱스 (골목 회피 · 하천 유도 검증용)
 

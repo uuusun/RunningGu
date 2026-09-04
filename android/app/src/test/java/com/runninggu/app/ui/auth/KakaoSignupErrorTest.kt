@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
@@ -115,7 +116,7 @@ class KakaoSignupErrorTest {
 
         // 위 둘과 달리 **여기서는 다시 누르는 게 맞다.** 문구가 같으면 그 차이가 사라진다
         assertEquals(
-            "네트워크에 연결되지 않았어요. 연결을 확인해 주세요.",
+            OFFLINE,
             viewModel.uiState.value.errorMessage,
         )
     }

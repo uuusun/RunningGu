@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.local.AuthTokens
 import com.runninggu.app.data.local.LoginProvider
 import com.runninggu.app.data.local.SessionProfile
@@ -155,7 +156,7 @@ class KakaoLoginBranchTest {
         )
         network.onKakaoToken("kakao-token")
         advanceUntilIdle()
-        assertEquals("네트워크에 연결할 수 없어요", network.uiState.value.errorMessage)
+        assertEquals(OFFLINE, network.uiState.value.errorMessage)
 
         val rejected = LoginViewModel(
             FakeKakaoRepository(

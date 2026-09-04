@@ -1,0 +1,58 @@
+graphhopper:
+  # EC2는 검증된 graph artifact만 읽는다. 이 설정에는 PBF·SRTM·import 입력을 두지 않는다.
+  graph.location: /data/graph/current
+
+  # GraphHopper 11 server 초기화 필수값이며 builder와 같아야 한다.
+  import.osm.ignored_highways: motorway,trunk
+  graph.encoded_values: foot_access, foot_priority, foot_average_speed, average_slope, hike_rating, road_class, road_environment, surface
+
+  profiles:
+    - name: run
+      custom_model:
+        priority:
+          - if: "!foot_access"
+            multiply_by: "0"
+          - if: "road_class == FOOTWAY || road_class == PATH || road_class == PEDESTRIAN"
+            multiply_by: "1.0"
+          - else_if: "road_class == CYCLEWAY || road_class == TRACK"
+            multiply_by: "0.95"
+          - else_if: "road_class == RESIDENTIAL || road_class == LIVING_STREET"
+            multiply_by: "0.5"
+          - else_if: "road_class == SERVICE"
+            multiply_by: "0.25"
+          - else_if: "road_class == TERTIARY"
+            multiply_by: "0.2"
+          - else_if: "road_class == PRIMARY || road_class == SECONDARY || road_class == TRUNK"
+            multiply_by: "0.05"
+          - else_if: "road_class == STEPS"
+            multiply_by: "0.05"
+        speed:
+          - if: "true"
+            limit_to: "foot_average_speed"
+
+  profiles_ch: []
+  profiles_lm:
+    - profile: run
+
+  # 이미 import된 3D graph의 dimension 선언이다. EC2에서 SRTM tile을 다시 받거나 import하지 않는다.
+  graph.elevation.provider: srtm
+  routing.non_ch.max_waypoint_distance: 1000000
+
+server:
+  # 기본 access log의 요청 URL에는 사용자 좌표가 포함된다(AGENTS §8, artifact 계약 §9.2).
+  request_log:
+    appenders: []
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: 0.0.0.0
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: 127.0.0.1
+
+logging:
+  loggers:
+    # GraphHopper 11의 GET /route INFO 메시지도 좌표·User-Agent를 기록한다.
+    # 요청 성공/실패는 호출자의 상태 지표로 확인하고 JVM GC·기동·오류 로그는 유지한다.
+    com.graphhopper.resources.RouteResource: WARN

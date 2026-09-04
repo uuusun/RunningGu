@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.home
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.ui.sectionMessage
@@ -49,7 +50,7 @@ class HomeSectionErrorTest {
         // 연결을 고쳐야 하는 것과 잠시 뒤 다시 눌러야 하는 것은 사용자가 할 일이 다르다.
         // 다른 화면들은 이미 갈라 놓았고 홈만 빠져 있었다
         assertEquals(
-            "네트워크에 연결할 수 없어요.",
+            OFFLINE,
             ApiException.Network(IOException("offline")).sectionMessage(),
         )
     }
