@@ -73,6 +73,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
                 " 김러너 ",
                 true,
                 true,
+                true,
                 false);
 
         assertThat(response.path("user").path("id").asLong()).isPositive();
@@ -112,13 +113,125 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
+    void 가입_연령확인_누락과_자료형오류는_VALIDATION_FAILED다() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", "missing-age@example.com",
+                                "password", "run4life1",
+                                "nickname", "연령누락",
+                                "agreements", Map.of(
+                                        "tos", true,
+                                        "privacy", true,
+                                        "marketing", false)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                "wrong-age-type@example.com",
+                                "run4life1",
+                                "연령자료형",
+                                "true",
+                                true,
+                                true,
+                                false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void 가입_연령확인이_false면_약관과_인증상태보다_먼저_거부하고_아무것도_생성하지_않는다()
+            throws Exception {
+        String email = "underage@example.com";
+        verifyEmail(email);
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                email,
+                                "run4life1",
+                                "연령미달",
+                                false,
+                                false,
+                                true,
+                                false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AGE_REQUIREMENT_NOT_MET"))
+                .andExpect(jsonPath("$.detail").value("만 14세 이상만 가입할 수 있습니다."));
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                "underage-without-verification@example.com",
+                                "run4life1",
+                                "인증이력없음",
+                                false,
+                                true,
+                                true,
+                                false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AGE_REQUIREMENT_NOT_MET"));
+
+        assertThat(count("app_user")).isZero();
+        assertThat(count("login_identity")).isZero();
+        assertThat(count("user_agreement")).isZero();
+        assertThat(count("refresh_token")).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_verification WHERE email = ? AND verified_at IS NOT NULL",
+                Integer.class,
+                email)).isOne();
+    }
+
+    @Test
+    void 가입_연령확인이_false면_비밀번호와_이메일중복보다_먼저_거부한다() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                "underage-with-invalid-password@example.com",
+                                "short1",
+                                "비밀번호오류",
+                                false,
+                                true,
+                                true,
+                                false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AGE_REQUIREMENT_NOT_MET"));
+
+        String duplicatedEmail = "underage-with-duplicate@example.com";
+        verifyEmail(duplicatedEmail);
+        signup(
+                duplicatedEmail,
+                "run4life1",
+                "기존가입자",
+                true,
+                true,
+                true,
+                false);
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupJson(
+                                duplicatedEmail,
+                                "run4life1",
+                                "중복가입시도",
+                                false,
+                                true,
+                                true,
+                                false)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AGE_REQUIREMENT_NOT_MET"));
+    }
+
+    @Test
     void 가입은_필수동의_비밀번호_인증_중복을_각_계약오류로_거부한다() throws Exception {
         verifyEmail("policy@example.com");
 
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
-                                "policy@example.com", "run4life1", "정책러너", false, true, false)))
+                                "policy@example.com", "run4life1", "정책러너", true, false, true, false)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AGREEMENT_REQUIRED"));
 
@@ -130,6 +243,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
                                 "정책러너",
                                 true,
                                 true,
+                                true,
                                 false)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PASSWORD"));
@@ -137,7 +251,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
-                                "missing@example.com", "run4life1", "이력없음", true, true, false)))
+                                "missing@example.com", "run4life1", "이력없음", true, true, true, false)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
 
@@ -145,7 +259,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
-                                "unverified@example.com", "run4life1", "미인증", true, true, false)))
+                                "unverified@example.com", "run4life1", "미인증", true, true, true, false)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
 
@@ -156,15 +270,15 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
-                                "expired@example.com", "run4life1", "인증만료", true, true, false)))
+                                "expired@example.com", "run4life1", "인증만료", true, true, true, false)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("CODE_EXPIRED"));
 
-        signup("policy@example.com", "run4life1", "정책러너", true, true, false);
+        signup("policy@example.com", "run4life1", "정책러너", true, true, true, false);
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signupJson(
-                                "policy@example.com", "run4life1", "다른닉네임", true, true, false)))
+                                "policy@example.com", "run4life1", "다른닉네임", true, true, true, false)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EMAIL_DUPLICATED"));
     }
@@ -172,7 +286,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 로그인은_새_기기_family를_발급하고_실패시_계정존재를_노출하지_않는다() throws Exception {
         verifyEmail("login@example.com");
-        signup("login@example.com", "run4life1", "로그인러너", true, true, false);
+        signup("login@example.com", "run4life1", "로그인러너", true, true, true, false);
 
         JsonNode login = login("LOGIN@example.com", "run4life1", 200);
         assertThat(login.path("user").path("email").asText()).isEqualTo("login@example.com");
@@ -189,7 +303,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     void 회전전_리프레시를_재사용하면_같은_family만_폐기한다() throws Exception {
         verifyEmail("rotate@example.com");
         JsonNode signup = signup(
-                "rotate@example.com", "run4life1", "회전러너", true, true, false);
+                "rotate@example.com", "run4life1", "회전러너", true, true, true, false);
         String oldRefresh = signup.path("refreshToken").asText();
         String otherDeviceRefresh = login("rotate@example.com", "run4life1", 200)
                 .path("refreshToken").asText();
@@ -209,7 +323,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     @Test
     void 원래_만료시각을_지난_폐기토큰은_재사용탐지로_family를_폐기하지_않는다() throws Exception {
         verifyEmail("expired-history@example.com");
-        signup("expired-history@example.com", "run4life1", "만료이력", true, true, false);
+        signup("expired-history@example.com", "run4life1", "만료이력", true, true, true, false);
         long userId = jdbcTemplate.queryForObject(
                 "SELECT id FROM app_user WHERE nickname_key = ?",
                 Long.class,
@@ -262,7 +376,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     void 로그아웃은_공개_멱등이고_Access_blacklist를_두지_않는다() throws Exception {
         verifyEmail("logout@example.com");
         JsonNode signup = signup(
-                "logout@example.com", "run4life1", "로그아웃러너", true, true, false);
+                "logout@example.com", "run4life1", "로그아웃러너", true, true, true, false);
         String accessToken = signup.path("accessToken").asText();
         String refreshToken = signup.path("refreshToken").asText();
 
@@ -286,7 +400,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
     void Refresh_JWT는_Bearer_Access로_사용할_수_없다() throws Exception {
         verifyEmail("filter@example.com");
         JsonNode signup = signup(
-                "filter@example.com", "run4life1", "필터러너", true, true, false);
+                "filter@example.com", "run4life1", "필터러너", true, true, true, false);
 
         mockMvc.perform(get("/api/me/not-implemented")
                         .header("Authorization", "Bearer " + signup.path("refreshToken").asText()))
@@ -298,12 +412,20 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
             String email,
             String password,
             String nickname,
+            boolean ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signupJson(email, password, nickname, tos, privacy, marketing)))
+                        .content(signupJson(
+                                email,
+                                password,
+                                nickname,
+                                ageOver14,
+                                tos,
+                                privacy,
+                                marketing)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
@@ -348,6 +470,7 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
             String email,
             String password,
             String nickname,
+            Object ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing) throws Exception {
@@ -355,10 +478,15 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
                 "email", email,
                 "password", password,
                 "nickname", nickname,
+                "ageOver14", ageOver14,
                 "agreements", Map.of(
                         "tos", tos,
                         "privacy", privacy,
                         "marketing", marketing)));
+    }
+
+    private long count(String table) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
     }
 
     private void verifyEmail(String email) {

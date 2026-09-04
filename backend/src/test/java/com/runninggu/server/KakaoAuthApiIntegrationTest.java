@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -85,6 +86,7 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
                 "  선택닉네임  ",
                 true,
                 true,
+                true,
                 false,
                 201);
 
@@ -146,7 +148,7 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isNewUser").value(true));
 
-        signup("same-email-token", "카카오러너", true, true, false, 201);
+        signup("same-email-token", "카카오러너", true, true, true, false, 201);
         assertThat(count("app_user")).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(DISTINCT provider) FROM login_identity",
@@ -158,10 +160,10 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
         given(userInfoProvider.retrieve("policy-token"))
                 .willReturn(new KakaoUserProfile("400", null, null));
 
-        signup("policy-token", "정책러너", false, true, false, 400);
+        signup("policy-token", "정책러너", true, false, true, false, 400);
         seedEmailUser("nickname@example.com", "중복닉네임");
         JsonNode duplicate = signup(
-                "policy-token", "중복닉네임", true, true, false, 409);
+                "policy-token", "중복닉네임", true, true, true, false, 409);
         assertThat(duplicate.path("code").asText()).isEqualTo("NICKNAME_DUPLICATED");
     }
 
@@ -228,16 +230,59 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
+    @Test
+    void 카카오_가입_연령확인_누락과_자료형오류는_VALIDATION_FAILED다() throws Exception {
+        mockMvc.perform(post("/api/auth/kakao/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "kakaoAccessToken", "missing-age-token",
+                                "nickname", "연령누락",
+                                "agreements", Map.of(
+                                        "tos", true,
+                                        "privacy", true,
+                                        "marketing", false)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        JsonNode wrongType = signup(
+                "wrong-age-type-token", "연령자료형", "true", true, true, false, 400);
+        assertThat(wrongType.path("code").asText()).isEqualTo("VALIDATION_FAILED");
+
+        verifyNoInteractions(userInfoProvider);
+    }
+
+    @Test
+    void 카카오_가입_연령확인이_false면_외부호출과_DB생성을_하지_않는다() throws Exception {
+        JsonNode response = signup(
+                "underage-token", "연령미달", false, true, true, false, 400);
+
+        assertThat(response.path("code").asText()).isEqualTo("AGE_REQUIREMENT_NOT_MET");
+        assertThat(response.path("detail").asText())
+                .isEqualTo("만 14세 이상만 가입할 수 있습니다.");
+        verifyNoInteractions(userInfoProvider);
+        assertThat(count("app_user")).isZero();
+        assertThat(count("login_identity")).isZero();
+        assertThat(count("user_agreement")).isZero();
+        assertThat(count("refresh_token")).isZero();
+    }
+
     private JsonNode signup(
             String token,
             String nickname,
+            Object ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing,
             int expectedStatus) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/kakao/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signupJson(token, nickname, tos, privacy, marketing)))
+                        .content(signupJson(
+                                token,
+                                nickname,
+                                ageOver14,
+                                tos,
+                                privacy,
+                                marketing)))
                 .andExpect(status().is(expectedStatus))
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
@@ -246,7 +291,7 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
     private MvcResult signupRequest(String token, String nickname) throws Exception {
         return mockMvc.perform(post("/api/auth/kakao/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(signupJson(token, nickname, true, true, false)))
+                        .content(signupJson(token, nickname, true, true, true, false)))
                 .andReturn();
     }
 
@@ -262,12 +307,14 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
     private String signupJson(
             String token,
             String nickname,
+            Object ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing) throws Exception {
         return json(Map.of(
                 "kakaoAccessToken", token,
                 "nickname", nickname,
+                "ageOver14", ageOver14,
                 "agreements", Map.of(
                         "tos", tos,
                         "privacy", privacy,
