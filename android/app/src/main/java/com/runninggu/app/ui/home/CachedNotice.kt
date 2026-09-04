@@ -13,6 +13,12 @@ import java.time.format.DateTimeFormatter
 private val CACHED_AT: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd HH:mm")
 
 /**
+ * 문구의 시각 부분. **화면 밖에서 고정할 수 있게 떼어 둔다** — Compose 안에 두면
+ * KST 변환이 맞는지 단위 테스트로 잡을 수 없다.
+ */
+internal fun cachedAtLabel(at: Instant): String = CACHED_AT.format(at.atZone(KST))
+
+/**
  * 캐시로 그린 영역임을 알리는 한 줄. (매핑표 171행 · SPEC §6.1 · 이슈 #276)
  *
  * ## 왜 필요한가
@@ -30,12 +36,6 @@ private val CACHED_AT: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd HH
  * `오프라인` 만 적으면 언제 것인지 모르고, 시각만 적으면 왜 낡았는지 모른다. 둘 다 적는다.
  * 시각은 **KST 로 옮겨** 보여준다 — 저장은 UTC 지만 사용자가 읽는 시간은 KST 다(§6.6).
  */
-/**
- * 문구의 시각 부분. **화면 밖에서 고정할 수 있게 떼어 둔다** — Compose 안에 두면
- * KST 변환이 맞는지 단위 테스트로 잡을 수 없다.
- */
-internal fun cachedAtLabel(at: Instant): String = CACHED_AT.format(at.atZone(KST))
-
 @Composable
 fun CachedNotice(cachedAt: Instant, modifier: Modifier = Modifier) {
     Text(
