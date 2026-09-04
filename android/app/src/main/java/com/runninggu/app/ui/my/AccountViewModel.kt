@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.my
 
+import com.runninggu.app.ui.OFFLINE
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.ServiceLocator
@@ -576,7 +577,7 @@ class AccountViewModel(
         ApiErrorCode.INVALID_REAUTH_TOKEN -> "시간이 지났어요. 다시 시도해 주세요."
         ApiErrorCode.REAUTH_PROVIDER_MISMATCH -> "가입할 때 쓴 방법으로 확인해 주세요"
         else -> if (this is ApiException.Network) {
-            "네트워크에 연결할 수 없어요"
+            OFFLINE
         } else {
             "탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요."
         }
@@ -593,7 +594,7 @@ class AccountViewModel(
         ApiErrorCode.CURRENT_PASSWORD_MISMATCH -> "현재 비밀번호가 맞지 않아요"
         ApiErrorCode.INVALID_PASSWORD -> "새 비밀번호는 8자 이상, 영문과 숫자를 함께 써 주세요"
         else -> if (this is ApiException.Network) {
-            "네트워크에 연결할 수 없어요"
+            OFFLINE
         } else {
             "비밀번호를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
         }
@@ -607,7 +608,7 @@ class AccountViewModel(
      */
     private fun Throwable.nicknameMessage(): String = when {
         apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED -> "이미 쓰고 있는 닉네임이에요"
-        this is ApiException.Network -> "네트워크에 연결할 수 없어요"
+        this is ApiException.Network -> OFFLINE
         else -> "닉네임을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요."
     }
 

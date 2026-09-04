@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.repository.AuthRepository
 import com.runninggu.app.data.remote.apiErrorCode
@@ -420,7 +421,7 @@ class SignupViewModel(
      * 가입하는 경우를 여기서 잡는다. 그 마지막 방어가 원인 불명으로 도착하면 안 된다.
      */
     private fun signupFailureMessage(cause: Throwable): String = when {
-        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        cause.isNetworkFailure() -> OFFLINE
 
         cause.apiErrorCode() == ApiErrorCode.NICKNAME_DUPLICATED ->
             "이미 쓰는 닉네임이에요. [뒤로] 를 눌러 다른 닉네임으로 바꿔 주세요."
@@ -513,7 +514,7 @@ class SignupViewModel(
         ApiErrorCode.AGE_REQUIREMENT_NOT_MET ->
             "만 14세 이상만 가입할 수 있어요."
         else -> if (isNetworkFailure()) {
-            "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+            OFFLINE
         } else {
             "가입에 실패했어요. 다시 시도해 주세요."
         }
@@ -607,7 +608,7 @@ class SignupViewModel(
 
     /** 코드 검증 실패 문구. 사유별로 사용자가 할 일이 다르다. (§1-4 · `ApiErrorCode`) */
     private fun verifyFailureMessage(cause: Throwable): String = when {
-        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        cause.isNetworkFailure() -> OFFLINE
         cause.apiErrorCode() == ApiErrorCode.CODE_EXPIRED ->
             "인증 코드가 만료됐어요. 메일을 다시 받아 주세요."
         cause.apiErrorCode() == ApiErrorCode.TOO_MANY_ATTEMPTS ->
@@ -619,7 +620,7 @@ class SignupViewModel(
 
     /** 인증 메일 발송 실패 문구. */
     private fun sendFailureMessage(cause: Throwable): String = when {
-        cause.isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+        cause.isNetworkFailure() -> OFFLINE
         cause.apiErrorCode() == ApiErrorCode.EMAIL_DUPLICATED -> "이미 가입된 이메일이에요."
         cause.apiErrorCode() == ApiErrorCode.SEND_COOLDOWN -> "잠시 후 다시 시도해 주세요."
         else -> "인증 메일을 보내지 못했어요. 다시 시도해 주세요."

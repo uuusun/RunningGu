@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.auth
 
+import com.runninggu.app.ui.OFFLINE
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -199,7 +200,7 @@ private const val KAKAO_SDK_FAILED_MESSAGE = "카카오 로그인을 시작하�
  * 이메일 로그인은 멀쩡하다는 것을 알려야 하기 때문이다.
  */
 private fun Throwable.kakaoMessage(): String = when {
-    this is ApiException.Network -> "네트워크에 연결할 수 없어요"
+    this is ApiException.Network -> OFFLINE
     else -> "카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
 }
 
@@ -219,7 +220,7 @@ private fun Throwable.kakaoMessage(): String = when {
  * 초기화하고 IP 창은 유지" 라 다른 계정으로 로그인해도 안 풀린다.
  */
 private fun Throwable.loginMessage(): String = when {
-    isNetworkFailure() -> "네트워크에 연결되지 않았어요. 연결을 확인해 주세요."
+    isNetworkFailure() -> OFFLINE
     apiErrorCode() == ApiErrorCode.RATE_LIMITED ->
         "로그인 시도가 많아요. 잠시 후 다시 시도해 주세요."
     else -> "이메일 또는 비밀번호를 확인해 주세요"

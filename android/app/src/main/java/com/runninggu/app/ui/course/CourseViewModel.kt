@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.ui.OFFLINE
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -489,7 +490,7 @@ internal fun snapTargetKm(raw: Double): Double {
  * 전자는 "잠시 뒤 다시" 가 맞고, 후자는 네트워크 문제일 수 있다.
  */
 internal fun ApiException.nearbyMessage(): String = when {
-    this is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    this is ApiException.Network -> OFFLINE
     this is ApiException.Http && code == ApiErrorCode.COURSE_SOURCES_UNAVAILABLE ->
         "코스 정보를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
     else -> userMessageOrDefault()
@@ -535,7 +536,7 @@ internal fun ApiException.nearbyMessage(): String = when {
  * 다시 누르라고 하면 사용자가 두 번 저장한다.
  */
 internal fun ApiException.saveMessage(): String = when (this) {
-    is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    is ApiException.Network -> OFFLINE
     is ApiException.Http -> userMessage ?: "저장하지 못했어요. (서버 응답 $status)"
     is ApiException.Malformed -> "저장은 됐을 수 있는데 결과를 확인하지 못했어요. 마이에서 확인해 주세요."
 }
@@ -546,7 +547,7 @@ internal fun ApiException.saveMessage(): String = when (this) {
  * **못 찾은 것과 못 부른 것을 나눈다** — 전자는 검색어를 바꾸면 되고 후자는 다시 눌러야 한다.
  */
 internal fun ApiException.searchMessage(): String = when {
-    this is ApiException.Network -> "네트워크에 연결할 수 없어요."
+    this is ApiException.Network -> OFFLINE
     this is ApiException.Http && code == ApiErrorCode.NO_RESULT ->
         "그런 장소를 못 찾았어요. 다른 이름으로 찾아보세요."
     else -> userMessageOrDefault()

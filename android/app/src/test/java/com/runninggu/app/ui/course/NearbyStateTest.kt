@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.CourseSource
@@ -103,7 +104,7 @@ class NearbyStateTest {
         // 서버가 못 준 것과 내가 못 부른 것은 사용자가 할 일이 다르다
         val state = nearby(StubCourses(error = ApiException.Network(IOException("끊김"))))
 
-        assertEquals("네트워크에 연결할 수 없어요.", (state as NearbyState.Error).message)
+        assertEquals(OFFLINE, (state as NearbyState.Error).message)
     }
 
     @Test
