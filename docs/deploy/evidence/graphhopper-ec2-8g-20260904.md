@@ -1,13 +1,39 @@
 # GraphHopper EC2 8GiB 검증 — 2026-09-04
 
-> **수정본 `d884d36`의 8GiB baseline과 별도 장애 격리 재검증 통과.**
-> 실제 운영 hard limit은 아직 미적용이다. swap 정책 확정·상한 적용 후 재시험이 남았으므로
-> 최종 운영 제한 승인이나 4GiB 합격을 뜻하지 않는다. 앞부분은 이전 `24efc8c` 시험에서 발견한
-> 결함을 보존한 기록이며, 최신 결과는 아래 「수정본 `d884d36`의 별도 재검증」에 있다.
+> **최종 `b8dafb8`의 8GiB 정상 30분·로그·백업·장애 격리·재부팅 검증 통과.**
+> GraphHopper 힙 4GiB·container 상한 5GiB·전용 swap 금지와 Spring 상한 1.5GiB를 적용했다.
+> 첫 제한 후보(힙 3GiB·container 4GiB)는 Full GC 1회로 미승인한 기록을 그대로 보존한다.
+> **4GiB 인스턴스 시험과 프로덕션 전체 출시 검증은 완료한 것이 아니다.**
+> 앞부분은 이전 `24efc8c` 시험의 결함과 `d884d36` baseline 결과를 보존한 기록이다.
 > 기준은 [artifact 계약 §9](../graphhopper-artifact-contract.md#9-사전-합격-기준)와
 > [EC2 실행서 §15](../aws-ec2-staging-runbook.md#15-외부-스모크재부팅-검증)다.
 
-## 실행 대상
+## 최종 설정과 검증 범위
+
+| 대상 | 2026-09-04 최종 적용값 |
+|---|---|
+| EC2 | 서울 staging `m7i-flex.large`, 8GiB 유지 |
+| GraphHopper heap | Xms1g / Xmx4g |
+| GraphHopper container | reservation 3g / memory 5g / memory+swap 5g; 실제 `memory.swap.max=0` |
+| Spring Boot | Xms256m / Xmx1g; systemd MemoryHigh=1G / MemoryMax=1536M |
+| PostgreSQL | 기존 image·data·hard limit 없음 유지, 백업 동시 실행과 장애 생존 확인 |
+| 호스트 swap | 4GiB 유지. GraphHopper만 swap 금지 |
+| 검증 timeout | 주 service와 verify unit의 60초 유지; 별도 전체 readiness 기준은 120초 |
+
+- 실제 검증·배포 source/release: `b8dafb86e8a608b8ae1fa10e9ff274ca1df5231b`.
+  이후 결과 정리용 문서 commit을 이 배포 commit으로 혼동하지 않는다.
+- 최종 image: `sha256:16b3618f3e69a094990e6c9360ee92972beec643ca26bc5d9b61404172910753`.
+  graph는 `gh11-korea-20260901-2ff6731b181a-2b8515dd29fc`다.
+- 동일 고정 정상 직접 요청 83개를 **60 requests/min·concurrency 2로 30분** 실행했다.
+  1800/1800 성공, 최저 MemAvailable 48.970%, 정상 OOM·Full GC·재시작·swap 증가 0.
+- 이 결과는 백엔드·DB를 함께 실행한 **GraphHopper 직접 요청 검증**이다. 앱 전체 API 부하,
+  최대 동시 사용자 수, 최소 인스턴스 크기를 증명하지 않는다. 4GiB 축소 시험은 하지 않았다.
+- 최종 설정은 private `compose.env`와 backend `memory.conf` drop-in에 적용했다.
+  다른 환경의 첫 측정을 위한 저장소 baseline 기본값 0/infinity를 일괄 변경하지 않는다.
+- PR #255 검증용 staging 배포이며 `main` 정식 릴리스나 머지를 대신하지 않는다.
+  기존 release·graph·로그를 보관했고 **EC2는 실행 상태로 유지했다**.
+
+## 첫 시험 실행 대상 — 이력
 
 - 환경: 서울 리전 staging, Ubuntu 24.04, `m7i-flex.large`, RAM 7776MiB
 - PR #255 head: `24efc8cc5816040aa12b9e3cc9409159995c0fa8`
@@ -162,7 +188,7 @@ container는 모두 제거됐고 실제 unit·기존 PostgreSQL Dockerfile 수�
 ## 첫 시험에서 이어진 작업
 
 - 수정 commit·CI candidate·새 server image의 EC2 배포와 동일 30분/재부팅 재시험 — 아래에서 완료
-- 실측 hard limit 선정과 적용 후 동일 시나리오 재시험
+- 실측 hard limit 선정과 적용 후 동일 시나리오 재시험 — 아래 `b8dafb8` 두 번째 후보에서 완료
 - 4GiB는 선택 시 같은 전체 시나리오 3회. 현재 결과로 4GiB 합격을 주장하지 않는다.
 
 ## 수정본 `d884d36`의 별도 재검증
@@ -273,7 +299,7 @@ container는 모두 제거됐고 실제 unit·기존 PostgreSQL Dockerfile 수�
   승인 전에는 해당 정책과 실제 memory 제한을 임의로 바꾸지 않는다. 호스트 전체 swap은 유지한다.
 - 정책 확정 뒤 측정 기반 상한 적용과 동일 시나리오 재시험이 남았다. 4GiB 인스턴스 시험은 하지 않았다.
 
-## 사용자 승인 후 측정 기반 제한 후보 — 재시험 전
+## 사용자 승인 후 측정 기반 제한 후보 선정
 
 2026-09-04 사용자가 GraphHopper만 swap을 금지하는 계약·Compose 수정과 제한 적용 재시험을 승인했다.
 호스트 swap 4GiB와 EC2 8GiB는 유지한다. 다음은 합격값이 아니라 **재시험 후보**다.
@@ -289,3 +315,144 @@ GraphHopper는 측정된 약 2.99GiB cgroup peak에 native·file cache 여유를
 회수 기준이다. Spring은 기존 1GiB heap을 유지하면서 native 여유를 포함한 1.5GiB 상한을 시험한다.
 이론 합계로 host 합격을 판정하지 않으며 실제 표본·GC·OOM·응답·재부팅·고장 격리로 판단한다.
 image·graph·profile·고정 정상 요청 목록은 그대로이므로 기존 로컬 기준선을 사용한다.
+
+## 제한 적용본 `b8dafb8` 재검증
+
+### CI·배포·커널 설정 — 통과
+
+- exact commit `b8dafb86e8a608b8ae1fa10e9ff274ca1df5231b`, PR #255 Draft, 대상 `develop`
+- [CI 33833669033](https://github.com/uuusun/RunningGu/actions/runs/33833669033), attempt 1:
+  SPEC·synthetic merge 검사·exact head 단위/통합/빌드·Importer 스모크·검증용 패키징 모두 성공
+- base `839df983ccfa425214d3103e6fd59bc507aff48d`, integration test
+  `cea8d3399f3758f5c930c7b2b5a49ce7b31c37a6`
+- Compose 정책 회귀 테스트 4개를 로컬에서 두 번 통과. `memswap_limit` 누락·0·독립 상한으로
+  변형하면 검사가 실패한다. actionlint 통과. 로컬 `test bootJar`는 7 tasks UP-TO-DATE 성공이며
+  실제 clean 빌드·테스트는 위 CI에서 별도로 성공했다.
+- 전송 ZIP 119,473,965 bytes,
+  SHA-256 `e87fc7c91886635cee32e03c4e990cd225b2cf5d0914cfdc8ed586ead5daa395`
+- source archive 22,338,343 bytes,
+  SHA-256 `ddb7647d120ce784d23bb6c27db49a82b1c8ad8030ce270bf340931669c299fa`
+- private S3 새 commit prefix에 두 파일을 업로드하고 기존 staging KMS 키·외부/내부 checksum을
+  EC2에서 재검증했다. 이미 검증된 image `16b3618f…`와 graph는 재사용했다.
+- source 준비 SSM `524e0c56-3a8a-4d34-898f-948e8a3a39fc`, release 설치
+  `ad585d3e-c5d6-44a0-ac01-b2b716eafa2d`, 활성화
+  `9ef038eb-f0fc-48b0-b2a8-446fcae1cb3a`: 모두 Success/exit 0
+- private `compose.env`와 backend unit을 백업하고, backend 제한은 새 `memory.conf` drop-in으로
+  적용했다. 사용자 PostgreSQL Dockerfile 변경과 기존 image/data는 그대로 보존했다.
+- Spring 중지 뒤 Importer `2026-09-04T03:47:51Z` NO_OP, exit 0
+- verify **684ms**, `ExecStartPre` 포함 job **693ms**, GraphHopper readiness **5739ms**,
+  양쪽 readiness **16379ms**, 두 service Result=success/NRestarts=0
+- Docker inspect: reservation **3221225472**, memory **4294967296**, memory+swap **4294967296** bytes
+- 실제 cgroup v2: `memory.max=4294967296`, `memory.swap.max=0`
+- Spring 실제 MemoryHigh **1073741824**, MemoryMax **1610612736** bytes
+- 호스트 swap **4294963200** bytes 유지, 사용 0. 인스턴스는 계속 8GiB다.
+
+### 첫 후보 전체 회귀 — 통과 / 정상 30분 부하 — 로그 감사 미통과
+
+- SSM `166932b1-9784-4b2b-9a97-73798726b8aa`: Success/exit 0, 같은 로컬 기준선 대비
+  83개 합격 셀 비회귀 PASS, 최대 선택 경로 계단 비율 0.46%
+- 정상 부하 SSM `9370f4c3-3368-447d-ac60-792a8942634f`, 시작 `2026-09-04T03:50:45Z`
+- 원본 경로 `/opt/runninggu-validation/8g-limited-b8dafb8-20260904`
+- 동일 고정 요청 83개, 60 requests/min, concurrency 2, timeout 5초, 예정 1800건/30분
+- 전체 백업 `03:52:45–03:53:32Z` 성공. 중간 수치를 최종 합격값으로 사용하지 않는다.
+- 마지막 요청 종료 `04:20:44.894195Z`, 정상 관측 구간 종료 `04:20:45Z`
+- 1800/1800 성공, 실패·missed·no valid point·timeout 0, p50 0.00885초,
+  p95 0.05271초, 최대 0.30903초. 360/360 표본, 최저 MemAvailable 53.107%,
+  swap 증가·OOM·재시작·비정상 표본 0. 부하 SSM은 Success/exit 0.
+- WAL 3회(`03:55:45/04:05:45/04:15:45Z`) 모두 성공.
+- 후속 로그 감사 SSM `a65d7eb7-5bab-406e-9aee-c8ecd1ad4818`은 **Failed/exit 1**.
+  Docker GC 1214줄, 정상 구간 Full GC 완료 **1회** 때문에 미통과했다. 좌표·query·키·email·
+  import·kernel OOM 표식과 주 service journal의 runtime GC 중복은 0이었다.
+- 진단 SSM `a4d882ae-1f2e-434e-ab97-2c6e1567abdb`,
+  `347e5244-9da7-404b-975d-2dc91f5813e9`: Success/exit 0.
+  `2026-09-04T04:16:04.892Z`의 `GC(140) Pause Full (G1 Compaction Pause)`를 확인했다.
+  GraphHopper와 Spring의 `memory.events max/oom_kill`은 모두 0이었다.
+- Full GC가 한 번이라는 이유로 기존 감사의 0회 조건을 바꿔 합격 처리하지 않는다.
+  첫 후보는 미승인으로 보존하고, 힙과 상한을 조정해 같은 전체 시험을 다시 수행한다.
+
+### 두 번째 제한 후보 — 격리·적용·회귀·정상 30분 통과
+
+- GraphHopper Xms1g/Xmx4g, reservation 3g, memory 5g, memory+swap 5g
+- Spring Xms256m/Xmx1g, MemoryHigh1G/MemoryMax1536M은 유지
+- EC2 8GiB, 호스트 swap 4GiB, GraphHopper swap 금지, graph/image/요청 목록/요청률 모두 유지
+- 근거: 기존 Xmx4g baseline은 정상 30분 Full GC 0회였으나 Xmx3g 후보는 Full GC 1회를
+  관측했다. Xmx4g로 복구하고 native/file cache 여유가 있는 5GiB hard limit을 시험한다.
+- 5GiB 상한·3GiB reservation·swap 금지를 그대로 둔 격리 시험에서만 Xms/Xmx6g와
+  AlwaysPreTouch로 고의 OOM을 유발한다. 통과 후 실제 후보 적용·전체 회귀·동일 30분·재부팅을 수행한다.
+
+- 격리 준비 `1a4abe25-8ea5-4b08-9d9a-38ab3357be06`, 전체 격리
+  `70b5ce83-2a8a-4715-b018-82620fd8fbd0`: Success/exit 0
+- `04:27:50Z` 정상 기동·privacy 검사 2회·정상 stop·재검증 성공. 실제 reservation3g/memory5g/
+  memory+swap5g와 cgroup `memory.swap.max=0`을 확인했다.
+- stderr 단일 저장, 예상치 않은 exit 0, required 설정 누락 모두 통과.
+- `04:29:36Z` 고의 OOM: `OOMKilled=true`, exit137, memory5368709120 bytes,
+  3회 재시작 제한·최종 failed·SNS 발행 성공. PostgreSQL 시작 시각과 backend 재시작 수 불변,
+  pgBackRest check·WAL 감시 성공. 이메일 수신 자체를 확인한 것은 아니다.
+- `04:30:07Z` 같은 artifact 복구 후 실제 unit 복원·서비스 readiness 모두 성공.
+  시험 container/network만 정리했고 graph 복사본·원본 로그는 보존했다.
+- 실제 제한 적용 `221f49dc-f97f-47fb-84fc-628651f855fa`: Success/exit 0.
+  첫 후보의 Docker 정상 구간 로그·journal을 별도로 저장한 뒤 설정을 바꿨다.
+- Spring 중지 뒤 Importer `04:31:52Z` NO_OP. verify687ms, prestart674ms,
+  GraphHopper readiness5692ms, 양쪽 readiness16657ms, 두 서비스 NRestarts0.
+- 실제 memory/memory+swap5368709120, reservation3221225472, cgroup swap max0 확인.
+  Spring High/Max1073741824/1610612736은 유지했다.
+- 고의 OOM 후 호스트 swap 사용 69632 bytes가 남았다. 임의로 비우지 않고 정상 시험의
+  사용량 증가·입출력 증분을 판정한다. 이 숫자를 정상 부하에서 새로 생긴 swap으로 세지 않는다.
+- 전체 회귀 `65e142d5-cd85-4269-9881-7cb480209b42`: Success/exit 0, 83셀 비회귀 PASS.
+- 정상 부하 `8c861108-3b23-4613-8a6e-24653044d93b`: `2026-09-04T04:34:09Z` 시작,
+  `/opt/runninggu-validation/8g-limited-5g-b8dafb8-20260904`에 별도 기록한다.
+- 동일 60 requests/min·동시성2·timeout5초·1800건/30분이다.
+- 종료 `05:04:09Z`, 마지막 요청 `05:04:08.720492Z`. **1800/1800 성공**, missed·실패·
+  no valid point·timeout 0. p50 **0.00911초**, p95 **0.05215초**, 최대 **0.33415초**.
+- **360/360 표본**, 최소 MemAvailable **48.970%**, OOM·재시작·비정상 표본 0.
+  swap 사용은 시작값 68KiB에서 증가하지 않았고 swap-in/out counter 증분도 0이었다.
+- full backup `04:36:09–04:36:57Z`, WAL `04:39:09/04:49:09/04:59:09Z` 모두 성공.
+- 정상 메모리 peak: GraphHopper **3,003,187,200 bytes**, PostgreSQL **219,348,992 bytes**,
+  Spring Boot **382,533,632 bytes**. GH·Spring `memory.events max/oom_kill` 모두 0.
+
+#### 로그 감사 오탐과 정정 — 원래 실패 결과 보존
+
+최초 종료 감사 `4406e20d-92d4-4680-9e34-e9c77c8e896c`는 Failed/exit 1이었다.
+두 번째 시험은 **Full GC 0회**였지만 `fixtureCoordinateLines=1`로 실패했다.
+진단 `496ec825-3f19-4dfc-8655-e4921f40f44d`,
+`bc81c914-a293-49fe-accd-2b48f0cb002f`에서 `Concurrent Mark`의 **GC 소요시간 숫자 일부**가
+fixture 좌표 문자열과 겹쳤음을 확인했다. 원본 측정의 `coordinate in line` 부분 문자열 검사가 원인이다.
+
+수정 감사는 정규식 `(?<![0-9.])[+-]?[0-9]+\.[0-9]+(?![0-9.])`로 숫자 전체를 추출하고
+`Decimal` 값으로 fixture 좌표와 비교한다. 실제 좌표와 0으로 끝나는 동치 표현은 잡지만,
+다른 수의 접두·접미 부분 일치는 좌표로 세지 않는다. 예를 들어 가짜 fixture `13.25`에 대해
+`point=13.25,27.5`, `lat=13.2500 lon=27.500`, `lat: 13.25`는 검출하고,
+`13.258ms`, `313.25ms`, `27.59ms`, `point=13.258,27.59`는 검출하지 않는 **7개 회귀 사례**를
+독립 기대값으로 실행했다. 실제 사용자 좌표를 허용하거나 로그 합격 기준을 바꾼 것이 아니다.
+
+- 정정 감사 `ba0e1c6b-2a21-4a01-b720-8924b5cd658b`: **Success/exit 0**, 숫자 토큰 테스트 7개 통과
+- Docker GC **745줄**, Full GC **0회**, 실제 좌표·query·키·email·import·kernel OOM 표식 **0**,
+  주 service journal의 runtime GC 중복 **0**
+- 원래 `log-audit-normal-window.json`은 미통과 그대로 보존하고,
+  `log-audit-normal-window-numeric-tokens.json`에 정정 결과를 별도 기록했다.
+- 서버 설정·이미지·요청 세트·30분 부하 결과는 바꾸지 않고 같은 종료 시각의 로그만 재분석했다.
+
+#### 재부팅과 최종 실제 상태 — 통과
+
+- `2026-09-04T05:10:44Z` 재부팅 요청, boot ID가
+  `ca60323b-eead-4f6f-a427-76a161c8674a`로 변경됐음을 확인했다.
+- GraphHopper activation `05:11:07Z`, container 시작 `05:11:12.456334371Z`.
+  `ExecStartPre` 포함 job **4669.404ms**, activation부터 양쪽 readiness 관측
+  **21017.605ms** — 120초 이내. 이 21초의 시작점은 AWS 재부팅 요청 시각이 아니다.
+- 같은 artifact·image 유지, graph hash 재검증 성공, import 로그 0건.
+  두 service `active/running`, `Result=success`, `NRestarts=0`.
+- GraphHopper의 실제 memory/memory+swap **5368709120**, reservation **3221225472** bytes와
+  cgroup `memory.swap.max=0`, Spring High/Max **1073741824/1610612736** bytes가 유지됐다.
+- host swap은 계속 4GiB이고 재부팅 후 사용 0이다. 시험 결과를 맞추려고 `swapoff`나 cache
+  강제 정리를 한 것이 아니며 정상 부하 중 남아 있던 68KiB와 구분한다.
+- 재부팅 SSM `05e62ace-201f-4848-b304-13b485bb3fb9`: **Success/exit 0**.
+- 최종 감사 SSM `1b61bdec-fda2-4796-a0c2-2f90f0d53a0f`: **Success/exit 0**.
+  `05:12:45Z` 실제 backend·GraphHopper·Docker·Nginx active, 격리 container 0,
+  실제 unit과 PostgreSQL 기존 미커밋 수정본이 백업과 일치함을 확인했다.
+- 정상 부하의 시작·종료 시각을 고정한 로그를 다시 검사해
+  `log-audit-final-normal-window-numeric-tokens.json`에 별도 보존했다. 숫자 토큰 검사 7개와
+  로그 합격 조건을 모두 통과했다. 의도적 장애 로그를 정상 부하에 섞지 않았다.
+- 재부팅 후 외부 HTTPS `/api/contests?size=1`: **HTTP 200, TLS 인증서 검증 성공**.
+- 이 결과로 두 번째 제한 후보를 **이번 8GiB staging의 실측 확정값**으로 선택한다.
+  4GiB 운영, clean-checkout PostgreSQL image 재현, 실제 DB 복원 리허설, SNS 이메일 수신,
+  프로덕션 출시 전체 체크리스트까지 확인했다는 뜻은 아니다.

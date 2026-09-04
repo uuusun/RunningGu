@@ -598,6 +598,12 @@ cgroup v2의 `memory.max`와 `memory.swap.max=0`을 직접 대조한다. backend
 후보값·기존값·실측 근거를 배포 증거에 남기고 같은 고정 요청 30분 부하·백업·재부팅·§9.3 격리를
 반복한다. 격리 시험의 reservation·memory·memory+swap은 실제 후보와 같아야 한다.
 
+2026-09-04 8GiB staging은 GraphHopper Xms1g/Xmx4g·reservation3g·memory5g·memory+swap5g,
+Spring Xms256m/Xmx1g·MemoryHigh1G/MemoryMax1536M으로 위 재시험을 통과했다.
+정확한 source/image·고정 부하·미승인 첫 후보·최종 결과는
+[8GiB 실측 기록](evidence/graphhopper-ec2-8g-20260904.md#최종-설정과-검증-범위)을 따른다.
+이는 해당 staging의 확정값이며 새 환경의 baseline 기본값이나 4GiB 합격을 뜻하지 않는다.
+
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
 
