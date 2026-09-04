@@ -4,6 +4,7 @@ import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.ContestDto
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -16,7 +17,7 @@ import java.time.LocalDate
  * ## 이 파일이 지키는 것
  *
  * 마감임박 캐시는 **개별 대회가 아니라 "서버가 고른 결과와 그 순서"** 를 담는다. 그래서
- * 다른 캐시와 규칙이 둘 다르다 — 통째로 바뀌고, 하루가 지나면 버린다.
+ * 다른 캐시와 규칙이 다르다 — 통째로 바뀌고, 하루가 지나면 버리고, **0건도 결과다.**
  *
  * # 망가뜨리면 이것만 실패한다
  * ```
@@ -26,11 +27,19 @@ import java.time.LocalDate
  * ② MAX_AGE 검사를 뺀다  →  1개 실패
  *      24시간이 지난 snapshot 은 없는 것으로 친다 FAILED
  *
- * ③ 빈 응답도 저장하게 한다  →  1개 실패
- *      빈 응답은 직전 snapshot 을 지우지 않는다 FAILED
+ * ③ save 에 `if (contests.isEmpty()) return` 을 되돌린다  →  2개 실패
+ *      서버 정상 빈 응답 뒤에는 이전 항목을 되살리지 않는다 FAILED
+ *      정상 빈 응답도 살아 있는 snapshot 이다 FAILED
  *
  * ④ rank 대신 contestId 로 정렬한다  →  1개 실패
  *      서버가 준 순서를 그대로 되돌려준다 FAILED
+ *
+ * ⑤ meta 대신 행 수로 snapshot 존재를 판단한다  →  1개 실패
+ *      정상 빈 응답도 살아 있는 snapshot 이다 FAILED
+ *
+ * ⑥ payload 에서 `dto.copy(dDayApply = null)` 을 뺀다  →  2개 실패
+ *      payload 에 dDayApply 를 담지 않는다 FAILED
+ *      payload 는 dDayApply 만 빼고 네트워크와 같다 FAILED
  * ```
  */
 class RoomClosingSoonCacheTest {
@@ -38,6 +47,7 @@ class RoomClosingSoonCacheTest {
     /** 인메모리 DAO. Room 없이 [RoomClosingSoonCache] 의 판단만 본다. */
     private class FakeDao : ClosingSoonCacheDao {
         val rows = mutableListOf<ClosingSoonCacheEntity>()
+        var meta: ClosingSoonSnapshotMetaEntity? = null
 
         override suspend fun insert(entries: List<ClosingSoonCacheEntity>) {
             rows += entries
@@ -47,6 +57,16 @@ class RoomClosingSoonCacheTest {
 
         override suspend fun clear() {
             rows.clear()
+        }
+
+        override suspend fun upsertMeta(meta: ClosingSoonSnapshotMetaEntity) {
+            this.meta = meta
+        }
+
+        override suspend fun meta(): ClosingSoonSnapshotMetaEntity? = meta
+
+        override suspend fun clearMeta() {
+            meta = null
         }
     }
 
@@ -88,15 +108,32 @@ class RoomClosingSoonCacheTest {
     }
 
     @Test
-    fun `빈 응답은 직전 snapshot 을 지우지 않는다`() = runBlocking {
+    fun `서버 정상 빈 응답 뒤에는 이전 항목을 되살리지 않는다`() = runBlocking {
         val cache = RoomClosingSoonCache(FakeDao(), Clock())
         cache.save(listOf(contest(1)))
 
-        // 서버가 정상적으로 0건을 줄 수 있다. 그걸 담아 두면 오프라인에서 "마감임박이 없다"
-        // 를 마지막 성공본으로 보여주게 되는데, 되살릴 값어치가 없으면서 쓸 만한 것만 잃는다
+        // 접수가 다 끝나 서버가 0건을 줬는데 어제의 넷을 그대로 보여주면, **서버가 뺀 대회가
+        // 오프라인에서 되살아난다.** 원자 교체 계약에 빈 응답 예외는 없다 (#283 리뷰)
         cache.save(emptyList())
 
-        assertEquals(listOf(1L), cache.snapshot()?.contests?.map { it.id })
+        assertEquals(emptyList<Long>(), cache.snapshot()?.contests?.map { it.id })
+    }
+
+    @Test
+    fun `정상 빈 응답도 살아 있는 snapshot 이다`() = runBlocking {
+        val cache = RoomClosingSoonCache(FakeDao(), Clock())
+
+        cache.save(emptyList())
+
+        // **null 이 아니다.** null 이면 호출부가 "받은 적 없다" 로 읽어서 오프라인에
+        // [다시 시도] 를 띄우는데, 서버는 "지금 없다" 고 답한 적이 있다
+        assertNotNull(cache.snapshot())
+        assertEquals(emptyList<Long>(), cache.snapshot()?.contests?.map { it.id })
+    }
+
+    @Test
+    fun `받은 적이 없으면 null 이다`() = runBlocking {
+        assertNull(RoomClosingSoonCache(FakeDao(), Clock()).snapshot())
     }
 
     // ── 만료 ────────────────────────────────────────────────
@@ -162,14 +199,31 @@ class RoomClosingSoonCacheTest {
     }
 
     @Test
-    fun `payload 는 네트워크와 같은 규칙으로 직렬화한다`() = runBlocking {
+    fun `payload 는 dDayApply 만 빼고 네트워크와 같다`() = runBlocking {
         val dao = FakeDao()
         val cache = RoomClosingSoonCache(dao, Clock())
         val dto = contest(1, applyEnd = LocalDate.of(2026, 9, 30))
 
         cache.save(listOf(dto))
 
-        // 매퍼가 한 벌이라 캐시에서 온 것과 서버에서 온 것이 갈릴 수 없다는 것이 전제다
-        assertEquals(dto, ApiJson.decodeFromString(ContestDto.serializer(), dao.rows[0].payload))
+        // 매퍼가 한 벌이라 캐시에서 온 것과 서버에서 온 것이 갈릴 수 없다는 것이 전제다.
+        // 다만 `dDayApply` 는 낡는 값이라 담지 않는다
+        assertEquals(
+            dto.copy(dDayApply = null),
+            ApiJson.decodeFromString(ContestDto.serializer(), dao.rows[0].payload),
+        )
+    }
+
+    @Test
+    fun `payload 에 dDayApply 를 담지 않는다`() = runBlocking {
+        val dao = FakeDao()
+        val cache = RoomClosingSoonCache(dao, Clock())
+
+        // contest() 가 dDayApply = 4 로 만든다
+        cache.save(listOf(contest(1, applyEnd = LocalDate.of(2026, 9, 30))))
+
+        // **글자로 확인한다.** 값을 안 읽는 것과 안 담는 것은 다르다 — 담겨 있으면 다음
+        // 사람이 payload 를 열어 그 값을 쓸 수 있다 (#283 리뷰)
+        assertFalse(dao.rows[0].payload.contains("dDayApply"))
     }
 }

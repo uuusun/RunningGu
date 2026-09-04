@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.ContestDto
 import java.time.Duration
@@ -42,6 +43,10 @@ interface ClosingSoonCache {
      *
      * 행 단위 upsert 가 아니다 — 지난 응답의 5번째가 남아 있으면 서버가 주지 않은 항목이
      * 목록에 섞인다. 마감임박은 "서버가 고른 넷" 이라 그 넷이 통째로 한 단위다.
+     *
+     * **정상 빈 응답(0건)도 저장한다.** 예외를 두면 서버가 목록에서 뺀 대회가 오프라인에서
+     * 되살아난다 — 접수가 다 끝나 서버가 0건을 줬는데, 앱은 어제의 넷을 그대로 보여준다.
+     * "성공 응답을 통째로 바꾼다" 는 계약에 빈 응답 예외는 없다(#283 리뷰).
      */
     suspend fun save(contests: List<ContestDto>)
 
@@ -53,6 +58,11 @@ interface ClosingSoonCache {
      * (정상 빈 상태다). 뭉뚱그리면 오프라인 오류가 "대회가 없음" 으로 둔갑한다.
      *
      * [MAX_AGE] 가 지난 snapshot 은 없는 것으로 친다.
+     *
+     * **0건짜리 유효한 snapshot 은 `null` 이 아니다.** 서버가 마지막으로 "없다" 고 답한
+     * 것도 성공 응답이라, 그때 오프라인이면 화면은 [다시 시도] 가 아니라 정상 빈 상태를
+     * 그려야 한다. 그래서 행이 없어도 저장 시각([ClosingSoonSnapshotMetaEntity])이 남아
+     * 있으면 살아 있는 snapshot 으로 본다.
      */
     suspend fun snapshot(): ClosingSoonSnapshot?
 
@@ -105,6 +115,21 @@ data class ClosingSoonCacheEntity(
     val cachedAt: Long,
 )
 
+/**
+ * snapshot 한 벌의 머리말. **행이 0개여도 남는다.** (#283 리뷰)
+ *
+ * 이것이 없으면 "마감임박을 받은 적이 없다" 와 "받았는데 0건이었다" 를 가를 수 없다.
+ * 앞엣것은 오프라인에서 네트워크 오류 + [다시 시도] 고, 뒤엣것은 정상 빈 상태다 —
+ * 사용자가 할 일이 다르다.
+ */
+@Entity(tableName = "cached_closing_soon_meta")
+data class ClosingSoonSnapshotMetaEntity(
+    /** 언제나 0. 이 표에는 **한 줄만** 산다 — snapshot 은 한 번에 하나다. */
+    @PrimaryKey val id: Int = 0,
+    /** 앱이 이 응답을 저장한 시각(epoch millis · UTC). */
+    val cachedAt: Long,
+)
+
 @Dao
 interface ClosingSoonCacheDao {
 
@@ -115,9 +140,10 @@ interface ClosingSoonCacheDao {
      * 트랜잭션을 안 걸면 "새 응답을 저장하다 죽어서 옛 목록까지 잃는" 경우가 생긴다.
      */
     @Transaction
-    suspend fun replaceAll(entries: List<ClosingSoonCacheEntity>) {
+    suspend fun replaceAll(meta: ClosingSoonSnapshotMetaEntity, entries: List<ClosingSoonCacheEntity>) {
         clear()
         insert(entries)
+        upsertMeta(meta)
     }
 
     @Insert
@@ -128,6 +154,15 @@ interface ClosingSoonCacheDao {
 
     @Query("DELETE FROM cached_closing_soon")
     suspend fun clear()
+
+    @Upsert
+    suspend fun upsertMeta(meta: ClosingSoonSnapshotMetaEntity)
+
+    @Query("SELECT * FROM cached_closing_soon_meta WHERE id = 0")
+    suspend fun meta(): ClosingSoonSnapshotMetaEntity?
+
+    @Query("DELETE FROM cached_closing_soon_meta")
+    suspend fun clearMeta()
 }
 
 /** Room 구현. 직렬화 규칙은 네트워크와 같은 [ApiJson] 을 쓴다. */
@@ -138,17 +173,17 @@ class RoomClosingSoonCache(
 ) : ClosingSoonCache {
 
     override suspend fun save(contests: List<ContestDto>) {
-        // **빈 응답은 저장하지 않는다.** 서버가 정상적으로 0건을 줄 수 있지만, 그걸 담아 두면
-        // 오프라인에서 "마감임박이 없다" 를 마지막 성공본으로 보여주게 된다. 그건 되살릴
-        // 값어치가 없고, 직전의 쓸 만한 snapshot 만 잃는다
-        if (contests.isEmpty()) return
         val at = now()
         dao.replaceAll(
-            contests.mapIndexed { index, dto ->
+            meta = ClosingSoonSnapshotMetaEntity(cachedAt = at),
+            entries = contests.mapIndexed { index, dto ->
                 ClosingSoonCacheEntity(
                     rank = index,
                     contestId = dto.id,
-                    payload = ApiJson.encodeToString(ContestDto.serializer(), dto),
+                    // **`dDayApply` 를 떼고 담는다.** 남겨 두면 "저장하지 않는다" 는 계약이
+                    // 글자로만 참이 되고, 다음 사람이 payload 를 열어 그 값을 쓸 수 있다.
+                    // 담지 않으면 애초에 쓸 수가 없다 (#283 리뷰)
+                    payload = ApiJson.encodeToString(ContestDto.serializer(), dto.copy(dDayApply = null)),
                     cachedAt = at,
                 )
             },
@@ -156,20 +191,23 @@ class RoomClosingSoonCache(
     }
 
     override suspend fun snapshot(): ClosingSoonSnapshot? {
-        val rows = dao.all()
-        if (rows.isEmpty()) return null
-
-        // 한 번에 넣으므로 모두 같은 값이지만, 혹시 갈렸으면 **가장 오래된 것**을 기준으로
-        // 삼는다. 낡은 쪽에 맞춰야 안전하다
-        val cachedAt = rows.minOf { it.cachedAt }
+        // **행이 아니라 meta 가 snapshot 의 존재를 말한다.** 행 수로 판단하면 "받은 적 없다"
+        // 와 "받았는데 0건이었다" 가 같아진다
+        val cachedAt = dao.meta()?.cachedAt ?: return null
         if (now() - cachedAt >= ClosingSoonCache.MAX_AGE.toMillis()) return null
 
+        val rows = dao.all()
         val contests = rows.mapNotNull { it.decode() }
-        // 전부 못 읽으면 되살릴 게 없는 것과 같다 — 빈 snapshot 을 주면 "대회가 없음" 이 된다
-        return if (contests.isEmpty()) null else ClosingSoonSnapshot(contests, cachedAt)
+        // 담긴 게 있었는데 **전부 못 읽으면** 되살릴 것이 없는 것과 같다. 빈 목록으로 주면
+        // 읽기 실패가 "대회가 없음" 으로 둔갑한다 — 0건으로 저장된 것과는 다르다
+        if (rows.isNotEmpty() && contests.isEmpty()) return null
+        return ClosingSoonSnapshot(contests, cachedAt)
     }
 
-    override suspend fun clear() = dao.clear()
+    override suspend fun clear() {
+        dao.clear()
+        dao.clearMeta()
+    }
 
     /** 못 읽는 행은 버린다. 이유는 [RoomContestCache] 와 같다. */
     private fun ClosingSoonCacheEntity.decode(): ContestDto? =

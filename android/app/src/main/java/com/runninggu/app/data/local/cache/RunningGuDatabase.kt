@@ -13,14 +13,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * **읽기 캐시 전용이다.** 서버가 SSOT 라 여기 있는 것이 서버로 올라가지 않고, 양방향
  * 동기화도 하지 않는다(AGENTS 2장 · SPEC §9.3).
  *
- * 지금은 `cached_contest` 와 `cached_closing_soon` 둘이다. `cached_itinerary` ·
+ * 지금은 `cached_contest` · `cached_closing_soon` · `cached_closing_soon_meta` 셋이다. `cached_itinerary` ·
  * `cached_course` · `cached_favorite` 는 **계정 데이터**라 로그아웃·계정 전환·탈퇴 시 삭제
  * 규칙과 함께 다음 PR 에서 붙인다(#105 결정). 축제는 SPEC §6.1 에 테이블이 없어 범위
  * 밖이다 — 매핑표 S1 오프라인 행이 "대회·축제" 라고 적고 있었는데 축제 캐시는 만든 적이
  * 없어서 이번에 문서를 코드에 맞췄다(#276).
  */
 @Database(
-    entities = [ContestCacheEntity::class, ClosingSoonCacheEntity::class],
+    entities = [
+        ContestCacheEntity::class,
+        ClosingSoonCacheEntity::class,
+        ClosingSoonSnapshotMetaEntity::class,
+    ],
     version = 2,
     exportSchema = true,
 )
@@ -53,6 +57,17 @@ abstract class RunningGuDatabase : RoomDatabase() {
                         `payload` TEXT NOT NULL,
                         `cachedAt` INTEGER NOT NULL,
                         PRIMARY KEY(`rank`)
+                    )
+                    """.trimIndent(),
+                )
+                // snapshot 이 0건이어도 "언제 받았는지" 는 남아야 한다 — 행 수로는
+                // "받은 적 없다" 와 "받았는데 0건" 을 못 가른다 (#283 리뷰)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `cached_closing_soon_meta` (
+                        `id` INTEGER NOT NULL,
+                        `cachedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
                     )
                     """.trimIndent(),
                 )

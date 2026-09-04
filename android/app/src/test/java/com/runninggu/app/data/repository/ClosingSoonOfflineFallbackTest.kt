@@ -100,7 +100,7 @@ class ClosingSoonOfflineFallbackTest {
     /** 인메모리 snapshot. 만료 판정은 [RoomClosingSoonCacheTest] 가 따로 본다. */
     private class FakeCache(var stored: ClosingSoonSnapshot? = null) : ClosingSoonCache {
         override suspend fun save(contests: List<ContestDto>) {
-            if (contests.isEmpty()) return
+            // 빈 응답도 담는다 — 원자 교체 계약에 예외가 없다 (#283 리뷰)
             stored = ClosingSoonSnapshot(contests, SAVED_AT)
         }
 
