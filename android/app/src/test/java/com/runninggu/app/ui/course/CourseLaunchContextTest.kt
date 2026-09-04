@@ -35,10 +35,8 @@ class CourseLaunchContextTest {
 
     private val dispatcher = StandardTestDispatcher()
 
-    private val stay = PoiItem(
+    private val stay = CourseLaunchContext.Stay(
         name = "부산 해운대 호텔",
-        address = "부산 해운대구",
-        description = "",
         lat = 35.1587,
         lng = 129.1604,
     )
@@ -54,7 +52,7 @@ class CourseLaunchContextTest {
     }
 
     /** S7 이 [러닝코스에서 보기] 로 띄운 S8 항목. */
-    private fun launchedFromItinerary(stay: PoiItem?, targetKm: Double) =
+    private fun launchedFromItinerary(stay: CourseLaunchContext.Stay?, targetKm: Double) =
         SavedStateHandle().also { CourseLaunchContext.set(it, stay = stay, targetKm = targetKm) }
 
     private fun viewModel(launchState: SavedStateHandle = SavedStateHandle()) = CourseViewModel(

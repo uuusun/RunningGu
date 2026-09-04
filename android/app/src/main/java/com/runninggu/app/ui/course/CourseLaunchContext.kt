@@ -1,7 +1,6 @@
 package com.runninggu.app.ui.course
 
 import androidx.lifecycle.SavedStateHandle
-import com.runninggu.app.data.model.PoiItem
 
 /**
  * S7 동선 → S8 러닝코스 연계로 넘기는 값. (SPEC §4.10 · §4.11-1 · 매핑표 D-15)
@@ -50,7 +49,7 @@ object CourseLaunchContext {
     data class Stay(val name: String, val lat: Double, val lng: Double)
 
     /** S7 이 [러닝코스에서 보기] 로 띄운 **S8 항목**의 상태에 담는다. */
-    fun set(handle: SavedStateHandle, stay: PoiItem?, targetKm: Double) {
+    fun set(handle: SavedStateHandle, stay: Stay?, targetKm: Double) {
         handle[KEY_TARGET_KM] = targetKm
         if (stay != null) {
             handle[KEY_START_NAME] = stay.name

@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
@@ -109,7 +110,7 @@ import kotlinx.coroutines.launch
 fun ResultScreen(
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
-    onOpenCourses: (targetKm: Double) -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
     /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
     onSaved: (message: String) -> Unit,
     /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
@@ -168,7 +169,7 @@ fun SavedItineraryScreen(
     itineraryId: Long,
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
-    onOpenCourses: (targetKm: Double) -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
     onSaved: (message: String) -> Unit,
     onLoginRequest: () -> Unit,
     viewModel: ResultViewModel,
@@ -209,7 +210,7 @@ fun SavedItineraryScreen(
 private fun ResultContent(
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
-    onOpenCourses: (targetKm: Double) -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
     /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
     onSaved: (message: String) -> Unit,
     /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
@@ -288,7 +289,7 @@ private fun ResultContent(
                     onPinClick = viewModel::onPinClick,
                     onCardClick = viewModel::onCardClick,
                     onCardCentered = viewModel::onCardCentered,
-                    onOpenCourses = { onOpenCourses(state.courseTargetKm) },
+                    onOpenCourses = { onOpenCourses(state.courseStay, state.courseTargetKm) },
                     editingEnabled = state.editingEnabled,
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,

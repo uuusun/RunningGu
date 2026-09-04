@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.EventType
@@ -114,6 +115,17 @@ data class ResultUiState(
      */
     val courseTargetKm: Double
         get() = Recovery.defaultCourseTargetKm(event)
+
+    /**
+     * S8 연계에 넘길 숙소. 숙소 없이 추천받았으면 null 이다. (§4.9 · D-15)
+     *
+     * **위저드 상태가 아니라 응답 snapshot 에서 읽는다.** 생성 경로에서는 둘이 같지만
+     * 복원 경로(S7-R)에는 위저드가 없고, 프로세스가 죽었다 살아난 S7 에서는 위저드가
+     * 기본값이라 `stay` 가 null 이다(#192 와 같은 뿌리). 서버가 `request.hotel` 로
+     * 되돌려주므로 양쪽 다 이걸 보면 갈릴 일이 없다 (#257 리뷰).
+     */
+    val courseStay: HotelSnapshot?
+        get() = result?.request?.hotel
 
     /**
      * 회복일인가. 일자 탭과 지도 핀 색을 가른다. (SPEC §4.10)

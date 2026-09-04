@@ -72,6 +72,7 @@ class RestoreItineraryTest {
         event: String = "K10",
         region: String? = "세종",
         needsRegeneration: Boolean = false,
+        hotel: HotelSnapshot? = HotelSnapshot("호텔", 36.50, 127.25),
     ) = SavedItineraryDetail(
         id = 7L,
         result = ItineraryResult(
@@ -82,7 +83,7 @@ class RestoreItineraryTest {
                 themes = listOf("TOUR"),
                 startDate = "2026-09-04",
                 endDate = "2026-09-05",
-                hotel = HotelSnapshot("호텔", 36.50, 127.25),
+                hotel = hotel,
             ),
             days = days,
             recovery = null,
@@ -279,6 +280,33 @@ class RestoreItineraryTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.needsRegeneration)
+    }
+
+
+    // **복원 화면에서만 숙소 연계가 끊겨 있었다** (#257 리뷰). 내비게이션이 항상
+    // `stay = null` 을 넘겨서, 생성 직후 S7 에서는 되던 [숙소 주변에서 뛰기·걷기] 가
+    // 저장한 동선을 열면 출발지 없이 열렸다. 값은 응답에 있었는데 아무도 안 읽었다.
+    @Test
+    fun `복원한 동선은 저장해 둔 숙소를 S8 출발지로 넘긴다`() = runTest {
+        val vm = viewModel(FakeDetailRepository(detail()))
+        vm.restore(7L)
+        advanceUntilIdle()
+
+        val stay = vm.uiState.value.courseStay
+        assertEquals("호텔", stay?.name)
+        assertEquals(36.50, stay?.lat)
+        assertEquals(127.25, stay?.lng)
+    }
+
+    // 숙소 없이 추천받은 동선(§4.9)은 출발지를 프리필하지 않는다. 위와 같은 값을
+    // 내면 사용자가 고르지도 않은 곳이 출발지로 잡힌다.
+    @Test
+    fun `숙소 없이 저장한 동선은 출발지를 넘기지 않는다`() = runTest {
+        val vm = viewModel(FakeDetailRepository(detail(hotel = null)))
+        vm.restore(7L)
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.courseStay)
     }
 
 }

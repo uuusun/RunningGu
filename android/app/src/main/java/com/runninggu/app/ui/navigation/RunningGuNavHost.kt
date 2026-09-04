@@ -200,11 +200,15 @@ fun RunningGuNavHost(
                     // 저장된 동선의 조건을 바꾸는 것은 **새로 만드는 것**이다. 대회를 다시
                     // 골라야 하므로 캘린더로 보낸다 — 위저드는 raceId 로 시작한다
                     onChangeConditions = { navController.navigate(Routes.CALENDAR) },
-                    onOpenCourses = { targetKm ->
+                    // **저장해 둔 숙소를 출발지로 넘긴다** (#257 리뷰 · D-15). 예전에는
+                    // 여기서 `stay = null` 을 보내서, 생성 직후 S7 에서는 되던 숙소 연계가
+                    // **복원 화면에서만** 사라졌다 — 사용자는 같은 동선을 보면서 어제는
+                    // 되던 것이 오늘은 안 되는 것을 겪는다.
+                    onOpenCourses = { stay, targetKm ->
                         navController.navigate(Routes.COURSES)
                         CourseLaunchContext.set(
                             navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
-                            stay = null,
+                            stay = stay?.let { CourseLaunchContext.Stay(it.name, it.lat, it.lng) },
                             targetKm = targetKm,
                         )
                     },
@@ -499,11 +503,14 @@ private fun NavGraphBuilder.wizardGraph(navController: NavHostController) {
                 // **띄운 뒤에 그 항목에 담는다.** 값이 S8 항목보다 오래 살지 않아야
                 // 연계가 끊겼을 때 다음 진입에 남지 않는다(#178 리뷰). 항목은 navigate 로
                 // 곧바로 쌓이고 화면 구성은 그다음이라, 여기서 담으면 ViewModel 이 읽는다
-                onOpenCourses = { targetKm ->
+                // 숙소는 **위저드 상태가 아니라 생성 응답 snapshot** 에서 온다(#257 리뷰).
+                // 위저드를 읽으면 프로세스가 죽었다 살아난 S7 에서 기본값(null)을 보내
+                // 여기서도 연계가 조용히 끊긴다 — #192 와 같은 뿌리다.
+                onOpenCourses = { stay, targetKm ->
                     navController.navigate(Routes.COURSES)
                     CourseLaunchContext.set(
                         handle = navController.getBackStackEntry(Routes.COURSES).savedStateHandle,
-                        stay = wizardViewModel.uiState.value.stay,
+                        stay = stay?.let { CourseLaunchContext.Stay(it.name, it.lat, it.lng) },
                         targetKm = targetKm,
                     )
                 },
