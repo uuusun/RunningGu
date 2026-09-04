@@ -121,7 +121,7 @@ class BundleContestRepositoryTest {
 
     @Test
     fun `마감 임박은 접수중만 마감일 순으로 준다`() = runBlocking {
-        val soon = repo().closingSoon(limit = 4)
+        val soon = repo().closingSoon(limit = 4).items
 
         assertTrue(soon.size <= 4)
         assertTrue(soon.all { it.contest.regEnd != null })

@@ -6,7 +6,9 @@ import com.runninggu.app.data.remote.ItineraryApi
 import com.runninggu.app.data.local.AuthTokens
 import android.content.Context
 import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.local.cache.ClosingSoonCache
 import com.runninggu.app.data.local.cache.ContestCache
+import com.runninggu.app.data.local.cache.RoomClosingSoonCache
 import com.runninggu.app.data.local.cache.RoomContestCache
 import com.runninggu.app.data.local.cache.RunningGuDatabase
 import com.runninggu.app.data.remote.ApiClient
@@ -191,8 +193,23 @@ object ServiceLocator {
      * **첫 조회 때 파일을 연다** — 앱 시작을 늦추지 않으려고 `lazy` 다.
      */
     private val contestCache: ContestCache? by lazy {
-        appContext?.let { RoomContestCache(RunningGuDatabase.open(it).contestCache()) }
+        appContext?.let { RoomContestCache(database(it).contestCache()) }
     }
+
+    /**
+     * 홈 마감임박 snapshot. (SPEC §6.1 `cached_closing_soon` · 이슈 #276)
+     *
+     * [contestCache] 와 **같은 DB 파일**을 쓴다 — [database] 가 한 번만 열도록 묶어 둔다.
+     */
+    private val closingSoonCache: ClosingSoonCache? by lazy {
+        appContext?.let { RoomClosingSoonCache(database(it).closingSoonCache()) }
+    }
+
+    /** 파일 DB 는 하나다. 두 캐시가 따로 열면 같은 파일을 두 번 여는 셈이다. */
+    private var db: RunningGuDatabase? = null
+
+    private fun database(context: android.content.Context): RunningGuDatabase =
+        db ?: RunningGuDatabase.open(context).also { db = it }
 
     /**
      * 서버 구현. 화면은 인터페이스만 보므로 스텁과 바꿔 끼울 수 있다.
@@ -201,7 +218,7 @@ object ServiceLocator {
      * 그전에는 오프라인에서 홈·캘린더·상세가 전부 오류였다.
      */
     val contestRepository: ContestRepository by lazy {
-        RemoteContestRepository(contestApi, contestCache)
+        RemoteContestRepository(contestApi, contestCache, closingSoonCache)
     }
     /**
      * S8 러닝코스. (API 명세 §6)

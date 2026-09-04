@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ClosingSoon
+import com.runninggu.app.data.repository.ClosingSoonResult
 import com.runninggu.app.data.repository.ContestFilter
 import com.runninggu.app.data.repository.ContestPage
 import com.runninggu.app.data.repository.ContestRepository
@@ -189,7 +190,7 @@ private class FakeContestRepository(
         filter: ContestFilter,
     ): Map<LocalDate, Int> = throw UnsupportedOperationException("S3 는 부르지 않는다")
 
-    override suspend fun closingSoon(limit: Int): List<ClosingSoon> =
+    override suspend fun closingSoon(limit: Int): ClosingSoonResult =
         throw UnsupportedOperationException("S3 는 부르지 않는다")
 
     private fun contest(id: Long, active: Boolean) = Contest(

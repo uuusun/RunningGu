@@ -1,5 +1,6 @@
 package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.local.cache.ClosingSoonCache
 import com.runninggu.app.data.local.cache.ContestCache
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
@@ -10,6 +11,9 @@ import com.runninggu.app.data.remote.mapper.toDomain
 import com.runninggu.app.data.remote.mapper.toServerName
 import com.runninggu.app.data.remote.mapper.toContest
 import com.runninggu.app.domain.EventType
+import com.runninggu.app.domain.dDay
+import com.runninggu.app.domain.today
+import java.time.Instant
 import java.time.LocalDate
 
 /**
@@ -26,8 +30,14 @@ interface ContestRepository {
     /** 월간 뷰 점 집계. 목록과 같은 필터를 넘겨야 어긋나지 않는다. */
     suspend fun dailyCounts(year: Int, month: Int, filter: ContestFilter = ContestFilter()): Map<LocalDate, Int>
 
-    /** 홈 마감 임박. `dDayApply` 가 필요하므로 [ClosingSoon] 으로 감싼다. */
-    suspend fun closingSoon(limit: Int = ContestApi.DEFAULT_CLOSING_SOON_LIMIT): List<ClosingSoon>
+    /**
+     * 홈 마감 임박. `dDayApply` 가 필요하므로 [ClosingSoon] 으로 감싼다.
+     *
+     * **출처를 함께 준다**([ClosingSoonResult.cachedAt]). 오프라인에서 되살린 목록은 화면이
+     * 마지막 성공본이라고 말해야 하는데, `List` 만 넘기면 그 사실이 여기서 사라진다
+     * (SPEC §6.1 캐시 출처 표기 · 이슈 #276).
+     */
+    suspend fun closingSoon(limit: Int = ContestApi.DEFAULT_CLOSING_SOON_LIMIT): ClosingSoonResult
 
     /**
      * 대회 상세. **canonical id 만 받는다.** (§3-4)
@@ -70,6 +80,18 @@ data class ContestPage(
     val hasNext: Boolean = false,
 )
 
+/**
+ * 마감 임박 조회 결과. (§3-3 · SPEC §6.1 · 이슈 #276)
+ *
+ * @param items 서버가 준 순서 그대로. 앱은 다시 고르지도 정렬하지도 않는다.
+ * @param cachedAt **캐시로 되살린 것이면** 앱이 그 응답을 저장한 시각, 서버에서 막 받은
+ *   것이면 `null`. 화면은 이 값이 있을 때만 "언제 것" 인지를 함께 그린다.
+ */
+data class ClosingSoonResult(
+    val items: List<ClosingSoon> = emptyList(),
+    val cachedAt: Instant? = null,
+)
+
 /** 마감 임박 항목 — 대회 + 마감까지 남은 일수. (§3-3) */
 data class ClosingSoon(
     val contest: Contest,
@@ -94,6 +116,11 @@ class RemoteContestRepository(
     private val api: ContestApi,
     /** 없으면 폴백 없이 서버만 본다. 캐시를 안 쓰는 테스트가 이 상태다. */
     private val cache: ContestCache? = null,
+    /**
+     * 마감임박 snapshot. [cache] 와 따로 두는 이유는 담는 것이 다르기 때문이다 —
+     * 이쪽은 개별 대회가 아니라 **서버가 고른 결과와 그 순서**다(#276).
+     */
+    private val closingSoonCache: ClosingSoonCache? = null,
 ) : ContestRepository {
 
     override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage = withCacheFallback(
@@ -140,8 +167,36 @@ class RemoteContestRepository(
             ).counts.associate { it.date to it.count }
         }
 
-    override suspend fun closingSoon(limit: Int): List<ClosingSoon> = apiCall {
-        api.closingSoon(limit).items.map { ClosingSoon(it.toContest(), it.dDayApply) }
+    /**
+     * 마감임박. 성공 응답을 [closingSoonCache] 에 snapshot 으로 남기고, **연결이 안 될 때만**
+     * 되살린다. (SPEC §6.1 `cached_closing_soon` · 매핑표 S1 오프라인 · 이슈 #276)
+     *
+     * ## 되살릴 때 서버 응답과 달라지는 것 하나
+     *
+     * `dDayApply` 를 **다시 센다.** 저장된 값을 그대로 쓰면 하루만 지나도 거짓이 되고,
+     * 이미 마감된 대회를 "마감 D-2" 로 보여주게 된다. 그래서 접수가 끝난 항목은 아예 뺀다.
+     *
+     * 빼고 나서 0건이면 **정상 빈 상태**다(빈 목록을 그대로 돌려준다). 되살릴 snapshot 이
+     * 아예 없는 것과는 다르다 — 그때는 원래 네트워크 오류를 그대로 던져서 화면이
+     * [다시 시도] 를 띄우게 한다.
+     */
+    override suspend fun closingSoon(limit: Int): ClosingSoonResult = try {
+        apiCall {
+            val items = api.closingSoon(limit).items
+            closingSoonCache?.save(items)
+            ClosingSoonResult(items.map { ClosingSoon(it.toContest(), it.dDayApply) })
+        }
+    } catch (e: ApiException.Network) {
+        val snapshot = closingSoonCache?.snapshot() ?: throw e
+        val today = today()
+        ClosingSoonResult(
+            items = snapshot.contests
+                // 접수가 이미 끝난 것은 뺀다. `applyEnd` 가 없으면 끝났는지 알 수 없으므로 남긴다 —
+                // 서버가 마감임박으로 골라 준 항목이라 "모르니까 버린다" 보다 남기는 쪽이 맞다
+                .filter { it.applyEnd == null || !it.applyEnd.isBefore(today) }
+                .map { ClosingSoon(it.toContest(), it.applyEnd?.let { end -> dDay(end, today) }) },
+            cachedAt = Instant.ofEpochMilli(snapshot.cachedAt),
+        )
     }
 
     override suspend fun detail(id: Long): Contest = withCacheFallback(

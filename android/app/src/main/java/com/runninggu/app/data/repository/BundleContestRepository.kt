@@ -46,13 +46,17 @@ class BundleContestRepository(
             .groupingBy { it.date }
             .eachCount()
 
-    override suspend fun closingSoon(limit: Int): List<ClosingSoon> {
+    override suspend fun closingSoon(limit: Int): ClosingSoonResult {
         val now = clock()
-        return matching(ContestFilter(openOnly = true))
-            .filter { it.regEnd != null }
-            .sortedBy { it.regEnd }
-            .take(limit)
-            .map { ClosingSoon(it, dDay(it.regEnd!!, now)) }
+        // 번들은 앱에 들어 있는 초기본이라 **캐시가 아니다.** `cachedAt` 을 붙이면 화면이
+        // "마지막으로 받은 것" 이라고 말하는데, 받은 적이 없으므로 사실이 아니다(#276)
+        return ClosingSoonResult(
+            items = matching(ContestFilter(openOnly = true))
+                .filter { it.regEnd != null }
+                .sortedBy { it.regEnd }
+                .take(limit)
+                .map { ClosingSoon(it, dDay(it.regEnd!!, now)) },
+        )
     }
 
     /**
