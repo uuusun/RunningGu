@@ -92,7 +92,9 @@ backend/graphhopper/
 └── graphhopper-server.yml
 
 backend/deploy/graphhopper/
+├── check-server-log-privacy.py
 ├── install-graph-artifact.sh
+├── test-start-graphhopper-compose.sh
 └── verify-active-graph.sh
 
 backend/deploy/common/
@@ -473,8 +475,18 @@ Compose v2가 foreground container stderr를 자기 stderr로 릴레이하므로
 받아 runtime 중에는 journal로 릴레이하지 않는다. `StandardError=journal`은 `ExecStartPre` 오류를
 위해 유지하며, wrapper는 Compose 실패 때만 종료 code와 민감정보를 제거한 마지막 stderr 일부를
 `logger -t runninggu-graphhopper`로 남긴다. `stop-graphhopper-compose.sh`가 만든
-`RuntimeDirectory` marker가 있을 때만 종료 code를 정상 stop으로 바꾸고, marker 없는 exit 0은
-실패로 바꿔 bounded restart와 알림 대상이 되게 한다.
+`RuntimeDirectory` marker가 있을 때만 `0`·`130`(SIGINT)·`143`(SIGTERM)을 정상 stop의 `0`으로
+바꾼다. marker가 있어도 `137`(OOM/SIGKILL)과 그 밖의 오류는 성공으로 바꾸지 않는다.
+marker 없는 exit 0은 실패로 바꿔 bounded restart와 알림 대상이 되게 한다.
+`test-start-graphhopper-compose.sh`는 실제 Docker·journal 없이 이 분기를 회귀 검사한다.
+
+Docker 로그의 크기 제한만으로 개인정보 보호를 충족하지 않는다. 운영 server 설정은
+`server.request_log.appenders: []`로 query string 접근 로그를 끄고,
+`logging.loggers.com.graphhopper.resources.RouteResource: WARN`으로 GraphHopper 11이 INFO에
+기록하는 좌표·User-Agent를 차단한다. JVM GC·기동·다른 오류 logger는 유지한다.
+격리 container에서 `check-server-log-privacy.py`로 고정 공개 fixture의 200·의도적 400을 확인하고
+두 요청의 좌표·User-Agent가 Docker 로그에 없는지 검사한다. 의도적 400은 정상 부하 입력이 아니다.
+이 검사만으로 모든 로그의 비밀값 검사를 대신하지 않으며 §9.2의 journal 점검도 유지한다.
 
 `runninggu-graphhopper-verify.service`는 `Type=oneshot`과 같은
 `verify-active-graph.sh`만 가지며 enable하지 않는다. 배포·감사에서 명시 실행할 뿐 재부팅 주체가

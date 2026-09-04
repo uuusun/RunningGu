@@ -546,10 +546,25 @@ manifest의 artifact ID와 기존 graph load가 있어야 하고 PBF 읽기·SRT
 로그가 없어야 한다. 주 service의 Compose·`ExecStartPre` 실패는
 `journalctl -u runninggu-graphhopper.service`, 검증·실패 알림은
 `journalctl -u runninggu-graphhopper-verify.service`와
-`journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. 주 service journal에 foreground
+`journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. `logger`가 보낸 알림 본문은
+unit 필터에 잡히지 않을 수 있으므로 `journalctl -t runninggu-graphhopper-alert`도 확인하고,
+알림 unit의 실행 시각·`Result=success`·`ExecMainStatus=0`과 대조한다. 주 service journal에 foreground
 Compose가 릴레이한 container runtime stdout·stderr가 있으면 실패다. 주 service는
 `start-graphhopper-compose.sh` wrapper로 runtime stderr를 내부 임시 파일에만 받고, 실패했을 때만
 민감정보를 제거한 종료 code와 마지막 stderr 일부를 journal에 남긴다.
+
+운영 `graphhopper-server.yml`은 query string 접근 로그를 끄고 `RouteResource` INFO의 좌표도
+차단한다. 격리 시험 container의 loopback 포트와 이름을 지정해 다음 검사를 2회 실행한다.
+이 검사는 200·의도적 400 응답과 좌표·User-Agent 비기록을 함께 확인하며 정상 부하와 분리한다.
+
+```bash
+python3 backend/deploy/graphhopper/check-server-log-privacy.py \
+  --container <ISOLATED_CONTAINER> --base-url http://127.0.0.1:18989
+```
+
+정상 `systemctl stop` 이후 `ActiveState=inactive`, `Result=success`, 의도하지 않은 알림 0건을
+확인한다. Compose가 반환한 130·143은 stop marker가 있을 때만 0으로 정규화한다. marker 없는
+130·143과 OOM/137을 성공으로 취급하지 않는다.
 
 `systemctl show runninggu-graphhopper.service`에서 `NRestarts`, `StartLimitIntervalUSec`,
 `StartLimitBurst`, `TimeoutStartUSec`, `TimeoutStopUSec`, `StandardOutput`, `StandardError`도
@@ -895,6 +910,9 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 2. GraphHopper 또는 foreground Compose가 예상하지 않게 exit 0이면 `Restart=always`가 다시 시작한다.
 3. cgroup OOM/exit 137은 5초 간격으로 재시도하되 PostgreSQL을 종료하지 않는다.
 4. 10분 window의 start 시도 3회를 소진하면 무한 반복하지 않고 failed 상태와 전용 알림을 남긴다.
+   systemd 버전에 따라 최종 `Result`가 `start-limit-hit` 대신 직전 `exit-code`로 남을 수 있다.
+   문자열 하나로 판정하지 않고 실제 기동 3회·`NRestarts=3`·`Start request repeated too quickly`
+   journal·failed 유지·추가 재시도 없음과 해당 시각의 전용 알림을 함께 확인한다.
 5. 격리된 시험 env에서 Compose required 변수를 하나 누락하면 container 생성 전 보간 실패 이유가
    주 service journal에 남고 시크릿 값은 남지 않는다.
 6. container stderr 표식은 Docker `local`에 남되 주 service journal에는 중복되지 않는다. 직접

@@ -28,6 +28,9 @@ set -e
 stop_marker=/run/runninggu-graphhopper/stop-requested
 if [ -f "$stop_marker" ]; then
   rm -f -- "$stop_marker"
+  # 정상 systemctl stop에서도 foreground Compose는 SIGINT/SIGTERM code를 반환한다.
+  # 운영자가 요청한 stop에서만 정규화한다. OOM(137)·그 밖의 오류는 숨기지 않는다.
+  case "$exit_code" in 0|130|143) exit_code=0 ;; esac
 elif [ "$exit_code" -eq 0 ]; then
   logger --tag runninggu-graphhopper -- "GraphHopper Compose가 예상하지 않게 exit 0으로 종료됐습니다."
   exit_code=1

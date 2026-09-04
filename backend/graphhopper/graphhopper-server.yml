@@ -39,6 +39,9 @@ graphhopper:
   routing.non_ch.max_waypoint_distance: 1000000
 
 server:
+  # 기본 access log의 요청 URL에는 사용자 좌표가 포함된다(AGENTS §8, artifact 계약 §9.2).
+  request_log:
+    appenders: []
   application_connectors:
     - type: http
       port: 8989
@@ -47,3 +50,9 @@ server:
     - type: http
       port: 8990
       bind_host: 127.0.0.1
+
+logging:
+  loggers:
+    # GraphHopper 11의 GET /route INFO 메시지도 좌표·User-Agent를 기록한다.
+    # 요청 성공/실패는 호출자의 상태 지표로 확인하고 JVM GC·기동·오류 로그는 유지한다.
+    com.graphhopper.resources.RouteResource: WARN

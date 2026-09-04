@@ -68,6 +68,7 @@ runs:
         sh -n deploy/validation/collect-runtime-metrics.sh
         sh -n deploy/validation/test-collect-runtime-metrics.sh
         sh deploy/validation/test-collect-runtime-metrics.sh
+        sh deploy/graphhopper/test-start-graphhopper-compose.sh
         grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' compose.ec2.yaml
         grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' deploy/backend/start-backend.sh
 
