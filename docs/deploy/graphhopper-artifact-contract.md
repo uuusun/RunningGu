@@ -1,8 +1,8 @@
 # GraphHopper 그래프 artifact 계약·배포 절차
 
-> 상태: **계약 확정·PR 2 구현 대기**. 이 문서가 정한 builder·검증 스크립트·systemd unit·Compose 변경은
-> 아직 구현되지 않았다. PR 2 구현과 아래 합격 기준 검증 전에는 현재 EC2 실행 절차를 이 문서의
-> 명령으로 대체했다고 간주하지 않는다.
+> 상태: **계약 확정·PR 2 구현 중**. PR 2가 이 문서의 builder·검증 스크립트·systemd unit·Compose
+> 변경을 제공한다. 실제 운영 release descriptor와 아래 합격 기준 검증 전에는 EC2 실행 절차를
+> 목표 구조로 활성화하지 않는다.
 >
 > 상위 제품 계약은 [`SPEC.md` §8.4](../../SPEC.md#84-m4-러닝코스--큐레이션--osmgraphhopper-생성-확정결정-42),
 > 전체 EC2 절차는 [`aws-ec2-staging-runbook.md`](aws-ec2-staging-runbook.md)를 따른다.
@@ -62,19 +62,49 @@ DB 백업의 7일 PITR 보존과 graph artifact의 2세대 롤백 보존을 한 
 
 ## 3. builder 재현 계약
 
-PR 2는 저장소에 다음 진입점을 제공해야 한다. 경로와 이름을 바꾸면 이 문서를 같은 PR에서
-수정한다.
+PR 2는 저장소에 다음 진입점·고정 입력·공통 구현을 제공해야 한다. 경로와 이름을 바꾸면 이 문서를
+같은 PR에서 수정한다.
 
 ```text
 scripts/osm/import/
 ├── Dockerfile
+├── ImportConfigNormalizer.java
+├── artifact_contract.py
 ├── build-graph.sh
+├── build-graph.ps1
+├── graphhopper-import.yml
+├── normalize-import-config.sh
+├── normalize_graph_metadata.py
 ├── package-graph.sh
+├── run-builder.sh
+├── test_artifact_contract.py
+├── test_normalize_graph_metadata.py
 └── verify-artifact.sh
 
+scripts/osm/
+├── operational_load.py
+├── roundtrip.py
+├── roundtrip_cases.py
+├── test_operational_load.py
+└── test_roundtrip_evidence.py
+
+backend/graphhopper/
+└── graphhopper-server.yml
+
 backend/deploy/graphhopper/
+├── check-server-log-privacy.py
 ├── install-graph-artifact.sh
+├── test-start-graphhopper-compose.sh
 └── verify-active-graph.sh
+
+backend/deploy/common/
+└── read-required-env.sh
+
+backend/deploy/validation/
+├── collect-runtime-metrics.sh
+├── summarize-runtime-metrics.py
+├── test-collect-runtime-metrics.sh
+└── test_summarize_runtime_metrics.py
 ```
 
 검증 로직을 세 군데에 복제하지 않는다. 책임 경계는 다음과 같다.
@@ -82,17 +112,41 @@ backend/deploy/graphhopper/
 | 진입점 | 실행 위치 | 단일 책임 |
 |---|---|---|
 | `verify-artifact.sh` | builder·EC2 | 로컬 bundle 또는 압축 해제 tree의 manifest 형식·canonical hash·archive 안전성을 검증하는 순수 검증기. 네트워크·설치·symlink·서비스 제어는 하지 않음 |
+| `normalize_graph_metadata.py` | builder | GraphHopper가 `properties`·`properties.txt`에 기록한 import·LM 실행 시각만 `SOURCE_DATE_EPOCH` 값으로 길이 보존 정규화. PBF data date와 graph payload는 바꾸지 않으며 필수 key가 없거나 중복이면 실패 |
 | `install-graph-artifact.sh` | EC2 | release descriptor가 지정한 S3 세 파일을 임시 directory에 받고 `verify-artifact.sh`를 호출한 뒤 안전하게 압축 해제·재검증·최종 version directory rename까지만 수행 |
 | `verify-active-graph.sh` | EC2 | `current` 상대 symlink, checkout의 release descriptor, 활성 manifest와 graph tree를 대조하며 공통 hash 검증은 `verify-artifact.sh`에 위임. 다운로드·symlink 변경·서비스 시작은 하지 않음 |
+| `read-required-env.sh` | EC2 | dotenv를 shell로 실행하지 않고 요청받은 단일 `KEY=unquoted-value`를 정확히 한 줄만 읽음. 값 내부 `=`는 보존하고 줄 끝 CR은 제거하되 따옴표 값·누락·빈 값·중복 key는 실패하며 다른 secret을 자식 프로세스 환경으로 내보내지 않음 |
+| `roundtrip.py --evidence` | 로컬·EC2 | caps/all의 모든 지점·거리·seed status와 품질 지표를 기록하고, 로컬 합격 셀마다 고정 정상 직접 요청 하나를 선택. EC2에서는 `--baseline`으로 로컬 성공 요청과 셀 커버리지 비회귀를 검사 |
+| `operational_load.py` | EC2 | 로컬 evidence의 정상 직접 요청 세트를 artifact ID·server image digest와 대조한 뒤 고정 직접 요청 도착률·고정 동시성으로 실행. worker 포화는 대기 대신 missed start로 실패시키고 `no valid point`를 포함한 모든 실패 요청을 기록 |
+| `collect-runtime-metrics.sh` | EC2 | 사전 지정한 시간 동안 host 메모리·swap counter·systemd 상태·container 자원을 5초 간격으로 비밀값 없이 기록. 부하 생성·합격 기준 변경·서비스 제어는 하지 않음 |
+| `summarize-runtime-metrics.py` | EC2 | 수집 표본 수·최저 `MemAvailable`·swap 증분, 필수 systemd service의 표본별 `active/running`·`NRestarts`, 필수 container의 표본별 존재·상태·OOM·`restart_count`를 계약 §9.2 기준으로 요약하고 기계 판정 가능한 항목이 모두 통과할 때만 종료 code 0 반환 |
 
 `runninggu-graphhopper-verify.service`와 GraphHopper 주 service의 `ExecStartPre`는 모두
 `verify-active-graph.sh`를 호출한다. systemd unit 안에 별도 hash 판정 로직을 넣지 않는다.
+
+`roundtrip.py --evidence`의 JSON `schemaVersion=1`은 artifact ID·server image digest·profile·seed
+수, 지점·거리 셀별 좌표와 seed별 status·실패 분류·품질 상한 통과 여부·경로 품질 수치,
+`normalRequests`를 가진다. 응답 geometry와 GraphHopper 오류 원문은 저장하지 않는다.
+`normalRequests`의 각 항목은 지점명·권역·고정 시험 좌표·목표거리·GraphHopper 요청거리·seed를
+가지며 `operational_load.py`는 이 목록만 소비한다. 소비자는 실행 전에 caps/all 고정 fixture의 모든
+지점·거리 셀과 seed 0..15 결과가 남아 있는지, 합격한 각 셀에서 실제 합격 seed가 정확히 하나씩
+`normalRequests`에 선택됐는지 확인한다. 따라서 결과를 본 뒤 셀이나 실패 요청을 함께 삭제한 파일도
+부하 입력으로 받지 않는다. schema를 바꾸면 producer와 consumer, 이 문서와 실행서를 같은 PR에서
+함께 바꾼다.
+설치기와 활성 검증기는 `compose.env` 전체를 `source`하지 않고 `read-required-env.sh`로 각자 필요한
+`GRAPHHOPPER_*` key만 읽는다. 운영 `compose.env`는 `KEY=unquoted-value` 형식만 사용하고 값 전체를
+작은따옴표나 큰따옴표로 감싸지 않는다. parser는 Windows 편집기에서 생길 수 있는 줄 끝 CR 하나만
+정규화하며 Compose의 전체 dotenv 문법을 재구현하지 않는다.
+활성 검증기는 manifest·tree hash 뒤 실제 server image를 network·root filesystem read-only로
+한 번 실행해 image의 비-root 사용자가 활성 version directory에 쓸 수 있는지도 확인한다. 이는
+GraphHopper가 `gh.lock`을 만들 수 있는지 보는 권한 probe이며 graph file을 생성하지 않는다.
 
 - builder base image와 GraphHopper 11.0 JAR의 SHA-256 또는 image digest를 고정한다.
 - server image에는 검증기가 읽을 GraphHopper version과 JAR SHA-256을 OCI label
   `org.runninggu.graphhopper.version`, `org.runninggu.graphhopper.jar-sha256`으로 기록한다.
 - host OS의 JDK·경로·locale에 의존하지 않는다. Windows·macOS에서도 Linux container 안에서
-  같은 명령을 실행한다.
+  같은 명령을 실행한다. macOS·Linux·WSL은 `build-graph.sh`, Windows PowerShell은
+  `build-graph.ps1`을 사용하되 두 진입점은 같은 Dockerfile과 container entrypoint를 호출한다.
 - `latest` PBF URL을 manifest 입력으로 쓰지 않는다. 날짜가 고정된 URL과 SHA-256을 먼저
   확정한다.
 - SRTM tile은 builder에서만 내려받고 사용한 tile 목록과 파일별 SHA-256을 기록한다.
@@ -175,7 +229,11 @@ gh11-korea-<PBF 기준일>-<build_input_sha256 앞 12자리>-<graph_files_sha256
 | archive SHA-256·size | manifest와 `SHA256SUMS` | 다운로드 직후 두 source 및 실제 파일을 비교 |
 | 생성 시각·생성 주체 | 없음 | 형식 검증 후 감사 기록만 남기며 합격값과 비교하지 않음 |
 
-import 영향 설정 hash에는 최소한 `datareader.file`의 논리 입력, `import.osm.*`,
+import 영향 설정의 정규화 hash 원본은 운영 builder 입력인
+`scripts/osm/import/graphhopper-import.yml`이다. 로컬 PoC 설정
+`backend/graphhopper/graphhopper.yml`과 운영 조회 설정
+`backend/graphhopper/graphhopper-server.yml`은 이 hash의 입력이 아니다. hash에는 최소한
+`datareader.file`의 논리 입력, `import.osm.*`,
 `graph.encoded_values`, `profiles`, `profiles_ch`, `profiles_lm`, `prepare.*`,
 `graph.elevation.*`, 별도 custom model 파일 내용이 포함된다. `server:`의 port·`bind_host`·logging은
 제외한다. allowlist key를 읽어 key 정렬·UTF-8·공백 없는 canonical JSON으로 만든 뒤 hash하며,
@@ -196,11 +254,24 @@ srtmFilesSha256=<lowercase_sha256>
 
 builder와 EC2 검증기는 이 공식을 각각 구현하지 않고 `verify-artifact.sh`의 공통 구현을 사용한다.
 
-SRTM과 graph file 목록 hash는 POSIX 상대경로 오름차순, lowercase SHA-256, 파일 크기를 UTF-8
-한 줄씩 결합한 canonical 목록의 SHA-256이다. 절대경로·생성 PC 경로·mtime·소유자 정보는 넣지
-않는다. `graph.filesSha256` 대상은 archive에 들어간 immutable graph payload만이며 설치 시 옆에
-두는 `graph-manifest.json`과 GraphHopper가 런타임에 생성·삭제하는 `gh.lock`은 제외한다. 그 밖의
-예상하지 못한 파일이 활성 tree에 있으면 검증을 실패시킨다.
+SRTM과 graph file 목록 hash는 POSIX 상대경로의 UTF-8 byte 오름차순으로 정렬한 다음, 각 파일을
+아래 한 줄 형식으로 결합한 UTF-8 bytes의 SHA-256이다. 세 필드 사이는 ASCII space 정확히 한
+개이고 파일마다 newline 하나가 있으며 마지막 줄도 newline으로 끝난다.
+
+```text
+<lowercase_sha256> <decimal_size_bytes> <UTF-8_POSIX_relative_path>\n
+```
+
+절대경로·생성 PC 경로·mtime·소유자 정보는 넣지 않는다. `graph.filesSha256` 대상은 archive에
+들어간 immutable graph payload만이며 설치 시 옆에 두는 `graph-manifest.json`과 GraphHopper가
+런타임에 생성·삭제하는 `gh.lock`은 제외한다. 그 밖의 예상하지 못한 파일이 활성 tree에 있으면
+검증을 실패시킨다.
+
+GraphHopper 11은 같은 입력으로 import해도 `properties`와 `properties.txt`의
+`datareader.import.date`·`prepare.lm.date.run`에 실제 실행 시각을 기록한다. builder는 package와
+`graph.filesSha256` 계산 전에 두 값을 `1970-01-01T00:00:00Z`로 정규화한다. 두 파일의 해당 key가
+각각 정확히 한 번 존재하지 않으면 artifact를 만들지 않는다. `datareader.data.date`는 PBF에 들어
+있는 원천 시각이므로 바꾸지 않는다.
 
 ### 4.2 release descriptor
 
@@ -251,7 +322,11 @@ volumes:
 server 설정은 `graph.location: /data/graph/current`를 사용한다. bind source로 `current` 자체를
 지정하지 않는다. GraphHopper 11이 version directory에 `gh.lock`을 쓰므로 PR 2의 첫 기준은 RW
 mount다. read-only 가능 여부는 별도 실측으로만 바꾸고, GraphHopper container UID가 활성 graph
-directory에 lock을 만들고 지울 수 있는지 검증한다.
+directory에 lock을 만들고 지울 수 있는지 검증한다. installer는 검증을 마친 payload file을
+`0444`, directory를 UID/GID `10001:10001`의 `0755`로 설치하고 manifest sidecar만 root 소유
+`0444`로 둔다. server 설정의 `graph.elevation.provider: srtm`은 이미 import된 3D graph의 dimension
+선언을 위해 유지하되 EC2에는 SRTM cache를 mount하지 않고 server 기동 중 tile 다운로드가 없어야
+한다.
 
 보관은 **현재 성공 세대 + 직전 성공 세대** 두 개다. 새 세대가 스모크를 통과하기 전에는 현재나
 직전 세대를 지우지 않는다. 실패·미완성 directory는 `current`가 가리키지 않게 하고 별도 정리한다.
@@ -297,8 +372,8 @@ PR 2 최초 전환은 다음 순서를 지킨다.
 
 ## 6. 다운로드·검증·활성화
 
-PR 2의 검증 스크립트와 systemd unit이 구현되기 전까지 아래 절차를 수동 명령으로 흉내 내어
-운영하지 않는다.
+아래 절차는 PR 2의 검증 스크립트와 systemd unit으로만 실행한다. 일부 단계를 수동 압축 해제나
+직접 container 기동으로 흉내 내어 우회하지 않는다.
 
 ### 6.1 설치 — 실행 중인 서비스에 영향 없음
 
@@ -360,12 +435,14 @@ Type=simple
 User=root
 WorkingDirectory=/opt/runninggu/repository/backend
 ExecStartPre=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/verify-active-graph.sh
-ExecStart=/usr/bin/docker compose --env-file /etc/runninggu/compose.env --profile routing -f /opt/runninggu/repository/backend/compose.yaml -f /opt/runninggu/repository/backend/compose.ec2.yaml up --no-deps --no-build --abort-on-container-exit --exit-code-from graphhopper graphhopper
-ExecStop=/usr/bin/docker compose --env-file /etc/runninggu/compose.env --profile routing -f /opt/runninggu/repository/backend/compose.yaml -f /opt/runninggu/repository/backend/compose.ec2.yaml stop graphhopper
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/start-graphhopper-compose.sh
+ExecStop=/bin/sh /opt/runninggu/repository/backend/deploy/graphhopper/stop-graphhopper-compose.sh
 Restart=always
 RestartSec=5
 # 검증 전용 초기 후보. §9.1 cold-cache 실측 뒤 전체 120초 예산 안에서 확정한다.
 TimeoutStartSec=60s
+# Compose stop_grace_period 30초보다 길어야 한다.
+TimeoutStopSec=45s
 
 NoNewPrivileges=true
 PrivateTmp=true
@@ -393,12 +470,23 @@ systemd가 실패를 관찰할 수 있어야 한다.
 않은 exit 0, cgroup OOM/exit 137, 10분 start limit 소진에 더해 container 생성 전 Compose 보간
 실패가 주 service journal에 원인을 남기는지 각각 검증한다.
 
-Compose v2가 foreground container stderr를 자기 stderr로 릴레이하는지도 실제 EC2 버전에서
-검증한다. 릴레이한다면 Docker `local`과 journal에 runtime stderr가 중복되므로 그대로 승인하지
-않는다. 이 경우 PR 2는 `ExecStart`를 얇은 wrapper로 감싸 Compose stderr를 내부 임시 파일로
-받고 runtime 중에는 journal로 릴레이하지 않는다. `StandardError=journal`은 `ExecStartPre` 오류를
-위해 유지하며, wrapper는 Compose가 실패했을 때만 종료 code와 민감정보를 제거한 마지막 stderr
-일부를 `logger -t runninggu-graphhopper`로 남긴다.
+Compose v2가 foreground container stderr를 자기 stderr로 릴레이하므로 PR 2는 `ExecStart`를
+`start-graphhopper-compose.sh` wrapper로 감싼다. wrapper는 Compose stderr를 private `/tmp` 파일로
+받아 runtime 중에는 journal로 릴레이하지 않는다. `StandardError=journal`은 `ExecStartPre` 오류를
+위해 유지하며, wrapper는 Compose 실패 때만 종료 code와 민감정보를 제거한 마지막 stderr 일부를
+`logger -t runninggu-graphhopper`로 남긴다. `stop-graphhopper-compose.sh`가 만든
+`RuntimeDirectory` marker가 있을 때만 `0`·`130`(SIGINT)·`143`(SIGTERM)을 정상 stop의 `0`으로
+바꾼다. marker가 있어도 `137`(OOM/SIGKILL)과 그 밖의 오류는 성공으로 바꾸지 않는다.
+marker 없는 exit 0은 실패로 바꿔 bounded restart와 알림 대상이 되게 한다.
+`test-start-graphhopper-compose.sh`는 실제 Docker·journal 없이 이 분기를 회귀 검사한다.
+
+Docker 로그의 크기 제한만으로 개인정보 보호를 충족하지 않는다. 운영 server 설정은
+`server.request_log.appenders: []`로 query string 접근 로그를 끄고,
+`logging.loggers.com.graphhopper.resources.RouteResource: WARN`으로 GraphHopper 11이 INFO에
+기록하는 좌표·User-Agent를 차단한다. JVM GC·기동·다른 오류 logger는 유지한다.
+격리 container에서 `check-server-log-privacy.py`로 고정 공개 fixture의 200·의도적 400을 확인하고
+두 요청의 좌표·User-Agent가 Docker 로그에 없는지 검사한다. 의도적 400은 정상 부하 입력이 아니다.
+이 검사만으로 모든 로그의 비밀값 검사를 대신하지 않으며 §9.2의 journal 점검도 유지한다.
 
 `runninggu-graphhopper-verify.service`는 `Type=oneshot`과 같은
 `verify-active-graph.sh`만 가지며 enable하지 않는다. 배포·감사에서 명시 실행할 뿐 재부팅 주체가
@@ -444,15 +532,29 @@ fault-isolation을 통과해야 hard limit을 활성화한다. Docker restart gu
 GraphHopper hard limit는 Compose `mem_limit`, Spring Boot hard limit는 systemd `MemoryMax`다.
 GraphHopper container는 Docker의 별도 cgroup에 있으므로 주 systemd service의 `MemoryMax`로
 제한한다고 간주하지 않는다. 두 hard limit 모두 위 측정 없이 숫자부터 고정하지 않는다.
+PR 2의 첫 8GiB baseline 설정은 GraphHopper `mem_reservation: 0`·`mem_limit: 0`, Spring Boot
+`MemoryHigh=infinity`·`MemoryMax=infinity`로 무제한을 명시한다. §9.3 합격 뒤에만 Compose env와
+exact systemd unit을 관측값으로 함께 바꾸고 다시 같은 검증을 수행한다.
+
+양수 hard limit을 적용할 때 GraphHopper의 `memswap_limit`(RAM+swap 합계)은 `mem_limit`와
+같은 `GRAPHHOPPER_MEMORY_LIMIT` 값으로 보간해 **이 container만 swap을 금지**한다.
+별도 swap 상한 환경변수를 두지 않는다. baseline의 두 값 `0`은 미설정 취급이므로 swap 금지를
+뜻하지 않는다. 호스트 전체 swap과 PostgreSQL의 기존 정책은 유지한다. Docker inspect의
+`HostConfig.MemorySwap == HostConfig.Memory > 0`과 실제 cgroup v2의 `memory.swap.max=0`을
+둘 다 확인하고 기록한다. §9.3에서도 운영 후보와 동일한 reservation·memory·memory+swap
+조합을 사용하며, 고의 OOM 유발용 heap만 일시적으로 높인다. 제한 적용 뒤 §9.1 전체 시험을
+다시 통과하기 전에는 후보를 운영 확정값으로 표시하지 않는다.
+([Docker memory-swap 계약](https://docs.docker.com/engine/containers/resource_constraints/#--memory-swap-details))
+
 PostgreSQL은 첫 격리 대상이 아니라 보호 대상이므로 최초 시험에는 hard limit을 두지 않고 peak와
 백업 working set을 reserve로 잡는다. 나중에 PostgreSQL hard limit을 추가한다면 OOM 재시작 loop와
 복구 정책을 같은 결정으로 검증한다.
 
 ### 8.2 Spring Boot
 
-현재 `runninggu-backend.service`의 `StartLimitIntervalSec=0`은 무제한 재시작을 허용한다.
-`MemoryMax`만 추가하면 cgroup OOM 뒤 5초 재시작을 무한 반복할 수 있으므로 다음을 한 PR에서
-함께 구현·검증한다.
+PR 1 이전 `runninggu-backend.service`의 `StartLimitIntervalSec=0`은 무제한 재시작을 허용했다.
+PR 2는 `MemoryMax`만 먼저 추가해 cgroup OOM 뒤 5초 재시작을 무한 반복하지 않도록 다음을 한
+단위로 구현·검증한다.
 
 - PostgreSQL 준비 대기를 최대 2분의 `ExecStartPre`로 분리한다.
 - `Restart=on-failure`, `RestartSec=5`는 유지하고 `StartLimitIntervalSec=600`,
@@ -506,15 +608,19 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 1. 위 로컬 회귀 기준선과 정상 직접 요청 세트를 고정한다.
 2. cold boot와 GraphHopper 내부 스모크를 수행한다.
 3. `roundtrip.py --preset caps --zone all`을 한 번 실행해 warm-up하고 로컬 회귀 기준선과 대조한다.
-4. 정상 직접 요청 세트를 고정 도착률로 반복하는 30분 부하 중 수동 전체 백업 1회와 WAL 감시
-   3회를 실행한다.
-5. 메모리·swap·GC·systemd `NRestarts`·container 상태를 5초 간격으로 기록하고,
-   verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각 기록한다.
+4. 정상 직접 요청 세트를 읽는 `operational_load.py`를 고정 직접 요청 도착률·고정 동시성으로 30분
+   실행한다. worker 포화로 예정된 직접 요청을 시작하지 못하면 기다려 부하를 낮추지 않고 missed
+   start로 기록해 실패한다. 이 부하 중 수동 전체 백업 1회와 WAL 감시 3회를 실행한다.
+5. `collect-runtime-metrics.sh`로 메모리·swap counter·systemd 상태·`NRestarts`·container
+   상태·`restart_count`를 5초
+   간격으로 기록한다. GraphHopper Docker local 로그와 Spring journal의 JVM unified GC 로그에서
+   readiness 이후 Full GC를 판정하고, verify oneshot과 주 service `ExecStartPre`의 소요시간을 각각
+   기록한다.
 6. GraphHopper 종료·호스트 재부팅 뒤 같은 artifact로 복구되는지 확인한다.
 7. 대회 snapshot Importer는 Spring Boot를 중지한 상태로 별도 실행하고 다시 시작한다.
 8. 4GiB 판정은 전체 시나리오를 3회 연속 통과해야 한다.
 
-8GiB와 4GiB 비교에서는 `roundtrip.py` 반복 횟수·요청률·동시성을 시험 전에 고정해 기록한다.
+8GiB와 4GiB 비교에서는 정상 직접 요청 목록·직접 요청 도착률·동시성을 시험 전에 고정해 기록한다.
 작은 instance에서 처리가 느려져 자동으로 요청 수가 줄어드는 closed-loop 결과를 같은 부하로
 간주하지 않는다.
 
@@ -526,15 +632,15 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 | 메모리 여유 | 모든 5초 표본에서 host `MemAvailable`이 전체 RAM의 20% 이상 |
 | swap | warm-up 뒤 `vmstat`의 swap-in·swap-out 지속 발생 0, swap 사용량 증가 없음 |
 | GC | readiness 이후 반복 Full GC 0건 |
-| GraphHopper 직접 요청 | §9.1의 정상 직접 요청 세트가 모두 HTTP 200·비어 있지 않은 `paths`로 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. `no valid point`를 포함한 4xx, 5xx, 빈 `paths`, timeout은 모두 실패. 직접 요청 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
+| GraphHopper 직접 요청 | `operational_load.py`의 missed start·실패 요청이 0이고 §9.1의 정상 직접 요청 세트가 모두 HTTP 200·비어 있지 않은 `paths`로 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. `no valid point`를 포함한 4xx, 5xx, 빈 `paths`, timeout은 모두 실패. 직접 요청 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
 | 라우팅 회귀 | `--preset caps --zone all`의 모든 직접 요청 status와 `no valid point` 건수를 기록. 로컬 기준선에서 합격한 지점·거리 셀은 EC2에서도 16개 seed 중 품질 상한 통과 경로가 하나 이상이어야 하며 기존 커버리지·거리·상승·차도·회전 상한이 비회귀. 기준선에서 성공한 동일 요청이 EC2에서 400이 되거나 합격 셀의 모든 seed가 실패하면 불합격 |
 | 실패 분류 | `no valid point` 400은 직접 요청·라우팅 실패이며 성공 수에 넣지 않음. 다만 이 응답만으로 OOM·instance 부족으로 판정하지 않고 OOM·5xx·timeout·재시작 지표와 분리 기록. 그 밖의 4xx는 요청·profile·배포 설정 오류로 분류해 불합격 |
 | 프로파일 | server graph에 `run`과 `run` LM만 존재하고 `foot` 없음 |
 | 백업 | 수동 full backup·pgBackRest check·WAL 감시 성공, 실패 알림 0건 |
 | 재부팅 | import 로그 0건, 기존 artifact 재사용. 배포는 verify oneshot 시작, 재부팅은 GraphHopper unit activation 시작부터 검증 시간을 포함해 2분 안에 GraphHopper·Spring readiness 성공 |
-| 로그 | GraphHopper runtime 기준 저장소는 Docker `local`이며 `docker compose logs graphhopper`로 검사. 주 service journal에는 container runtime stdout 0건이고 Compose·`ExecStartPre` 실패 이유는 남음. container runtime stderr도 중복되지 않아야 하며, 직접 Compose가 이를 journal로 릴레이하면 §7 wrapper 적용 전 불합격. 모든 저장소에 PBF 내용·AWS 자격 증명·사용자 정보가 없음 |
+| 로그 | GraphHopper runtime 기준 저장소는 Docker `local`이며 `docker compose logs graphhopper`로 검사. 주 service journal에는 container runtime stdout·stderr 0건이고 Compose·`ExecStartPre` 실패 이유만 남음. §7 wrapper가 실패 때 남긴 마지막 stderr에도 PBF 내용·AWS 자격 증명·사용자 정보가 없음 |
 
-`MemAvailable 20%`를 충족하려고 cache를 강제로 비우거나, swap을 끄거나, 시험 요청률을 결과에
+`MemAvailable 20%`를 충족하려고 cache를 강제로 비우거나, 호스트 swap을 끄거나, 시험 요청률을 결과에
 맞춰 낮추지 않는다. 시험 명령·시작/종료 시각·instance type·heap·hard limit·artifact ID를 결과와
 함께 남긴다. graph hash 검증 시간을 줄여 보이려고 시험 직전 page cache를 인위적으로 데우거나
 비우지 않는다.
@@ -550,7 +656,8 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 시험이 아니라, 측정 뒤 정한 GraphHopper Compose `mem_limit`를 운영에 켜도 장애가 host 전체로 번지지
 않는지 확인하는 안전 시험이다. hard limit 활성화 전 다음을 별도 기록으로 모두 통과한다.
 
-1. 격리된 시험 요청으로 GraphHopper만 의도적으로 cgroup OOM에 도달시킨다.
+1. §8.1의 운영 후보와 같은 reservation·memory·memory+swap 상한을 기록하고, 격리된 시험
+   환경에서 heap을 높여 GraphHopper만 의도적으로 cgroup OOM에 도달시킨다. 호스트 swap은 유지한다.
 2. `runninggu-graphhopper.service`의 start 시도가 10분 window에서 3회로 제한되어 무한 반복하지
    않고 최종 failed 상태와 GraphHopper 전용 알림을 남긴다.
 3. 같은 동안 PostgreSQL이 생존하고 `pgBackRest check`와 WAL 감시가 성공한다.
@@ -570,10 +677,44 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 
 ## 11. PR 분리
 
+### 11.1 머지 전 staging 검증용 백엔드 묶음
+
+PR 2의 8GiB 완료 조건을 머지 전에 검증하기 위해, 같은 저장소에서 `develop`을 대상으로 연 PR은
+GitHub Actions에 `pr-validation` 백엔드 묶음을 보관할 수 있다. 기존 PR synthetic merge 검사는
+유지하며, 그 검사와 SPEC 검사가 성공한 뒤 별도 job이 event에 고정된 PR head SHA를 checkout해
+동일한 공통 검사·테스트·빌드·Importer 스모크를 다시 수행한다. 두 job은
+`.github/actions/backend-verify/action.yml`의 공통 단계를 사용한다. fork PR은 묶음을 만들지 않는다.
+
+이 묶음의 이름은 `runninggu-backend-pr<PR번호>-<head SHA>-<run ID>-<attempt>`다. 기존 서버 JAR,
+Importer JAR, 대회 snapshot, `SHA256SUMS`, `release-manifest.txt`만 포함하며 graph archive는 넣지 않는다.
+보관 기간은 기존 통합 묶음과 같은 30일이다. CI는 AWS 자격 증명이나 배포 권한을 갖지 않으며
+묶음 생성은 EC2 배포·PR 승인·머지·정식 릴리스가 아니다.
+
+`release-manifest.txt`는 UTF-8 `key=value` 행과 마지막 LF를 사용한다. 검증용 필드는 다음 순서다.
+
+1. `git_commit`: 실제 checkout HEAD이며 event의 PR head SHA와 같아야 함
+2. `workflow_run_id`, `workflow_run_attempt`: 양의 정수
+3. `artifact_kind=pr-validation`, `allowed_environment=staging`
+4. `pull_request_number`: 양의 정수
+5. `head_commit`: `git_commit`과 같은 40자리 lowercase SHA
+6. `base_commit`: 해당 event의 PR base SHA
+7. `integration_test_commit`: 앞선 통합 검사 job이 실제로 checkout한 synthetic merge SHA
+
+생성기는 checkout SHA 불일치, 잘못된 식별자, 필수 payload 누락·예상하지 않은 파일·symlink를 거부하고 세 payload와
+manifest의 실제 bytes에 대한 SHA-256을 기록한다. `github.sha`를 PR head로 간주해 라벨만 바꾸지 않는다.
+배포 담당자는 성공한 CI run·attempt·PR head를 확인하고 `SHA256SUMS`, manifest, 배포 요청 SHA,
+EC2 checkout HEAD가 일치할 때만 staging에 설치한다. PR head가 바뀌었다면 이전 묶음을 새 검증에 쓰지 않는다.
+
+production에는 `pr-validation` 묶음을 사용하지 않는다. 머지 후에는 통합된 commit의 기존 push CI
+묶음을 새로 생성한다. 검증용 묶음을 이름만 바꿔 승격하지 않으며, 테스트한 코드·설정·graph가 변경되면
+해당 운영 검증을 다시 수행한다. `main`은 기존 Git 컨벤션대로 정식 릴리스 때만 변경한다.
+
+### 11.2 PR별 완료 조건
+
 | PR | 범위 | 완료 조건 |
 |---|---|---|
 | PR 1 | 이 계약, SPEC §8.4, 상위 배포 가이드, EC2 실행서 동기화 | 팀 결정과 문서 충돌 없음 |
-| PR 2 | builder·manifest·설치·검증·GraphHopper systemd 단일 소유·Docker local 로그 단일화·exit 0/137 재시작·로컬/EC2 Compose 분리·구 named volume 전환·heap 환경변수화·Spring 재시작 정책 구현 | 검증 시간 포함 8GiB §9.2 정상 부하와 §9.3 별도 안전 시험 통과 |
+| PR 2 | builder·manifest·설치·검증·GraphHopper systemd 단일 소유·Docker local 로그 단일화·exit 0/137 재시작·로컬/EC2 Compose 분리·구 named volume 전환·heap 환경변수화·Spring 재시작 정책·라우팅 evidence와 고정 정상 요청 부하 도구 구현 | 검증 시간 포함 8GiB §9.2 정상 부하와 §9.3 별도 안전 시험 통과 |
 | PR 3(선택) | LM 제거 실험 | 독립 benchmark에서 시간·커버리지 계약 통과할 때만 채택 |
 
 `run` LM 제거는 PR 2에 넣지 않는다. 운영 builder·server 설정에서 `foot`을 제외하고 `run` LM을

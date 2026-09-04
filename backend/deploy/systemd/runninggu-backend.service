@@ -3,9 +3,9 @@ Description=런닝구 Spring Boot 백엔드
 Wants=network-online.target
 After=network-online.target docker.service
 Requires=docker.service
-# 부팅 시 PostgreSQL 컨테이너가 늦게 준비되면 Flyway 연결 실패 후 5초 간격으로
-# 다시 시작해 최종적으로 DB에 연결한다. 이 재시도를 systemd가 차단하지 않게 한다.
-StartLimitIntervalSec=0
+OnFailure=runninggu-backend-alert@%n.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
 
 [Service]
 Type=simple
@@ -13,11 +13,17 @@ User=runninggu
 Group=runninggu
 WorkingDirectory=/opt/runninggu/current
 EnvironmentFile=/etc/runninggu/application.env
-ExecStart=/usr/bin/java -Xms256m -Xmx2g -jar /opt/runninggu/current/runninggu-server.jar
+# Docker socket을 쓰는 readiness gate만 root로 실행하고 JVM은 runninggu 사용자로 유지한다.
+ExecStartPre=+/bin/sh /opt/runninggu/repository/backend/deploy/backend/wait-for-postgres.sh
+ExecStart=/bin/sh /opt/runninggu/repository/backend/deploy/backend/start-backend.sh
 
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=125s
 TimeoutStopSec=30
+# 첫 8GiB baseline은 무제한으로 측정한다. §9.3 합격 뒤 둘을 관측값으로 함께 교체한다.
+MemoryHigh=infinity
+MemoryMax=infinity
 
 NoNewPrivileges=true
 PrivateTmp=true
