@@ -1167,11 +1167,17 @@ $ParsedSummary = $Summary | ConvertFrom-Json
 if (-not $ParsedSummary.passed -or $ParsedSummary.runId -ne $RunId) {
   throw '앱 API 부하 요약의 합격 상태 또는 run ID가 일치하지 않습니다.'
 }
+if ($ParsedSummary.dispatchDelayLimitMs -ne 500 -or
+    $ParsedSummary.lateDispatches -ne 0 -or
+    $ParsedSummary.maxDispatchDelayMs -gt 500) {
+  throw '고정 도착 시각의 500ms dispatch 지연 계약을 지키지 못했습니다.'
+}
 ```
 
 같은 생성기에서 실제 staging 경로로 사용 중인 NIC의 송·수신 byte와 link speed를 5초 간격으로
 별도 기록한다. 최종 byte 차이만으로 순간 포화가 없었다고 판정하지 않는다. 실행기 결과의
-`processCpuPercentOfOneCore`, `missedStarts=0`, transport 실패 0과 NIC 표본을 함께 봐야 한다.
+`processCpuPercentOfOneCore`, `missedStarts=0`, `lateDispatches=0`, `maxDispatchDelayMs≤500`, transport
+실패 0과 NIC 표본을 함께 봐야 한다. 500ms를 초과한 요청은 나중에 몰아서 보내지 않고 실패한다.
 
 부하 시작을 기준으로 약 5분·15분·25분에 EC2의 다른 SSM session에서 WAL 검사를 각각 한 번,
 본 시험 구간에 full backup을 한 번 실행한다. 어느 하나가 실패하면 앱 응답이 모두 성공해도
@@ -1186,7 +1192,8 @@ sudo systemctl status --no-pager runninggu-postgres-backup.service
 ```
 
 부하 summary는 예정·dispatch·완료가 모두 2,100건이고 본 시험 성공이 1,800건이어야 한다.
-`missedStarts=0`, 빈 `failureClasses`, preflight 14종, 갱신 4건, cleanup/logout 성공과 세 성능
+`missedStarts=0`, `lateDispatches=0`, `maxDispatchDelayMs≤500`, 빈 `failureClasses`, preflight 14종,
+갱신 4건, cleanup/logout 성공과 세 성능
 그룹에 더해 `near_curated`·`near_osm`·`itinerary_generate` 각각의 p95/max가 모두 합격이어야 한다.
 `app-runtime-summary.json`도 `passed=true`여야 하며 백업 1회·WAL 3회 결과를 별도 보존한다.
 
@@ -1195,6 +1202,12 @@ sudo systemctl status --no-pager runninggu-postgres-backup.service
 빠짐없이 있어야 한다. 요약 스크립트는 승인된 정확한 8개 endpoint·상한을 독립 상수로 검증하며,
 최종 counter는 그 상한을 넘을 수 없다. 이 안전한 요약 stdout만 결과 증거에 옮기고 원본 backend
 journal 전체를 복사하지 않는다.
+
+가드가 송신 전에 차단하거나 trip시키면 공통 예외 처리로 앱 응답이 `500`, 실행기 실패 분류가
+`unexpected_http`일 수 있다. 이를 성공으로 허용하지 않으며, 같은 run ID의 아래 가드 요약에서
+`unsafeEvents`(journal의 `TRIP`·`BLOCK` 집계)와 `non2xxResults`를 대조해 가드 동작 여부를 교차
+확인한다. 어느 쪽이든 전체 run은 실패이고, 이 staging 시험 장치 때문에 제품 HTTP 오류 계약을
+바꾸지는 않는다.
 
 ```bash
 set -eu

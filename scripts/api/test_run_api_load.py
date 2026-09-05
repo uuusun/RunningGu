@@ -4,6 +4,7 @@ import copy
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import plan_api_arrivals as arrivals
 import run_api_load as runner
@@ -106,6 +107,7 @@ class FixtureContractTest(unittest.TestCase):
         self.assertFalse(summary["loadExecuted"])
         self.assertTrue(summary["readyForLoad"])
         self.assertEqual(2_100, summary["plannedRequests"])
+        self.assertEqual(runner.MAX_DISPATCH_DELAY_MS, summary["dispatchDelayLimitMs"])
         self.assertNotIn("해운대", rendered)
         self.assertNotIn("35.385905", rendered)
 
@@ -186,6 +188,17 @@ class RequestContractTest(unittest.TestCase):
 
 
 class SecretAndResultTest(unittest.TestCase):
+    class FakeClock:
+        def __init__(self, sleep_overrun_seconds: float):
+            self.now = 0.0
+            self.sleep_overrun_seconds = sleep_overrun_seconds
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, seconds: float) -> None:
+            self.now += seconds + self.sleep_overrun_seconds
+
     class LoginClient:
         def __init__(self):
             self.calls = []
@@ -252,7 +265,9 @@ class SecretAndResultTest(unittest.TestCase):
         sessions = {"A": runner.AccountSession("A", 1, "TOKEN", "REFRESH")}
 
         class Client:
-            def exchange(self, spec, access_token=None):
+            def exchange(self, spec, access_token=None, before_send=None):
+                if before_send is not None:
+                    before_send()
                 return runner.Exchange(500, {"detail": "NEVER_RENDER_BODY"}, 321.5, 77)
 
         semaphore = __import__("threading").BoundedSemaphore(1)
@@ -322,6 +337,200 @@ class SecretAndResultTest(unittest.TestCase):
         )
         self.assertTrue(all(group["passed"] for group in summary["groups"]))
         self.assertTrue(all(scenario["passed"] for scenario in summary["heavyScenarios"]))
+        self.assertEqual(runner.MAX_DISPATCH_DELAY_MS, summary["dispatchDelayLimitMs"])
+        self.assertEqual(0.0, summary["maxDispatchDelayMs"])
+        self.assertEqual(0, summary["lateDispatches"])
+
+    def test_schedule_does_not_catch_up_after_large_clock_delay(self):
+        fixture = runner.validate_fixture(fixture_value())
+        clock = self.FakeClock(120.0)
+        client = mock.Mock()
+        schedule = [{
+            "sequence": 1,
+            "phase": "measurement",
+            "phaseMinute": 0,
+            "plannedOffsetMs": 0,
+            "caseId": "contest_list",
+        }]
+
+        results, maintenance, dispatched = runner.execute_schedule(
+            client,
+            fixture,
+            {},
+            schedule,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+            refresh_at_seconds=None,
+        )
+
+        self.assertEqual([], maintenance)
+        self.assertEqual(0, dispatched)
+        self.assertEqual(1, len(results))
+        self.assertEqual("missed_start", results[0].error)
+        self.assertEqual(120_000.0, results[0].dispatch_delay_ms)
+        self.assertFalse(results[0].dispatched)
+        client.exchange.assert_not_called()
+
+        full_schedule = arrivals.build_schedule()
+        full_results = [
+            runner.TaskResult(
+                item["sequence"],
+                item["phase"],
+                item["caseId"],
+                runner.CASE_GROUPS[item["caseId"]],
+                True,
+                10.0,
+                1,
+                None,
+            )
+            for item in full_schedule
+        ]
+        full_results[0] = runner.TaskResult(
+            full_schedule[0]["sequence"],
+            full_schedule[0]["phase"],
+            full_schedule[0]["caseId"],
+            runner.CASE_GROUPS[full_schedule[0]["caseId"]],
+            False,
+            None,
+            0,
+            "missed_start",
+            120_000.0,
+            False,
+        )
+        preflight = [
+            {"caseId": case_id, "durationMs": 1.0}
+            for case_id in runner.CASE_GROUPS
+            if case_id not in {"favorite_add", "favorite_delete"}
+        ]
+        maintenance = [
+            {"operation": "refresh_before_load", "account": "A", "success": True},
+            {"operation": "refresh_before_load", "account": "B", "success": True},
+            {"operation": "refresh", "account": "A", "success": True},
+            {"operation": "refresh", "account": "B", "success": True},
+        ]
+        summary = runner.summarize_run(
+            "run-1",
+            "a" * 64,
+            full_schedule,
+            full_results,
+            maintenance,
+            len(full_schedule) - 1,
+            preflight,
+            True,
+            True,
+            1.0,
+            2.0,
+        )
+
+        self.assertFalse(summary["passed"])
+        self.assertEqual(1, summary["missedStarts"])
+        self.assertEqual(1, summary["lateDispatches"])
+        self.assertEqual(120_000.0, summary["maxDispatchDelayMs"])
+
+    def test_dispatch_delay_boundary_allows_500ms_and_rejects_above_it(self):
+        fixture = runner.validate_fixture(fixture_value())
+        schedule = [{
+            "sequence": 1,
+            "phase": "measurement",
+            "phaseMinute": 0,
+            "plannedOffsetMs": 0,
+            "caseId": "contest_list",
+        }]
+
+        class SuccessClient:
+            def __init__(self):
+                self.calls = 0
+
+            def exchange(self, spec, access_token=None, before_send=None):
+                if before_send is not None:
+                    before_send()
+                self.calls += 1
+                return runner.Exchange(
+                    spec.expected_status,
+                    payload_for(spec.case_id, fixture),
+                    1.0,
+                    1,
+                )
+
+        allowed_clock = self.FakeClock(runner.MAX_DISPATCH_DELAY_MS / 1000)
+        allowed_client = SuccessClient()
+        allowed, _, allowed_dispatched = runner.execute_schedule(
+            allowed_client,
+            fixture,
+            {},
+            schedule,
+            monotonic=allowed_clock.monotonic,
+            sleep=allowed_clock.sleep,
+            refresh_at_seconds=None,
+        )
+
+        self.assertEqual(1, allowed_dispatched)
+        self.assertEqual(1, allowed_client.calls)
+        self.assertTrue(allowed[0].success)
+        self.assertEqual(runner.MAX_DISPATCH_DELAY_MS, allowed[0].dispatch_delay_ms)
+
+        rejected_clock = self.FakeClock((runner.MAX_DISPATCH_DELAY_MS + 1) / 1000)
+        client = mock.Mock()
+        rejected, _, rejected_dispatched = runner.execute_schedule(
+            client,
+            fixture,
+            {},
+            schedule,
+            monotonic=rejected_clock.monotonic,
+            sleep=rejected_clock.sleep,
+            refresh_at_seconds=None,
+        )
+
+        self.assertEqual(0, rejected_dispatched)
+        self.assertEqual("missed_start", rejected[0].error)
+        self.assertEqual(runner.MAX_DISPATCH_DELAY_MS + 1, rejected[0].dispatch_delay_ms)
+        client.exchange.assert_not_called()
+
+    def test_worker_delay_after_submission_is_rejected_before_http(self):
+        fixture = runner.validate_fixture(fixture_value())
+        schedule = [{
+            "sequence": 1,
+            "phase": "measurement",
+            "phaseMinute": 0,
+            "plannedOffsetMs": 0,
+            "caseId": "contest_list",
+        }]
+
+        class WorkerDelayClock:
+            def __init__(self):
+                self.now = 0.0
+                self.calls = 0
+
+            def monotonic(self):
+                self.calls += 1
+                if self.calls == 4:
+                    self.now += (runner.MAX_DISPATCH_DELAY_MS + 1) / 1000
+                return self.now
+
+            def sleep(self, seconds):
+                self.now += seconds
+
+        clock = WorkerDelayClock()
+        client = runner.HttpClient()
+        opener = mock.Mock()
+        client.opener = mock.Mock(return_value=opener)
+        results, _, dispatched = runner.execute_schedule(
+            client,
+            fixture,
+            {},
+            schedule,
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+            refresh_at_seconds=None,
+        )
+
+        self.assertEqual(0, dispatched)
+        self.assertEqual("missed_start", results[0].error)
+        self.assertEqual(runner.MAX_DISPATCH_DELAY_MS + 1, results[0].dispatch_delay_ms)
+        self.assertFalse(results[0].dispatched)
+        client.opener.assert_called_once_with()
+        opener.open.assert_not_called()
+        self.assertFalse(client.network_started)
 
     def test_one_slow_heavy_scenario_cannot_hide_in_combined_group(self):
         schedule = arrivals.build_schedule()

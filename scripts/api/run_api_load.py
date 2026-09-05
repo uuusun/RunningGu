@@ -31,6 +31,7 @@ import plan_api_arrivals as arrivals
 
 STAGING_ORIGIN = "https://staging-api.runninggu.store"
 MAX_BODY_BYTES = 4 * 1024 * 1024
+MAX_DISPATCH_DELAY_MS = 500.0
 RUN_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 GROUP_LIMITS_MS = {
     "simple": (1_000, 3_000),
@@ -118,6 +119,8 @@ class TaskResult:
     duration_ms: float | None
     response_bytes: int
     error: str | None
+    dispatch_delay_ms: float = 0.0
+    dispatched: bool = True
 
 
 def require(condition: bool, code: str = "fixture_contract") -> None:
@@ -340,7 +343,12 @@ class HttpClient:
             self._thread_local.opener = opener
         return opener
 
-    def exchange(self, spec: RequestSpec, access_token: str | None = None) -> Exchange:
+    def exchange(
+        self,
+        spec: RequestSpec,
+        access_token: str | None = None,
+        before_send: Callable[[], None] | None = None,
+    ) -> Exchange:
         headers = {
             "Accept": "application/json",
             "User-Agent": "RunningGu-ApiLoad/1",
@@ -357,11 +365,14 @@ class HttpClient:
             headers=headers,
             method=spec.method,
         )
-        started = time.perf_counter_ns()
-        self.network_started = True
+        opener = self.opener()
         try:
+            if before_send is not None:
+                before_send()
+            started = time.perf_counter_ns()
+            self.network_started = True
             try:
-                response = self.opener().open(request, timeout=20)
+                response = opener.open(request, timeout=20)
             except urllib.error.HTTPError as error:
                 response = error
             with response:
@@ -618,15 +629,43 @@ def execute_task(
     fixture: dict,
     sessions: dict[str, AccountSession],
     semaphore: threading.BoundedSemaphore,
+    *,
+    planned_start: float | None = None,
+    monotonic: Callable[[], float] = time.monotonic,
 ) -> TaskResult:
     exchange = None
+    dispatch_delay_ms = 0.0
+    dispatched = planned_start is None
+
+    def measure_dispatch_delay() -> None:
+        nonlocal dispatch_delay_ms, dispatched
+        if planned_start is None:
+            return
+        dispatched = False
+        dispatch_delay_ms = round(
+            max(0.0, (monotonic() - planned_start) * 1000),
+            3,
+        )
+        if dispatch_delay_ms > MAX_DISPATCH_DELAY_MS:
+            raise LoadError("missed_start")
+        dispatched = True
+
     try:
         account = sessions.get(spec.account_label) if spec.account_label else None
-        exchange = client.exchange(spec, session_token(spec, sessions))
+        access_token = session_token(spec, sessions)
+        if planned_start is None:
+            exchange = client.exchange(spec, access_token)
+        else:
+            exchange = client.exchange(
+                spec,
+                access_token,
+                before_send=measure_dispatch_delay,
+            )
         validate_exchange(spec, exchange, fixture, account)
         return TaskResult(
             item["sequence"], item["phase"], spec.case_id, spec.group, True,
             exchange.duration_ms, exchange.response_bytes, None,
+            dispatch_delay_ms, dispatched,
         )
     except LoadError as error:
         return TaskResult(
@@ -634,11 +673,12 @@ def execute_task(
             exchange.duration_ms if exchange is not None else error.duration_ms,
             exchange.response_bytes if exchange is not None else error.response_bytes,
             error.code,
+            dispatch_delay_ms, dispatched,
         )
     except Exception:
         return TaskResult(
             item["sequence"], item["phase"], spec.case_id, spec.group, False,
-            None, 0, "internal_runner",
+            None, 0, "internal_runner", dispatch_delay_ms, dispatched,
         )
     finally:
         semaphore.release()
@@ -693,7 +733,6 @@ def execute_schedule(
 
     refresh_thread = threading.Thread(target=refresh_worker, name="api-load-refresh", daemon=True)
     refresh_thread.start()
-    dispatched = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=arrivals.MAX_IN_FLIGHT) as executor:
         for item in schedule:
             if stop.is_set():
@@ -713,7 +752,7 @@ def execute_schedule(
                         results.append(TaskResult(
                             item["sequence"], item["phase"], item["caseId"],
                             CASE_GROUPS[item["caseId"]], False, None, 0,
-                            "dependency_not_complete",
+                            "dependency_not_complete", 0.0, False,
                         ))
                     stop.set()
                     break
@@ -723,17 +762,36 @@ def execute_schedule(
                         results.append(TaskResult(
                             item["sequence"], item["phase"], item["caseId"],
                             CASE_GROUPS[item["caseId"]], False, None, 0,
-                            "dependency_failed",
+                            "dependency_failed", 0.0, False,
                         ))
                     stop.set()
                     break
 
             if not semaphore.acquire(blocking=False):
+                dispatch_delay_ms = round(
+                    max(0.0, (monotonic() - target) * 1000),
+                    3,
+                )
                 with results_lock:
                     results.append(TaskResult(
                         item["sequence"], item["phase"], item["caseId"],
                         CASE_GROUPS[item["caseId"]], False, None, 0,
-                        "missed_start",
+                        "missed_start", dispatch_delay_ms, False,
+                    ))
+                stop.set()
+                break
+
+            dispatch_delay_ms = round(
+                max(0.0, (monotonic() - target) * 1000),
+                3,
+            )
+            if dispatch_delay_ms > MAX_DISPATCH_DELAY_MS:
+                semaphore.release()
+                with results_lock:
+                    results.append(TaskResult(
+                        item["sequence"], item["phase"], item["caseId"],
+                        CASE_GROUPS[item["caseId"]], False, None, 0,
+                        "missed_start", dispatch_delay_ms, False,
                     ))
                 stop.set()
                 break
@@ -741,25 +799,32 @@ def execute_schedule(
             account_label = account_for_item(item) if item["caseId"] in {"me", "favorite_list", "favorite_add", "favorite_delete"} else None
             spec = request_spec(item["caseId"], fixture, account_label)
             future = executor.submit(
-                execute_task, item, spec, client, fixture, sessions, semaphore
+                execute_task,
+                item,
+                spec,
+                client,
+                fixture,
+                sessions,
+                semaphore,
+                planned_start=target,
+                monotonic=monotonic,
             )
             futures[item["sequence"]] = future
-            dispatched += 1
 
             def capture(completed: concurrent.futures.Future) -> None:
                 result = completed.result()
-                with results_lock:
-                    results.append(result)
                 if not result.success:
                     stop.set()
 
             future.add_done_callback(capture)
 
         for future in futures.values():
-            future.result()
+            results.append(future.result())
     stop.set()
     refresh_thread.join(timeout=5)
-    return sorted(results, key=lambda row: row.sequence), maintenance, dispatched
+    sorted_results = sorted(results, key=lambda row: row.sequence)
+    dispatched = sum(row.dispatched for row in sorted_results)
+    return sorted_results, maintenance, dispatched
 
 
 def summarize_run(
@@ -851,6 +916,14 @@ def summarize_run(
         })
 
     failures = Counter(row.error for row in results if row.error is not None)
+    max_dispatch_delay_ms = max(
+        (row.dispatch_delay_ms for row in results),
+        default=0.0,
+    )
+    late_dispatches = sum(
+        row.dispatch_delay_ms > MAX_DISPATCH_DELAY_MS
+        for row in results
+    )
     all_scheduled = len(results) == len(schedule)
     all_success = all(row.success for row in results) and all_scheduled
     maintenance_pairs = Counter(
@@ -876,6 +949,7 @@ def summarize_run(
     passed = (
         all_success
         and dispatched == len(schedule)
+        and late_dispatches == 0
         and threshold_failures == 0
         and actual_preflight == expected_preflight
         and maintenance_success
@@ -892,6 +966,9 @@ def summarize_run(
         "successfulRequests": sum(row.success for row in results),
         "measurementSuccessful": sum(row.success for row in measurement),
         "missedStarts": failures.get("missed_start", 0),
+        "dispatchDelayLimitMs": MAX_DISPATCH_DELAY_MS,
+        "maxDispatchDelayMs": round(max_dispatch_delay_ms, 3),
+        "lateDispatches": late_dispatches,
         "failureClasses": dict(sorted(failures.items())),
         "degradedResponses": failures.get("degraded_response", 0),
         "emptyResponses": failures.get("empty_fixture", 0),
@@ -923,6 +1000,7 @@ def dry_run_summary(fixture: dict, fixture_hash: str) -> dict:
         "plannedRequests": len(schedule),
         "requestsPerMinute": 60,
         "maxInFlight": arrivals.MAX_IN_FLIGHT,
+        "dispatchDelayLimitMs": MAX_DISPATCH_DELAY_MS,
         "loadExecuted": False,
         "readyForLoad": fixture["approvalStatus"] == "APPROVED",
     }

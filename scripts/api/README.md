@@ -66,11 +66,13 @@ python3 scripts/api/run_api_load.py \
 
 실행기는 로그인과 계정 분리 확인, 14개 정상 preflight, 부하 직전·20분 시점의 두 계정 토큰 갱신,
 5분 준비 + 30분 본 시험, 즐겨찾기 정리·로그아웃을 수행한다. 분당 60건의 고정 도착 시각을
-응답 완료에 맞춰 늦추지 않고 동시 진행 4개가 모두 차 있으면 `missed_start`로 실패한다.
+응답 완료에 맞춰 늦추지 않는다. HTTP 송신 직전이 예정 시각보다 500ms 초과 늦거나 동시 진행
+4개가 모두 차 있으면 그 요청을 뒤늦게 전송하지 않고 `missed_start`로 실패한다.
 응답 원문·토큰·이메일·비밀번호·검색어·좌표는 결과에 남기지 않는다.
 
 결과 JSON의 요청 수·실패 분류·그룹별 p50/p95/max와 curated·OSM·동선 생성 각각의
-p50/p95/max·응답 byte·실행기 CPU를 보존한다. 이 값만으로
+p50/p95/max·응답 byte·실행기 CPU, `dispatchDelayLimitMs`·`maxDispatchDelayMs`·
+`lateDispatches`를 보존한다. 이 값만으로
 부하 생성기 NIC 비포화를 증명하지는 않는다. EC2 5초 자원 표본, 백업·WAL, 가드 journal 최종
 요약과 부하 생성기 OS의 네트워크 표본을 같은 run 증거에 함께 남겨야 한다.
 
