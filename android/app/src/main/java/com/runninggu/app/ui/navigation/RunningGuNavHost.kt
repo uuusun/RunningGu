@@ -23,6 +23,7 @@ import com.runninggu.app.ui.course.CourseDetailScreen
 import com.runninggu.app.ui.course.CourseDetailViewModel
 import com.runninggu.app.ui.course.CourseLaunchContext
 import com.runninggu.app.ui.course.CourseScreen
+import com.runninggu.app.ui.course.CuratedCourseDetailScreen
 import com.runninggu.app.ui.course.CourseUiState
 import com.runninggu.app.ui.course.CourseViewModel
 import com.runninggu.app.ui.home.HomeScreen
@@ -121,8 +122,30 @@ fun RunningGuNavHost(
                 ),
                 // 게스트가 코스를 저장하려 하면 로그인으로 보내고, 끝나면 러닝코스로 돌아온다 (D-27)
                 onLoginRequest = { navController.navigate(Routes.authGraph(Routes.COURSES)) },
+                // 지역별 목록에서 코스를 골랐다 (#280). `courseId` 는 두루누비 catalog 의
+                // 공개 안정키라 route 에 실어도 된다 — near snapshot 과 다른 점이다
+                onCourseClick = { courseId ->
+                    navController.navigate(Routes.courseDetailCurated(courseId))
+                },
                 modifier = Modifier.statusBarsPadding(),
             )
+        }
+
+        // S8-D 큐레이션 코스 상세 (#280). 저장 코스 상세와 route·화면을 나눈다 —
+        // id 의 의미도 하는 일도 다르다(matrix D-20).
+        composable(
+            route = Routes.COURSE_DETAIL_CURATED_PATTERN,
+            arguments = listOf(navArgument(Routes.ARG_COURSE_ID) { type = NavType.StringType }),
+        ) { entry ->
+            val courseId = entry.arguments?.getString(Routes.ARG_COURSE_ID)
+            if (courseId != null) {
+                CuratedCourseDetailScreen(
+                    courseId = courseId,
+                    onBack = { navController.popBackStack() },
+                    viewModel = viewModel(),
+                    modifier = Modifier.statusBarsPadding(),
+                )
+            }
         }
 
         // S10 마이 — 로그인 필요(결정-4). 게스트는 화면 안에서 로그인 유도만 본다.

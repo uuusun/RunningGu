@@ -69,6 +69,8 @@ import com.runninggu.app.ui.map.RunningGuMap
 fun CourseScreen(
     viewModel: CourseViewModel,
     onLoginRequest: () -> Unit,
+    /** 지역별 목록에서 코스를 골랐다 → S8-D 큐레이션 상세 (#280). */
+    onCourseClick: (courseId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,7 +106,7 @@ fun CourseScreen(
 
         when (state.tab) {
             CourseUiState.Tab.NEARBY -> NearbyTab(state, viewModel)
-            CourseUiState.Tab.BY_REGION -> RegionTab(state, viewModel)
+            CourseUiState.Tab.BY_REGION -> RegionTab(state, viewModel, onCourseClick)
         }
     }
 }
@@ -530,7 +532,11 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
 // ── 지역별 ────────────────────────────────────────────────
 
 @Composable
-private fun RegionTab(state: CourseUiState, viewModel: CourseViewModel) {
+private fun RegionTab(
+    state: CourseUiState,
+    viewModel: CourseViewModel,
+    onCourseClick: (courseId: String) -> Unit,
+) {
     LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item { RegionChips(state, viewModel) }
 
@@ -551,7 +557,7 @@ private fun RegionTab(state: CourseUiState, viewModel: CourseViewModel) {
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
-                items(courses.courses) { CourseRow(it) }
+                items(courses.courses) { CourseRow(it) { onCourseClick(it.courseId) } }
 
                 if (courses.hasNext || courses.moreMessage != null) {
                     item { LoadMoreRow(courses, viewModel) }
@@ -636,8 +642,9 @@ private fun RegionChips(state: CourseUiState, viewModel: CourseViewModel) {
 }
 
 @Composable
-private fun CourseRow(course: CourseSummary) {
+private fun CourseRow(course: CourseSummary, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),

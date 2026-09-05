@@ -1,9 +1,11 @@
 package com.runninggu.app.data.remote
 
+import com.runninggu.app.data.remote.dto.CourseDetailDto
 import com.runninggu.app.data.remote.dto.CoursePageDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
 import com.runninggu.app.data.remote.dto.CoursesNearDto
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -41,6 +43,16 @@ interface CourseApi {
         @Query("page") page: Int? = null,
         @Query("size") size: Int? = null,
     ): CoursePageDto
+
+    /**
+     * 큐레이션 코스 상세. 없는 id 는 `404 COURSE_NOT_FOUND`. (#280 계약)
+     *
+     * **`courses/regions` 보다 아래에 둔다.** Retrofit 은 선언 순서를 보지 않지만
+     * 사람이 읽을 때 `{courseId}` 가 `regions` 를 삼키는 것처럼 보인다 — 실제로는
+     * 서버 라우팅이 가르므로 문제없다.
+     */
+    @GET("courses/{courseId}")
+    suspend fun detail(@Path("courseId") courseId: String): CourseDetailDto
 
     /** 지역 칩. 코스 수 내림차순. (§6-3) */
     @GET("courses/regions")

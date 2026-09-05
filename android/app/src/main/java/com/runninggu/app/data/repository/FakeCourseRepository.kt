@@ -2,6 +2,8 @@ package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.CourseRegion
+import java.time.Instant
+import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
@@ -93,6 +95,52 @@ object FakeCourseRepository : CourseRepository {
     }
 
     override suspend fun regions(): List<CourseRegion> = DEMO_REGIONS
+
+    /**
+     * 큐레이션 코스 상세. 서버가 서기 전까지 화면을 만들 수 있게 둔다(AGENTS 4장-6).
+     *
+     * **목록에 있는 코스만 연다.** 없는 id 에 `404` 를 흉내내는 대신 [NoSuchElementException]
+     * 을 던지면 화면이 오류로 그린다 — 여기서 `ApiException` 을 조립하면 스텁이 와이어
+     * 계약을 흉내내기 시작해서, 진짜 서버가 왔을 때 뭐가 스텁이었는지 알기 어려워진다.
+     */
+    override suspend fun detail(courseId: String): CuratedCourseDetail {
+        val course = DEMO_COURSES.first { it.courseId == courseId }
+        // 데모라 실제 GPX 가 없다 — 시작점 주변으로 그럴듯한 선을 만든다
+        val path = demoLoop(DEMO_ENTRY.getValue(course.courseId).lat, DEMO_ENTRY.getValue(course.courseId).lng, course.distanceKm)
+        return CuratedCourseDetail(
+            courseId = course.courseId,
+            courseName = course.courseName,
+            sido = course.sido,
+            sigun = course.sigun,
+            distanceKm = course.distanceKm,
+            difficulty = course.difficulty,
+            gainM = course.gainM,
+            durationMin = course.durationMin,
+            dataSource = course.dataSource,
+            // API_GPX 만 값이 있다 — GPX_ONLY 는 null 이 계약이다 (#280)
+            syncedAt = if (course.dataSource == CourseDataSource.API_GPX) DEMO_SYNCED_AT else null,
+            // 스텁은 인코딩하지 않는다. 앱에는 디코더만 있고(§7-A), 화면은 path 를 쓴다
+            pathPolyline = "",
+            path = path,
+            elevationProfileM = List(24) { 20 + (it * 7) % 40 },
+            attributions = listOf("두루누비 걷기길(한국관광공사)"),
+        )
+    }
+
+    private val DEMO_SYNCED_AT: Instant = Instant.parse("2026-08-20T00:00:00Z")
+
+    /**
+     * 데모 코스의 진입점. 실제로는 서버가 GPX 첫 점을 준다.
+     *
+     * 목록([CourseSummary])에 좌표가 없다는 것이 #280 의 출발점이라, 스텁도 그 사실을
+     * 그대로 둔다 — 좌표는 상세에서만 나온다.
+     */
+    private val DEMO_ENTRY: Map<String, LatLng> = mapOf(
+        "T_CRS_MNG0000005117" to LatLng(35.1587, 129.1604),
+        "T_CRS_MNG0000005118" to LatLng(34.7604, 127.6622),
+        "T_CRS_MNG0000004411" to LatLng(35.2285, 128.6811),
+        "forest-jirisan-1" to LatLng(35.3372, 127.7305),
+    )
 
     /** 코스 수 내림차순 — 서버가 정하는 순서를 흉내낸다. (§6-3) */
     private val DEMO_REGIONS = listOf(
