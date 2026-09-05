@@ -42,7 +42,7 @@ EC2 사양에 포함하지 않는다. 8GiB에서 heap 환경변수화, cold star
 working set·GC·동시 프로세스를 기록하고 사양 또는 구조를 다시 결정한다. 더 큰 사양을 승인할
 때는 §15 검증과 월 예상비용·80% 알림값을 같은 결정으로 갱신한다.
 
-swap은 RAM 대체재가 아니다. 지속적으로 사용되면 인스턴스를 늘린다.
+swap 사용량만으로 증설하지 않는다. 지속 입출력이 있으면 요청 성능·메모리 여유·GC와 함께 분석한다.
 
 ## 2. 배포 artifact 원칙
 
@@ -853,8 +853,11 @@ sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
 `failedDirectRequests=0`, `noValidPointResponses=0`, `requestsOverTimeout=0`을 확인하고 직접 요청의
 p50·p95·max를 기록한다. `noValidPointResponses`는 `failedDirectRequests`의 부분집합이며 성공으로
 세지 않는다. `runtime-summary.json`도 `passed=true`여야 한다. 이 요약기는 표본 누락,
-`MemAvailable` 20% 미만, warm-up 뒤 swap counter·사용량 증가, systemd 재시작, container
-OOM·비정상 상태를 실패시킨다.
+`MemAvailable` 20% 미만, systemd 재시작, container OOM·비정상 상태를 실패시킨다.
+2026-09-05 승인된 `acceptancePolicy=capacity-v2`는 swap 사용량·counter 증분과 활동 구간을
+진단용으로 보존한다. swap 증가만으로 부하를 중단하지 않으며 발생 시각을 요청·메모리·GC와
+대조해 판정 기록을 남긴다. swap 값 누락·음수·counter 감소·표본 누락은 여전히 실패다.
+자원 요약만으로 전체 합격을 선언하지 않으며 요청·GC·백업·WAL 결과를 함께 판정한다.
 
 GraphHopper와 Spring Boot는 운영 시작 명령에 JVM unified GC 로그를 켠다. 시험 시작 뒤 Full GC를
 다음 두 기준 저장소에서 확인한다. readiness 이후 반복 Full GC가 있으면 실패다.
@@ -951,7 +954,13 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 2026-09-05 `673a2f7` 정식 develop CI artifact의 기존 8GiB 배포와 승인된 앱 부하 시험을 완료했다.
 2,100건 전송·완료, 본 시험 1,800건 성공, 480개 자원 표본과 backup 1회·WAL 3회,
 가드 해제·재기동·HTTPS 복귀 및 단발 Full GC 1회의 구간 판정은
-[실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 4GiB는 별도 승인 전이며 변경하지 않았다.
+[실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 이후 승인된 4GiB 시험은 후보 상한의
+장애 격리까지 통과했다. 비대상 기종 `c7i.large` 변경은 Free Plan에서 거부돼 당시 8GiB로 복구했다.
+추가 승인 후 `ap-northeast-2b`의 무료 대상 `c7i-flex.large`로 이전했으나 첫 직접 부하에서
+warm-up 이후 swap 사용량이 40KiB 증가해 당시 계약상 불합격·중단했다. 4GiB 앱 API 부하와 3회 연속 검증은 미완료다.
+최신 DB를 가진 새 `i-07aa483968f4daddc`는 `m7i-flex.large` 8GiB와 원래 JVM 설정으로 복구했고,
+가드 비활성·readiness·HTTPS 7항목을 확인했다. Free Plan 유지, 옛 2a 서버 정지 보존 상태다.
+[4GiB 시험·이전·복구 증거](evidence/staging-4g-validation-20260905.md)를 따른다.
 
 이 가드는 [`api-load-test-plan.md`](api-load-test-plan.md)의 앱 API 부하 시험에만 사용한다.
 제품 API·캐시·재시도 계약을 바꾸는 기능이 아니며 기본값은 비활성이다. Java 설정도

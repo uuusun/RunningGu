@@ -630,7 +630,7 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 |---|---|
 | OOM | 정상 부하에서 kernel·systemd cgroup·Docker OOM kill 0건 |
 | 메모리 여유 | 모든 5초 표본에서 host `MemAvailable`이 전체 RAM의 20% 이상 |
-| swap | warm-up 뒤 `vmstat`의 swap-in·swap-out 지속 발생 0, swap 사용량 증가 없음 |
+| swap | warm-up 뒤 사용량·swap-in/out 증분·발생 구간을 기록한다. 증가 자체는 단독 중단·불합격 조건이 아니며, 지속 입출력은 같은 구간의 요청 지연·메모리 여유·GC와 함께 분석한다 |
 | GC | readiness 이후 반복 Full GC 0건 |
 | GraphHopper 직접 요청 | `operational_load.py`의 missed start·실패 요청이 0이고 §9.1의 정상 직접 요청 세트가 모두 HTTP 200·비어 있지 않은 `paths`로 현재 [`application.yml`](../../backend/src/main/resources/application.yml)의 client read timeout 5초 안에 완료. `no valid point`를 포함한 4xx, 5xx, 빈 `paths`, timeout은 모두 실패. 직접 요청 p50·p95·max는 기록하되 합의되지 않은 총 3초 기준을 만들지 않음 |
 | 라우팅 회귀 | `--preset caps --zone all`의 모든 직접 요청 status와 `no valid point` 건수를 기록. 로컬 기준선에서 합격한 지점·거리 셀은 EC2에서도 16개 seed 중 품질 상한 통과 경로가 하나 이상이어야 하며 기존 커버리지·거리·상승·차도·회전 상한이 비회귀. 기준선에서 성공한 동일 요청이 EC2에서 400이 되거나 합격 셀의 모든 seed가 실패하면 불합격 |
@@ -639,6 +639,23 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 | 백업 | 수동 full backup·pgBackRest check·WAL 감시 성공, 실패 알림 0건 |
 | 재부팅 | import 로그 0건, 기존 artifact 재사용. 배포는 verify oneshot 시작, 재부팅은 GraphHopper unit activation 시작부터 검증 시간을 포함해 2분 안에 GraphHopper·Spring readiness 성공 |
 | 로그 | GraphHopper runtime 기준 저장소는 Docker `local`이며 `docker compose logs graphhopper`로 검사. 주 service journal에는 container runtime stdout·stderr 0건이고 Compose·`ExecStartPre` 실패 이유만 남음. §7 wrapper가 실패 때 남긴 마지막 stderr에도 PBF 내용·AWS 자격 증명·사용자 정보가 없음 |
+
+**2026-09-05 승인한 재시험 기준(`capacity-v2`).** 운영책임자는 초기 하루 방문 20회 미만을 예상하며
+비용을 줄이기 위해 4GiB 운영을 우선 검증하도록 승인했다. 종전 swap 증가 0 조건은 일회성
+페이지 회수도 탈락시키므로 위 진단 조건으로 대체한다. 요청량·응답시간·메모리 여유 20%·
+OOM·비정상 재시작·반복 Full GC·백업·복구와 전체 시나리오 3회 연속 조건은 유지한다.
+PSI `1%·3분`은 승인된 합격 조건이 아니며 새 실패 조건으로 도입하지 않는다.
+
+요약기는 `acceptancePolicy=capacity-v2`, swap 증분과 활동 표본 구간 수·최장 연속 구간 수를
+출력한다. 음수·누락·파싱 오류·누적 counter 감소와 불완전한 수집은 실패한다.
+swap 활동이 있으면 원시 시각을 요청·메모리·GC 기록과 대조한 해석을 증거에 남긴다.
+이 요약의 `passed`는 기계 판정 가능한 자원 항목에 한하며, 앱 응답시간·오류·GC·백업·WAL
+감사를 합쳐야 전체 합격이다. 기준 위반은 시험 실패로 기록하고, CPU·DB·upstream·입력·
+JVM/cgroup 상한과 호스트 RAM 부족 중 원인을 분리한다.
+과거 중단한 시험은 새 기준으로 소급 합격시키지 않는다. 새 run ID로 앱 API 시험을 먼저
+완주한 뒤 §9.1 전체 시나리오를 3회 연속 수행한다. 동일 hard limit의 기존 장애 격리 증거는
+재사용하고, 상한이 바뀌면 재검증한다. 완료 후 4GiB에서 24시간 낮은 활동 상태를 관찰한다.
+관찰 중 추가 대량 외부 API 호출을 하지 않고 자동 백업·메모리·서비스 상태와 유휴 후 첫 요청을 확인한다.
 
 `MemAvailable 20%`를 충족하려고 cache를 강제로 비우거나, 호스트 swap을 끄거나, 시험 요청률을 결과에
 맞춰 낮추지 않는다. 시험 명령·시작/종료 시각·instance type·heap·hard limit·artifact ID를 결과와
