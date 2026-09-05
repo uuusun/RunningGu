@@ -3,6 +3,8 @@ package com.runninggu.server.course.infrastructure;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamEndpoint;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
 import com.runninggu.server.course.application.CourseMetadata;
 import com.runninggu.server.course.application.CourseMetadataBatch;
 import com.runninggu.server.course.application.CourseMetadataProvider;
@@ -16,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,14 +42,19 @@ public final class KtoCourseClient implements CourseMetadataProvider {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String serviceKey;
+    private final UpstreamLoadGuard upstreamLoadGuard;
 
     public KtoCourseClient(
             RestClient restClient,
             ObjectMapper objectMapper,
-            String serviceKey) {
+            String serviceKey,
+            UpstreamLoadGuard upstreamLoadGuard) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.serviceKey = serviceKey;
+        this.upstreamLoadGuard = Objects.requireNonNull(
+                upstreamLoadGuard,
+                "upstreamLoadGuard");
     }
 
     @Override
@@ -124,16 +132,19 @@ public final class KtoCourseClient implements CourseMetadataProvider {
 
     private CourseListPage parsePage(String responseBody) {
         if (!StringUtils.hasText(responseBody)) {
+            tripKtoResultCode();
             throw new CourseMetadataSyncException(Reason.INVALID_RESPONSE);
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             if (root == null || !root.isObject()) {
+                tripKtoResultCode();
                 throw new CourseMetadataSyncException(Reason.INVALID_RESPONSE);
             }
             JsonNode response = root.path("response");
             String resultCode = textOrNull(response.path("header").path("resultCode"));
             if (!SUCCESS_CODE.equals(resultCode)) {
+                tripKtoResultCode();
                 throw new CourseMetadataSyncException(Reason.INVALID_RESPONSE);
             }
             JsonNode body = response.path("body");
@@ -145,9 +156,14 @@ public final class KtoCourseClient implements CourseMetadataProvider {
                     itemNodes(body.path("items").path("item")),
                     totalCount);
         } catch (JsonProcessingException exception) {
+            tripKtoResultCode();
             log.warn("두루누비 API가 JSON이 아닌 응답을 반환했습니다.");
             throw new CourseMetadataSyncException(Reason.INVALID_RESPONSE, exception);
         }
+    }
+
+    private void tripKtoResultCode() {
+        upstreamLoadGuard.tripKtoResultCode(UpstreamEndpoint.KTO_DURUNUBI_COURSE);
     }
 
     private List<JsonNode> itemNodes(JsonNode itemNode) {

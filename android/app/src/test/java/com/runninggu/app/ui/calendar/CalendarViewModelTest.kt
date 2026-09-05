@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ClosingSoon
+import com.runninggu.app.data.repository.ClosingSoonResult
 import com.runninggu.app.data.repository.ContestFilter
 import com.runninggu.app.data.repository.ContestPage
 import com.runninggu.app.data.repository.ContestRepository
@@ -358,7 +359,7 @@ private class RecordingContestRepository : ContestRepository {
         filter: ContestFilter,
     ): Map<LocalDate, Int> = mapOf(LocalDate.of(year, month, 10) to 1)
 
-    override suspend fun closingSoon(limit: Int): List<ClosingSoon> = emptyList()
+    override suspend fun closingSoon(limit: Int): ClosingSoonResult = ClosingSoonResult()
 
     override suspend fun detail(id: Long): Contest = contest(id.toString(), firstDate)
 

@@ -1,12 +1,14 @@
 package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.model.CourseRegion
+import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.mapper.toNearbyCourses
+import com.runninggu.app.data.remote.mapper.toDomain
 import com.runninggu.app.data.remote.mapper.toRegions
 import com.runninggu.app.data.remote.mapper.toSummary
 
@@ -37,6 +39,14 @@ interface CourseRepository {
 
     /** 지역 칩. (§6-3) */
     suspend fun regions(): List<CourseRegion>
+
+    /**
+     * 큐레이션 코스 상세. (`GET /api/courses/{courseId}` · #280)
+     *
+     * 지역별 목록이 좌표를 안 주기 때문에 필요하다 — 목록만으로는 코스를 눌러도
+     * 어디인지 알 수 없다. 없는 id 는 `404 COURSE_NOT_FOUND` 로 온다.
+     */
+    suspend fun detail(courseId: String): CuratedCourseDetail
 
     companion object {
         const val DEFAULT_PAGE_SIZE = 20
@@ -92,4 +102,7 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
     }
 
     override suspend fun regions(): List<CourseRegion> = apiCall { api.regions().toRegions() }
+
+    override suspend fun detail(courseId: String): CuratedCourseDetail =
+        apiCall { api.detail(courseId).toDomain() }
 }

@@ -85,7 +85,7 @@ class HomeUiStateTest {
 
     @Test
     fun `마감 임박이 없으면 히어로에 세울 대회도 없다`() {
-        assertNull(HomeUiState(closingSoon = SectionState.Empty).featured)
+        assertNull(HomeUiState(closingSoon = SectionState.Empty()).featured)
         assertNull(HomeUiState(closingSoon = SectionState.Loading).featured)
         assertNull(HomeUiState(closingSoon = SectionState.Error(null)).featured)
     }

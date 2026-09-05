@@ -746,6 +746,39 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
 - `page` 기본값은 `0`, `size` 기본값은 `20`이며 `size` 최대값은 `50`이다. `page<0` 또는 `size<1|size>50`은 `400 VALIDATION_FAILED`다. 마지막 페이지를 넘은 `page`는 오류가 아니라 `200`의 빈 `content[]`, `hasNext=false`, 빈 `attributions[]`로 응답한다.
 
+### 6-4 `GET /api/courses/{courseId}` — 큐레이션 코스 상세
+
+지역별 목록(6-2)이 좌표를 주지 않아 **코스를 눌러도 갈 곳이 없던 것**을 푸는 응답이다 🔒확정(#280).
+공개 조회이며 `API_GPX|GPX_ONLY` 모두 지원한다.
+
+```json
+{
+  "courseId": "T_CRS_MNG0000005117",
+  "courseName": "해파랑길 1코스",
+  "sido": "부산",
+  "sigun": "남구",
+  "distanceKm": 17.8,
+  "difficulty": "NORMAL",
+  "gainM": 312,
+  "durationMin": 162,
+  "dataSource": "API_GPX",
+  "syncedAt": "2026-08-20T00:00:00Z",
+  "pathPolyline": "…",
+  "elevationProfileM": [12, 14, 19],
+  "attributions": ["두루누비 걷기길(한국관광공사)"]
+}
+```
+
+- `pathPolyline` 은 **원본 큐레이션 코스 전체 points 순서**의 2D Google Encoded Polyline E5 다.
+  `/courses/near` 가 목표 거리에 맞춰 잘라 만든 왕복이 아니므로, 같은 `courseId` 라도 두 응답의
+  거리·시간·고도가 다른 것이 정상이다.
+- `elevationProfileM` 은 전체 points 를 순서 보존·최대 100개로 균등 축약한다. 미보유 시 `[]`.
+- `durationMin` 은 6-2 와 같은 `distanceKm × 1000 / 110`, 최소 1분.
+- `difficulty` 는 **전체 코스 등급**이라 `HARD` 도 온다(6-2 와 같다).
+- `syncedAt` 은 6-2 와 같은 규칙 — `API_GPX` 만 값이 있고 번들 fallback·`GPX_ONLY` 는 `null`.
+- `attributions` 는 해당 코스 원천의 완성 문구 배열이며 앱은 변형하지 않는다(결정-44).
+- 현재 snapshot 에 없는 ID 는 `404 COURSE_NOT_FOUND`.
+
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
 
 같은 catalog snapshot의 서비스 대상 코스를 `sido`별로 세고 `count DESC, region ASC`로

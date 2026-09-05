@@ -1,7 +1,13 @@
 package com.runninggu.server.course.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.runninggu.server.common.upstream.UpstreamEndpoint;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties.EndpointLimits;
 import com.runninggu.server.course.application.CourseMetadataSyncException.Reason;
 import com.runninggu.server.course.domain.Course;
 import com.runninggu.server.course.domain.CourseDataSource;
@@ -18,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class CourseSyncServiceTest {
@@ -126,6 +133,32 @@ class CourseSyncServiceTest {
         assertThat(first.get(2, TimeUnit.SECONDS).success()).isTrue();
     }
 
+    @Test
+    void staging_guard_종료예외는_재던지고_동기화상태는_복구한다() {
+        CourseCatalog catalog = catalog();
+        UpstreamLoadGuardException terminalException = terminalGuardException();
+        AtomicInteger attempts = new AtomicInteger();
+        CourseSyncService service = service(catalog, () -> {
+            if (attempts.getAndIncrement() == 0) {
+                throw terminalException;
+            }
+            return new CourseMetadataBatch(
+                    Map.of("C1", new CourseMetadata(
+                            "C1", "복구 확인", CourseDifficulty.EASY, "순환형", "요약")),
+                    1,
+                    0);
+        });
+
+        assertThatThrownBy(service::synchronize)
+                .isSameAs(terminalException);
+
+        CourseSyncResult retried = service.synchronize();
+
+        assertThat(retried.success()).isTrue();
+        assertThat(retried.skipped()).isFalse();
+        assertThat(attempts).hasValue(2);
+    }
+
     private CourseSyncService service(
             CourseCatalog catalog,
             CourseMetadataProvider provider) {
@@ -167,5 +200,20 @@ class CourseSyncServiceTest {
                                 BigDecimal.ONE,
                                 BigDecimal.ONE)),
                 null);
+    }
+
+    private UpstreamLoadGuardException terminalGuardException() {
+        UpstreamLoadGuard guard = new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                true,
+                "staging",
+                "course-sync-test",
+                100,
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+        try {
+            guard.tripKtoResultCode(UpstreamEndpoint.KTO_DURUNUBI_COURSE);
+            throw new AssertionError("guard가 종료 예외를 던져야 합니다");
+        } catch (UpstreamLoadGuardException exception) {
+            return exception;
+        }
     }
 }

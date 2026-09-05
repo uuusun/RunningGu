@@ -99,6 +99,18 @@ object Routes {
     fun courseDetailSaved(savedCourseId: Long): String = "courseDetail/saved/$savedCourseId"
 
     /**
+     * 큐레이션 코스 상세. (#280 · `GET /api/courses/{courseId}`)
+     *
+     * **여기는 id 를 route 에 실어도 된다.** `near` 가 못 실은 이유는 감출 좌표 snapshot
+     * 이었기 때문인데, `courseId` 는 두루누비 catalog 의 공개 안정키다 — 링크로 나가도
+     * 잃을 것이 없고, 프로세스가 죽었다 살아나도 다시 조회하면 그만이다.
+     */
+    const val ARG_COURSE_ID = "courseId"
+    const val COURSE_DETAIL_CURATED_PATTERN = "courseDetail/curated/{$ARG_COURSE_ID}"
+
+    fun courseDetailCurated(courseId: String): String = "courseDetail/curated/$courseId"
+
+    /**
      * 위저드 그래프(S4~S7). (SPEC §2.2)
      *
      * 그래프 자체에 route를 주는 이유는 ViewModel 스코프 때문이다 — 이 route로

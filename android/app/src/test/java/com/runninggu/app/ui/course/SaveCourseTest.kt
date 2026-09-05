@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.course
 
+import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
@@ -484,6 +485,10 @@ private class StubCourseRepository(private val items: List<NearbyItem>) : Course
     override suspend fun byRegion(region: String?, page: Int, size: Int) = CoursePage()
 
     override suspend fun regions() = emptyList<com.runninggu.app.data.model.CourseRegion>()
+
+    // 이 테스트는 상세를 안 쓴다 (#280)
+    override suspend fun detail(courseId: String): CuratedCourseDetail =
+        error("이 테스트는 상세를 부르지 않는다")
 }
 
 /** 무엇을 저장하라고 시켰는지 적어 두는 가짜. */

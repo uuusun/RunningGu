@@ -164,7 +164,7 @@ Compose 화면
 | 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 같은 기기 family에서 회전된 token pair | 실패→세션 삭제·로그인, 과거 토큰 재사용이면 해당 family 폐기 | 서버 SHA-256 hash + DataStore |
 | 게스트 저장·찜 차단 | Android guard | 원래 route와 동작 종류 | 로그인 모달 | 로그인 후 원래 화면 복귀, **자동 실행하지 않음** | route 임시 상태 |
 | 공통 API 오류 | Problem Details parser | status, code | 화면별 Error | Empty로 강등 금지 | 저장 없음 |
-| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 | 쓰기 비활성 | 기기 캐시 |
+| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 + **출처·시각 표기**(`LOCAL_CACHE` · `cachedAt`) | 쓰기 비활성. `ApiException.Network` 일 때만 폴백 — 서버가 답한 4xx·5xx 에는 쓰지 않는다 | 기기 캐시 |
 
 ### A1 로그인
 
@@ -211,10 +211,10 @@ Compose 화면
 | 검색 제출 | S2 이동 | route q | 없음 | LOCAL_STATE | 빈 검색은 캘린더 기본 목록 |
 | 달력·지도·코스·관광 아이콘 | Navigation/scroll | 지도=`courses` · 코스=`courses?tab=region` | 없음 | LOCAL_STATE | **지도와 코스는 같은 S8 의 다른 탭**(SPEC §4.4-2) — 지도는 [출발지 주변], 코스는 [지역별]. 탭은 좌표와 달리 route 인자로 넘긴다(감출 값이 아니다 · D-15 대비). 관광은 축제 영역 스크롤 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
-| 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB/Room | 영역별 Loading/Empty/Error |
+| 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB / Room `cached_closing_soon` | 영역별 Loading/Empty/Error. 오프라인이면 24시간 미만 snapshot 으로 그린다(아래 행) |
 | 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 축제 카드 탭 | 로컬 상태 | 없음 | 없음 | LOCAL_STATE | **제자리 확대**(카드 200→300dp · 사진 116→186dp) + 고른 카드를 가운데로 스크롤. 화면 이동 없음 |
-| 오프라인 | Room | cachedAt | 마지막 성공 대회·축제 | LOCAL_CACHE | 새로고침/쓰기 제한 |
+| 오프라인 | Room `cached_closing_soon` | cachedAt | 마지막 성공 마감임박 snapshot — 서버가 준 `rank` 순서 보존, `dDayApply` 는 저장하지 않고 `applyEnd` + 조회 시점 KST 로 재계산 | LOCAL_CACHE + cachedAt 표기 | `cachedAt` 24시간 미만만 유효. 접수 종료(`applyEnd < 오늘`) 항목 제외, 제외 후 0건이면 정상 Empty. cache 없음·24시간 초과는 **Empty 가 아니라** 네트워크 Error + [다시 시도]. 새로고침/쓰기 제한 |
 
 홈 마감 임박은 4건으로 확정했다(D-03). 홈 축제는 사용자 위치를 받지 않는 전국 월간 목록이다(D-04).
 
@@ -322,6 +322,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
 | 걷기 스팟 선택 | 로컬 상태 | 없음 | LOCAL_STATE | **P0 는 출발지로 삼지 않는다** 🔒확정(#269). 선택 표시·지도 포커스만 바뀌고 재조회하지 않으며, `[저장]` 아래에 `걷기 스팟은 저장할 수 없어요. 지도에서 위치만 확인해 주세요.` 표시. 새 `OriginState` 갈래·출발지 이력·확인창 없음. 출발지 승격은 P1 별도 계약 |
+| 지역별 코스 선택 | `GET /api/courses/{courseId}` | courseId | 목록 필드 + pathPolyline + elevationProfileM + attributions | `courseDetail/curated/{courseId}` 로 이동(#280). **courseId 는 catalog 공개 안정키라 route 에 실어도 된다** — near snapshot 과 다른 점이다. 없는 id 는 `404 COURSE_NOT_FOUND` |
 
 ### S8-D 코스 상세
 
@@ -329,8 +330,9 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 |---|---|---|---|
 | near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | routeId,dataSource,pathPolyline,routeKm,durationMin,difficulty,gainM,elevationProfileM,lat,lng | 저장 |
 | saved 저장 코스 | `courseDetail/saved/{savedCourseId}` + `GET /api/me/courses/{id}` | 목록 필드 + pathPolyline + attributions[] | 출처 완성 문구를 `" · "`로 연결, 삭제 확인 |
+| curated 큐레이션 코스 | `courseDetail/curated/{courseId}` + `GET /api/courses/{courseId}` | 목록 필드 + pathPolyline + elevationProfileM + attributions[] | **읽기 전용** — 삭제도 저장도 없다(#280). `pathPolyline` 은 원본 코스 **전체** points 라 near 의 왕복 구간과 거리·시간·고도가 달라도 정상. `difficulty` 는 전체 등급이라 `HARD` 도 온다 |
 
-`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`의 sealed 타입이다. `Ran` 은 두지 않는다(결정-56). NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
+`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`, `Curated(courseId)`의 sealed 타입이다. `Ran` 은 두지 않는다(결정-56). NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
 
 ### 러닝 기록 — **제품에 없다** 🔒확정(결정-56)
 

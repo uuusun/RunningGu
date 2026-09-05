@@ -946,6 +946,364 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 8GiB 한 번 통과를 4GiB 승인 근거로 쓰지 않으며 4GiB는 같은 요청 목록·요청률·동시성과 전체
 시나리오를 3회 연속 통과해야 한다.
 
+### 15.3 staging 앱 API 부하 시험의 외부 호출 가드
+
+2026-09-05 `673a2f7` 정식 develop CI artifact의 기존 8GiB 배포와 승인된 앱 부하 시험을 완료했다.
+2,100건 전송·완료, 본 시험 1,800건 성공, 480개 자원 표본과 backup 1회·WAL 3회,
+가드 해제·재기동·HTTPS 복귀 및 단발 Full GC 1회의 구간 판정은
+[실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 4GiB는 별도 승인 전이며 변경하지 않았다.
+
+이 가드는 [`api-load-test-plan.md`](api-load-test-plan.md)의 앱 API 부하 시험에만 사용한다.
+제품 API·캐시·재시도 계약을 바꾸는 기능이 아니며 기본값은 비활성이다. Java 설정도
+`RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging`이 아니면 활성화를 거부한다. production에서는 켜지
+않아야 하고, 대회 snapshot Importer unit은 아래 환경변수를 제거하므로 가드를 사용하지 않는다.
+
+시험마다 영숫자·`.`·`_`·`-`만 사용하는 1~64자 새 run ID를 먼저 정한다. 이전 시험에서 위험
+신호가 발생했거나 backend가 재시작됐다면 같은 run ID로 재개하지 않고 해당 시험을 실패로
+기록한다. `/etc/runninggu/application.env`를 `sudoedit`으로 열어 다음 여섯 항목을 각각 정확히
+한 번만 두고 값을 설정한다. 이 파일의 API 키·DB·SMTP 값을 명령행이나 로그에 출력하지 않는다.
+
+```bash
+sudoedit /etc/runninggu/application.env
+```
+
+```dotenv
+RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging
+UPSTREAM_LOAD_GUARD_ENABLED=true
+UPSTREAM_LOAD_GUARD_RUN_ID=<새_run_id>
+UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT=100
+UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT=5000
+UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT=2000
+```
+
+값을 저장한 뒤 저장소의 dotenv reader로 가드 항목만 검증한다. 실제 비밀값을 source하거나
+출력하지 않는다. 활성화부터 사전 요청·위험 신호 확인까지 아래 명령은 같은 shell session에서
+실행한다.
+
+아래 shell 예시는 POSIX `sh`에서도 동작하며 각 블록 첫 `set -eu`가 중간 실패를 즉시 중단한다.
+활성화 검증 블록은 같은 shell session에서 이어서 실행한다.
+
+```bash
+set -eu
+cd /opt/runninggu/repository
+ENV_FILE=/etc/runninggu/application.env
+READ_ENV=backend/deploy/common/read-required-env.sh
+
+read_guard_env() {
+  sudo /bin/sh "$READ_ENV" "$ENV_FILE" "$1"
+}
+
+test "$(read_guard_env RUNNINGGU_DEPLOYMENT_ENVIRONMENT)" = staging
+test "$(read_guard_env UPSTREAM_LOAD_GUARD_ENABLED)" = true
+RUN_ID=$(read_guard_env UPSTREAM_LOAD_GUARD_RUN_ID)
+case "$RUN_ID" in
+  ''|*[!A-Za-z0-9._-]*)
+    echo '부하 시험 run ID 형식이 잘못됐습니다.' >&2
+    exit 1
+    ;;
+esac
+if [ "${#RUN_ID}" -gt 64 ]; then
+  echo '부하 시험 run ID는 64자를 넘을 수 없습니다.' >&2
+  exit 1
+fi
+test "$(read_guard_env UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT)" = 100
+test "$(read_guard_env UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT)" = 5000
+test "$(read_guard_env UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT)" = 2000
+```
+
+시험 시작 시각을 먼저 기록하고 backend만 재시작한다. PostgreSQL과 GraphHopper는 재시작하지
+않는다. 설정 바인딩이나 가드 전제 검증이 실패해 backend가 active/readiness 상태가 되지 않으면
+시험을 시작하지 않는다.
+
+```bash
+set -eu
+GUARD_STARTED_AT=$(date --iso-8601=seconds)
+sudo systemctl restart runninggu-backend.service
+sudo systemctl is-active --quiet runninggu-backend.service
+
+ready=0
+for attempt in $(seq 1 60); do
+  if curl --fail --silent --show-error \
+    --output /dev/null \
+    'http://127.0.0.1:8080/api/contests?size=1'
+  then
+    ready=1
+    break
+  fi
+  sleep 2
+done
+test "$ready" -eq 1
+
+# 시험 중 재시작과 in-memory counter 초기화를 탐지할 비밀 없는 기준을 /run에 고정한다.
+VALIDATION_DIR=/run/runninggu-upstream-load-guard
+STATE_FILE="$VALIDATION_DIR/$RUN_ID.env"
+sudo install -d -m 0700 -o root -g root "$VALIDATION_DIR"
+test ! -e "$STATE_FILE" || {
+  echo '이미 사용한 run ID입니다. 새 run ID를 정하십시오.' >&2
+  exit 1
+}
+BASE_INVOCATION_ID=$(sudo systemctl show runninggu-backend.service --property=InvocationID --value)
+BASE_NRESTARTS=$(sudo systemctl show runninggu-backend.service --property=NRestarts --value)
+test -n "$BASE_INVOCATION_ID"
+case "$BASE_NRESTARTS" in ''|*[!0-9]*) exit 1 ;; esac
+sudo install -m 0600 -o root -g root /dev/null "$STATE_FILE"
+printf 'RUN_ID=%s\nGUARD_STARTED_AT=%s\nINVOCATION_ID=%s\nNRESTARTS=%s\n' \
+  "$RUN_ID" "$GUARD_STARTED_AT" "$BASE_INVOCATION_ID" "$BASE_NRESTARTS" \
+  | sudo tee "$STATE_FILE" >/dev/null
+
+# course sync가 켜져 있으면 시작 직후 동기화가 끝나야 부하와 섞이지 않는다.
+if [ "$(read_guard_env COURSE_SYNC_ENABLED)" = true ]; then
+  course_sync=waiting
+  sync_log=$(mktemp)
+  chmod 0600 "$sync_log"
+  trap 'rm -f "$sync_log"' EXIT HUP INT TERM
+  for attempt in $(seq 1 60); do
+    sudo journalctl \
+      -u runninggu-backend.service \
+      --since "$GUARD_STARTED_AT" \
+      --grep '두루누비 메타 동기화 완료|두루누비 메타 동기화 실패|두루누비 메타 동기화 중 내부 오류' \
+      --output=cat \
+      --no-pager \
+      >"$sync_log"
+    if grep -Eq '동기화 실패|내부 오류' "$sync_log"; then
+      echo '시작 직후 course sync가 실패했습니다.' >&2
+      exit 1
+    fi
+    if grep -Fq '두루누비 메타 동기화 완료. success=true' "$sync_log"; then
+      course_sync=passed
+      break
+    fi
+    sleep 2
+  done
+  rm -f "$sync_log"
+  trap - EXIT HUP INT TERM
+  test "$course_sync" = passed
+fi
+
+test "$(sudo systemctl show runninggu-backend.service --property=InvocationID --value)" = "$BASE_INVOCATION_ID"
+test "$(sudo systemctl show runninggu-backend.service --property=NRestarts --value)" = "$BASE_NRESTARTS"
+```
+
+backend 재시작으로 cache가 비어 있는 상태에서 승인된 KTO 축제 endpoint를 정확히 한 번 통과하는
+고정 사전 요청을 실행한다. 앱 응답 성공뿐 아니라 같은 run ID의 `KTO_SEARCH_FESTIVAL` 2xx 완료
+로그가 반드시 있어야 한다. 로그가 0건이면 가드 비활성·interceptor 미연결 가능성이 있으므로
+실패다. `TRIP`·`BLOCK`이 하나라도 있으면 외부 호출을 더 보내지 않고 시험을 종료한다. 정상
+2xx/4xx도 endpoint별 시도 횟수에는 포함되며, cache hit처럼 실제 네트워크 요청이 없었던 경우에만
+포함되지 않는다.
+
+```bash
+set -eu
+curl --fail --silent --show-error \
+  --output /dev/null \
+  'http://127.0.0.1:8080/api/festivals?yearMonth=2026-09&size=1'
+
+guard_log=$(mktemp)
+chmod 0600 "$guard_log"
+trap 'rm -f "$guard_log"' EXIT HUP INT TERM
+sudo journalctl \
+  -u runninggu-backend.service \
+  --since "$GUARD_STARTED_AT" \
+  --grep "runId=${RUN_ID}[[:space:]]provider=" \
+  --output=cat \
+  --no-pager \
+  >"$guard_log"
+python3 backend/deploy/validation/summarize-upstream-load-guard.py \
+  --run-id="$RUN_ID" \
+  --require-endpoint KTO_SEARCH_FESTIVAL \
+  <"$guard_log"
+rm -f "$guard_log"
+trap - EXIT HUP INT TERM
+
+test "$(sudo systemctl is-active runninggu-backend.service)" = active
+test "$(sudo systemctl show runninggu-backend.service --property=InvocationID --value)" = "$BASE_INVOCATION_ID"
+test "$(sudo systemctl show runninggu-backend.service --property=NRestarts --value)" = "$BASE_NRESTARTS"
+```
+
+가드 preflight 뒤에는 **EC2 밖의 별도 부하 생성기**에서 머지된 같은 commit을 checkout한다.
+승인된 파일 이름·canonical hash·시간표 hash를 배포 증거와 대조하고, 먼저 네트워크 없는 기본
+검증에서 `approvalStatus=APPROVED`, `readyForLoad=true`, `loadExecuted=false`를 확인한다.
+`*.candidate.json`을 이름만 바꾸거나 실행 결과를 보고 fixture를 수정해 계속하지 않는다.
+
+```powershell
+$Python = '<Python_3_executable>'
+$RunId = '<위_가드와_같은_run_id>'
+$Fixture = 'scripts/api/fixtures/staging-api-load-v1.approved.json'
+
+& $Python scripts/api/run_api_load.py --fixture $Fixture
+if ($LASTEXITCODE -ne 0) { throw '승인 요청 세트 검증 실패' }
+```
+
+부하 명령을 시작하기 직전에 EC2의 별도 SSM session에서 40분간 5초 자원 표본을 시작한다.
+실행기의 preflight와 5분 준비·30분 본 시험·종료 정리를 모두 포함하기 위한 시간이다. 아래 session은
+수집이 끝날 때까지 닫지 않는다. `/opt/runninggu-validation/$RUN_ID`는 매 run마다 새 경로여야 한다.
+
+```bash
+set -eu
+RUN_ID='<위_가드와_같은_run_id>'
+VALIDATION_RUN_DIR="/opt/runninggu-validation/$RUN_ID"
+sudo install -d -o root -g runninggu -m 0770 "$VALIDATION_RUN_DIR"
+date --iso-8601=seconds | sudo tee "$VALIDATION_RUN_DIR/app-load-started-at.txt" >/dev/null
+sudo /bin/sh \
+  /opt/runninggu/repository/backend/deploy/validation/collect-runtime-metrics.sh \
+  --duration-seconds 2400 \
+  --interval-seconds 5 \
+  --output "$VALIDATION_RUN_DIR/app-runtime-metrics.log"
+sudo python3 \
+  /opt/runninggu/repository/backend/deploy/validation/summarize-runtime-metrics.py \
+  --metrics "$VALIDATION_RUN_DIR/app-runtime-metrics.log" \
+  --output "$VALIDATION_RUN_DIR/app-runtime-summary.json"
+```
+
+자원 수집이 시작된 것을 확인한 뒤 부하 생성기에서 실제 실행을 시작한다. 이메일·비밀번호는 Python의
+숨김 prompt에만 입력하고 명령행·파일·채팅에 넣지 않는다. stdout은 비밀 없는 최종 JSON 한 건뿐이다.
+두 계정 로그인 이후부터는 실패·중단 때도 `loadExecuted=true`가 남아야 한다.
+
+```powershell
+$ResultDir = Join-Path $env:TEMP "runninggu-api-load-$RunId"
+if (Test-Path -LiteralPath $ResultDir) { throw '이미 사용한 로컬 run ID입니다.' }
+New-Item -ItemType Directory -Path $ResultDir | Out-Null
+
+$Summary = & $Python scripts/api/run_api_load.py --fixture $Fixture --execute --run-id $RunId
+$LoadExit = $LASTEXITCODE
+$Summary | Set-Content -Encoding utf8 (Join-Path $ResultDir 'api-load-summary.json')
+$Summary
+if ($LoadExit -ne 0) { throw "앱 API 부하 실패: exit=$LoadExit" }
+$ParsedSummary = $Summary | ConvertFrom-Json
+if (-not $ParsedSummary.passed -or $ParsedSummary.runId -ne $RunId) {
+  throw '앱 API 부하 요약의 합격 상태 또는 run ID가 일치하지 않습니다.'
+}
+if ($ParsedSummary.dispatchDelayLimitMs -ne 500 -or
+    $ParsedSummary.lateDispatches -ne 0 -or
+    $ParsedSummary.maxDispatchDelayMs -gt 500) {
+  throw '고정 도착 시각의 500ms dispatch 지연 계약을 지키지 못했습니다.'
+}
+```
+
+같은 생성기에서 실제 staging 경로로 사용 중인 NIC의 송·수신 byte와 link speed를 5초 간격으로
+별도 기록한다. 최종 byte 차이만으로 순간 포화가 없었다고 판정하지 않는다. 실행기 결과의
+`processCpuPercentOfOneCore`, `missedStarts=0`, `lateDispatches=0`, `maxDispatchDelayMs≤500`, transport
+실패 0과 NIC 표본을 함께 봐야 한다. 500ms를 초과한 요청은 나중에 몰아서 보내지 않고 실패한다.
+
+부하 시작을 기준으로 약 5분·15분·25분에 EC2의 다른 SSM session에서 WAL 검사를 각각 한 번,
+본 시험 구간에 full backup을 한 번 실행한다. 어느 하나가 실패하면 앱 응답이 모두 성공해도
+전체 run은 실패다.
+
+```bash
+sudo systemctl start runninggu-postgres-wal-archive-check.service
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
+
+sudo systemctl start runninggu-postgres-backup.service
+sudo systemctl status --no-pager runninggu-postgres-backup.service
+```
+
+부하 summary는 예정·dispatch·완료가 모두 2,100건이고 본 시험 성공이 1,800건이어야 한다.
+`missedStarts=0`, `lateDispatches=0`, `maxDispatchDelayMs≤500`, 빈 `failureClasses`, preflight 14종,
+갱신 4건, cleanup/logout 성공과 세 성능
+그룹에 더해 `near_curated`·`near_osm`·`itinerary_generate` 각각의 p95/max가 모두 합격이어야 한다.
+`app-runtime-summary.json`도 `passed=true`여야 하며 백업 1회·WAL 3회 결과를 별도 보존한다.
+
+본 시험의 모든 요청이 끝난 뒤, 가드를 끄기 전에 같은 run ID의 journal을 아래처럼 요약한다.
+`TRIP`·`BLOCK`과 2xx 이외 결과가 0이어야 하고, endpoint/provider별 고유 counter가 1부터 최종값까지
+빠짐없이 있어야 한다. 요약 스크립트는 승인된 정확한 8개 endpoint·상한을 독립 상수로 검증하며,
+최종 counter는 그 상한을 넘을 수 없다. 이 안전한 요약 stdout만 결과 증거에 옮기고 원본 backend
+journal 전체를 복사하지 않는다.
+
+가드가 송신 전에 차단하거나 trip시키면 공통 예외 처리로 앱 응답이 `500`, 실행기 실패 분류가
+`unexpected_http`일 수 있다. 이를 성공으로 허용하지 않으며, 같은 run ID의 아래 가드 요약에서
+`unsafeEvents`(journal의 `TRIP`·`BLOCK` 집계)와 `non2xxResults`를 대조해 가드 동작 여부를 교차
+확인한다. 어느 쪽이든 전체 run은 실패이고, 이 staging 시험 장치 때문에 제품 HTTP 오류 계약을
+바꾸지는 않는다.
+
+```bash
+set -eu
+cd /opt/runninggu/repository
+ENV_FILE=/etc/runninggu/application.env
+READ_ENV=backend/deploy/common/read-required-env.sh
+read_guard_env() {
+  sudo /bin/sh "$READ_ENV" "$ENV_FILE" "$1"
+}
+
+RUN_ID=$(read_guard_env UPSTREAM_LOAD_GUARD_RUN_ID)
+case "$RUN_ID" in ''|*[!A-Za-z0-9._-]*) exit 1 ;; esac
+STATE_FILE="/run/runninggu-upstream-load-guard/$RUN_ID.env"
+test -f "$STATE_FILE"
+STATE_RUN_ID=$(sudo /bin/sh "$READ_ENV" "$STATE_FILE" RUN_ID)
+GUARD_STARTED_AT=$(sudo /bin/sh "$READ_ENV" "$STATE_FILE" GUARD_STARTED_AT)
+BASE_INVOCATION_ID=$(sudo /bin/sh "$READ_ENV" "$STATE_FILE" INVOCATION_ID)
+BASE_NRESTARTS=$(sudo /bin/sh "$READ_ENV" "$STATE_FILE" NRESTARTS)
+test "$STATE_RUN_ID" = "$RUN_ID"
+test "$(sudo systemctl is-active runninggu-backend.service)" = active
+test "$(sudo systemctl show runninggu-backend.service --property=InvocationID --value)" = "$BASE_INVOCATION_ID"
+test "$(sudo systemctl show runninggu-backend.service --property=NRestarts --value)" = "$BASE_NRESTARTS"
+
+guard_log=$(mktemp)
+chmod 0600 "$guard_log"
+trap 'rm -f "$guard_log"' EXIT HUP INT TERM
+sudo journalctl \
+  -u runninggu-backend.service \
+  --since "$GUARD_STARTED_AT" \
+  --grep "runId=${RUN_ID}[[:space:]]provider=" \
+  --output=cat \
+  --no-pager \
+  >"$guard_log"
+python3 backend/deploy/validation/summarize-upstream-load-guard.py \
+  --run-id="$RUN_ID" \
+  --require-endpoint KTO_SEARCH_FESTIVAL \
+  <"$guard_log"
+rm -f "$guard_log"
+trap - EXIT HUP INT TERM
+
+test "$(sudo systemctl is-active runninggu-backend.service)" = active
+test "$(sudo systemctl show runninggu-backend.service --property=InvocationID --value)" = "$BASE_INVOCATION_ID"
+test "$(sudo systemctl show runninggu-backend.service --property=NRestarts --value)" = "$BASE_NRESTARTS"
+```
+
+성공·실패와 관계없이 시험이 끝나면 `/etc/runninggu/application.env`의 가드 항목을 즉시 다음
+평시 값으로 되돌린다. 위 `test`가 실패했거나 shell session이 끊겼어도 새 session에서 이 절차를
+먼저 수행한다. run ID와 상한을 남긴 채 `enabled=false`만 바꾸지 않는다.
+
+```bash
+sudoedit /etc/runninggu/application.env
+```
+
+```dotenv
+RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging
+UPSTREAM_LOAD_GUARD_ENABLED=false
+UPSTREAM_LOAD_GUARD_RUN_ID=
+UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT=0
+UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT=0
+UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT=0
+```
+
+비활성 값이 각각 한 줄인지 값 노출 없이 확인한 뒤 backend만 재시작하고 내부 readiness와 외부
+HTTPS 스모크를 다시 통과시킨다.
+
+```bash
+set -eu
+ENV_FILE=/etc/runninggu/application.env
+for expected in \
+  'RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging' \
+  'UPSTREAM_LOAD_GUARD_ENABLED=false' \
+  'UPSTREAM_LOAD_GUARD_RUN_ID=' \
+  'UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT=0' \
+  'UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT=0' \
+  'UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT=0'
+do
+  key=${expected%%=*}
+  test "$(sudo grep -c "^${key}=" "$ENV_FILE")" -eq 1
+  test "$(sudo grep -Fxc "$expected" "$ENV_FILE")" -eq 1
+done
+
+sudo systemctl restart runninggu-backend.service
+sudo systemctl is-active --quiet runninggu-backend.service
+curl --fail --silent --show-error \
+  --output /dev/null \
+  'http://127.0.0.1:8080/api/contests?size=1'
+curl --fail --silent --show-error \
+  --output /dev/null \
+  'https://staging-api.runninggu.store/api/contests?size=1'
+```
+
 ## 16. 백업·복구
 
 ### 16.1 확정 구성
