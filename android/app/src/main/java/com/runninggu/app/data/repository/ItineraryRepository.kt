@@ -10,12 +10,21 @@ import com.runninggu.app.data.remote.mapper.toSavedItinerary
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.ItineraryApi
 import com.runninggu.app.data.remote.apiCall
+import com.runninggu.app.data.remote.dto.BlockCreateRequestDto
+import com.runninggu.app.data.remote.dto.BlockOrderRequestDto
+import com.runninggu.app.data.remote.dto.BlockPatchRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
 import com.runninggu.app.data.remote.dto.HotelDto
 import com.runninggu.app.data.remote.mapper.toResult
 import com.runninggu.app.data.remote.mapper.toServerName
+import com.runninggu.app.data.remote.dto.DEFAULT_BLOCK_START_TIME
+import com.runninggu.app.data.remote.mapper.toEditedBlock
+import com.runninggu.app.data.remote.mapper.toDomain
+import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.EventType
+import com.runninggu.app.domain.ItineraryBlock
+import com.runninggu.app.domain.Poi
 import com.runninggu.app.domain.PoiCategory
 import com.runninggu.app.domain.Recovery
 import kotlinx.coroutines.delay
@@ -41,6 +50,43 @@ data class GenerateItineraryRequest(
  * (AGENTS 2장). 화면에서 필요한 세 값만 옮겨 담는다.
  */
 data class HotelInput(val name: String, val lat: Double, val lng: Double)
+
+/**
+ * 새로 추가할 블록. (`POST .../blocks` · §5-7)
+ *
+ * 도메인 [com.runninggu.app.domain.ItineraryBlock] 을 그대로 받지 않는다 — 그쪽은 서버
+ * id 를 필수로 들고 있는데 **추가 전에는 그 id 가 없다.** 화면이 빈 문자열이나 가짜 id 를
+ * 채워 넣게 만들면, 그 값이 다음 요청에 실려 나간다.
+ */
+data class NewBlock(
+    val title: String,
+    val category: BlockCategory,
+    /** 안 정하면 계약 기본값 `"13:00"` 🔒(§5-7). 서버 기본값과 같아야 한다. */
+    val startTime: String = DEFAULT_BLOCK_START_TIME,
+    /** 장소 없는 블록도 정상이다 (§5-1 과 같다). */
+    val place: Poi? = null,
+    val description: String = "",
+)
+
+/**
+ * 블록 부분 수정. (`PATCH .../blocks/{blockId}` · §5-8)
+ *
+ * **`null` 은 "이 필드를 안 건드린다" 다.** 서버가 보낸 필드만 반영하므로, 안 바꿀 값을
+ * 현재 값으로 채워 보내면 그 사이 서버에서 바뀐 값을 덮어쓴다.
+ *
+ * 그래서 **`null` 로 장소를 지울 수는 없다.** 지우는 계약이 §5-8 에 없다 — 필요해지면
+ * 계약부터다(AGENTS 4장).
+ */
+data class BlockPatch(
+    val startTime: String? = null,
+    val title: String? = null,
+    val category: BlockCategory? = null,
+    val place: Poi? = null,
+    val description: String? = null,
+)
+
+/** 추가된 블록의 id 와 순서. 맨 끝에 붙는다 (§5-7). */
+data class AddedBlock(val blockId: Long, val orderNo: Int)
 
 /**
  * 동선 생성 창구. (SPEC 결정-41)
@@ -89,6 +135,53 @@ interface ItineraryRepository {
      */
     suspend fun delete(id: Long) = Unit
 
+    // ── 저장 후 편집 (§5-7 ~ §5-10 · 이슈 #213) ────────────────
+    //
+    // **저장 전 편집과 다른 계약이다.** 저장 전(S7 생성 직후)은 앱이 로컬 트리를 고치고
+    // [save] 로 통째로 보낸다. 저장 후(S7-R 복원)는 블록 하나가 곧 서버 왕복이다.
+    //
+    // `POST /itineraries` 로 다시 저장하는 길을 쓰지 않는 이유는 선경님이 #213 에서
+    // 짚으셨다 — 그 API 는 저장 시점 canonical 대회로 **RACE 블록을 재구성**하므로,
+    // USER 장소 하나만 고쳐도 대회 정보가 말없이 바뀌고 `needsRegeneration` → 명시적
+    // 재생성 → `PUT` 교체 흐름을 우회한다(SPEC 결정-45).
+    //
+    // 기본 구현이 예외를 던지는 것은 [save] 와 같은 이유다. 생성만 쓰는 구현이 여럿인데
+    // 조용히 성공한 척하면 **저장 안 된 편집을 저장됐다고 그리게 된다.**
+
+    /** 블록 추가. 그 일자 맨 끝에 붙는다 (§5-7). */
+    suspend fun addBlock(itineraryId: Long, dayId: Long, block: NewBlock): AddedBlock =
+        throw UnsupportedOperationException("이 구현은 저장 후 편집을 하지 않는다 (§5-7)")
+
+    /**
+     * USER 블록 수정. 갱신된 블록 전체가 온다 (§5-8).
+     *
+     * RACE 블록이면 `ApiErrorCode.SYSTEM_BLOCK_IMMUTABLE` 이 올라온다.
+     */
+    suspend fun updateBlock(
+        itineraryId: Long,
+        dayId: Long,
+        blockId: Long,
+        patch: BlockPatch,
+    ): ItineraryBlock =
+        throw UnsupportedOperationException("이 구현은 저장 후 편집을 하지 않는다 (§5-8)")
+
+    /** USER 블록 삭제 (§5-9). RACE 면 `SYSTEM_BLOCK_IMMUTABLE` 이다. */
+    suspend fun deleteBlock(itineraryId: Long, dayId: Long, blockId: Long): Unit =
+        throw UnsupportedOperationException("이 구현은 저장 후 편집을 하지 않는다 (§5-9)")
+
+    /**
+     * USER 블록 순서 변경. **그 일자의 전체 블록**이 정렬된 채 온다 (§5-10).
+     *
+     * [blockIds] 는 그 일자의 **USER 블록 전체 집합**이어야 한다 — 일부만 보내거나 RACE
+     * 를 섞으면 `ApiErrorCode.BLOCK_SET_MISMATCH` 다. 부분 갱신이 아니라 전체 교체다.
+     */
+    suspend fun reorderBlocks(
+        itineraryId: Long,
+        dayId: Long,
+        blockIds: List<Long>,
+    ): List<ItineraryBlock> =
+        throw UnsupportedOperationException("이 구현은 저장 후 편집을 하지 않는다 (§5-10)")
+
     companion object {
         /** 개인 목록 기본 페이지 크기 🔒(§0-4). */
         const val DEFAULT_PAGE_SIZE = 20
@@ -133,6 +226,34 @@ class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryReposi
         apiCall { api.detail(id).toDetail() }
 
     override suspend fun delete(id: Long) = apiCall { api.delete(id) }
+
+    // ── 저장 후 편집 (§5-7 ~ §5-10) ──────────────────────────────
+
+    override suspend fun addBlock(itineraryId: Long, dayId: Long, block: NewBlock): AddedBlock =
+        apiCall {
+            val created = api.addBlock(itineraryId, dayId, block.toDto())
+            AddedBlock(blockId = created.blockId, orderNo = created.orderNo)
+        }
+
+    override suspend fun updateBlock(
+        itineraryId: Long,
+        dayId: Long,
+        blockId: Long,
+        patch: BlockPatch,
+    ): ItineraryBlock = apiCall {
+        api.updateBlock(itineraryId, dayId, blockId, patch.toDto()).toEditedBlock()
+    }
+
+    override suspend fun deleteBlock(itineraryId: Long, dayId: Long, blockId: Long) =
+        apiCall { api.deleteBlock(itineraryId, dayId, blockId) }
+
+    override suspend fun reorderBlocks(
+        itineraryId: Long,
+        dayId: Long,
+        blockIds: List<Long>,
+    ): List<ItineraryBlock> = apiCall {
+        api.reorderBlocks(itineraryId, dayId, BlockOrderRequestDto(blockIds)).toDomain()
+    }
 }
 
 /**
@@ -141,6 +262,40 @@ class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryReposi
  * 날짜는 KST 비즈니스 날짜라 `toString()` 이 곧 `YYYY-MM-DD` 다. enum 은 서버와 같은
  * 대문자 이름을 그대로 보낸다 — 라벨(한국어)을 보내면 안 된다.
  */
+/**
+ * 추가 요청으로. (§5-7)
+ *
+ * `startTime` 을 안 넘기면 계약 기본값 `"13:00"` 이 실린다 — 서버 기본값과 같은 값을
+ * 앱도 들고 있어야 화면이 보여 준 시각과 저장된 시각이 갈리지 않는다.
+ */
+internal fun NewBlock.toDto(): BlockCreateRequestDto = BlockCreateRequestDto(
+    title = title,
+    category = category.name,
+    startTime = startTime,
+    placeName = place?.name,
+    address = place?.addr?.ifBlank { null },
+    lat = place?.lat,
+    lng = place?.lng,
+    description = description,
+)
+
+/**
+ * 수정 요청으로. (§5-8)
+ *
+ * **`null` 은 "안 건드린다" 이지 "비운다" 가 아니다.** 서버가 보낸 필드만 반영하므로,
+ * 안 바꿀 값을 현재 값으로 채워 보내면 그 사이 서버에서 바뀐 값을 덮어쓴다.
+ */
+internal fun BlockPatch.toDto(): BlockPatchRequestDto = BlockPatchRequestDto(
+    startTime = startTime,
+    title = title,
+    category = category?.name,
+    placeName = place?.name,
+    address = place?.addr?.ifBlank { null },
+    lat = place?.lat,
+    lng = place?.lng,
+    description = description,
+)
+
 internal fun GenerateItineraryRequest.toDto() = GenerateItineraryRequestDto(
     contestId = contestId,
     startDate = startDate.toString(),

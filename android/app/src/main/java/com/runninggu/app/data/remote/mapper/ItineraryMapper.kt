@@ -8,6 +8,7 @@ import com.runninggu.app.data.model.ContestSnapshot
 import com.runninggu.app.data.model.SavedItinerary
 import com.runninggu.app.data.model.SavedItineraryDetail
 import com.runninggu.app.data.remote.dto.BlockDto
+import com.runninggu.app.data.remote.dto.DayBlocksDto
 import com.runninggu.app.data.remote.dto.ContestSnapshotDto
 import com.runninggu.app.data.remote.dto.DayDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
@@ -75,6 +76,44 @@ private fun BlockDto.toDomain(dayIndex: Int, blockIndex: Int): ItineraryBlock {
         systemManaged = type == BlockType.RACE,
     )
 }
+
+// ── 저장 후 편집 (§5-7 ~ §5-10) ────────────────────────────────
+
+/**
+ * 편집 응답의 블록 하나. (§5-8 · §5-10)
+ *
+ * **생성 응답용 [toDomain] 과 갈라 둔다.** 그쪽은 id 가 없을 때 `blk_0_1` 같은 값을
+ * 만들어 주는데, 편집 경로에서 그러면 **다음 요청이 그 가짜 id 로 나간다.** 저장된
+ * 동선에서 온 블록은 서버 id 가 반드시 있으므로(§5-5), 없으면 계약이 깨진 것이라
+ * 조용히 메우지 않고 올린다 — `MeMapper` 의 모르는 `loginProvider` 와 같은 판단이다.
+ */
+fun BlockDto.toEditedBlock(): ItineraryBlock {
+    val serverId = id ?: throw IllegalArgumentException(
+        "저장 후 편집 응답에 블록 id 가 없다 (§5-8 · §5-10)",
+    )
+    val type = if (blockType == "RACE") BlockType.RACE else BlockType.USER
+    return ItineraryBlock(
+        id = serverId.toString(),
+        time = startTime,
+        title = title,
+        catKey = categoryOf(category),
+        place = placeName?.let {
+            Poi(name = it, lat = lat ?: 0.0, lng = lng ?: 0.0, addr = address.orEmpty())
+        },
+        desc = description,
+        blockType = type,
+        // 생성 매퍼와 같은 이유로 종류에서 다시 계산한다 — 둘이 어긋나면 잠금이 풀린다
+        systemManaged = type == BlockType.RACE,
+    )
+}
+
+/**
+ * 순서 변경 응답. **그 일자의 전체 블록**이 `orderNo` 오름차순으로 온다 (§5-10).
+ *
+ * 서버가 RACE 를 제자리에 끼워 돌려주므로 앱이 다시 합치지 않는다. 정렬도 다시 하지
+ * 않는다 — 서버가 정한 순서가 곧 계약이고, 앱이 또 정렬하면 규칙이 두 곳이 된다.
+ */
+fun DayBlocksDto.toDomain(): List<ItineraryBlock> = blocks.map { it.toEditedBlock() }
 
 /** 서버 Enum(대문자)을 화면 분류로. 모르는 값은 관광지로 떨어뜨린다. (API 명세 부록 C) */
 private fun categoryOf(raw: String): BlockCategory =
