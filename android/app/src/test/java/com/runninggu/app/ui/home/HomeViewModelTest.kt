@@ -6,6 +6,7 @@ import com.runninggu.app.data.model.Festival
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.httpErrorOf
 import com.runninggu.app.data.repository.ClosingSoon
+import com.runninggu.app.data.repository.ClosingSoonResult
 import com.runninggu.app.data.repository.ContestFilter
 import com.runninggu.app.data.repository.ContestPage
 import com.runninggu.app.data.repository.ContestRepository
@@ -14,6 +15,7 @@ import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.common.SectionState
+import com.runninggu.app.ui.common.cachedAt
 import com.runninggu.app.ui.common.valueOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -27,6 +29,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -79,6 +82,62 @@ class HomeViewModelTest {
 
         val ids = viewModel.uiState.value.closingSoon.valueOrNull.orEmpty().map { it.id }
         assertEquals(listOf("1", "2"), ids)
+    }
+
+    @Test
+    fun `캐시로 그린 목록에는 언제 것인지가 붙는다`() = runTest(dispatcher) {
+        // 화면이 "마지막 성공본" 이라고 말하려면 출처와 시각이 UiState 까지 와야 한다.
+        // 여기서 끊기면 화면은 낡은 목록을 최신인 것처럼 그린다(SPEC §6.1 · #276)
+        val saved = Instant.ofEpochMilli(1_700_000_000_000L)
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(
+                closingSoon = listOf(closingSoon(1, LocalDate.of(2026, 9, 1))),
+                cachedAt = saved,
+            ),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(saved, viewModel.uiState.value.closingSoon.cachedAt)
+    }
+
+    @Test
+    fun `서버에서 막 받은 목록에는 붙지 않는다`() = runTest(dispatcher) {
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = listOf(closingSoon(1, LocalDate.of(2026, 9, 1)))),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.closingSoon.cachedAt)
+    }
+
+    @Test
+    fun `되살린 결과가 0건이어도 언제 것인지가 남는다`() = runTest(dispatcher) {
+        // **여기가 비면 마지막 성공본으로 접힌 화면과 방금 서버가 0건을 준 화면이
+        // 같아 보인다.** 0건은 드문 경우가 아니다 — 접수 종료 항목을 다 걸러내면
+        // 바로 이 상태고, 캐시가 하루쯤 묵으면 자연스럽게 일어난다 (#283 리뷰)
+        val saved = Instant.ofEpochMilli(1_700_000_000_000L)
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = emptyList(), cachedAt = saved),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value.closingSoon
+        assertTrue("정상 빈 상태여야 한다: $state", state is SectionState.Empty)
+        assertEquals(saved, state.cachedAt)
+    }
+
+    @Test
+    fun `서버가 준 0건에는 붙지 않는다`() = runTest(dispatcher) {
+        val viewModel = HomeViewModel(
+            RecordingContestRepository(closingSoon = emptyList()),
+            StubFestivalRepository(),
+        )
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.closingSoon.cachedAt)
     }
 
     @Test
@@ -208,15 +267,17 @@ class HomeViewModelTest {
 private class RecordingContestRepository(
     private val closingSoon: List<ClosingSoon> = emptyList(),
     private val failure: Throwable? = null,
+    /** 캐시로 되살린 결과를 흉내 낼 때만 넣는다. 서버 응답이면 null 이다(#276). */
+    private val cachedAt: Instant? = null,
 ) : ContestRepository {
 
     var lastLimit: Int? = null
         private set
 
-    override suspend fun closingSoon(limit: Int): List<ClosingSoon> {
+    override suspend fun closingSoon(limit: Int): ClosingSoonResult {
         lastLimit = limit
         failure?.let { throw it }
-        return closingSoon
+        return ClosingSoonResult(closingSoon, cachedAt)
     }
 
     override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage =

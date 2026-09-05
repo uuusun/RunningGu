@@ -566,8 +566,17 @@ favoriteContest { userId, contestId, savedAt }                               // 
 
 - `routeId`는 near 응답 안에서 경로 항목을 식별하는 불투명 문자열이다. `sourceCourseId`는 큐레이션 원본에만 있고 OSM 생성 경로에서는 생략한다. `fullDistKm`도 원본 전체 길이가 있는 큐레이션 경로에만 있다.
 - `CourseDataSource`는 `API_GPX | GPX_ONLY | OSM_GENERATED`다. OSM 생성 경로는 서버 요청 시점에 계산하며 PostgreSQL 코스 마스터나 지역별 목록에 적재하지 않는다.
-- **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_itinerary`, `cached_course`, `cached_favorite`)만 둔다. 서버 ID와 `cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
+- **Room 캐시 초안** 📱전환🔧정책: 서버 DTO 캐시(`cached_contest`, `cached_closing_soon`, `cached_itinerary`, `cached_course`, `cached_favorite`)만 둔다. 서버 ID와 `cachedAt`을 보존하며 오프라인 쓰기 충돌 병합은 MVP에서 제공하지 않는다. DataStore는 세션 토큰·게스트 여부·설정만 저장한다.
 - `cachedAt`은 **앱이 마지막 성공 응답을 저장한 시각**이다. 서버가 준 값이 아니다 — P0 API 계약에 `ETag`·`Last-Modified` 조건부 요청이 없어서 서버가 주는 버전 자체가 없다. 그래서 초안에 있던 "버전" 보존을 뺐다. 조건부 요청을 넣기로 하면 응답 헤더·재검증·`304` 동작을 계약으로 먼저 확정한 뒤 컬럼을 더한다(이슈 #105, 2026-09-03).
+- **`cached_closing_soon`** 📱전환🔒확정(이슈 #276, 2026-09-03): 홈 마감임박(`GET /api/contests/closing-soon`) 전용 snapshot이다. `cached_contest`를 재사용하지 않는다 — 마감임박은 **서버가 고르고 서버가 순서를 정하는** 목록이라, 앱이 캐시에서 다시 고르면 그 선정 규칙을 앱이 구현하는 셈이 된다.
+  - 저장: 성공 응답의 `rank`(서버가 준 순서) · `ContestDto` · `cachedAt`을 **한 snapshot 단위로 원자 교체**한다. 행 단위 upsert가 아니다 — 이전 응답의 5번째가 남으면 서버가 주지 않은 항목이 목록에 섞인다.
+  - **정상 빈 응답(0건)에도 예외가 없다.** 예외를 두면 서버가 목록에서 뺀 대회가 오프라인에서 되살아난다 — 접수가 다 끝나 서버가 0건을 줬는데 앱은 어제의 넷을 그대로 보여준다. 그리고 0건으로 저장된 snapshot은 **살아 있는 snapshot**이라, 그 상태로 오프라인이면 네트워크 오류가 아니라 정상 빈 상태를 그린다. 행이 0개여도 저장 시각이 남아야 해서 `cached_closing_soon_meta` 한 줄을 함께 둔다 — 행 수로는 "받은 적 없다"와 "받았는데 0건"을 가를 수 없다(이슈 #283 리뷰).
+  - `dDayApply`는 **담지도 않는다** — 직렬화 전에 떼어 낸다. 읽지 않는 것과 담지 않는 것은 다르다: 담겨 있으면 다음 사람이 payload를 열어 그 값을 쓸 수 있다(이슈 #283 리뷰). 저장된 `applyEnd`와 꺼내는 시점의 KST 날짜로 다시 계산한다. 목록·상세와 결정적으로 다른 점이다 — 대회일은 안 낡지만 "마감 D-4"는 하루만 지나도 거짓이 되고, **이미 마감된 대회를 "마감 D-2"로 보여주는 것은 안 보여주는 것보다 나쁘다.**
+  - 만료: `cachedAt` 기준 **24시간 미만**만 유효하다. 시각은 UTC로 저장한다(§6.6).
+  - 꺼낼 때 **접수가 이미 끝난 항목(`applyEnd < 오늘(KST)`)을 제외**한다. `applyEnd`가 없으면 끝났는지 알 수 없으므로 남긴다.
+  - 제외 후 0건이면 **정상 빈 상태**다. cache가 없거나 24시간이 지났으면 낡은 목록을 보여주지 않고 기존 네트워크 오류와 [다시 시도]를 표시한다 — "대회가 없음" 빈 상태로 바꾸지 않는다. 없는 것과 못 불러온 것은 사용자가 할 일이 다르다.
+  - 폴백 조건은 `cached_contest`와 같다. **연결 자체가 안 됐을 때(`ApiException.Network`)만** 되살리고, 서버가 답한 `4xx`·`5xx`에는 쓰지 않는다.
+- **캐시 출처 표기** 📱전환🔒확정(이슈 #276 · #275 후속, 2026-09-03): 캐시로 그린 영역은 **마지막 성공본임을 화면에서 알 수 있어야 한다.** repository는 값과 함께 출처(`LOCAL_CACHE`)와 `cachedAt`을 올리고, `UiState`는 그것을 그대로 담는다. 앱이 "언제 것인지"를 모르는 채로 낡은 목록을 그리면 사용자는 지금 서버가 말한 것과 다른 화면을 보면서 그 사실을 알 수 없다. P0에서 이 표기를 붙이는 곳은 홈 마감임박이고, 대회 목록·상세(#275)는 같은 계약으로 뒤따른다.
 - 저장 코스의 `pathPolyline`은 **고도를 제외한 2D Google Encoded Polyline precision 5(E5)** 다. 서버는 이를 위도·경도 순서의 E5 좌표열로 복원하고, 연속 중복 좌표만 제거해 진행 순서를 유지한다. canonical geometry는 각 좌표를 소수점 5자리 고정 `lat,lng`로 쓰고 좌표끼리 `;`로 연결한 공백 없는 문자열(예: `37.12345,127.12345;37.12346,127.12346`)의 UTF-8 바이트다. 코스명·지역·난이도·시간·상승고도·거리·`dataSource`는 입력에서 제외하며, 서버가 `v1:` + SHA-256 lowercase hex 형식의 `routeFingerprint`를 계산한다. `(userId, routeFingerprint)` 중복 저장은 멱등 처리하고, `sourceCourseId`가 없는 OSM 생성 경로도 같은 API로 저장한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 저장 코스 `elevationProfileM`은 정수 미터 배열이며 순서를 보존하고 최대 100개, 미보유 시 `[]`다. PostgreSQL `elevation_profile_m`은 `JSONB NOT NULL DEFAULT '[]'`로 저장하고 DB는 JSON 배열·최대 길이를, 서비스는 각 원소가 정수인지 검증한다. 검색·정렬에는 사용하지 않고 `routeFingerprint`에서도 제외한다 🔒확정(결정-33 08-23 재개정, 이슈 #62).
 - 서버는 저장 시 실제 경로 원천의 검증 완료 attribution 완성 문구를 `attributions` snapshot으로 확정한다. PostgreSQL은 `JSONB NOT NULL DEFAULT '[]'`로 보존하며, 상세 API만 `List<String>`으로 반환한다. 클라이언트 입력과 이후 라이선스 문구 변경은 기존 값에 반영하지 않고, attribution은 geometry 기반 `routeFingerprint` 계산에서도 제외한다 🔒확정(결정-44).

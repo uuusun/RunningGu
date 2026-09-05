@@ -228,7 +228,7 @@ private fun <T> LazyListScope.section(
 ) {
     when (state) {
         SectionState.Loading -> item { LoadingState(message = "불러오는 중…") }
-        SectionState.Empty -> empty?.let { item { it() } } ?: Unit
+        is SectionState.Empty -> empty?.let { item { it() } } ?: Unit
         is SectionState.Error -> item {
             // 서버가 준 문구가 있으면 그걸 쓴다. 없을 때만 영역 기본 문구다 (§0-3)
             ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)

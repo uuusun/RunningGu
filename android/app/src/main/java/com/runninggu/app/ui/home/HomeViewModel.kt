@@ -6,6 +6,7 @@ import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.repository.FestivalRepository
+import com.runninggu.app.ui.common.DataOrigin
 import com.runninggu.app.ui.common.SectionState
 import com.runninggu.app.ui.model.toFestivalSummary
 import com.runninggu.app.ui.model.toRaceSummary
@@ -61,9 +62,13 @@ class HomeViewModel(
         closingSoonJob = viewModelScope.launch {
             _uiState.update { it.copy(closingSoon = SectionState.Loading) }
             val next = try {
-                contestRepository.closingSoon(CLOSING_SOON_LIMIT)
+                val result = contestRepository.closingSoon(CLOSING_SOON_LIMIT)
+                result.items
                     .map { it.contest.toRaceSummary() }
-                    .toSectionState()
+                    // 되살린 목록이면 **언제 것인지를 함께 올린다.** 캐시가 0건으로 걸러졌을
+                    // 때는 Empty 라 출처가 붙을 자리가 없는데, 그건 보여줄 목록 자체가
+                    // 없는 것이라 "언제 것" 을 말할 대상도 없다(#276)
+                    .toSectionState(result.cachedAt?.let { DataOrigin.LocalCache(it) } ?: DataOrigin.Server)
             } catch (e: ApiException) {
                 SectionState.Error(e.sectionMessage())
             }
@@ -108,8 +113,13 @@ class HomeViewModel(
 /**
  * 조회 결과를 영역 상태로. 빈 목록은 [SectionState.Empty] 다.
  *
+ * **빈 목록에도 출처를 넘긴다.** 캐시로 되살렸는데 0건이면 화면이 "언제 것" 을 말할 수
+ * 있어야 한다 — 여기서 떨어뜨리면 repository 가 준 `cachedAt` 이 사라진다(#283 리뷰).
+ *
  * **정상 0건과 오류를 섞지 않기 위해** 여기서 한 번만 판단한다 — 화면마다 `isEmpty()` 를
  * 따로 보면 어디선가 빠진다(API 명세 §0-3).
  */
-internal fun <T> List<T>.toSectionState(): SectionState<List<T>> =
-    if (isEmpty()) SectionState.Empty else SectionState.Content(this)
+internal fun <T> List<T>.toSectionState(
+    origin: DataOrigin = DataOrigin.Server,
+): SectionState<List<T>> =
+    if (isEmpty()) SectionState.Empty(origin) else SectionState.Content(this, origin)
