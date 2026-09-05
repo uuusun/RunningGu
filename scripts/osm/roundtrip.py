@@ -55,6 +55,25 @@ QUALITY = {
 #: 표에 없는 값(unclassified 등)의 기본 점수.
 QUALITY_DEFAULT = 0.40
 
+#: 발에 좋은 노면. 흙·잔디·자갈길은 무릎 부담이 덜하다.
+SOFT_SURFACE = {"ground", "dirt", "earth", "grass", "gravel", "fine_gravel", "sand", "wood"}
+#: 포장 노면. 러닝이 가능하지만 딱딱하다.
+PAVED_SURFACE = {"asphalt", "concrete", "paved", "paving_stones", "sett", "cobblestone"}
+
+#: 길이 어디에 놓여 있는가. `road_class` 가 못 가르는 것을 가른다.
+#:
+#: **이게 이 측정을 더한 이유다.** `road_class` 만 보면 대로변 보도와 한강 산책로가
+#: 둘 다 `footway` 로 1.00 점이다(이슈 #224). 실제로 뛰면 완전히 다른 길인데
+#: 이름표가 같아서 점수가 같다. `road_environment` 는 다리·터널·페리를 갈라 주고,
+#: `surface` 는 흙길과 아스팔트를 갈라 준다 — 둘 다 `graphhopper.yml` 의
+#: `graph.encoded_values` 에 이미 올라가 있어 요청만 하면 온다.
+TUNNEL_ENV = {"tunnel"}
+BRIDGE_ENV = {"bridge"}
+
+#: 경사 구간 판정 기준(%). 이 이상이면 러닝 리듬이 끊긴다고 본다.
+STEEP_SLOPE_PCT = 6.0
+
+
 #: 실제로 몸이 꺾이는 안내만 고른다. GraphHopper `sign` 기준.
 #:
 #: 안내 목록에는 직진(0)·도착(4)·경유(5)와 길 이름만 바뀌는 구간까지 들어 있어
@@ -80,7 +99,8 @@ def route_observation(
                 "point": f"{lat},{lng}", "profile": profile, "algorithm": "round_trip",
                 "round_trip.distance": int(km * 1000), "round_trip.seed": seed,
                 "points_encoded": "false", "elevation": "true",
-                "instructions": "true", "details": ["road_class"],
+                "instructions": "true",
+                "details": ["road_class", "surface", "road_environment", "average_slope"],
             },
             timeout=120,
         )
@@ -149,10 +169,14 @@ def _parse(p: dict, seed: int) -> dict:
     # 길 종류별 **실제 거리**를 잰다. details 의 a·b 는 좌표점 번호라 개수로 세면
     # 좌표가 촘촘한 굽은 길이 부풀고 곧은 차도는 줄어든다.
     seg = [meters(pts[i - 1], pts[i]) for i in range(1, len(pts))]
-    agg: collections.Counter = collections.Counter()
-    for a, b, v in p.get("details", {}).get("road_class", []):
-        agg[v] += sum(seg[a:b])
+    agg = _by_distance(p, seg, "road_class")
     total = max(1.0, sum(agg.values()))
+    surface = _by_distance(p, seg, "surface")
+    env = _by_distance(p, seg, "road_environment")
+    # 노면·환경은 details 를 안 주는 서버에서도 돌아야 한다. 그때는 분모가 0 이라
+    # 비율을 내지 않고 None 을 둔다 — 0% 로 적으면 "포장이 하나도 없다" 로 읽힌다.
+    surface_total = sum(surface.values())
+    env_total = sum(env.values())
     steps = p.get("instructions") or []
     return {
         "km": p["distance"] / 1000,
@@ -164,12 +188,67 @@ def _parse(p: dict, seed: int) -> dict:
         "qual": sum(QUALITY.get(v, QUALITY_DEFAULT) * c for v, c in agg.items()) * 100 / total,
         "turns": sum(1 for s in steps if s.get("sign") in TURN_SIGNS),
         "steps": len(steps),
+        # ── 이름표가 못 가르는 것 (이슈 #224) ──
+        # 같은 footway 라도 흙길과 아스팔트는 다른 길이다. 못 받았으면 None.
+        "soft": _share(surface, SOFT_SURFACE, surface_total),
+        "paved": _share(surface, PAVED_SURFACE, surface_total),
+        "tunnel": _share(env, TUNNEL_ENV, env_total),
+        "bridge": _share(env, BRIDGE_ENV, env_total),
+        "steep": _steep_share(p, seg),
         "gain": sum(
             max(0, pts[i][2] - pts[i - 1][2])
             for i in range(1, len(pts)) if len(pts[i]) > 2
         ),
         "seed": seed,
     }
+
+
+def _by_distance(p: dict, seg: list[float], key: str) -> collections.Counter:
+    """`details[key]` 를 **실제 거리**로 합산한다.
+
+    details 의 `a`·`b` 는 좌표점 번호라 개수로 세면 좌표가 촘촘한 굽은 길이 부풀고
+    곧은 차도는 줄어든다. 세 지표가 같은 실수를 반복하지 않게 한 곳에 모았다.
+    """
+    agg: collections.Counter = collections.Counter()
+    for a, b, v in p.get("details", {}).get(key, []):
+        if v is None:
+            continue
+        agg[str(v).lower()] += sum(seg[a:b])
+    return agg
+
+
+def _share(agg: collections.Counter, wanted: set[str], total: float) -> float | None:
+    """`wanted` 가 차지하는 비율(%). 분모가 0 이면 None.
+
+    **0.0 과 None 을 가른다.** 서버가 그 detail 을 안 주면 0% 가 아니라 "모른다" 다 —
+    0 으로 적으면 표에서 "포장이 하나도 없는 길" 로 읽힌다.
+    """
+    if total <= 0:
+        return None
+    return sum(c for v, c in agg.items() if v in wanted) * 100 / total
+
+
+def _steep_share(p: dict, seg: list[float]) -> float | None:
+    """경사 |average_slope| 가 [STEEP_SLOPE_PCT] 이상인 구간의 거리 비율(%).
+
+    오르막·내리막을 함께 센다. 내리막도 리듬이 끊기는 건 같고, 왕복 경로라
+    한쪽만 세면 같은 언덕이 절반으로 보인다.
+    """
+    rows = p.get("details", {}).get("average_slope", [])
+    if not rows:
+        return None
+    steep = 0.0
+    total = 0.0
+    for a, b, v in rows:
+        if v is None:
+            continue
+        length = sum(seg[a:b])
+        total += length
+        if abs(float(v)) >= STEEP_SLOPE_PCT:
+            steep += length
+    if total <= 0:
+        return None
+    return steep * 100 / total
 
 
 def candidates(lat: float, lng: float, km: float, profile: str = "run", seeds: int = 16) -> list[dict]:
@@ -388,7 +467,7 @@ def caps_stats(
                 "pointsEncoded": False,
                 "elevation": True,
                 "instructions": True,
-                "details": ["road_class"],
+                "details": ["road_class", "surface", "road_environment", "average_slope"],
             },
             "seedCount": seeds,
             "cells": evidence_cells,
@@ -511,7 +590,7 @@ def route_cm(lat, lng, km, seed, feats=None, avoid_alley=False):
         "points": [[lng, lat]], "profile": "run", "algorithm": "round_trip",
         "round_trip.distance": int(km * 1000), "round_trip.seed": seed,
         "points_encoded": False, "elevation": True, "instructions": True,
-        "details": ["road_class"],
+        "details": ["road_class", "surface", "road_environment", "average_slope"],
     }
     pri, cm = [], {}
     if feats:
