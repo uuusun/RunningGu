@@ -132,8 +132,10 @@ data class BlockCreatedDto(val blockId: Long, val orderNo: Int)
  * **보낸 필드만 반영된다.** 그래서 전부 nullable 이고 기본값이 `null` 이다 — 안 건드릴
  * 필드를 현재 값으로 채워 보내면, 그 사이 서버 값이 바뀌었을 때 덮어쓰게 된다.
  *
- * `null` 을 "이 필드를 비워 달라" 는 뜻으로 쓸 수 없다는 뜻이기도 하다. 장소를 지우는
- * 계약은 §5-8 에 없다 — 필요해지면 계약부터다.
+ * **서버는 명시적 `null` 을 "그 값을 지워라" 로 읽는다**(§5-8 · #213). 그런데 `ApiJson` 이
+ * `explicitNulls = false` 라 여기 `null` 을 넣어도 본문에서 빠지므로 **지우는 요청이 되지
+ * 않는다.** 그게 이 타입에서는 맞는 동작이다 — 안 바꿀 필드가 전부 `null` 이라, `null` 이
+ * 실려 나가면 제목만 바꾸는 요청이 장소를 지운다. `BlockPatchWireTest` 가 그 줄을 지킨다.
  */
 @Serializable
 data class BlockPatchRequestDto(

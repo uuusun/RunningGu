@@ -625,11 +625,18 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
 | 5-7 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. **필드 부재와 명시적 `null` 을 가른다** — 없으면 기존 값 유지, `"placeName": null` 은 그 값을 **제거**한다(이슈 #213). 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-9 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-10 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
 
 5-8의 block 응답은 5-5 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
+
+**서버는 문자열 값을 정규화해 저장한다** 🔒확정(이슈 #213 · 2026-09-05). `title` 은 앞뒤 공백을
+제거하며 비면 `400 VALIDATION_FAILED` 이고, `placeName`·`address`·`description` 은 공백만 있는
+값을 `null` 로 바꾼다. `startTime` 은 5-7 의 기본값 규칙을 따른다. **따라서 앱이 보낸 값과 저장된
+값이 다를 수 있다** — 5-7 응답은 `{blockId, orderNo}` 뿐이라 앱이 보낸 값으로 행을 그리면 공백이
+남거나 빈 문자열이 `null` 과 어긋난다. 앱은 보내기 전에 같은 정규화를 하거나 5-8 · 5-5 응답으로
+상태를 교체한다.
 
 ---
 
