@@ -86,6 +86,41 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
+    void 게스트에게_전체_코스_상세를_제공하고_외부_API는_호출하지_않는다() throws Exception {
+        mockMvc.perform(get("/api/courses/C001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value("C001"))
+                .andExpect(jsonPath("$.courseName").value("서울 짧은길"))
+                .andExpect(jsonPath("$.distanceKm").value(3.0))
+                .andExpect(jsonPath("$.durationMin").value(27))
+                .andExpect(jsonPath("$.gainM").value(10))
+                .andExpect(jsonPath("$.dataSource").value("API_GPX"))
+                .andExpect(jsonPath("$.syncedAt").value(nullValue()))
+                .andExpect(jsonPath("$.pathPolyline").isNotEmpty())
+                .andExpect(jsonPath("$.elevationProfileM", contains(10, 11)))
+                .andExpect(jsonPath("$.attributions", contains("두루누비 걷기길(한국관광공사)")));
+        verifyNoInteractions(kakaoPoiSource, osmRouteGenerator);
+    }
+
+    @Test
+    void GPX_ONLY와_HARD도_상세에서_제공하고_해당_원천만_표시한다() throws Exception {
+        mockMvc.perform(get("/api/courses/C003"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.difficulty").value("HARD"))
+                .andExpect(jsonPath("$.dataSource").value("GPX_ONLY"))
+                .andExpect(jsonPath("$.syncedAt").value(nullValue()))
+                .andExpect(jsonPath("$.attributions", contains("테스트 트레일 원천")));
+    }
+
+    @Test
+    void 없는_코스_ID는_게스트에게도_404_problem을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/courses/not-present"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+    }
+
+    @Test
     void 지역은_NFC와_앞뒤공백을_정규화하고_sido와_정확히_일치시킨다() throws Exception {
         mockMvc.perform(get("/api/courses").param("region", "  서울  "))
                 .andExpect(status().isOk())

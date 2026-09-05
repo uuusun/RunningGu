@@ -51,7 +51,8 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/courses",
                                 "/api/courses/near",
-                                "/api/courses/regions")
+                                "/api/courses/regions",
+                                "/api/courses/*")
                         .permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,

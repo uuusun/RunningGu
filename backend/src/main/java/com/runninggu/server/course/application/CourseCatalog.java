@@ -72,6 +72,16 @@ public final class CourseCatalog {
                 attributions(current, content));
     }
 
+    /** 공개 안정키로 원본 코스 전체를 조회한다. (SPEC §5.8·API 명세 §6-4·이슈 #280) */
+    public CourseDetail detail(String courseId) {
+        CourseCatalogSnapshot current = snapshot.get();
+        Course course = current.courses().stream()
+                .filter(candidate -> candidate.courseId().equals(courseId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.COURSE_NOT_FOUND));
+        return new CourseDetail(course, attributions(current, List.of(course)));
+    }
+
     public List<CourseRegionCount> regions() {
         CourseCatalogSnapshot current = snapshot.get();
         Map<String, Long> counts = current.courses().stream()
