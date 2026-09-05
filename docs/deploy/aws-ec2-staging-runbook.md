@@ -948,6 +948,11 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 
 ### 15.3 staging 앱 API 부하 시험의 외부 호출 가드
 
+2026-09-05 `673a2f7` 정식 develop CI artifact의 기존 8GiB 배포와 승인된 앱 부하 시험을 완료했다.
+2,100건 전송·완료, 본 시험 1,800건 성공, 480개 자원 표본과 backup 1회·WAL 3회,
+가드 해제·재기동·HTTPS 복귀 및 단발 Full GC 1회의 구간 판정은
+[실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 4GiB는 별도 승인 전이며 변경하지 않았다.
+
 이 가드는 [`api-load-test-plan.md`](api-load-test-plan.md)의 앱 API 부하 시험에만 사용한다.
 제품 API·캐시·재시도 계약을 바꾸는 기능이 아니며 기본값은 비활성이다. Java 설정도
 `RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging`이 아니면 활성화를 거부한다. production에서는 켜지

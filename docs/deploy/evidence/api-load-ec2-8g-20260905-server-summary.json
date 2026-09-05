@@ -1,0 +1,344 @@
+{
+  "metrics": {
+    "commandId": "090bd995-bfc7-45c3-bdd3-4b74ee3ed05d",
+    "status": "Success",
+    "responseCode": 0,
+    "result": {
+      "resources": {
+        "expectedSamples": 480,
+        "actualSamples": 480,
+        "malformedObservations": 0,
+        "invalidSampleValues": 0,
+        "minimumMemAvailablePercent": 67.372,
+        "maximumSwapGrowthKiB": 0,
+        "pswpinGrowth": 0,
+        "pswpoutGrowth": 0,
+        "systemdObservationCounts": {
+          "runninggu-backend.service": 480,
+          "runninggu-graphhopper.service": 480
+        },
+        "missingSystemdServiceSamples": 0,
+        "unhealthySystemdServiceSamples": 0,
+        "systemdRestartGrowth": {
+          "runninggu-backend.service": 0,
+          "runninggu-graphhopper.service": 0
+        },
+        "containerObservationCounts": {
+          "graphhopper": 480,
+          "postgres": 480
+        },
+        "missingContainerSamples": 0,
+        "containerRestartGrowth": {
+          "graphhopper": 0,
+          "postgres": 0
+        },
+        "oomKilledSamples": 0,
+        "unhealthyContainerSamples": 0,
+        "passed": true
+      },
+      "backupWal": [
+        {
+          "kind": "wal",
+          "startedAt": "2026-09-05T05:48:06.823141+00:00",
+          "completedAt": "2026-09-05T05:48:07.129631+00:00",
+          "passed": true
+        },
+        {
+          "kind": "wal",
+          "startedAt": "2026-09-05T05:58:07.306413+00:00",
+          "completedAt": "2026-09-05T05:58:07.594608+00:00",
+          "passed": true
+        },
+        {
+          "kind": "backup",
+          "startedAt": "2026-09-05T05:59:47.622591+00:00",
+          "completedAt": "2026-09-05T06:00:35.771779+00:00",
+          "passed": true
+        },
+        {
+          "kind": "wal",
+          "startedAt": "2026-09-05T06:08:06.898457+00:00",
+          "completedAt": "2026-09-05T06:08:07.190758+00:00",
+          "passed": true
+        }
+      ],
+      "gcOom": {
+        "backendFullGc": 10,
+        "graphhopperFullGc": 0,
+        "kernelOomEvents": 0,
+        "collectorExitCode": 0,
+        "finishedAt": "2026-09-05T06:23:06.567004+00:00"
+      },
+      "guard": {
+        "runId": "api8g-673a2f7-20260905T0540Z",
+        "guardLines": 143,
+        "malformedLines": 0,
+        "unsafeEvents": 0,
+        "non2xxResults": 0,
+        "counterGaps": 0,
+        "overLimit": 0,
+        "requiredEndpoint": "KTO_SEARCH_FESTIVAL",
+        "requiredEndpointSeen": true,
+        "endpoints": [
+          {
+            "endpoint": "KAKAO_CATEGORY",
+            "attempts": 7,
+            "finalCount": 7,
+            "limit": 2000
+          },
+          {
+            "endpoint": "KAKAO_KEYWORD",
+            "attempts": 98,
+            "finalCount": 98,
+            "limit": 2000
+          },
+          {
+            "endpoint": "KTO_SEARCH_FESTIVAL",
+            "attempts": 8,
+            "finalCount": 8,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_KOR_LOCATION",
+            "attempts": 14,
+            "finalCount": 14,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_WELLNESS_LOCATION",
+            "attempts": 14,
+            "finalCount": 14,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_DURUNUBI_COURSE",
+            "attempts": 2,
+            "finalCount": 2,
+            "limit": 100
+          }
+        ],
+        "providers": [
+          {
+            "provider": "KAKAO",
+            "attempts": 105,
+            "finalCount": 105,
+            "limit": "5000"
+          },
+          {
+            "provider": "KTO",
+            "attempts": 38,
+            "finalCount": 38,
+            "limit": "NONE"
+          }
+        ],
+        "passed": true,
+        "invocationUnchanged": true,
+        "nRestartsUnchanged": true
+      }
+    }
+  },
+  "cleanup": {
+    "commandId": "7c49316b-f2b1-4f14-94af-f9ad7a850ab1",
+    "status": "Success",
+    "responseCode": 0,
+    "result": {
+      "runId": "api8g-673a2f7-20260905T0540Z",
+      "finishedAt": "2026-09-05T06:23:20.096107+00:00",
+      "guardDisabled": true,
+      "readiness": true,
+      "backendNRestarts": "0",
+      "guardSummary": {
+        "runId": "api8g-673a2f7-20260905T0540Z",
+        "guardLines": 143,
+        "malformedLines": 0,
+        "unsafeEvents": 0,
+        "non2xxResults": 0,
+        "counterGaps": 0,
+        "overLimit": 0,
+        "requiredEndpoint": "KTO_SEARCH_FESTIVAL",
+        "requiredEndpointSeen": true,
+        "endpoints": [
+          {
+            "endpoint": "KAKAO_CATEGORY",
+            "attempts": 7,
+            "finalCount": 7,
+            "limit": 2000
+          },
+          {
+            "endpoint": "KAKAO_KEYWORD",
+            "attempts": 98,
+            "finalCount": 98,
+            "limit": 2000
+          },
+          {
+            "endpoint": "KTO_SEARCH_FESTIVAL",
+            "attempts": 8,
+            "finalCount": 8,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_KOR_LOCATION",
+            "attempts": 14,
+            "finalCount": 14,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_WELLNESS_LOCATION",
+            "attempts": 14,
+            "finalCount": 14,
+            "limit": 100
+          },
+          {
+            "endpoint": "KTO_DURUNUBI_COURSE",
+            "attempts": 2,
+            "finalCount": 2,
+            "limit": 100
+          }
+        ],
+        "providers": [
+          {
+            "provider": "KAKAO",
+            "attempts": 105,
+            "finalCount": 105,
+            "limit": "5000"
+          },
+          {
+            "provider": "KTO",
+            "attempts": 38,
+            "finalCount": 38,
+            "limit": "NONE"
+          }
+        ],
+        "passed": true,
+        "invocationUnchanged": true,
+        "nRestartsUnchanged": true
+      }
+    }
+  },
+  "postCleanup": {
+    "commandId": "da96d03b-a698-4a5e-8955-222428cd1ada",
+    "status": "Success",
+    "responseCode": 0,
+    "result": {
+      "checkedAt": "2026-09-05T06:23:58.844311+00:00",
+      "source": "673a2f796052f4553113d5cd25608fb3821222ac",
+      "currentRelease": "/opt/runninggu/releases/673a2f796052f4553113d5cd25608fb3821222ac",
+      "graphAndPostgresUnchanged": true,
+      "graphhopperInvocationUnchanged": true,
+      "bootUnchanged": true,
+      "composeSettingsUnchanged": true,
+      "postgresDockerfileUnchanged": true,
+      "backendMemoryHigh": "1073741824",
+      "backendMemoryMax": "1610612736",
+      "backendActive": "active",
+      "graphhopperActive": "active",
+      "expiryTimerActive": "inactive",
+      "expiryTimerLoadState": "not-found",
+      "currentSecretValuesChecked": 5,
+      "currentSecretValueMatches": 0,
+      "backendGcLoggingEnabled": true,
+      "graphhopperGcLoggingEnabled": true,
+      "metricsSha256": "4ae213506129048e1d069210541f3407d47d31b49cb88c46a6f50a40e6ec5ce8",
+      "maximumBackendMemoryCurrentBytes": 427466752,
+      "containerPeaks": {
+        "graphhopper": {
+          "maximumCpuPercent": 75.24,
+          "maximumMemoryPercentOfLimit": 27.58
+        },
+        "postgres": {
+          "maximumCpuPercent": 18.23,
+          "maximumMemoryPercentOfLimit": 1.26
+        }
+      }
+    }
+  },
+  "gcReview": {
+    "commandId": "a5f5d385-b9cf-47c9-9549-1e1cf37b41fd",
+    "status": "Success",
+    "responseCode": 0,
+    "result": {
+      "guardStartedAt": "2026-09-05T05:42:05.543918+00:00",
+      "metricsStartedAt": "2026-09-05T05:43:06.732762+00:00",
+      "applicationStarted": [
+        {
+          "at": "2026-09-05T05:42:15.844Z",
+          "startupSeconds": 8.948
+        }
+      ],
+      "records": [
+        {
+          "at": "2026-09-05T05:42:08.207+0000",
+          "gcId": 3,
+          "detail": "(Metadata GC Threshold)",
+          "startLine": true,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:08.232+0000",
+          "gcId": 3,
+          "detail": "(Metadata GC Threshold) 27M->9M(247M) 25.205ms",
+          "startLine": false,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:09.973+0000",
+          "gcId": 6,
+          "detail": "(Metadata GC Threshold)",
+          "startLine": true,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:10.028+0000",
+          "gcId": 6,
+          "detail": "(Metadata GC Threshold) 74M->18M(247M) 55.788ms",
+          "startLine": false,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:11.938+0000",
+          "gcId": 10,
+          "detail": "(Metadata GC Threshold)",
+          "startLine": true,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:11.992+0000",
+          "gcId": 10,
+          "detail": "(Metadata GC Threshold) 40M->25M(247M) 54.015ms",
+          "startLine": false,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:16.446+0000",
+          "gcId": 18,
+          "detail": "(Metadata GC Threshold)",
+          "startLine": true,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T05:42:16.581+0000",
+          "gcId": 18,
+          "detail": "(Metadata GC Threshold) 104M->45M(247M) 134.332ms",
+          "startLine": false,
+          "beforeMetricsStart": true
+        },
+        {
+          "at": "2026-09-05T06:07:37.815+0000",
+          "gcId": 30,
+          "detail": "(CodeCache GC Threshold)",
+          "startLine": true,
+          "beforeMetricsStart": false
+        },
+        {
+          "at": "2026-09-05T06:07:37.939+0000",
+          "gcId": 30,
+          "detail": "(CodeCache GC Threshold) 51M->50M(247M) 123.752ms",
+          "startLine": false,
+          "beforeMetricsStart": false
+        }
+      ],
+      "startupCompletedEvents": 4,
+      "observationCompletedEvents": 1
+    }
+  }
+}
