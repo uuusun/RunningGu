@@ -63,6 +63,7 @@ import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
 import com.runninggu.app.ui.common.SectionState
+import com.runninggu.app.ui.common.cachedAt
 import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.registrationStatus
@@ -228,13 +229,29 @@ private fun <T> LazyListScope.section(
 ) {
     when (state) {
         SectionState.Loading -> item { LoadingState(message = "불러오는 중…") }
-        is SectionState.Empty -> empty?.let { item { it() } } ?: Unit
+        // **캐시에서 온 0건은 접지 않는다** (#283 리뷰 · 선경님). 접으면 "마지막 성공
+        // 결과가 비어 있다" 와 "방금 서버가 0건을 줬다" 가 같은 화면이 된다 — 접수 종료
+        // 필터가 다 걸러내면 바로 이 상태라 드물지도 않다. 서버가 준 0건은 지금처럼 접는다.
+        is SectionState.Empty -> state.cachedAt?.let { at ->
+            item {
+                CachedNotice(cachedAt = at, modifier = Modifier.padding(horizontal = ScreenPadding))
+                empty?.invoke()
+            }
+        } ?: empty?.let { item { it() } } ?: Unit
         is SectionState.Error -> item {
             // 서버가 준 문구가 있으면 그걸 쓴다. 없을 때만 영역 기본 문구다 (§0-3)
             ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)
         }
 
-        is SectionState.Content -> item { content(state.value) }
+        // **캐시로 그린 것이면 그렇다고 말한다** (매핑표 171행 · #276). 영역 단위로 붙이는
+        // 이유는 폴백도 영역 단위이기 때문이다 — 마감임박은 캐시에서 오고 축제는 오류일 수
+        // 있어서, 화면 위에 한 번 적으면 어느 쪽이 낡은 것인지 알 수 없다.
+        is SectionState.Content -> item {
+            state.cachedAt?.let {
+                CachedNotice(cachedAt = it, modifier = Modifier.padding(horizontal = ScreenPadding))
+            }
+            content(state.value)
+        }
     }
 }
 
