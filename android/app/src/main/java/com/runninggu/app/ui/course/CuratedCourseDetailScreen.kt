@@ -167,9 +167,29 @@ private fun Stat(label: String, value: String) {
     }
 }
 
-/** "{시도} {시군}" — 없는 쪽은 뺀다. */
+/**
+ * 지역 표기. **`sigun` 이 이미 시도를 품고 있다.** (#286 기기 확인)
+ *
+ * 서버가 두루누비 catalog 를 그대로 주는데 두 필드가 이렇게 온다.
+ *
+ * ```
+ * sido = "강원"   sigun = "강원 양구군"
+ * sido = "부산"   sigun = "부산 중구"
+ * ```
+ *
+ * 그래서 둘을 이어붙이면 `강원 강원 양구군` 이 된다 — 실제로 그렇게 나왔다.
+ * **지역별 목록([courseSubtitle])은 처음부터 `sigun` 만 쓰고 있었다.** 상세만 달랐다.
+ *
+ * `sigun` 이 없을 때만 `sido` 로 물러선다 — 계약상 둘 다 nullable 이다(§6-4).
+ */
 private fun regionOf(detail: CuratedCourseDetail): String =
-    listOfNotNull(detail.sido, detail.sigun).joinToString(" ").ifBlank { "지역 정보 없음" }
+    regionLabel(sido = detail.sido, sigun = detail.sigun)
+
+/** 화면 밖에서 고정할 수 있게 값만 받는다 — Compose 안에 두면 단위 테스트가 안 닿는다. */
+internal fun regionLabel(sido: String?, sigun: String?): String =
+    sigun?.takeIf { it.isNotBlank() }
+        ?: sido?.takeIf { it.isNotBlank() }
+        ?: "지역 정보 없음"
 
 /**
  * 코스 경로선. **핀 없이 선만** 그린다 (SPEC §3-8).

@@ -143,4 +143,22 @@ class CuratedCourseDetailTest {
 
         assertEquals(2, repo.calls)
     }
+
+    // **`sigun` 이 시도를 품고 있다** — 서버가 두루누비 catalog 를 그대로 준다(#286 기기 확인).
+    // 이어붙이면 `강원 강원 양구군` 이 된다. 지역별 목록은 처음부터 `sigun` 만 썼다.
+    @Test
+    fun `지역은 시군만 쓴다 - 시도를 겹쳐 적지 않는다`() {
+        assertEquals("강원 양구군", regionLabel(sido = "강원", sigun = "강원 양구군"))
+    }
+
+    @Test
+    fun `시군이 없으면 시도로 물러선다`() {
+        assertEquals("강원", regionLabel(sido = "강원", sigun = null))
+        assertEquals("강원", regionLabel(sido = "강원", sigun = "  "))
+    }
+
+    @Test
+    fun `둘 다 없으면 없다고 적는다`() {
+        assertEquals("지역 정보 없음", regionLabel(sido = null, sigun = null))
+    }
 }
