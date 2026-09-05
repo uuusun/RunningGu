@@ -6,7 +6,13 @@
 > 본 시험 성공 1,800건, dispatch 누락·지연 0, 최대 지연 31ms, 자원 480개 표본의 최소 가용 메모리
 > 67.372%, backup 1회·WAL 3회 성공이다. 관측 중 단발 Full GC 1회(123.752ms), 반복 발생 없음도 기록했다.
 > 가드 해제·backend 재기동·readiness·HTTPS 재확인까지 완료했다. 상세 판정과 범위는
-> [이번 실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 4GiB는 미시험·별도 승인 대기다.
+> [이번 실행 증거](evidence/api-load-ec2-8g-20260905.md)를 따른다. 이후 4GiB 시험 승인을 받아 후보 상한의
+> 장애 격리를 통과했다. 비대상 기종 `c7i.large` 변경은 Free Plan에서 거부돼 당시 8GiB로 복구했고,
+> 추가 승인 후 `ap-northeast-2b`의 무료 대상 `c7i-flex.large`로 이전했다. 4GiB 첫 직접 부하는
+> warm-up 이후 swap 사용량 40KiB 증가로 당시 계약에 미달해 중단했다. 4GiB 앱 API 부하·3회 연속 검증은 미완료다.
+> 최신 DB를 가진 새 `i-07aa483968f4daddc`를 `m7i-flex.large` 8GiB와 원래 JVM 설정으로 복구했고,
+> 가드 비활성·readiness·HTTPS 7항목을 확인했다. Free Plan은 유지하며 옛 2a 서버는 정지 보존한다.
+> [4GiB 시험·이전·복구 증거](evidence/staging-4g-validation-20260905.md)를 따른다.
 
 > 작성·기준 승인: 2026-09-04. 운영책임자가 이 대화에서 §4 요청량·비율·동시성과 §5 합격 기준에
 > 동의하고 다음 시험 준비를 승인했다. 아래는 준비 당시 이력이며 현재 실행 결과는 위 증거를 따른다.
@@ -17,6 +23,27 @@
 > 회원 생성·메일 설정 변경·4GiB 변경은 각각 필요한 준비와 별도 승인을 거친다.
 
 ## 1. 목적과 기존 검증의 경계
+
+### 초기 운영 목표 — 2026-09-05 사용자 설명
+
+사용자는 출시 초기 하루 접속이 20회 미만일 것으로 예상하며, 예산을 최대한 아끼기 위해
+4GiB에서 정상 운영하는 것을 우선 목표로 한다. 이 수치는 실측이 아닌 이용량 예상이며,
+현재는 앱을 열어 이용하는 방문 횟수로 해석한다. 일일 고유 사용자 수·HTTP 요청 수·동시 요청 수와
+같은 단위로 취급하지 않는다. 방문당 API 호출 수와 사용 기능에 따라 실제 서버 부하가 달라진다.
+
+4GiB를 우선 후보로 두고 실제 앱 이용 흐름, 비용이 큰 코스·동선 생성, 백업·재부팅을 포함해
+정상 운영 가능 여부를 확인한다. 기존 60 API 요청/분은 예상 일일 방문량이 아니라 비교 시험 부하다.
+앞선 4GiB 직접 요청 관측은 긍정적이지만, 앱 API 전체 시험의 합격이나 장기 안정성을 대신하지 않는다.
+운영책임자가 2026-09-05 재시험 계획을 승인했다. 대체 기준은 §5.2의 `capacity-v2`를 따른다.
+
+AWS Free Plan에서는 `c7i-flex.large`와 `m7i-flex.large`가 모두 대상이다. 4GiB는 무료 자격을
+얻기 위한 유일한 선택이 아니라 운영비와 크레딧 소모를 줄이려는 후보다.
+신규 계정 Free Plan은 계정 생성 후 6개월 또는 크레딧 소진 중 먼저 오는 시점에 종료되며,
+EC2는 방문이 없어도 실행 시간에 따라 사용량이 발생한다. 실제 남은 크레딧·만료일·스토리지 등
+부대 사용량을 예산과 함께 확인해야 한다([AWS EC2 Free Tier](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-free-tier-usage.html),
+[EC2 실행 시간과 사용량](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/LaunchingAndUsingInstances.html)).
+
+### 검증 범위
 
 - `HTTPS → Nginx → Spring Boot → PostgreSQL·GraphHopper·외부 API` 경로를 시험한다.
 - 기존 [8GiB 증거](evidence/graphhopper-ec2-8g-20260904.md)는 GraphHopper 직접 요청
@@ -263,10 +290,12 @@ timeout 설정을 변경하지 않는다. 계약 문서와 실행 도구는 실�
 
 ### 5.2 자원·복구
 
-[기존 artifact 계약 §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의 기준을 완화하지 않는다.
+[artifact 계약 §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의 `capacity-v2`를 적용한다.
+2026-09-05 재시험 승인으로 swap 증가 0만 진단 조건으로 대체했다. 나머지 조건은 유지한다.
 
 - 5초 표본마다 host `MemAvailable` ≥ 전체 RAM의 20%, 정상 OOM 0, 비정상 재시작 0.
-- warm-up 후 swap 사용 증가·지속 swap-in/out 없음, readiness 이후 반복 Full GC 없음.
+- warm-up 후 swap 사용량·입출력 증분·발생 구간을 기록한다. 증가만으로 중단·탈락하지 않으며,
+  지속 활동은 같은 시각의 요청 지연·메모리·GC와 함께 분석한다. readiness 이후 반복 Full GC 없음.
 - 본 시험 중 전체 백업 1회, WAL 점검 3회 성공. 부하 때문에 백업을 빼지 않는다.
 - JVM heap뿐 아니라 GH cgroup·Spring systemd·PG·호스트 수치를 함께 기록한다.
 - GH 직접 요청 검증·장애 격리·재부팅은 기존 계약대로 별도 증거를 유지한다.
@@ -274,7 +303,15 @@ timeout 설정을 변경하지 않는다. 계약 문서와 실행 도구는 실�
 
 정상 부하 실패를 RAM 부족으로 바로 단정하지 않는다. 인증/fixture, upstream, DB 쿼리,
 GraphHopper 품질, 부하 생성기 포화, 실제 메모리 부족을 증거로 분류한 뒤 재시험한다.
-기준이나 요청량을 결과에 맞춰 낮춘 재시험은 동일 조건 합격이 아니다.
+실행 증거에 `acceptancePolicy=capacity-v2`와 실행 도구의 버전을 기록한다. 종전 기준의 중도 종료
+결과는 미완료로 보존한다. 기존 8GiB와 입력·요청량·응답시간은 같지만 swap 판정 기준은 바뀌었음을 명시한다.
+
+승인한 재시험 순서는 기존 2b 서버의 4GiB 전환·readiness/HTTPS → 가드 활성화·preflight →
+앱 API 35분과 자원 40분·백업 1회·WAL 3회 → 즉시 가드 해제·backend 재기동 →
+GraphHopper 직접 부하·백업·재부팅·Importer 등 기존 전체 시나리오 3회 연속 → 24시간 관찰이다.
+실제 앱 부하는 2,100건·본 시험 1,800건·60건/분·최대 동시 진행 4개를 유지하며,
+표본마다 MemAvailable 20% 이상과 §5.1 성공·dispatch·응답시간 조건을 모두 확인한다.
+실패하면 원인을 분류하고 서비스가 불안정하면 같은 서버를 검증된 8GiB·설정으로 복구한다.
 
 ## 6. 승인 이후 작업 순서
 

@@ -17,6 +17,7 @@ EXPECTED_SYSTEMD_SERVICES = (
     "runninggu-graphhopper.service",
 )
 EXPECTED_CONTAINERS = ("graphhopper", "postgres")
+ACCEPTANCE_POLICY = "capacity-v2"
 
 
 def values(line: str) -> dict[str, str]:
@@ -106,6 +107,13 @@ def summarize(lines: list[str]) -> dict[str, object]:
             swap_used.append(int(sample["swap_used_kib"]))
             pswpin.append(int(sample["pswpin"]))
             pswpout.append(int(sample["pswpout"]))
+            # §9.2: 정상 swap 활동과 계측 오류·counter 초기화는 구분한다.
+            if (
+                min(swap_used[-1], pswpin[-1], pswpout[-1]) < 0
+                or (len(pswpin) > 1 and pswpin[-1] < pswpin[-2])
+                or (len(pswpout) > 1 and pswpout[-1] < pswpout[-2])
+            ):
+                invalid_sample_values += 1
         except (KeyError, TypeError, ValueError):
             invalid_sample_values += 1
         for service in EXPECTED_SYSTEMD_SERVICES:
@@ -168,6 +176,14 @@ def summarize(lines: list[str]) -> dict[str, object]:
     )
     pswpin_growth = pswpin[-1] - pswpin[0] if pswpin else None
     pswpout_growth = pswpout[-1] - pswpout[0] if pswpout else None
+    swap_active_intervals = 0
+    longest_swap_active_streak = 0
+    current_swap_active_streak = 0
+    for index in range(1, min(len(pswpin), len(pswpout))):
+        active = pswpin[index] > pswpin[index - 1] or pswpout[index] > pswpout[index - 1]
+        swap_active_intervals += int(active)
+        current_swap_active_streak = current_swap_active_streak + 1 if active else 0
+        longest_swap_active_streak = max(longest_swap_active_streak, current_swap_active_streak)
     passed = (
         expected_samples > 0
         and len(sample_groups) == expected_samples
@@ -175,9 +191,6 @@ def summarize(lines: list[str]) -> dict[str, object]:
         and invalid_sample_values == 0
         and minimum_memory is not None
         and minimum_memory >= 20.0
-        and maximum_swap_growth == 0
-        and pswpin_growth == 0
-        and pswpout_growth == 0
         and all(count == expected_samples for count in systemd_observation_counts.values())
         and all(count == expected_samples for count in container_observation_counts.values())
         and unhealthy_systemd_service_samples == 0
@@ -187,6 +200,7 @@ def summarize(lines: list[str]) -> dict[str, object]:
         and all(growth == 0 for growth in container_restart_growth.values())
     )
     return {
+        "acceptancePolicy": ACCEPTANCE_POLICY,
         "expectedSamples": expected_samples,
         "actualSamples": len(sample_groups),
         "malformedObservations": malformed_observations,
@@ -195,6 +209,8 @@ def summarize(lines: list[str]) -> dict[str, object]:
         "maximumSwapGrowthKiB": maximum_swap_growth,
         "pswpinGrowth": pswpin_growth,
         "pswpoutGrowth": pswpout_growth,
+        "swapActiveIntervals": swap_active_intervals,
+        "longestSwapActiveIntervalStreak": longest_swap_active_streak,
         "systemdObservationCounts": systemd_observation_counts,
         "missingSystemdServiceSamples": missing_systemd_service_samples,
         "unhealthySystemdServiceSamples": unhealthy_systemd_service_samples,
