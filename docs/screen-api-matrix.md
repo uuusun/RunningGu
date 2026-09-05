@@ -321,6 +321,8 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
+| 걷기 스팟 선택 | 로컬 상태 | 없음 | LOCAL_STATE | **P0 는 출발지로 삼지 않는다** 🔒확정(#269). 선택 표시·지도 포커스만 바뀌고 재조회하지 않으며, `[저장]` 아래에 `걷기 스팟은 저장할 수 없어요. 지도에서 위치만 확인해 주세요.` 표시. 새 `OriginState` 갈래·출발지 이력·확인창 없음. 출발지 승격은 P1 별도 계약 |
+| 지역별 코스 선택 | `GET /api/courses/{courseId}` | courseId | 목록 필드 + pathPolyline + elevationProfileM + attributions | `courseDetail/curated/{courseId}` 로 이동(#280). **courseId 는 catalog 공개 안정키라 route 에 실어도 된다** — near snapshot 과 다른 점이다. 없는 id 는 `404 COURSE_NOT_FOUND` |
 
 ### S8-D 코스 상세
 
@@ -328,8 +330,9 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 |---|---|---|---|
 | near `ROUTE` 항목 | `courseDetail/near` + 이전 통합 목록 snapshot | routeId,dataSource,pathPolyline,routeKm,durationMin,difficulty,gainM,elevationProfileM,lat,lng | 저장 |
 | saved 저장 코스 | `courseDetail/saved/{savedCourseId}` + `GET /api/me/courses/{id}` | 목록 필드 + pathPolyline + attributions[] | 출처 완성 문구를 `" · "`로 연결, 삭제 확인 |
+| curated 큐레이션 코스 | `courseDetail/curated/{courseId}` + `GET /api/courses/{courseId}` | 목록 필드 + pathPolyline + elevationProfileM + attributions[] | **읽기 전용** — 삭제도 저장도 없다(#280). `pathPolyline` 은 원본 코스 **전체** points 라 near 의 왕복 구간과 거리·시간·고도가 달라도 정상. `difficulty` 는 전체 등급이라 `HARD` 도 온다 |
 
-`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`의 sealed 타입이다. `Ran` 은 두지 않는다(결정-56). NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
+`CourseDetailKey`는 `Near(snapshot)`, `Saved(savedCourseId)`, `Curated(courseId)`의 sealed 타입이다. `Ran` 은 두지 않는다(결정-56). NEAR snapshot은 URL에 직렬화하지 않고 `SavedStateHandle` 또는 내비게이션 그래프 범위 상태로 전달한다.
 
 ### 러닝 기록 — **제품에 없다** 🔒확정(결정-56)
 

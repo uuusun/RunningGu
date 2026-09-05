@@ -3,6 +3,8 @@ package com.runninggu.server.poi.infrastructure;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamEndpoint;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
 import com.runninggu.server.poi.application.KtoPoiSource;
 import com.runninggu.server.poi.application.PoiSearchCriteria;
 import com.runninggu.server.poi.application.PoiSourceException;
@@ -17,6 +19,7 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,16 +42,21 @@ public class KtoPoiClient implements KtoPoiSource {
     private final RestClient wellnessRestClient;
     private final ObjectMapper objectMapper;
     private final String serviceKey;
+    private final UpstreamLoadGuard upstreamLoadGuard;
 
     public KtoPoiClient(
             RestClient korRestClient,
             RestClient wellnessRestClient,
             ObjectMapper objectMapper,
-            String serviceKey) {
+            String serviceKey,
+            UpstreamLoadGuard upstreamLoadGuard) {
         this.korRestClient = korRestClient;
         this.wellnessRestClient = wellnessRestClient;
         this.objectMapper = objectMapper;
         this.serviceKey = serviceKey;
+        this.upstreamLoadGuard = Objects.requireNonNull(
+                upstreamLoadGuard,
+                "upstreamLoadGuard");
     }
 
     @Override
@@ -109,17 +117,20 @@ public class KtoPoiClient implements KtoPoiSource {
 
     private List<Poi> parse(String responseBody, PoiSearchCriteria criteria) {
         if (!StringUtils.hasText(responseBody)) {
+            tripKtoResultCode(criteria);
             throw new PoiSourceException(Reason.ERROR);
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             if (root == null || !root.isObject()) {
+                tripKtoResultCode(criteria);
                 throw new PoiSourceException(Reason.ERROR);
             }
             JsonNode response = root.path("response");
             String resultCode = textOrNull(response.path("header").path("resultCode"));
             if (!SUCCESS_CODE.equals(resultCode)) {
-                log.warn("KTO POI API가 실패 코드를 반환했습니다. resultCode={}", resultCode);
+                tripKtoResultCode(criteria);
+                log.warn("KTO POI API가 실패 코드를 반환했습니다.");
                 throw new PoiSourceException(Reason.ERROR);
             }
             JsonNode body = response.path("body");
@@ -137,9 +148,17 @@ public class KtoPoiClient implements KtoPoiSource {
             }
             return items;
         } catch (JsonProcessingException exception) {
+            tripKtoResultCode(criteria);
             log.warn("KTO POI API가 JSON이 아닌 응답을 반환했습니다.");
             throw new PoiSourceException(Reason.ERROR, exception);
         }
+    }
+
+    private void tripKtoResultCode(PoiSearchCriteria criteria) {
+        UpstreamEndpoint endpoint = criteria.category() == PoiCategory.WELLNESS
+                ? UpstreamEndpoint.KTO_WELLNESS_LOCATION
+                : UpstreamEndpoint.KTO_KOR_LOCATION;
+        upstreamLoadGuard.tripKtoResultCode(endpoint);
     }
 
     private List<JsonNode> itemNodes(JsonNode itemNode) {

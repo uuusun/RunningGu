@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "approvalStatus": "APPROVED",
+  "environment": "staging",
+  "origin": "https://staging-api.runninggu.store",
+  "inputs": {
+    "yearMonth": "2026-10",
+    "contest": {
+      "id": 126,
+      "date": "2026-10-11",
+      "event": "HALF"
+    },
+    "courseList": {
+      "page": 0,
+      "size": 20
+    },
+    "nearCurated": {
+      "lat": 35.385905,
+      "lng": 129.347568,
+      "targetKm": 5,
+      "radiusKm": 8,
+      "size": 12
+    },
+    "nearOsm": {
+      "lat": 37.5665,
+      "lng": 126.978,
+      "targetKm": 5,
+      "radiusKm": 8,
+      "size": 12
+    },
+    "festival": {
+      "yearMonth": "2026-10",
+      "size": 2
+    },
+    "poi": {
+      "category": "TOUR",
+      "lat": 35.0111886,
+      "lng": 126.7183615,
+      "radius": 8000,
+      "size": 3
+    },
+    "geocode": {
+      "query": "해운대해수욕장"
+    },
+    "itinerary": {
+      "contestId": 126,
+      "startDate": "2026-10-10",
+      "endDate": "2026-10-12",
+      "event": "HALF",
+      "themes": [
+        "TOUR",
+        "FOOD"
+      ],
+      "hotel": null
+    },
+    "favoriteContestId": 126
+  },
+  "expectations": {
+    "contestActive": true,
+    "closingSoonNonEmpty": true,
+    "dailyCountsNonEmpty": true,
+    "courseListNonEmpty": true,
+    "nearCuratedRouteSources": [
+      "API_GPX",
+      "GPX_ONLY"
+    ],
+    "nearOsmRouteSource": "OSM_GENERATED",
+    "festivalNonEmpty": true,
+    "poiSource": "LIVE",
+    "poiNonEmpty": true,
+    "itineraryDayCount": 3,
+    "itineraryRaceBlockCount": 1
+  }
+}

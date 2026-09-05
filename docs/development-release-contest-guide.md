@@ -369,7 +369,16 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 - [ ] `contestImport`를 명시 실행하고 동일 입력 no-op·오류 전체 롤백 확인
 - [ ] GraphHopper version·PBF·SRTM·import 설정 hash, graph artifact checksum, 상대 symlink 활성화·2세대 롤백, 메모리·기동 시간을 확인했다
 - [ ] KTO·카카오 timeout·캐시·레이트리밋·429 정책 확인
+- [ ] 앱 API 혼합 부하 때만 `RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging`과 명시적 run ID로
+  upstream guard를 활성화하고, KTO operation별 100회·카카오 전체 5,000회/endpoint별 2,000회의
+  실제 시도 상한, allowlist 선차단, 첫 429·예상 밖 5xx·timeout·KTO 오류 즉시 중단과 안전 로그를
+  검증했다. 성공 증거를 남긴 뒤 다시 비활성화했으며 production에서는 활성화하지 않았다 —
+  [시험 계획](deploy/api-load-test-plan.md)
 - [ ] AWS SES 발신 `no-reply@runninggu.store`와 스팸함·인증 코드·재설정 링크의 운영 도메인을 확인했다. SES는 거래성 메일만 보내며 P0 마케팅 메일은 보내지 않는다(#229·#230)
+  - 2026-09-04 staging 도메인/DKIM·SMTP 적용과 TLS 로그인 성공. 최초 발송의 IAM 수신 identity 권한 누락을 보완한 뒤 앱 인증 메일 2건 모두 204·두 메일함 도착을 확인했다. [설정 기록](deploy/evidence/ses-smtp-staging-20260904.md)을 따르며, 정상 가입·재설정 전체 흐름·프로덕션 준비 완료로 체크하지 않는다
+  - 후속 [첫 계정 가입 확인](deploy/evidence/signup-success-20260904.md): 인증 200·가입 201과 별도 재로그인 200 확인. 다만 [마케팅 상태 복원 결함](deploy/evidence/marketing-relogin-diagnosis-20260904.md), 인증된 GET `/me`·두 번째 계정·재설정은 남아 있어 전체 체크는 유지한다
+  - 추가 [읽기 전용 검증](deploy/evidence/api-readonly-boundaries-20260904.md): 공개·미인증 경계 14항목 2회 및 앱 재시작 후 GET `/me` 200 확인. 마케팅 결함은 민지 태그 이슈 #287로 분리했으며, 두 번째 계정·재설정·전체 혼합 부하는 여전히 미완료
+  - 같은 후속 기록에서 두 번째 정상 가입도 확인했다. 테스트 계정 2개가 준비됐으며, 데이터 분리·제한된 쓰기·재설정·전체 혼합 부하는 계속 미완료다
 - [ ] 로그에 토큰·비밀번호·이메일·좌표가 없는지 샘플 검사
 - [ ] 장애 감지·담당자 알림·운영사무국 심사 기간 대응 체계 확정
 - [ ] 배포 직전 DB 백업과 직전 앱/서버 artifact 보관
@@ -379,6 +388,15 @@ Play Console의 Data safety 답변은 앱, 서버, SDK의 실제 동작과 개�
 머지 전 8GiB 검증에는 [GraphHopper artifact 계약 §11.1](deploy/graphhopper-artifact-contract.md#111-머지-전-staging-검증용-백엔드-묶음)의
 PR head 전용 CI 묶음을 staging에서만 사용한다. 정식 릴리스·`main` 변경·자동 배포를 뜻하지 않는다.
 머지 후에는 통합 commit의 CI 묶음을 다시 만들며 PR 검증용 묶음을 이름만 바꿔 승격하지 않는다.
+
+2026-09-04 PR #255 머지 후 `develop` CI 묶음의 staging 전환·스모크는
+[별도 배포 기록](deploy/evidence/staging-develop-1c3f2ef-20260904.md)에 남겼다.
+같은 날 #263 머지 후 연령 검증이 포함된 `b9e632d`의 staging 재배포·입력 거부 시험은
+[후속 배포 기록](deploy/evidence/staging-develop-b9e632d-20260904.md)에 남겼다.
+그 다음 [앱 API 부하 시험 계획](deploy/api-load-test-plan.md)은 **기준 승인·실행 준비 중**이며,
+기존 GraphHopper 직접 요청 검증이나 프로덕션 전체 체크리스트의 완료를 대신하지 않는다.
+그 계획의 upstream guard는 staging 부하 시험용 쿼터 보호 장치이며 SPEC·HTTP API·캐시·재시도·
+폴백 계약을 바꾸는 프로덕션 기능이 아니다.
 
 1. 릴리스 후보 커밋에서 Android·백엔드 전체 테스트를 실행한다.
 2. 백엔드 JAR·데이터 snapshot·GraphHopper graph artifact의 SHA-256, Git commit 또는 builder
