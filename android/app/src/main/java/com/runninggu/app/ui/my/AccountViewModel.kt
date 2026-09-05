@@ -47,6 +47,8 @@ data class AccountUiState(
     val passwordEdit: PasswordEdit? = null,
     /** 탈퇴 다이얼로그. `null` 이면 닫혀 있다. */
     val withdraw: WithdrawEdit? = null,
+    /** `GET /me` 가 실패했는가. 조회 중과 실패를 가르려고 든다 (#290 리뷰). */
+    val marketingLoadFailed: Boolean = false,
 ) {
     /** 비밀번호 변경 메뉴는 EMAIL 가입자에게만 보인다 (#59 · 결정-38). */
     val showsPasswordMenu: Boolean get() = profile?.loginProvider == LoginProvider.EMAIL
@@ -73,6 +75,34 @@ data class AccountUiState(
      * 그려 놓고, 그 사람이 켜려고 누르면 실제로는 **철회 요청**이 나간다.
      */
     val marketingKnown: Boolean get() = profile?.marketingAgreed != null
+
+    /**
+     * 마케팅 동의 줄에 뭐라고 적을 것인가. (#290 리뷰 · 선경님)
+     *
+     * **잠그기만 하면 안 된다.** 값을 모를 때 `checked` 로는 `false` 가 가므로, 화면에는
+     * 그냥 **꺼진 스위치**가 보인다. 서버가 ON 인 사용자가 오프라인으로 들어오면 "나는
+     * 동의 안 했구나" 로 읽고 만다 — 잠겨 있다는 것만으로는 왜인지 알 수 없다.
+     */
+    val marketingNotice: MarketingNotice
+        get() = when {
+            marketingKnown -> MarketingNotice.NONE
+            marketingLoadFailed -> MarketingNotice.FAILED
+            else -> MarketingNotice.LOADING
+        }
+}
+
+/** 마케팅 동의 줄의 보조 문구. (#287 · #290 리뷰) */
+enum class MarketingNotice(val description: String?) {
+    /** 값을 안다. 원래 설명을 그대로 쓴다. */
+    NONE(null),
+
+    /** `GET /me` 가 아직 안 왔다. */
+    LOADING("동의 상태를 불러오는 중이에요"),
+
+    /**
+     * 못 읽었다. **[다시 시도] 를 함께 준다** — 안 주면 사용자가 앱을 껐다 켜는 수밖에 없다.
+     */
+    FAILED("동의 상태를 불러오지 못했어요"),
 }
 
 /**
@@ -174,13 +204,20 @@ class AccountViewModel(
      * 세대를 들고 갔다가 [SessionStore.updateProfile] 에서 비교한다 — 왕복 중에 로그아웃·
      * 계정 전환이 있었으면 **남의 프로필**이다(#170 리뷰와 같은 장치).
      */
-    private fun refreshProfile() {
+    fun refreshProfile() {
         if (profileJob?.isActive == true) return
         val epoch = SessionStore.sessionEpoch
+        // **개정 번호도 함께 든다** (#290 리뷰). 세대는 로그인 단위라 같은 세션에서
+        // 이 조회가 도는 동안 성공한 PATCH 를 못 막는다 — 늦게 온 이 응답이 방금 저장한
+        // 닉네임을 되돌리거나, 철회한 마케팅을 다시 켠다.
+        val revision = SessionStore.profileRev
         profileJob = viewModelScope.launch {
+            _uiState.update { it.copy(marketingLoadFailed = false) }
             runCatchingUnlessCancelled { memberRepository.me() }
-                .onSuccess { SessionStore.updateProfile(epoch, it) }
-            // 실패는 조용히 넘긴다. 계정 화면은 이 값 없이도 나머지를 다 그린다
+                .onSuccess { SessionStore.applyFetchedProfile(epoch, revision, it) }
+                // **못 읽었다는 것을 화면이 알아야 한다.** 조용히 넘기면 잠긴 OFF 스위치만
+                // 남아서, 서버가 ON 인 사용자가 "동의 안 했다" 로 읽는다(#290 리뷰).
+                .onFailure { _uiState.update { s -> s.copy(marketingLoadFailed = true) } }
         }
     }
 

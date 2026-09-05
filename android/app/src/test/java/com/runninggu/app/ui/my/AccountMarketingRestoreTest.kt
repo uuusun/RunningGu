@@ -172,6 +172,126 @@ class AccountMarketingRestoreTest {
         assertNull("보낼 값을 모르는데 보내면 안 된다", member.sentMarketing)
     }
 
+    // ── 같은 세션 안의 순서 역전 (#290 리뷰) ──────────────────────
+
+    @Test
+    fun `늦은_조회는_방금_저장한_닉네임을_되돌리지_않는다`() = runTest(dispatcher) {
+        // 선경님이 재현하신 그대로다. epoch 는 로그인 세대라 이 사이에 안 바뀐다
+        로그인()
+        val gate = CompletableDeferred<SessionProfile>()
+        val member = FakeMeRepository(
+            me = gate,
+            patchNickname = 로그인직후.copy(nickname = "새닉네임", marketingAgreed = true),
+        )
+        val viewModel = viewModel(member)
+
+        // 조회가 도는 동안 닉네임을 바꾼다
+        viewModel.onNicknameChange("새닉네임")
+        advanceUntilIdle()
+        assertEquals("새닉네임", SessionStore.session.value?.nickname)
+
+        // 이제 출발할 때의 프로필이 도착한다
+        gate.complete(로그인직후.copy(nickname = "러너", marketingAgreed = true))
+        advanceUntilIdle()
+
+        assertEquals("늦은 조회가 저장한 닉네임을 덮으면 안 된다", "새닉네임", SessionStore.session.value?.nickname)
+    }
+
+    @Test
+    fun `늦은_조회는_방금_철회한_마케팅을_다시_켜지_않는다`() = runTest(dispatcher) {
+        // 선경님이 적으신 순서 그대로다.
+        //
+        //   GET /me 출발 (느림)
+        //   닉네임 PATCH 성공 → **전체 프로필**이 오므로 마케팅 값도 채워진다(§2) → 토글 열림
+        //   마케팅 철회 PATCH 성공 → 서버 OFF
+        //   늦은 GET 도착 → 출발 당시의 ON 이 다시 얹힌다
+        //
+        // **서버 저장 결과는 OFF 인데 앱만 ON 이 된다** — 이 PR 이 고치려던 버그의 거울상이다.
+        로그인()
+        val gate = CompletableDeferred<SessionProfile>()
+        val member = FakeMeRepository(
+            me = gate,
+            patchNickname = 로그인직후.copy(nickname = "새닉네임", marketingAgreed = true),
+            patchMarketing = 로그인직후.copy(nickname = "새닉네임", marketingAgreed = false),
+        )
+        val viewModel = viewModel(member)
+
+        // ① 조회는 아직 안 왔는데 닉네임 저장이 값을 채워 준다
+        viewModel.onNicknameChange("새닉네임")
+        advanceUntilIdle()
+        assertTrue("PATCH 응답이 전체 프로필이라 토글이 열린다", viewModel.uiState.value.marketingKnown)
+
+        // ② 사용자가 철회한다
+        viewModel.onToggleMarketing()
+        advanceUntilIdle()
+        assertEquals("보낸 값은 철회다", false, member.sentMarketing)
+        assertEquals(false, SessionStore.session.value?.marketingAgreed)
+
+        // ③ 이제 출발할 때의 ON 이 도착한다
+        gate.complete(로그인직후.copy(marketingAgreed = true))
+        advanceUntilIdle()
+
+        assertEquals(
+            "늦은 조회가 철회를 되돌리면 서버는 OFF 인데 앱만 ON 이 된다",
+            false,
+            SessionStore.session.value?.marketingAgreed,
+        )
+    }
+
+    @Test
+    fun `조회가_먼저_끝나면_그_값이_그대로_선다`() = runTest(dispatcher) {
+        // 대조군 — 순서가 정상이면 조회 결과가 반영돼야 한다. 이게 없으면 위 둘이
+        // "그냥 조회를 안 쓴다" 로도 통과한다
+        로그인()
+        val member = FakeMeRepository(result = Result.success(로그인직후.copy(marketingAgreed = true)))
+        val viewModel = viewModel(member)
+
+        assertTrue(viewModel.uiState.value.marketingAgreed)
+        assertEquals(true, SessionStore.session.value?.marketingAgreed)
+    }
+
+    // ── 모른다는 것을 화면에 적는다 (#290 리뷰) ────────────────────
+
+    @Test
+    fun `조회_중에는_불러오는_중이라고_적는다`() = runTest(dispatcher) {
+        로그인()
+        val viewModel = viewModel(FakeMeRepository(me = CompletableDeferred()))
+
+        assertEquals(MarketingNotice.LOADING, viewModel.uiState.value.marketingNotice)
+    }
+
+    @Test
+    fun `조회에_실패하면_못_불러왔다고_적는다`() = runTest(dispatcher) {
+        // 잠그기만 하면 꺼진 스위치로 보인다 — 서버가 ON 인 사용자가 "동의 안 했다" 로 읽는다
+        로그인()
+        val member = FakeMeRepository(result = Result.failure(ApiException.Network(IOException("끊김"))))
+        val viewModel = viewModel(member)
+
+        assertEquals(MarketingNotice.FAILED, viewModel.uiState.value.marketingNotice)
+    }
+
+    @Test
+    fun `값을_알면_보조_문구를_안_붙인다`() = runTest(dispatcher) {
+        로그인()
+        val member = FakeMeRepository(result = Result.success(로그인직후.copy(marketingAgreed = true)))
+        val viewModel = viewModel(member)
+
+        assertEquals(MarketingNotice.NONE, viewModel.uiState.value.marketingNotice)
+    }
+
+    @Test
+    fun `실패한_뒤_다시_시도하면_다시_조회한다`() = runTest(dispatcher) {
+        로그인()
+        val member = FakeMeRepository(result = Result.failure(ApiException.Network(IOException("끊김"))))
+        val viewModel = viewModel(member)
+        assertEquals(1, member.meCalls)
+
+        viewModel.refreshProfile()
+        advanceUntilIdle()
+
+        assertEquals("재조회 경로가 없으면 앱을 껐다 켜는 수밖에 없다", 2, member.meCalls)
+    }
+
     // ── 계정이 바뀌는 경우 ────────────────────────────────────────
 
     @Test
@@ -211,6 +331,10 @@ class AccountMarketingRestoreTest {
 private class FakeMeRepository(
     private val result: Result<SessionProfile>? = null,
     private val me: CompletableDeferred<SessionProfile>? = null,
+    /** `PATCH /me`(닉네임)가 돌려줄 프로필. **전체 프로필이 온다**(§2). */
+    private val patchNickname: SessionProfile? = null,
+    /** `PATCH /me/agreements` 가 돌려줄 프로필. */
+    private val patchMarketing: SessionProfile? = null,
 ) : MemberRepository {
 
     var meCalls = 0
@@ -226,11 +350,11 @@ private class FakeMeRepository(
 
     override suspend fun updateMarketing(agreed: Boolean): SessionProfile {
         sentMarketing = agreed
-        return result?.getOrThrow() ?: error("이 테스트는 여기까지 오면 안 된다")
+        return patchMarketing ?: result?.getOrThrow() ?: error("이 테스트는 여기까지 오면 안 된다")
     }
 
     override suspend fun updateNickname(nickname: String): SessionProfile =
-        error("이 테스트는 닉네임을 부르지 않는다")
+        patchNickname ?: error("이 테스트는 닉네임을 부르지 않는다")
 
     override suspend fun updatePassword(currentPassword: String, newPassword: String): AuthTokens =
         error("이 테스트는 비밀번호를 부르지 않는다")
