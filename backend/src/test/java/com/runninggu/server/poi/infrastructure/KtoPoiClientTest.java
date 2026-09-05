@@ -6,6 +6,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardInterceptor;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties.EndpointLimits;
+import com.runninggu.server.common.upstream.UpstreamProvider;
 import com.runninggu.server.poi.application.PoiSearchCriteria;
 import com.runninggu.server.poi.application.PoiSourceException;
 import com.runninggu.server.poi.application.PoiSourceException.Reason;
@@ -19,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -42,7 +50,8 @@ class KtoPoiClientTest {
                         .baseUrl("https://apis.data.test/B551011/WellnessTursmService")
                         .build(),
                 new ObjectMapper(),
-                "decoded+/=key");
+                "decoded+/=key",
+                disabledGuard());
     }
 
     @Test
@@ -162,6 +171,91 @@ class KtoPoiClientTest {
     }
 
     @Test
+    void guard가_켜지면_누락된_KTO_실패코드는_전체_시험을_trip한다() {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder korBuilder = RestClient.builder();
+        RestClient.Builder wellnessBuilder = RestClient.builder();
+        MockRestServiceServer guardedKorServer = MockRestServiceServer.bindTo(korBuilder).build();
+        MockRestServiceServer guardedWellnessServer = MockRestServiceServer
+                .bindTo(wellnessBuilder)
+                .build();
+        UpstreamLoadGuardInterceptor interceptor = new UpstreamLoadGuardInterceptor(
+                guard,
+                UpstreamProvider.KTO);
+        KtoPoiClient guardedClient = new KtoPoiClient(
+                korBuilder
+                        .baseUrl("https://apis.data.go.kr/B551011/KorService2")
+                        .requestInterceptor(interceptor)
+                        .build(),
+                wellnessBuilder
+                        .baseUrl("https://apis.data.go.kr/B551011/WellnessTursmService")
+                        .requestInterceptor(interceptor)
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedKorServer.expect(request -> {})
+                .andRespond(withSuccess(
+                        """
+                        {"response":{"header":{},"body":{"items":"","totalCount":0}}}
+                        """,
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> guardedClient.search(criteria(PoiCategory.TOUR, ""), 8))
+                .isInstanceOf(UpstreamLoadGuardException.class);
+        guardedKorServer.verify();
+        guardedWellnessServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_켜지면_resultCode를_판독할_수_없는_본문도_trip한다(String responseBody) {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder korBuilder = RestClient.builder();
+        RestClient.Builder wellnessBuilder = RestClient.builder();
+        MockRestServiceServer guardedKorServer = MockRestServiceServer.bindTo(korBuilder).build();
+        MockRestServiceServer guardedWellnessServer = MockRestServiceServer
+                .bindTo(wellnessBuilder)
+                .build();
+        UpstreamLoadGuardInterceptor interceptor = new UpstreamLoadGuardInterceptor(
+                guard,
+                UpstreamProvider.KTO);
+        KtoPoiClient guardedClient = new KtoPoiClient(
+                korBuilder
+                        .baseUrl("https://apis.data.go.kr/B551011/KorService2")
+                        .requestInterceptor(interceptor)
+                        .build(),
+                wellnessBuilder
+                        .baseUrl("https://apis.data.go.kr/B551011/WellnessTursmService")
+                        .requestInterceptor(interceptor)
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedKorServer.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> guardedClient.search(criteria(PoiCategory.TOUR, ""), 8))
+                .isInstanceOfSatisfying(
+                        UpstreamLoadGuardException.class,
+                        exception -> assertThat(exception.reason())
+                                .isEqualTo(UpstreamLoadGuardException.Reason.KTO_RESULT_CODE));
+        guardedKorServer.verify();
+        guardedWellnessServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_꺼지면_resultCode를_판독할_수_없는_본문은_기존_외부오류다(String responseBody) {
+        korServer.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertReason(Reason.ERROR);
+        korServer.verify();
+        wellnessServer.verify();
+    }
+
+    @Test
     void JSON을_요청했는데_XML이_오면_외부오류다() {
         korServer.expect(request -> {})
                 .andRespond(withSuccess("<OpenAPI_ServiceResponse/>", MediaType.APPLICATION_XML));
@@ -201,5 +295,23 @@ class KtoPoiClientTest {
                   "items":{"item":%s},"numOfRows":100,"pageNo":1,"totalCount":%d
                 }}}
                 """.formatted(items, totalCount);
+    }
+
+    private UpstreamLoadGuard disabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                false,
+                "local",
+                null,
+                null,
+                null));
+    }
+
+    private UpstreamLoadGuard enabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                true,
+                "staging",
+                "poi-test",
+                100,
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
     }
 }

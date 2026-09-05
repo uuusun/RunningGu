@@ -7,6 +7,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardInterceptor;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties.EndpointLimits;
+import com.runninggu.server.common.upstream.UpstreamProvider;
 import com.runninggu.server.geocode.application.GeocodeProviderException;
 import com.runninggu.server.geocode.application.GeocodeProviderException.Reason;
 import com.runninggu.server.geocode.domain.GeocodeResult;
@@ -127,6 +133,32 @@ class KakaoLocalClientTest {
 
         assertThat(client.findFirst("장소")).isPresent();
         server.verify();
+    }
+
+    @Test
+    void guard가_켜지면_첫_429에서_trip하고_재시도하지_않는다() {
+        UpstreamLoadGuard guard = new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                true,
+                "staging",
+                "kakao-429-test",
+                100,
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
+        KakaoLocalClient guardedClient = new KakaoLocalClient(
+                builder
+                        .baseUrl("https://dapi.kakao.com")
+                        .requestInterceptor(new UpstreamLoadGuardInterceptor(
+                                guard,
+                                UpstreamProvider.KAKAO))
+                        .build(),
+                "test-rest-key");
+        guardedServer.expect(request -> {})
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> guardedClient.findFirst("장소"))
+                .isInstanceOf(UpstreamLoadGuardException.class);
+        guardedServer.verify();
     }
 
     @Test

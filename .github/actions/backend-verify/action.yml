@@ -66,12 +66,18 @@ runs:
         python3 ../scripts/osm/test_operational_load.py
         python3 ../scripts/osm/test_roundtrip_evidence.py
         python3 deploy/validation/test_summarize_runtime_metrics.py
+        python3 deploy/validation/test_summarize_upstream_load_guard.py
         sh -n deploy/validation/collect-runtime-metrics.sh
         sh -n deploy/validation/test-collect-runtime-metrics.sh
         sh deploy/validation/test-collect-runtime-metrics.sh
         sh deploy/graphhopper/test-start-graphhopper-compose.sh
         grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' compose.ec2.yaml
         grep -Fq -- '-Xlog:gc*:stdout:time,uptime,level,tags' deploy/backend/start-backend.sh
+
+    - name: Validate app API load tools
+      shell: bash
+      working-directory: backend
+      run: python3 -m unittest discover -s ../scripts/api -p 'test_*.py' -v
 
     - name: Test and prepare EC2 artifact
       shell: bash

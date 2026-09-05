@@ -1,5 +1,6 @@
 package com.runninggu.server.course.application;
 
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
 import com.runninggu.server.course.domain.Course;
 import com.runninggu.server.course.domain.CourseDataSource;
 import java.time.Clock;
@@ -103,6 +104,8 @@ public class CourseSyncService {
                     gpxOnly,
                     apiOnly,
                     batch.invalidFieldCount());
+        } catch (UpstreamLoadGuardException exception) {
+            throw exception;
         } catch (CourseMetadataSyncException exception) {
             long durationMs = Duration.between(startedAt, clock.instant()).toMillis();
             log.warn(

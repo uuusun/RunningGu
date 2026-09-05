@@ -7,6 +7,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardInterceptor;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties.EndpointLimits;
+import com.runninggu.server.common.upstream.UpstreamProvider;
 import com.runninggu.server.festival.application.FestivalProviderException;
 import com.runninggu.server.festival.application.FestivalProviderException.Reason;
 import com.runninggu.server.festival.domain.Festival;
@@ -17,6 +23,8 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -37,7 +45,8 @@ class KtoFestivalClientTest {
         client = new KtoFestivalClient(
                 builder.baseUrl("https://apis.data.test/B551011/KorService2").build(),
                 new ObjectMapper(),
-                "decoded+/=key");
+                "decoded+/=key",
+                disabledGuard());
     }
 
     @Test
@@ -161,6 +170,70 @@ class KtoFestivalClientTest {
     }
 
     @Test
+    void guard가_켜지면_KTO_실패코드는_전체_시험을_trip한다() {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
+        KtoFestivalClient guardedClient = new KtoFestivalClient(
+                builder
+                        .baseUrl("https://apis.data.go.kr/B551011/KorService2")
+                        .requestInterceptor(new UpstreamLoadGuardInterceptor(
+                                guard,
+                                UpstreamProvider.KTO))
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedServer.expect(request -> {})
+                .andRespond(withSuccess(
+                        """
+                        {"response":{"header":{"resultCode":"30","resultMsg":"KEY ERROR"}}}
+                        """,
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> guardedClient.searchStartingFrom(EVENT_START_DATE))
+                .isInstanceOf(UpstreamLoadGuardException.class);
+        guardedServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_켜지면_resultCode를_판독할_수_없는_본문도_trip한다(String responseBody) {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
+        KtoFestivalClient guardedClient = new KtoFestivalClient(
+                builder
+                        .baseUrl("https://apis.data.go.kr/B551011/KorService2")
+                        .requestInterceptor(new UpstreamLoadGuardInterceptor(
+                                guard,
+                                UpstreamProvider.KTO))
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedServer.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> guardedClient.searchStartingFrom(EVENT_START_DATE))
+                .isInstanceOfSatisfying(
+                        UpstreamLoadGuardException.class,
+                        exception -> assertThat(exception.reason())
+                                .isEqualTo(UpstreamLoadGuardException.Reason.KTO_RESULT_CODE));
+        guardedServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_꺼지면_resultCode를_판독할_수_없는_본문은_기존_외부오류다(String responseBody) {
+        server.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertReason(Reason.ERROR);
+        server.verify();
+    }
+
+    @Test
     void JSON을_요청했는데_XML이_오면_외부오류다() {
         server.expect(request -> {})
                 .andRespond(withSuccess(
@@ -194,7 +267,8 @@ class KtoFestivalClientTest {
         KtoFestivalClient missingKeyClient = new KtoFestivalClient(
                 RestClient.create("https://apis.data.test"),
                 new ObjectMapper(),
-                " ");
+                " ",
+                disabledGuard());
 
         assertThatThrownBy(() -> missingKeyClient.searchStartingFrom(EVENT_START_DATE))
                 .isInstanceOfSatisfying(
@@ -230,5 +304,23 @@ class KtoFestivalClientTest {
                   "addr1":"주소"
                 }]
                 """.formatted(contentId, contentId, lng, lat, contentId);
+    }
+
+    private UpstreamLoadGuard disabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                false,
+                "local",
+                null,
+                null,
+                null));
+    }
+
+    private UpstreamLoadGuard enabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                true,
+                "staging",
+                "festival-test",
+                100,
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
     }
 }
