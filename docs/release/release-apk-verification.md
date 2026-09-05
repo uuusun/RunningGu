@@ -43,8 +43,8 @@ APK        파일명 / 소스 커밋 / SHA-256
 | 확인 | 기대 | 실제 | 판정 |
 |---|---|---|---|
 | 패키지명 | `com.runninggu.app` | `com.runninggu.app` | ✅ 일치 (2026-09-05) |
-| **새 출시 키** 해시 등록 | `oRJtsESChTHqkP9fnp4lRq+wNxM=` | | ⬜ 등록 대기 |
-| 기존 해시 유지 | 4개 그대로 | | |
+| **새 출시 키** 해시 등록 | `oRJtsESChTHqkP9fnp4lRq+wNxM=` | 등록함 | ✅ 완료 (2026-09-05) |
+| 기존 해시 유지 | 4개 그대로 | 지우지 않음 | ✅ 완료 |
 
 ### 등록된 키 해시 (2026-09-05 기준)
 
@@ -54,7 +54,7 @@ APK        파일명 / 소스 커밋 / SHA-256
 | `Vb4Jzj79UvMCSjM+iRqs6WUNyYY=` | 이건모 맥북 디버그 | 이 PC 에서 산출 |
 | `Y95WvQZPi0Er3QqUEGPGdYGcltE=` | 김민지 Windows 디버그 | #104 |
 | `zEs1rfvXJVmdEvIRu8HlFL6koFk=` | 이건모 Windows 디버그 | #104 · #77 |
-| **`oRJtsESChTHqkP9fnp4lRq+wNxM=`** | **유선경 새 출시 키** | 선경님 전달 · **추가 대상** |
+| **`oRJtsESChTHqkP9fnp4lRq+wNxM=`** | **유선경 새 출시 키** | 선경님 전달 · **2026-09-05 등록 완료** |
 
 > **이번 출시부터 키가 바뀐다** — 선경님이 만든 새 출시 키를 쓴다(2026-09-05). 기존 민지님
 > 릴리스 해시는 **지우지 않는다.** 그 키로 서명된 APK 도 아직 시험에 쓴다.
