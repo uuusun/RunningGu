@@ -34,11 +34,18 @@ data class SessionProfile(
     /**
      * 마케팅 수신 동의. `GET /me` 의 `agreements.marketing` 자리다 (API 명세 §2).
      *
-     * 계정 관리 화면의 토글 초기값이라 세션에 함께 들고 있는다 — 기본값 false 로 두면
-     * **가입 때 동의한 사용자에게도 꺼진 것으로 보이고**, 토글을 한 번 눌러야 맞춰지는데
-     * 그러면 실제로는 철회가 된다.
+     * 계정 관리 화면의 토글 초기값이라 세션에 함께 들고 있는다.
+     *
+     * **`null` 은 "서버에 아직 안 물었다" 이고, `false` 와 다르다** (이슈 #287).
+     * 예전에는 기본값이 `false` 였는데, 로그인 응답의 `user` 가 약관을 포함하지 않는
+     * **요약**이라(§1-5 · §1-6 · §1-7) 재로그인한 사용자마다 **서버는 ON 인데 화면이
+     * OFF 로** 보였다. 안 물어본 것을 "꺼져 있다" 고 말하면 사용자가 토글을 눌러 맞추는데,
+     * 그건 맞추는 게 아니라 **철회**다.
+     *
+     * 채우는 자리는 `GET /me` 하나다 — 시작 시 세션 검증(`ApiSessionValidator`),
+     * 계정 관리 진입(`AccountViewModel`), `PATCH /me` · `PATCH /me/agreements` 응답.
      */
-    val marketingAgreed: Boolean = false,
+    val marketingAgreed: Boolean? = null,
 )
 
 /**

@@ -57,8 +57,22 @@ data class AccountUiState(
      *
      * 세션은 `GET /me` · `PATCH /me/agreements` 응답으로만 채워지므로(명세 §2)
      * **여기 보이는 값은 언제나 서버가 말한 값**이다.
+     *
+     * **[marketingKnown] 이 false 인 동안 이 값을 읽지 말 것.** 그때는 "꺼져 있다" 가
+     * 아니라 "아직 모른다" 이고, 여기서는 둘이 똑같이 `false` 로 보인다(#287).
      */
     val marketingAgreed: Boolean get() = profile?.marketingAgreed == true
+
+    /**
+     * 서버가 말한 마케팅 동의 값을 들고 있는가. (이슈 #287)
+     *
+     * 재로그인 직후에는 `false` 다 — 로그인 응답의 `user` 가 약관 없는 요약이라
+     * (§1-5~§1-7) 세션의 값이 `null` 이기 때문이다. `GET /me` 가 돌아오면 true 가 된다.
+     *
+     * **화면은 이걸 보고 스위치를 잠근다.** 안 그러면 서버가 ON 인 사용자에게 OFF 로
+     * 그려 놓고, 그 사람이 켜려고 누르면 실제로는 **철회 요청**이 나간다.
+     */
+    val marketingKnown: Boolean get() = profile?.marketingAgreed != null
 }
 
 /**
@@ -128,6 +142,9 @@ class AccountViewModel(
 
     /** 마케팅 토글 연타. 스위치도 잠그지만 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
     private var marketingJob: Job? = null
+
+    /** `GET /me` 보충 조회. 세션이 여러 번 흘러도 왕복은 하나만 띄운다 (#287). */
+    private var profileJob: Job? = null
     private var nicknameJob: Job? = null
     private var passwordJob: Job? = null
     private var withdrawJob: Job? = null
@@ -136,7 +153,34 @@ class AccountViewModel(
         viewModelScope.launch {
             SessionStore.session.collect { profile ->
                 _uiState.update { it.copy(profile = profile) }
+                // **모르는 값이 있으면 그때만 묻는다** (#287). 화면에 들어올 때마다 부르면
+                // 이미 아는 값을 다시 받으려고 왕복이 는다 — 서버 값이 바뀌는 자리는
+                // 이 화면의 토글뿐이고, 그건 PATCH 응답으로 이미 갱신된다(§2).
+                if (profile != null && profile.marketingAgreed == null) refreshProfile()
             }
+        }
+    }
+
+    /**
+     * 세션에 빠진 값을 `GET /me` 로 채운다. (이슈 #287 · 명세 §2)
+     *
+     * 로그인 응답의 `user` 는 약관 없는 요약이라(§1-5~§1-7), 재로그인하면 마케팅 동의가
+     * `null` 인 채로 계정 관리에 도착한다. 화면이 그걸 OFF 로 그리면 **서버는 ON 인데
+     * 사용자에게는 꺼진 것으로 보이고**, 켜려고 누른 토글이 철회 요청이 된다.
+     *
+     * **실패해도 아무것도 확정하지 않는다.** `null` 을 그대로 두면 화면이 스위치를 잠근
+     * 채 둔다 — 오프라인에서 "동의 안 함" 을 보여 주는 것보다 낫다. 다음 진입에 다시 묻는다.
+     *
+     * 세대를 들고 갔다가 [SessionStore.updateProfile] 에서 비교한다 — 왕복 중에 로그아웃·
+     * 계정 전환이 있었으면 **남의 프로필**이다(#170 리뷰와 같은 장치).
+     */
+    private fun refreshProfile() {
+        if (profileJob?.isActive == true) return
+        val epoch = SessionStore.sessionEpoch
+        profileJob = viewModelScope.launch {
+            runCatchingUnlessCancelled { memberRepository.me() }
+                .onSuccess { SessionStore.updateProfile(epoch, it) }
+            // 실패는 조용히 넘긴다. 계정 화면은 이 값 없이도 나머지를 다 그린다
         }
     }
 
@@ -215,7 +259,11 @@ class AccountViewModel(
     fun onToggleMarketing() {
         val profile = _uiState.value.profile ?: return
         if (_uiState.value.savingMarketing) return
-        val next = !profile.marketingAgreed
+        // **모르는 값은 뒤집지 않는다** (#287). `null` 을 false 로 읽고 뒤집으면 이미 동의한
+        // 사용자에게 ON 을 보내 아무 일도 안 일어나거나, 반대로 철회가 나간다.
+        // 화면도 이때 스위치를 잠그지만(marketingKnown), 여기서도 막는다 — 화면이 하나가 아니다
+        val current = profile.marketingAgreed ?: return
+        val next = !current
         val epoch = SessionStore.sessionEpoch
         marketingJob?.cancel()
         marketingJob = viewModelScope.launch {
@@ -233,7 +281,7 @@ class AccountViewModel(
                             // 서버가 답한 값으로 말한다 — 보낸 값이 아니다
                             message = when {
                                 !applied -> null
-                                updated.marketingAgreed -> "마케팅 수신에 동의했어요"
+                                updated.marketingAgreed == true -> "마케팅 수신에 동의했어요"
                                 else -> "마케팅 수신 동의를 철회했어요"
                             },
                         )

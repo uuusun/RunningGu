@@ -41,6 +41,19 @@ sealed interface ReauthCredential {
 
 interface MemberRepository {
 
+    /**
+     * 내 정보 조회. (`GET /me` · 명세 §2)
+     *
+     * **로그인 응답으로는 프로필이 다 안 채워진다.** `POST /auth/login` · `/auth/kakao` 의
+     * `user` 는 닉네임·이메일·가입수단만 있는 **요약**이라 약관이 빠져 있다(§1-5~§1-7).
+     * 그래서 재로그인하면 마케팅 동의가 서버는 ON 인데 앱에서 `null`(모름)이 된다.
+     * 계정 관리가 이 호출로 채운다(이슈 #287).
+     *
+     * 시작 시 세션 검증도 같은 엔드포인트를 쓴다(`ApiSessionValidator`). 그쪽은 "이 세션이
+     * 살아 있나" 를 묻고 여기는 "지금 값이 뭔가" 를 묻는 것이라, 부르는 자리가 다르다.
+     */
+    suspend fun me(): SessionProfile
+
     /** 닉네임 변경. 중복이면 `ApiErrorCode.NICKNAME_DUPLICATED` 가 올라온다. */
     suspend fun updateNickname(nickname: String): SessionProfile
 
@@ -85,6 +98,8 @@ interface MemberRepository {
 }
 
 class RemoteMemberRepository(private val api: MeApi) : MemberRepository {
+
+    override suspend fun me(): SessionProfile = apiCall { api.me().toSessionProfile() }
 
     override suspend fun updateNickname(nickname: String): SessionProfile = apiCall {
         api.updateNickname(UpdateNicknameRequest(nickname)).toSessionProfile()

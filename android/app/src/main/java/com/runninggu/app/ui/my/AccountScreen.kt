@@ -117,8 +117,11 @@ fun AccountScreen(
                 label = "마케팅 정보 수신",
                 description = "혜택·소식 메일을 받아요",
                 checked = state.marketingAgreed,
-                // 서버가 답할 때까지 잠근다. 스위치는 세션 값을 그리므로 그때까지 안 움직인다
-                enabled = !state.savingMarketing,
+                // 서버가 답할 때까지 잠근다. 스위치는 세션 값을 그리므로 그때까지 안 움직인다.
+                // **재로그인 직후에는 값 자체를 모른다**(#287) — 로그인 응답에 약관이 없어서
+                // `GET /me` 가 돌아와야 안다. 그동안 열어 두면 OFF 로 보이는 스위치를 눌러
+                // 이미 동의한 사용자가 철회하게 된다.
+                enabled = !state.savingMarketing && state.marketingKnown,
                 onToggle = viewModel::onToggleMarketing,
             )
 
