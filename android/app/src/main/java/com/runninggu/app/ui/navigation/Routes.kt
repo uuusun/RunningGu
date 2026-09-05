@@ -121,6 +121,24 @@ object Routes {
 
     fun wizard(raceId: String): String = "wizard/${Uri.encode(raceId)}"
 
+    /** 저장 동선 상세(S7-R)의 인자. (§5-5) */
+    const val ARG_ITINERARY_ID = "itineraryId"
+
+    /**
+     * S7-R 저장 동선 상세. **위저드 그래프 밖이다.** (#213)
+     *
+     * 복원은 `itineraryId` 로 들어오고 `raceId` 를 모른다 — 응답을 받아야 안다. 그래서
+     * `wizard/{raceId}` 그래프에 얹지 않는다.
+     *
+     * 그래프 안에 두면 S4 를 지나오지 않은 채 그래프 스코프 ViewModel 이 기본값으로
+     * 살아나서, `planConfirmed` 가드가 S4 로 되돌린다(#192). 그 가드를 우회하거나
+     * 무력화하는 것은 둘 다 위험하다 — **복원된 기본값으로 동선을 만들면 조용히 틀린
+     * 결과가 나온다.**
+     */
+    const val ITINERARY_PATTERN = "itinerary/{$ARG_ITINERARY_ID}"
+
+    fun itinerary(itineraryId: Long): String = "itinerary/$itineraryId"
+
     /** 선택 인자를 포함한 캘린더 route 패턴. */
     const val CALENDAR_PATTERN = "$CALENDAR?$ARG_QUERY={$ARG_QUERY}"
 

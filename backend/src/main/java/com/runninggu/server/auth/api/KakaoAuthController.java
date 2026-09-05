@@ -59,6 +59,7 @@ public class KakaoAuthController {
         AuthSessionResponse response = AuthSessionResponse.from(kakaoAuthService.signup(
                 request.kakaoAccessToken(),
                 request.nickname(),
+                request.ageOver14(),
                 agreements.tos(),
                 agreements.privacy(),
                 agreements.marketing()));

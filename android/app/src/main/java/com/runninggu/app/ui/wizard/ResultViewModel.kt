@@ -1,13 +1,17 @@
 package com.runninggu.app.ui.wizard
 
 import com.runninggu.app.ui.runCatchingUnlessCancelled
+import com.runninggu.app.ui.userMessageOrDefault
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.data.remote.mapper.eventTypeFromServerName
 import com.runninggu.app.data.repository.FakeItineraryRepository
 import com.runninggu.app.data.repository.GenerateItineraryRequest
 import com.runninggu.app.data.repository.HotelInput
 import com.runninggu.app.data.repository.ItineraryRepository
 import com.runninggu.app.domain.BlockCategory
+import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.BlockType
 import com.runninggu.app.domain.ItineraryBlock
 import com.runninggu.app.domain.ItineraryDay
@@ -23,7 +27,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.remote.ApiErrorCode
-import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.local.SessionStore
@@ -124,8 +127,83 @@ class ResultViewModel(
         send(request)
     }
 
+    /**
+     * 저장한 동선을 되살린다. (S7-R · §5-5 · #213)
+     *
+     * **생성과 화면이 같고 채우는 것만 다르다.** 그래서 [generate] 와 같은 `ResultUiState`
+     * 를 만든다 — 편집·저장·지도가 한 벌이라 두 경로가 갈라지지 않는다.
+     *
+     * 다시 부르면 다시 조회한다. `LOADING`·`CONTENT` 중 같은 id 로 또 들어오는 것만
+     * 막는다 — 회전이나 재진입으로 `LaunchedEffect` 가 다시 도는 경우다([generate] 와
+     * 같은 이유).
+     */
+    fun restore(itineraryId: Long, force: Boolean = false) {
+        val current = _uiState.value
+        // [다시 시도] 는 같은 id 로 다시 부르는 것이라 위 가드에 걸린다. `force` 로 넘긴다
+        if (!force &&
+            current.restoredItineraryId == itineraryId &&
+            current.phase in setOf(ResultUiState.Phase.LOADING, ResultUiState.Phase.CONTENT)
+        ) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = ResultUiState(
+                phase = ResultUiState.Phase.LOADING,
+                restoredItineraryId = itineraryId,
+            )
+            val outcome = runCatchingUnlessCancelled { repository.detail(itineraryId) }
+            _uiState.value = outcome.fold(
+                onSuccess = { detail ->
+                    // 교체·추가 시트의 후보 중심. 숙소 > 대회장 순은 생성과 같다(§4.10)
+                    sheetCenter = detail.result.request.hotel?.let { it.lat to it.lng }
+                        ?: detail.contest.let { c ->
+                            val lat = c.lat
+                            val lng = c.lng
+                            if (lat != null && lng != null) lat to lng else null
+                        }
+                    val loaded = ResultUiState(
+                        // 저장된 것이라 빈 날은 없어야 하지만, 계약이 막지 않으므로 같이 다룬다
+                        phase = if (detail.result.days.isEmpty()) {
+                            ResultUiState.Phase.EMPTY
+                        } else {
+                            ResultUiState.Phase.CONTENT
+                        },
+                        result = detail.result,
+                        // **모르는 종목이면 저장된 것을 못 읽은 것이다.** 기본값으로 슬쩍
+                        // 바꾸면 회복 배지가 다른 종목 기준으로 뜬다 — HALF 로 떨어뜨리지
+                        // 않고 그대로 두는 편이 낫지만, 상태가 non-null 이라 여기서 정한다
+                        event = eventTypeFromServerName(detail.result.request.event)
+                            ?: EventType.HALF,
+                        region = detail.region.orEmpty(),
+                        restoredItineraryId = itineraryId,
+                        needsRegeneration = detail.needsRegeneration,
+                    )
+                    loaded.copy(activeBlockId = loaded.mapPins.firstOrNull()?.id)
+                },
+                onFailure = {
+                    ResultUiState(
+                        phase = ResultUiState.Phase.ERROR,
+                        restoredItineraryId = itineraryId,
+                        // 서버가 준 문구가 있으면 그걸 쓴다. 그 밖(네트워크·해석 실패)은
+                        // 사용자가 할 일이 같아서 한 문장으로 둔다
+                        errorMessage = (it as? ApiException)?.userMessageOrDefault()
+                            ?: "동선을 불러오지 못했어요.",
+                    )
+                },
+            )
+        }
+    }
+
     /** 오류 상태의 [다시 시도]. 같은 입력으로 재요청한다. (SPEC §4.10) */
     fun retry() {
+        // **복원으로 들어온 화면은 다시 생성하면 안 된다** (#257 리뷰).
+        // 복원에는 `lastRequest` 가 없어서 예전에는 [다시 시도] 가 아무 일도 안 했다 —
+        // 오류 화면에 버튼만 있고 눌러도 그대로였다.
+        val restoredId = _uiState.value.restoredItineraryId
+        if (restoredId != null) {
+            restore(restoredId, force = true)
+            return
+        }
         lastRequest?.let(::send)
     }
 

@@ -9,12 +9,15 @@ import org.springframework.stereotype.Service;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class KakaoAuthService {
 
+    private final AgeRequirementPolicy ageRequirementPolicy;
     private final KakaoUserInfoProvider userInfoProvider;
     private final KakaoAuthTransaction transaction;
 
     public KakaoAuthService(
+            AgeRequirementPolicy ageRequirementPolicy,
             KakaoUserInfoProvider userInfoProvider,
             KakaoAuthTransaction transaction) {
+        this.ageRequirementPolicy = ageRequirementPolicy;
         this.userInfoProvider = userInfoProvider;
         this.transaction = transaction;
     }
@@ -28,9 +31,11 @@ public class KakaoAuthService {
     public AuthSessionResult signup(
             String kakaoAccessToken,
             String nickname,
+            boolean ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing) {
+        ageRequirementPolicy.validate(ageOver14);
         KakaoUserProfile profile = retrieve(kakaoAccessToken);
         return transaction.signup(profile, nickname, tos, privacy, marketing);
     }

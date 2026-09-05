@@ -32,6 +32,7 @@ public class EmailAuthService {
     private static final EmailVerificationPurpose SIGNUP = EmailVerificationPurpose.SIGNUP;
     private static final String LOGIN_FAILURE_DETAIL = "이메일 또는 비밀번호를 확인해 주세요.";
 
+    private final AgeRequirementPolicy ageRequirementPolicy;
     private final EmailNormalizer emailNormalizer;
     private final NicknamePolicy nicknamePolicy;
     private final PasswordPolicy passwordPolicy;
@@ -50,6 +51,7 @@ public class EmailAuthService {
     private final String dummyPasswordHash;
 
     public EmailAuthService(
+            AgeRequirementPolicy ageRequirementPolicy,
             EmailNormalizer emailNormalizer,
             NicknamePolicy nicknamePolicy,
             PasswordPolicy passwordPolicy,
@@ -65,6 +67,7 @@ public class EmailAuthService {
             TokenIssuer tokenIssuer,
             AgreementProperties agreementProperties,
             Clock clock) {
+        this.ageRequirementPolicy = ageRequirementPolicy;
         this.emailNormalizer = emailNormalizer;
         this.nicknamePolicy = nicknamePolicy;
         this.passwordPolicy = passwordPolicy;
@@ -89,9 +92,11 @@ public class EmailAuthService {
             String email,
             String password,
             String nickname,
+            boolean ageOver14,
             boolean tos,
             boolean privacy,
             boolean marketing) {
+        ageRequirementPolicy.validate(ageOver14);
         String normalizedEmail = emailNormalizer.normalize(email);
         passwordPolicy.validate(password);
         String displayNickname = nicknamePolicy.normalizeDisplay(nickname);

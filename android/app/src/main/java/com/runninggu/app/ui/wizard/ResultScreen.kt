@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.BlockType
@@ -87,7 +88,6 @@ import com.runninggu.app.ui.map.RunningGuMap
 import com.runninggu.app.domain.ItineraryDay
 import com.runninggu.app.domain.ItineraryEdits
 import com.runninggu.app.domain.PoiCategory
-import com.runninggu.app.ui.common.BottomActionBar
 import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
@@ -106,12 +106,11 @@ import kotlinx.coroutines.launch
  * - 상단 지도(번호 핀·폴리라인) — AP-03 카카오맵이 필요하다
  * - 저장 CTA 의 실제 저장 — `POST /api/itineraries`(AP-14)
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultScreen(
     onBack: () -> Unit,
     onChangeConditions: () -> Unit,
-    onOpenCourses: (targetKm: Double) -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
     /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
     onSaved: (message: String) -> Unit,
     /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
@@ -121,6 +120,107 @@ fun ResultScreen(
     modifier: Modifier = Modifier,
 ) {
     val wizard by wizardViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(wizard) {
+        // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
+        //
+        // 시스템이 프로세스를 되살리며 S7 로 바로 복원하면 `wizard` 가 기본값이라, 그대로
+        // 부르면 "여행 조건이 덜 정해졌어요" 가 뜬다 — 사용자가 잘못한 게 없는데 조건을
+        // 다시 고르라고 한다. 조회가 끝나면 `wizard` 가 바뀌어 여기가 다시 돈다.
+        // **복원된 기본값으로는 만들지 않는다.** (#192 리뷰) 사용자가 S4 를 지나온 상태여야
+        // 날짜·종목·취향이 그의 선택이다. 아니면 내비게이션이 S4 로 되돌린다.
+        if (wizard.contestPhase == WizardUiState.Phase.LOADED && wizard.planConfirmed) {
+            viewModel.generate(wizard)
+        }
+    }
+
+    ResultContent(
+        onBack = onBack,
+        onChangeConditions = onChangeConditions,
+        onOpenCourses = onOpenCourses,
+        onSaved = onSaved,
+        onLoginRequest = onLoginRequest,
+        viewModel = viewModel,
+        title = "추천 동선",
+        modifier = modifier,
+    ) { inner, content ->
+        // 대회를 실는 동안의 로딩·오류를 가린다. 넘겨받는 `RaceSummary` 는 본문이 쓰지
+        // 않는다 — 이 게이트는 **표시가 아니라 관문**이다
+        WizardContestGate(state = wizard, onRetry = wizardViewModel::load, modifier = inner) {
+            content()
+        }
+    }
+}
+
+/**
+ * S7-R 저장 동선 상세. **S7 과 같은 본문을 쓴다.** (§5-5 · #213)
+ *
+ * 생성 경로와 다른 것은 둘뿐이다.
+ *
+ * - 채우는 것 — `POST /itineraries/generate` 가 아니라 `GET /api/itineraries/{id}`
+ * - 대회 게이트 없음 — 저장된 동선은 대회 snapshot 을 이미 들고 있다
+ *
+ * **위저드 그래프 안에 두지 않는다.** 복원은 S4(일정 선택)를 지나오지 않아서, 그래프
+ * 스코프 ViewModel 이 기본값으로 살아나면 `planConfirmed` 가드가 S4 로 되돌린다(#192).
+ * 편집 상태는 이 route 자신의 ViewModel 이 든다.
+ */
+@Composable
+fun SavedItineraryScreen(
+    itineraryId: Long,
+    onBack: () -> Unit,
+    onChangeConditions: () -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
+    onSaved: (message: String) -> Unit,
+    onLoginRequest: () -> Unit,
+    viewModel: ResultViewModel,
+    modifier: Modifier = Modifier,
+) {
+    // 같은 id 로 다시 들어오면 ViewModel 이 막는다 — 회전·재진입으로 여기가 다시 돈다
+    LaunchedEffect(itineraryId) { viewModel.restore(itineraryId) }
+
+    ResultContent(
+        onBack = onBack,
+        onChangeConditions = onChangeConditions,
+        onOpenCourses = onOpenCourses,
+        onSaved = onSaved,
+        onLoginRequest = onLoginRequest,
+        viewModel = viewModel,
+        title = "저장한 동선",
+        modifier = modifier,
+    ) { inner, content ->
+        Box(inner) { content() }
+    }
+}
+
+/**
+ * **생성(S7)과 복원(S7-R)이 함께 쓰는 본문.** (#213)
+ *
+ * 두 경로가 화면에서 하는 일이 같다 — 회복 배지 · 요약 · 일자 탭 · 타임라인 · 편집
+ * 모드 · 지도. 다른 것은 **무엇으로 채우는가**와 **대회 조회 게이트가 있는가** 둘뿐이라,
+ * 그 둘만 진입점이 정하고 나머지는 여기 한 벌로 둔다.
+ *
+ * 두 벌로 두면 드래그 그립 · 스와이프 삭제 · 재생성 · 장소 추가를 두 곳에서 고치게
+ * 되고, 계측 테스트(#71)도 두 벌이 된다.
+ *
+ * @param gate 본문을 감싸는 것. 생성 경로는 대회 조회의 로딩·오류를 가리고,
+ *  복원 경로는 가릴 것이 없어 그대로 그린다.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResultContent(
+    onBack: () -> Unit,
+    onChangeConditions: () -> Unit,
+    onOpenCourses: (stay: HotelSnapshot?, targetKm: Double) -> Unit,
+    /** 저장 성공 — 마이[동선]으로 옮기고 문구를 띄운다 (SPEC §4.10). */
+    onSaved: (message: String) -> Unit,
+    /** 게스트가 [저장] 을 눌렀다 (매핑표 S7 "게스트 modal"). */
+    onLoginRequest: () -> Unit,
+    viewModel: ResultViewModel,
+    /** 앱바 제목. 생성과 복원이 같은 본문을 쓰지만 사용자에게는 다른 화면이다. */
+    title: String,
+    modifier: Modifier = Modifier,
+    gate: @Composable (Modifier, @Composable () -> Unit) -> Unit,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // 저장됐다. **이 화면은 문구를 그리지 않는다** — §4.10 이 마이[동선]으로 옮기라고
@@ -145,24 +245,11 @@ fun ResultScreen(
         )
     }
 
-    LaunchedEffect(wizard) {
-        // **대회를 실은 뒤에만 생성한다.** (#192 리뷰)
-        //
-        // 시스템이 프로세스를 되살리며 S7 로 바로 복원하면 `wizard` 가 기본값이라, 그대로
-        // 부르면 "여행 조건이 덜 정해졌어요" 가 뜬다 — 사용자가 잘못한 게 없는데 조건을
-        // 다시 고르라고 한다. 조회가 끝나면 `wizard` 가 바뀌어 여기가 다시 돈다.
-        // **복원된 기본값으로는 만들지 않는다.** (#192 리뷰) 사용자가 S4 를 지나온 상태여야
-        // 날짜·종목·취향이 그의 선택이다. 아니면 내비게이션이 S4 로 되돌린다.
-        if (wizard.contestPhase == WizardUiState.Phase.LOADED && wizard.planConfirmed) {
-            viewModel.generate(wizard)
-        }
-    }
-
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("추천 동선", style = MaterialTheme.typography.titleMedium) },
+                title = { Text(title, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
@@ -171,16 +258,13 @@ fun ResultScreen(
             )
         },
         bottomBar = {
-            if (state.phase == ResultUiState.Phase.CONTENT) {
+            // 복원 화면에는 저장 바가 없다 — 누를 수 있으면 A 경로로 통째 저장된다 (#213)
+            if (state.phase == ResultUiState.Phase.CONTENT && state.editingEnabled) {
                 SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
             }
         },
     ) { innerPadding ->
-        WizardContestGate(
-            state = wizard,
-            onRetry = wizardViewModel::load,
-            modifier = Modifier.padding(innerPadding),
-        ) {
+        gate(Modifier.padding(innerPadding)) {
         Box {
             when (state.phase) {
                 ResultUiState.Phase.LOADING -> LoadingState("동선 짜는 중…")
@@ -205,7 +289,8 @@ fun ResultScreen(
                     onPinClick = viewModel::onPinClick,
                     onCardClick = viewModel::onCardClick,
                     onCardCentered = viewModel::onCardCentered,
-                    onOpenCourses = { onOpenCourses(state.courseTargetKm) },
+                    onOpenCourses = { onOpenCourses(state.courseStay, state.courseTargetKm) },
+                    editingEnabled = state.editingEnabled,
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
                     onMoveBlock = viewModel::onMoveBlock,
@@ -231,6 +316,8 @@ fun ResultScreen(
 @Composable
 private fun Content(
     state: ResultUiState,
+    /** 화면 전체가 편집을 여는가. 복원(S7-R)은 P0 에서 false 다 (#213). */
+    editingEnabled: Boolean,
     onDaySelect: (Int) -> Unit,
     onPinClick: (String) -> Unit,
     onCardClick: (String) -> Unit,
@@ -313,16 +400,17 @@ private fun Content(
             .collect { blockId -> blockId?.let(onCardCentered) }
     }
 
-    // **지도를 목록 밖에 둔다.** 안에 있으면 스크롤과 함께 위로 밀려 사라진다 — 아래
-    // 타임라인을 훑는 동안 "지금 보는 장소가 어디쯤인가" 를 볼 수 없다. §4.10 의
-    // 지도↔타임라인 동기화는 **지도가 보이는 동안** 의미가 있다(#208).
+    // **지도와 날짜 탭을 목록 밖에 둔다.** 안에 있으면 스크롤과 함께 위로 밀려 사라진다 —
+    // 아래 타임라인을 훑는 동안 "지금 보는 장소가 어디쯤인가" 를 볼 수 없고(#208), 카드를
+    // 몇 개 내린 뒤에는 **바뀐 지도를 보면서 날짜를 다시 고를 수가 없다**(#277 · 건모 확인).
     //
-    // 목록 안의 `item(key = "map")` 과 `item(key = "summary")` 였던 것을 위로 뺐다.
-    // 그래서 **`TIMELINE_FIRST_ITEM_INDEX` 도 4 → 3 → 2 로 같이 내려왔다.**
+    // 회복 배지·변경 안내·요약도 같이 올린다. 탭만 빼내면 화면 순서가
+    // `지도 → 탭 → 배지 → 요약 → D+1` 이 되어, 여행 전체를 말하는 줄들이
+    // 날짜를 고른 뒤에 나온다.
     //
-    // 두 방향이 서로 다르게 만들어져 있다 — 카드→지도는 `visibleItemsInfo` 를 `key` 로
-    // 훑어 인덱스와 무관하지만(303행), **지도→카드는 인덱스를 쓴다**(274행). 한쪽만 보고
-    // "안 깨진다" 고 판단하기 쉬운 자리다(#277 리뷰).
+    // 목록에서 `map` 과 `summary` 두 item 이 빠졌으므로 **[TIMELINE_FIRST_ITEM_INDEX] 도
+    // 4 → 2 로 같이 내렸다.** 두 방향이 서로 다르게 만들어져 있다 — 카드→지도는
+    // `visibleItemsInfo` 를 `key` 로 훑어 인덱스와 무관하지만 **지도→카드는 인덱스를 쓴다.**
     Column(Modifier.fillMaxWidth()) {
         // 지도는 가로 여백 없이 화면 폭을 다 쓴다.
         // 편집 중에는 핀 탭도 받지 않는다 — ViewModel 이 한 번 더 막지만, 눌러도 아무 일이
@@ -332,17 +420,19 @@ private fun Content(
             onPinClick = if (state.isEditing) ({ _: String -> }) else onPinClick,
         )
 
-        // **날짜 탭도 지도와 같이 고정한다.** 날짜를 바꾸면 지도와 아래 목록이 같이 바뀌는데,
-        // 탭이 목록을 따라 흘러가면 카드를 몇 개 내린 뒤에는 **바뀐 지도를 보면서 날짜를 다시
-        // 고를 수가 없다.** 위로 되감아야 한다.
-        //
-        // 회복 배지와 요약도 같이 올린다. 탭만 빼내면 화면 순서가
-        // `지도 → 탭 → 배지 → 요약 → D+1` 이 되어, 여행 전체를 말하는 두 줄이
-        // 날짜를 고른 뒤에 나온다.
         Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
             state.result?.recovery?.let {
                 Spacer(Modifier.height(16.dp))
                 RecoveryBadge(label = it.label, text = it.note)
+            }
+
+            // **대회가 바뀐 저장 동선은 그렇다고 말한다** (#257 리뷰 · 매핑표 S7-R).
+            // 안 알리면 저장해 둔 일정이 최신 대회와 어긋난 채로 정상처럼 보인다.
+            // 재생성 CTA 는 P0 밖이라(저장 후 편집이 블록 API 로 가야 한다 · #213)
+            // **알리는 것까지만** 한다 — 못 고치는 버튼을 두는 것보다 낫다
+            if (state.needsRegeneration) {
+                Spacer(Modifier.height(16.dp))
+                ContestChangedNotice()
             }
 
             Spacer(Modifier.height(16.dp))
@@ -374,7 +464,8 @@ private fun Content(
                         DayHeader(
                             label = day.label,
                             isEditing = state.isEditing,
-                            onToggleEdit = onToggleEdit,
+                            // 복원 화면에는 [편집] 이 없다 — 눌러 봐야 저장할 길이 없다 (#213)
+                            onToggleEdit = if (editingEnabled) onToggleEdit else null,
                         )
                         Spacer(Modifier.height(10.dp))
                     }
@@ -441,6 +532,41 @@ private fun Content(
 }
 
 /** 회복 배지. `noHard` 종목에만 나온다. (SPEC §4.10 · §5.6-6) */
+/**
+ * 저장한 뒤 대회 정보가 바뀌었다는 안내. (§5-3 · §5-5 · 매핑표 S7-R)
+ *
+ * **일정은 저장 시점 그대로 둔다.** 최신 대회로 갈아 끼우면 사용자가 저장해 둔 것과 다른
+ * 것을 보게 된다 — 바뀐 사실만 알리고 다시 만들지는 사용자가 정한다.
+ *
+ * **재생성 CTA 는 P0 에 없다.** 그건 `POST /itineraries/generate` 로 새로 만들고
+ * `PUT /itineraries/{id}` 로 교체하는 흐름인데, 저장 후 편집 자체가 아직 앱에 없다(#213).
+ * 누르면 아무 일도 안 하는 버튼을 두느니 **안내만 정확히 하는 편**이 낫다.
+ */
+@Composable
+private fun ContestChangedNotice() {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = "대회 정보가 바뀌었어요",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "저장한 일정은 그대로 두었어요. 날짜·장소가 달라졌을 수 있으니 " +
+                    "대회 상세에서 확인해 주세요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
 @Composable
 private fun RecoveryBadge(label: String, text: String) {
     Surface(
@@ -524,7 +650,7 @@ private fun RecoveryDot() {
 
 /** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
 @Composable
-private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: () -> Unit) {
+private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -535,8 +661,11 @@ private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: () -> Uni
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
-        TextButton(onClick = onToggleEdit) {
-            Text(if (isEditing) "완료" else "편집")
+        // 편집을 못 여는 화면에서는 버튼 자체를 안 그린다. 흐리게 두면 "왜 안 눌리지" 가 된다
+        onToggleEdit?.let {
+            TextButton(onClick = it) {
+                Text(if (isEditing) "완료" else "편집")
+            }
         }
     }
 }
@@ -868,17 +997,11 @@ private val TIMELINE_ROW_GAP = 10.dp
 /**
  * 조회 모드 타임라인 **첫 카드의 item 인덱스**. (SPEC §4.10 · #208 리뷰)
  *
- * 카드 위에 `dayHeader` · `dayNote` **둘**이 있다. 둘 다 `day != null` 안에 있지만
- * **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 둘이 항상 선다.
- *
- * **넷 → 셋 → 둘로 두 번 내려왔다.** 처음에는 `map` 이 목록의 첫 item 이었고, 다음에는
- * `summary`(회복 배지 · 요약 · 날짜 탭)가 있었다. 상단 고정으로 하나씩 빼면서 줄었다.
- * 첫 번째 때는 이 상수를 안 따라 내려서 핀을 누르면 **한 칸 아래 카드**로 스크롤됐다 —
- * 아래 KDoc 이 예고한 그대로였고, 리뷰에서 잡혔다(#277 리뷰).
+ * 카드 위에 `map` · `summary` · `dayHeader` · `dayNote` 넷이 있다. 뒤 셋은 `day != null`
+ * 안에 있지만 **카드도 같은 조건 안**이라, 카드가 있는 상황에서는 넷이 항상 선다.
  *
  * [Content] 의 item 을 늘리거나 줄이면 **여기도 같이 고쳐야 한다.** 어긋나도 조용하다 —
- * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다. **단위 테스트가 안 닿는다** — Compose 화면이고
- * `private const` 라 밖에서 볼 수 없다. 기기에서 핀을 눌러 보는 수밖에 없다.
+ * 핀을 눌렀을 때 엉뚱한 카드로 스크롤된다.
  */
 private const val TIMELINE_FIRST_ITEM_INDEX = 2
 
@@ -1259,27 +1382,30 @@ private fun DayMap(state: ResultUiState, onPinClick: (String) -> Unit) {
  */
 @Composable
 private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
-    BottomActionBar {
-        Button(
-            onClick = onSave,
-            enabled = canSave,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
+    Surface(shadowElevation = 8.dp) {
+        Column(
+            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
-            Text(
-                text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
-        // 실패 문구는 **같은 바 안에** 둔다. 바깥에 두면 그림자 경계 위로 떠서 다른 층처럼 보인다
-        if (save is SaveItineraryState.Failed) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = save.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
+            Button(
+                onClick = onSave,
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Text(
+                    text = if (save is SaveItineraryState.Saving) "저장 중…" else "이 동선 저장하기",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (save is SaveItineraryState.Failed) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = save.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }

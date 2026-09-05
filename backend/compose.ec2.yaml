@@ -24,4 +24,26 @@ services:
       - ./deploy/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
 
   graphhopper:
+    # base의 로컬 PBF·graph·SRTM mount를 완전히 교체한다. Docker Compose 2.24.4+가 필요하다.
+    volumes: !override
+      - type: bind
+        source: /opt/runninggu-data/graph
+        target: /data/graph
+    command:
+      - -Xms${GRAPHHOPPER_XMS:?GRAPHHOPPER_XMS를 설정해야 합니다}
+      - -Xmx${GRAPHHOPPER_XMX:?GRAPHHOPPER_XMX를 설정해야 합니다}
+      # §9.2의 readiness 이후 반복 Full GC 0건을 Docker local 로그에서 판정한다.
+      - -Xlog:gc*:stdout:time,uptime,level,tags
+      - -jar
+      - /opt/graphhopper/graphhopper-web.jar
+      - server
+      - /opt/graphhopper/graphhopper-server.yml
+    restart: "no"
+    # 첫 8GiB baseline은 0(무제한)으로 측정한다. §9.3 통과 뒤 관측값으로 교체한다.
+    mem_reservation: ${GRAPHHOPPER_MEMORY_RESERVATION:-0}
+    mem_limit: ${GRAPHHOPPER_MEMORY_LIMIT:-0}
+    # 양수 상한에서는 RAM+swap 합계를 RAM과 같게 해 GraphHopper만 swap을 금지한다(계약 §8.1).
+    # baseline의 0은 미설정 취급이며 swap 금지를 뜻하지 않는다.
+    memswap_limit: ${GRAPHHOPPER_MEMORY_LIMIT:-0}
+    stop_grace_period: 30s
     logging: *bounded-logging

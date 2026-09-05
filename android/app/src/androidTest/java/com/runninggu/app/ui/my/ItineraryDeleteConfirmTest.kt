@@ -33,6 +33,7 @@ class ItineraryDeleteConfirmTest {
                     hasNext = false,
                     totalElements = 1,
                 ),
+                onItineraryClick = {},
                 onDelete = { deleted += it },
                 onBrowseRaces = {},
                 onRetry = {},

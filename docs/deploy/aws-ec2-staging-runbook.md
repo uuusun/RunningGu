@@ -3,10 +3,10 @@
 > 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)의
 > AWS EC2 스테이징 구현 실행서다. 정책이나 절차가 충돌하면 상위 §7이 우선한다.
 >
-> **PR 1 초안 주의:** GraphHopper 관련 목표 구조는
-> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. builder·검증
-> 스크립트·systemd unit·Compose 변경이 PR 2로 구현되고 8GiB 합격 기준을 통과하기 전에는 이
-> 실행서만 보고 실제 배포하지 않는다.
+> **PR 2 구현 주의:** GraphHopper 관련 목표 구조는
+> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. PR 2 구현만으로
+> EC2 크기가 승인되는 것은 아니다. 실제 운영 release descriptor를 확정하고 8GiB 합격 기준을
+> 통과하기 전에는 이 실행서의 GraphHopper 활성화 단계를 운영에 적용하지 않는다.
 
 이 실행서는 `staging-api.runninggu.store` 단일 EC2에 Spring Boot JAR, PostgreSQL 17,
 GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator를 추가하지 않으며 기존
@@ -48,6 +48,10 @@ swap은 RAM 대체재가 아니다. 지속적으로 사용되면 인스턴스를
 
 EC2에서 Gradle 테스트나 빌드를 실행하지 않는다. 백엔드 CI가 다음을 모두 통과한 동일 commit의
 `runninggu-backend-<Git SHA>` artifact만 배포한다.
+
+PR CI는 GitHub가 만든 base와 head의 synthetic merge commit을 시험하되 배포 artifact를 업로드하지
+않는다. 스테이징에 쓰는 artifact와 `release-manifest.txt`는 `develop` 또는 `main` push 실행에서만
+만들어 업로드하며, 이름과 manifest의 Git SHA는 그 push commit과 같아야 한다.
 
 1. Playwright Chromium 설치
 2. 단위·Testcontainers 통합·브라우저 테스트
@@ -99,7 +103,9 @@ sudo apt-get install -y \
   git \
   curl \
   unzip \
-  dnsutils
+  dnsutils \
+  python3 \
+  python3-requests
 ```
 
 Docker Engine과 Compose plugin은 Docker의 Ubuntu 공식 저장소 절차로 설치한다. 편의 설치
@@ -135,6 +141,7 @@ sudo install -d -o runninggu -g runninggu -m 0755 /opt/runninggu/repository
 sudo install -d -o root -g runninggu -m 0750 /opt/runninggu/releases
 sudo install -d -o root -g root -m 0755 /opt/runninggu-data
 sudo install -d -o root -g root -m 0755 /opt/runninggu-data/graph
+sudo install -d -o root -g runninggu -m 0770 /opt/runninggu-validation
 sudo install -d -o root -g runninggu -m 0750 /etc/runninggu
 ```
 
@@ -203,11 +210,15 @@ sudo install -m 0600 -o root -g root \
 sudo install -m 0600 -o root -g root \
   backend/deploy/env/graphhopper-alert.env.example \
   /etc/runninggu/graphhopper-alert.env
+sudo install -m 0600 -o root -g root \
+  backend/deploy/env/backend-alert.env.example \
+  /etc/runninggu/backend-alert.env
 
 sudoedit /etc/runninggu/compose.env
 sudoedit /etc/runninggu/application.env
 sudoedit /etc/runninggu/backup-alert.env
 sudoedit /etc/runninggu/graphhopper-alert.env
+sudoedit /etc/runninggu/backend-alert.env
 ```
 
 - 두 파일의 `DB_PASSWORD`에는 같은 URL-safe 값을 넣는다.
@@ -221,7 +232,9 @@ sudoedit /etc/runninggu/graphhopper-alert.env
 - `backup-alert.env`에는 운영책임자 이메일을 구독시킨 SNS topic ARN을 넣는다. instance
   profile에는 해당 topic의 `sns:Publish` 최소 권한만 추가한다.
 - `graphhopper-alert.env`는 같은 SNS topic을 쓸 수 있지만 알림 unit과 메시지는 백업 실패와
-  구분한다. PR 2가 예시 파일과 GraphHopper 전용 알림 unit을 제공하기 전에는 배포하지 않는다.
+  구분한다.
+- `backend-alert.env`도 topic 공유는 가능하지만 Spring Boot 기동·OOM·start-limit 실패로 메시지를
+  구분한다. 세 alert env에는 정적 AWS access key를 넣지 않는다.
 
 ## 7. GraphHopper graph artifact 설치 준비
 
@@ -271,6 +284,7 @@ service를 제어하지 않는다.
 
 모든 Compose 명령은 `/opt/runninggu/repository/backend`에서 base와 EC2 파일을 함께 사용한다.
 `config` 전체 출력에는 DB 비밀번호가 포함될 수 있으므로 화면이나 로그로 출력하지 않는다.
+EC2의 `docker compose version --short`는 `!override`를 지원하는 **2.24.4 이상**이어야 한다.
 
 ```bash
 cd /opt/runninggu/repository/backend
@@ -366,6 +380,19 @@ sudo /bin/sh deploy/backup/check-wal-archive.sh
 성공한 GitHub Actions run에서 exact commit의 artifact를 승인된 경로로 전달한다. GitHub token을
 명령 인자나 shell history에 넣지 않는다. EC2에서 압축을 푼 뒤 checksum부터 검증한다.
 
+PR #255처럼 머지 전 운영 검증이 완료 조건이면 같은 저장소의 `develop` 대상 PR에서 생성된
+`runninggu-backend-pr<PR번호>-<head SHA>-<run ID>-<attempt>`를 사용한다. 기존 통합 검사와 별도
+PR head 검사 모두 성공한 run이어야 하며, Actions에서 현재 PR head·run ID·attempt를 확인해 기록한다.
+`release-manifest.txt`의 `artifact_kind=pr-validation`, `allowed_environment=staging`,
+`git_commit=head_commit=<검증할 PR head SHA>`와 PR 번호가 모두 맞아야 한다. `base_commit`과
+`integration_test_commit`은 통합 검사 대상 추적용이며 EC2 checkout에는 `git_commit`을 사용한다.
+이는 staging 전용 경로이고 production 배포나 PR 승인·머지를 뜻하지 않는다. PR head가 갱신되면
+새 CI 묶음을 사용한다. 자세한 필드 계약은 [artifact 계약 §11.1](graphhopper-artifact-contract.md#111-머지-전-staging-검증용-백엔드-묶음)을 따른다.
+
+다운로드 후 아래 checksum 검증에 이어 manifest의 식별자를 배포 요청·GitHub CI와 대조하고,
+§6의 exact commit checkout과 일치시킨다. 머지 후 `develop`/`main` push 묶음은 기존 경로를 유지하며,
+검증용 묶음을 정식 묶음으로 이름만 바꿔 재사용하지 않는다.
+
 ```bash
 cd <artifact를_푼_임시_디렉터리>
 sha256sum -c SHA256SUMS
@@ -415,6 +442,9 @@ sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend.service \
   /etc/systemd/system/runninggu-backend.service
 sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/systemd/runninggu-backend-alert@.service \
+  /etc/systemd/system/runninggu-backend-alert@.service
+sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/systemd/runninggu-graphhopper.service \
   /etc/systemd/system/runninggu-graphhopper.service
 sudo install -m 0644 \
@@ -442,6 +472,7 @@ sudo systemctl daemon-reload
 sudo systemd-analyze verify \
   /etc/systemd/system/runninggu-contest-import.service \
   /etc/systemd/system/runninggu-backend.service \
+  /etc/systemd/system/runninggu-backend-alert@.service \
   /etc/systemd/system/runninggu-graphhopper.service \
   /etc/systemd/system/runninggu-graphhopper-verify.service \
   /etc/systemd/system/runninggu-graphhopper-alert@.service \
@@ -515,16 +546,63 @@ manifest의 artifact ID와 기존 graph load가 있어야 하고 PBF 읽기·SRT
 로그가 없어야 한다. 주 service의 Compose·`ExecStartPre` 실패는
 `journalctl -u runninggu-graphhopper.service`, 검증·실패 알림은
 `journalctl -u runninggu-graphhopper-verify.service`와
-`journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. 주 service journal에 foreground
-Compose가 릴레이한 container runtime stdout이 있으면 실패다. runtime stderr까지 릴레이되면
-계약 §7의 wrapper를 적용하기 전에는 배포하지 않는다.
+`journalctl -u 'runninggu-graphhopper-alert@*'`에서 확인한다. `logger`가 보낸 알림 본문은
+unit 필터에 잡히지 않을 수 있으므로 `journalctl -t runninggu-graphhopper-alert`도 확인하고,
+알림 unit의 실행 시각·`Result=success`·`ExecMainStatus=0`과 대조한다. 주 service journal에 foreground
+Compose가 릴레이한 container runtime stdout·stderr가 있으면 실패다. 주 service는
+`start-graphhopper-compose.sh` wrapper로 runtime stderr를 내부 임시 파일에만 받고, 실패했을 때만
+민감정보를 제거한 종료 code와 마지막 stderr 일부를 journal에 남긴다.
+
+운영 `graphhopper-server.yml`은 query string 접근 로그를 끄고 `RouteResource` INFO의 좌표도
+차단한다. 격리 시험 container의 loopback 포트와 이름을 지정해 다음 검사를 2회 실행한다.
+이 검사는 200·의도적 400 응답과 좌표·User-Agent 비기록을 함께 확인하며 정상 부하와 분리한다.
+
+```bash
+python3 backend/deploy/graphhopper/check-server-log-privacy.py \
+  --container <ISOLATED_CONTAINER> --base-url http://127.0.0.1:18989
+```
+
+정상 `systemctl stop` 이후 `ActiveState=inactive`, `Result=success`, 의도하지 않은 알림 0건을
+확인한다. Compose가 반환한 130·143은 stop marker가 있을 때만 0으로 정규화한다. marker 없는
+130·143과 OOM/137을 성공으로 취급하지 않는다.
 
 `systemctl show runninggu-graphhopper.service`에서 `NRestarts`, `StartLimitIntervalUSec`,
-`StartLimitBurst`, `TimeoutStartUSec`, `StandardOutput`, `StandardError`도 확인한다. 초기
+`StartLimitBurst`, `TimeoutStartUSec`, `TimeoutStopUSec`, `StandardOutput`, `StandardError`도
+확인한다. `TimeoutStopUSec`는 container의 `stop_grace_period=30s`보다 긴 45초여야 Compose stop이
+중간에 잘리지 않는다. 초기
 `TimeoutStartSec=60s`는 검증 전용 후보이고 전체 readiness 120초와 같은 뜻이 아니다. 검증
 unit·주 service의
 `ExecStartPre` 또는 내부 스모크가 실패하면 Spring Boot를 시작하지 않는다. 운영자가 직접
 `docker compose up -d graphhopper`로 systemd를 우회하지 않는다.
+
+첫 8GiB baseline에서는 `docker inspect`의 GraphHopper `HostConfig.Memory`가 `0`,
+`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`가 `infinity`인지 확인한다.
+이는 상한 누락이 아니라 실제 peak를 얻기 위한 명시적 무제한 상태다. 계약 §9.3 합격 뒤에만
+`compose.env`의 `GRAPHHOPPER_MEMORY_RESERVATION`·`GRAPHHOPPER_MEMORY_LIMIT`과 backend unit의
+`MemoryHigh`·`MemoryMax`를 관측값으로 함께 바꾸고 `daemon-reload` 후 전체 시험을 반복한다.
+
+양수 `GRAPHHOPPER_MEMORY_LIMIT`은 Compose의 `mem_limit`와 `memswap_limit`에 같은 값으로
+적용되어 GraphHopper container만 swap을 금지한다. baseline 값 0은 이 금지를 적용하지 않는다.
+호스트 swap을 끄거나 PostgreSQL의 메모리 정책을 바꾸지 않는다. 변경 전 private `compose.env`와
+backend unit을 접근 제한된 검증 디렉터리에 백업하고, 기존 release·graph·image를 보존한다.
+backend의 측정 상한은 `/etc/systemd/system/runninggu-backend.service.d/memory.conf`에
+`[Service]`, `MemoryHigh=...`, `MemoryMax=...`만 둔 drop-in으로 적용할 수 있다.
+기존 동명 drop-in이 있으면 덮어쓰지 말고 먼저 확인·백업한다. 실패 시 이번에 바꾼 env와 unit 또는
+drop-in만 원복한 뒤 `daemon-reload`하고 서비스를 복구한다. 다른 drop-in은 지우지 않는다.
+
+GraphHopper는 systemd로 중지·시작해 Compose가 변경된 container 설정을 반영하게 한다.
+`docker inspect`의 `HostConfig.MemoryReservation`, `Memory`, `MemorySwap`을 기록하고,
+`MemorySwap == Memory > 0`인지 확인한다. 해당 container PID의 `/proc/<PID>/cgroup` 경로로
+cgroup v2의 `memory.max`와 `memory.swap.max=0`을 직접 대조한다. backend는
+`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`로 적용값을 확인한다.
+후보값·기존값·실측 근거를 배포 증거에 남기고 같은 고정 요청 30분 부하·백업·재부팅·§9.3 격리를
+반복한다. 격리 시험의 reservation·memory·memory+swap은 실제 후보와 같아야 한다.
+
+2026-09-04 8GiB staging은 GraphHopper Xms1g/Xmx4g·reservation3g·memory5g·memory+swap5g,
+Spring Xms256m/Xmx1g·MemoryHigh1G/MemoryMax1536M으로 위 재시험을 통과했다.
+정확한 source/image·고정 부하·미승인 첫 후보·최종 결과는
+[8GiB 실측 기록](evidence/graphhopper-ec2-8g-20260904.md#최종-설정과-검증-범위)을 따른다.
+이는 해당 staging의 확정값이며 새 환경의 baseline 기본값이나 4GiB 합격을 뜻하지 않는다.
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
@@ -663,6 +741,162 @@ dry-run 성공과 deploy hook의 `nginx -t`, reload 성공을 모두 확인한�
 
 ## 15. 외부 스모크·재부팅 검증
 
+### 15.1 고정 부하·5초 자원·GC 기록
+
+EC2 첫 실행 전에 같은 artifact·server image를 로컬 운영 호환 container로 띄운다. 활성 artifact
+ID와 배포할 image의 content-addressed ID를 넣어 전체 회귀 기준선과 정상 직접 요청 세트를 release
+evidence에 고정한다. 이 파일은 첫 EC2 결과를 본 뒤 수정하지 않는다.
+
+```bash
+cd '<로컬_repository>'
+ARTIFACT_ID='<활성_artifact_id>'
+SERVER_IMAGE='<배포할_GraphHopper_image>'
+SERVER_IMAGE_DIGEST=$(docker image inspect --format '{{.Id}}' "$SERVER_IMAGE")
+BASELINE="docs/deploy/evidence/graphhopper-routing-${ARTIFACT_ID}.json"
+
+python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
+  --evidence "$BASELINE"
+```
+
+동일한 evidence 파일이 배포 commit에 포함된 뒤 EC2에서 전체 회귀와 JVM warm-up을 수행한다. 로컬
+성공 요청이나 셀 커버리지가 후퇴하면 30분 부하를 시작하지 않는다. 아래 현재 결과 파일은 실행마다
+새 경로를 사용한다.
+
+```bash
+cd /opt/runninggu/repository
+ARTIFACT_ID='<활성_artifact_id>'
+SERVER_IMAGE='<배포한_GraphHopper_image>'
+SERVER_IMAGE_DIGEST=$(sudo docker image inspect --format '{{.Id}}' "$SERVER_IMAGE")
+BASELINE="docs/deploy/evidence/graphhopper-routing-${ARTIFACT_ID}.json"
+sudo install -d -o root -g runninggu -m 0770 /opt/runninggu-validation
+
+sudo -u runninggu python3 scripts/osm/roundtrip.py \
+  --preset caps \
+  --zone all \
+  --seeds 16 \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
+  --evidence "/opt/runninggu-validation/${ARTIFACT_ID}-ec2-routing.json" \
+  --baseline "$BASELINE"
+```
+
+시험 전에 정상 직접 요청 도착률과 동시성을 운영 기록에 확정한다. 이 값과 요청 세트는 8GiB와
+4GiB에서 같아야 하며 아래 placeholder를 채우지 않은 명령은 실행하지 않는다. worker 포화로 예정
+시각에 직접 요청을 시작하지 못하면 기다려 요청량을 줄이지 않고 missed start로 남겨 실패한다.
+
+첫 SSM session에서 5초 자원 수집기와 30분 부하를 실행한다.
+
+```bash
+RUN_ID='<8g-baseline-YYYYMMDD-HHMM>'
+REQUESTS_PER_MINUTE='<사전_확정값>'
+CONCURRENCY='<사전_확정값>'
+test -n "$ARTIFACT_ID"
+test -n "$SERVER_IMAGE_DIGEST"
+test -f "/opt/runninggu/repository/$BASELINE"
+
+sudo install -d -o root -g runninggu -m 0770 \
+  "/opt/runninggu-validation/$RUN_ID"
+
+TEST_STARTED_AT=$(date --iso-8601=seconds)
+printf '%s\n' "$TEST_STARTED_AT" \
+  | sudo tee "/opt/runninggu-validation/$RUN_ID/started-at.txt" >/dev/null
+
+sudo /bin/sh \
+  /opt/runninggu/repository/backend/deploy/validation/collect-runtime-metrics.sh \
+  --duration-seconds 1800 \
+  --interval-seconds 5 \
+  --output "/opt/runninggu-validation/$RUN_ID/runtime-metrics.log" &
+METRICS_PID=$!
+
+sudo -u runninggu python3 \
+  /opt/runninggu/repository/scripts/osm/operational_load.py \
+  --request-set "/opt/runninggu/repository/$BASELINE" \
+  --artifact-id "$ARTIFACT_ID" \
+  --server-image-digest "$SERVER_IMAGE_DIGEST" \
+  --duration-seconds 1800 \
+  --requests-per-minute "$REQUESTS_PER_MINUTE" \
+  --concurrency "$CONCURRENCY" \
+  --timeout-seconds 5 \
+  --output "/opt/runninggu-validation/$RUN_ID/graphhopper-load.jsonl"
+LOAD_EXIT=$?
+
+wait "$METRICS_PID"
+test "$LOAD_EXIT" -eq 0
+tail -n 1 "/opt/runninggu-validation/$RUN_ID/graphhopper-load.jsonl"
+
+sudo python3 \
+  /opt/runninggu/repository/backend/deploy/validation/summarize-runtime-metrics.py \
+  --metrics "/opt/runninggu-validation/$RUN_ID/runtime-metrics.log" \
+  --output "/opt/runninggu-validation/$RUN_ID/runtime-summary.json"
+```
+
+둘째 SSM session에서는 부하 중 수동 full backup을 한 번 실행한다.
+
+```bash
+sudo systemctl start runninggu-postgres-backup.service
+sudo systemctl status --no-pager runninggu-postgres-backup.service
+```
+
+같은 session에서 부하 시작 후 서로 다른 세 시점(예: 5분·15분·25분)에 WAL 검사를 실행한다.
+
+```bash
+sudo systemctl start runninggu-postgres-wal-archive-check.service
+sudo systemctl status --no-pager runninggu-postgres-wal-archive-check.service
+```
+
+부하 종료 뒤 `graphhopper-load.jsonl` 마지막 summary의 `passed=true`, `missedRequestStarts=0`,
+`failedDirectRequests=0`, `noValidPointResponses=0`, `requestsOverTimeout=0`을 확인하고 직접 요청의
+p50·p95·max를 기록한다. `noValidPointResponses`는 `failedDirectRequests`의 부분집합이며 성공으로
+세지 않는다. `runtime-summary.json`도 `passed=true`여야 한다. 이 요약기는 표본 누락,
+`MemAvailable` 20% 미만, warm-up 뒤 swap counter·사용량 증가, systemd 재시작, container
+OOM·비정상 상태를 실패시킨다.
+
+GraphHopper와 Spring Boot는 운영 시작 명령에 JVM unified GC 로그를 켠다. 시험 시작 뒤 Full GC를
+다음 두 기준 저장소에서 확인한다. readiness 이후 반복 Full GC가 있으면 실패다.
+
+```bash
+TEST_STARTED_AT=$(sudo cat "/opt/runninggu-validation/$RUN_ID/started-at.txt")
+
+cd /opt/runninggu/repository/backend
+sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  logs --since "$TEST_STARTED_AT" graphhopper \
+  | grep -E 'Pause Full|Full GC' || true
+
+sudo journalctl \
+  -u runninggu-backend.service \
+  --since "$TEST_STARTED_AT" \
+  --no-pager \
+  | grep -E 'Pause Full|Full GC' || true
+```
+
+정상 부하 OOM 여부도 같은 시간 범위에서 확인한다.
+
+```bash
+sudo journalctl -k --since "$TEST_STARTED_AT" --no-pager \
+  | grep -Ei 'oom|out of memory|killed process' || true
+
+cd /opt/runninggu/repository/backend
+graphhopper_container=$(sudo docker compose \
+  --env-file /etc/runninggu/compose.env \
+  --profile routing \
+  -f compose.yaml \
+  -f compose.ec2.yaml \
+  ps -q graphhopper)
+sudo docker inspect "$graphhopper_container" \
+  --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}} Status={{.State.Status}}'
+```
+
+### 15.2 외부 스모크·재부팅
+
 외부 HTTPS에서 기존 API를 확인한다.
 
 ```bash
@@ -670,27 +904,6 @@ curl --fail --silent --show-error \
   --output /dev/null \
   'https://staging-api.runninggu.store/api/contests?size=1'
 ```
-
-GraphHopper 인스턴스 사양 시험은 계약 §9.1의 두 요청 세트를 먼저 고정한다. EC2에서 처음 실행하기
-전에 동일한 graph artifact와 server image로 로컬 운영 호환 container를 띄우고 다음 근거를 release
-evidence에 남긴다.
-
-1. `roundtrip.py --preset caps --zone all` 전체 지점·거리·seed별 HTTP status와 셀별 품질 상한 통과
-   후보 수
-2. 위 결과에서 HTTP 200·비어 있지 않은 `paths`가 확인된 정상 직접 요청의 exact
-   `point`·`round_trip.distance`·`round_trip.seed`·요청 옵션 목록
-3. graph artifact ID·server image digest·실행 명령·시작/종료 시각
-
-정상 직접 요청 목록은 로컬 회귀 기준선에서 합격한 모든 지점·거리 셀을 최소 하나씩 포함한다.
-EC2 결과를 본 뒤 실패한 요청을 목록에서 빼거나 다른 seed로 교체하지 않는다. artifact·image·profile
-또는 요청 옵션이 바뀌면 로컬 고정부터 다시 수행한다.
-
-30분 메모리·처리량 부하는 정상 직접 요청 세트만 고정 도착률로 반복한다. 이 세트에서는 모든 요청이
-5초 안에 HTTP 200과 비어 있지 않은 `paths`를 반환해야 하며 `no valid point` 400도 예외 없이 시험
-실패다. 별도로 전체 `caps/all` 회귀를 실행해 개별 400을 라우팅 실패로 집계하고, 로컬에서 합격한
-지점·거리 셀이 EC2에서도 seed 16개 중 품질 상한 통과 경로를 하나 이상 유지하는지 확인한다.
-`no valid point`를 성공으로 기록하거나 실패 건수에서 빼지 않되, 그 응답만으로 OOM이나 instance
-부족이라고 판정하지 않는다. OOM·5xx·timeout·재시작과 라우팅 실패 수를 분리해 결과에 남긴다.
 
 다음도 확인한다.
 
@@ -700,7 +913,8 @@ EC2 결과를 본 뒤 실패한 요청을 목록에서 빼거나 다른 seed로 
 - Nginx access log가 쿼리스트링을 제외한 `runninggu_noqs` 포맷을 사용하는가
 - GraphHopper가 같은 graph artifact ID를 재사용하고 PBF·SRTM download·import를 시작하지 않는가
 - GraphHopper runtime stdout은 Docker `local`에만 있고 주 service journal에 중복되지 않는가
-- container runtime stderr가 주 service journal로 릴레이되지 않으며, 릴레이되면 failure-only wrapper가 적용됐는가
+- container runtime stderr가 주 service journal로 릴레이되지 않고, failure-only wrapper가
+  Compose 실패의 정제된 마지막 stderr만 남기는가
 - GraphHopper 검증·알림 journal과 Docker runtime log 모두에 PBF 내용·AWS 자격 증명·사용자 정보가 없는가
 - `free -h`, `docker stats --no-stream`, `systemd-cgtop`에서 swap·메모리 합격 기준을 만족하는가
 
@@ -719,6 +933,9 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 2. GraphHopper 또는 foreground Compose가 예상하지 않게 exit 0이면 `Restart=always`가 다시 시작한다.
 3. cgroup OOM/exit 137은 5초 간격으로 재시도하되 PostgreSQL을 종료하지 않는다.
 4. 10분 window의 start 시도 3회를 소진하면 무한 반복하지 않고 failed 상태와 전용 알림을 남긴다.
+   systemd 버전에 따라 최종 `Result`가 `start-limit-hit` 대신 직전 `exit-code`로 남을 수 있다.
+   문자열 하나로 판정하지 않고 실제 기동 3회·`NRestarts=3`·`Start request repeated too quickly`
+   journal·failed 유지·추가 재시도 없음과 해당 시각의 전용 알림을 함께 확인한다.
 5. 격리된 시험 env에서 Compose required 변수를 하나 누락하면 container 생성 전 보간 실패 이유가
    주 service journal에 남고 시크릿 값은 남지 않는다.
 6. container stderr 표식은 Docker `local`에 남되 주 service journal에는 중복되지 않는다. 직접
@@ -963,6 +1180,6 @@ GraphHopper graph rollback은 §17.1과 같은 stop → 직전 상대 symlink �
 - Flyway·Importer·앱·GraphHopper·SMTP 스모크 결과
 - certbot 자동 갱신 dry-run
 - DB 백업과 실제 복원 리허설
-- 8GiB 재부팅 자동 복구와 30분 메모리·백업 동시 부하 합격 기록
-- 4GiB를 사용한다면 같은 시나리오 3회 연속 합격 기록
+- 8GiB 재부팅 자동 복구, 로컬 고정 정상 요청의 30분 메모리·백업 동시 부하, 전체 라우팅 회귀 합격 기록
+- 4GiB를 사용한다면 같은 요청 목록·도착률·동시성과 시나리오의 3회 연속 합격 기록
 - Android 스테이징 `BASE_URL` E2E

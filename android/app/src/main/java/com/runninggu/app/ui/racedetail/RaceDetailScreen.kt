@@ -98,6 +98,7 @@ fun RaceDetailScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val loginRequired by viewModel.loginRequired.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(raceId) { viewModel.start(raceId) }
 
@@ -130,8 +131,18 @@ fun RaceDetailScreen(
                     }
                 },
                 actions = {
-                    // 공유는 표시 전용 — 실제 카톡 공유는 AP-17(P1)에서 붙인다. (SPEC §4.6)
-                    IconButton(onClick = {}, enabled = false) {
+                    // **안드로이드 공유 시트를 쓴다** (SPEC §4.6 · A4 개정).
+                    // 원래 "표시 전용, 실공유는 AP-17(P1)" 이었는데, 카카오 공유 SDK 를
+                    // 기다릴 이유가 없었다 — `ACTION_SEND` 는 새 의존성이 0개고 시트에
+                    // 카톡·문자·링크 복사가 다 뜬다. 카톡 전용 카드(썸네일·버튼)는
+                    // 그대로 AP-17 에 남는다.
+                    //
+                    // 대회를 아직 못 불러왔으면 보낼 것이 없다 — 하단 CTA 와 같은 기준으로
+                    // 비활성이다(§4.6). 누를 수는 있는데 아무 일이 없는 편이 더 나쁘다.
+                    IconButton(
+                        onClick = { state.race?.let(context::shareRace) },
+                        enabled = state.race != null,
+                    ) {
                         Icon(Icons.Filled.Share, contentDescription = "공유")
                     }
                     IconButton(onClick = viewModel::onFavoriteToggle) {

@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.home
 
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.Festival
 import com.runninggu.app.data.remote.ApiException
@@ -193,7 +194,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            "네트워크에 연결할 수 없어요.",
+            OFFLINE,
             (viewModel.uiState.value.festivals as SectionState.Error).message,
         )
     }
