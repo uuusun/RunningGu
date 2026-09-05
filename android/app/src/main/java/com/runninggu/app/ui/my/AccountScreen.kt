@@ -115,11 +115,19 @@ fun AccountScreen(
             SectionTitle("알림")
             SwitchRow(
                 label = "마케팅 정보 수신",
-                description = "혜택·소식 메일을 받아요",
+                // **모를 때는 왜 모르는지 적는다**(#290 리뷰). 잠그기만 하면 꺼진 스위치로
+                // 보여서, 서버가 ON 인 사용자가 "동의 안 했구나" 로 읽는다.
+                description = state.marketingNotice.description ?: "혜택·소식 메일을 받아요",
                 checked = state.marketingAgreed,
-                // 서버가 답할 때까지 잠근다. 스위치는 세션 값을 그리므로 그때까지 안 움직인다
-                enabled = !state.savingMarketing,
+                // 서버가 답할 때까지 잠근다. 스위치는 세션 값을 그리므로 그때까지 안 움직인다.
+                // **재로그인 직후에는 값 자체를 모른다**(#287) — 로그인 응답에 약관이 없어서
+                // `GET /me` 가 돌아와야 안다. 그동안 열어 두면 OFF 로 보이는 스위치를 눌러
+                // 이미 동의한 사용자가 철회하게 된다.
+                enabled = !state.savingMarketing && state.marketingKnown,
                 onToggle = viewModel::onToggleMarketing,
+                // 못 읽었으면 다시 읽을 길을 준다 — 없으면 앱을 껐다 켜는 수밖에 없다
+                onRetry = viewModel::refreshProfile
+                    .takeIf { state.marketingNotice == MarketingNotice.FAILED },
             )
 
             // 비밀번호 변경은 EMAIL 가입자에게만 (SPEC §4.13 · #59 loginProvider 기준).
@@ -240,6 +248,8 @@ private fun SwitchRow(
     checked: Boolean,
     enabled: Boolean = true,
     onToggle: () -> Unit,
+    /** 값을 못 읽었을 때의 재조회. null 이면 안 그린다 (#290 리뷰). */
+    onRetry: (() -> Unit)? = null,
 ) {
     Row(
         Modifier
@@ -255,7 +265,13 @@ private fun SwitchRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = { onToggle() })
+        // **스위치 대신 [다시 시도] 를 둔다.** 못 읽은 값을 스위치로 그리면 그 모양 자체가
+        // "꺼져 있다" 는 말이 된다 — 잠갔어도 마찬가지다(#290 리뷰).
+        if (onRetry != null) {
+            TextButton(onClick = onRetry) { Text("다시 시도") }
+        } else {
+            Switch(checked = checked, enabled = enabled, onCheckedChange = { onToggle() })
+        }
     }
 }
 

@@ -34,11 +34,18 @@ data class SessionProfile(
     /**
      * 마케팅 수신 동의. `GET /me` 의 `agreements.marketing` 자리다 (API 명세 §2).
      *
-     * 계정 관리 화면의 토글 초기값이라 세션에 함께 들고 있는다 — 기본값 false 로 두면
-     * **가입 때 동의한 사용자에게도 꺼진 것으로 보이고**, 토글을 한 번 눌러야 맞춰지는데
-     * 그러면 실제로는 철회가 된다.
+     * 계정 관리 화면의 토글 초기값이라 세션에 함께 들고 있는다.
+     *
+     * **`null` 은 "서버에 아직 안 물었다" 이고, `false` 와 다르다** (이슈 #287).
+     * 예전에는 기본값이 `false` 였는데, 로그인 응답의 `user` 가 약관을 포함하지 않는
+     * **요약**이라(§1-5 · §1-6 · §1-7) 재로그인한 사용자마다 **서버는 ON 인데 화면이
+     * OFF 로** 보였다. 안 물어본 것을 "꺼져 있다" 고 말하면 사용자가 토글을 눌러 맞추는데,
+     * 그건 맞추는 게 아니라 **철회**다.
+     *
+     * 채우는 자리는 `GET /me` 하나다 — 시작 시 세션 검증(`ApiSessionValidator`),
+     * 계정 관리 진입(`AccountViewModel`), `PATCH /me` · `PATCH /me/agreements` 응답.
      */
-    val marketingAgreed: Boolean = false,
+    val marketingAgreed: Boolean? = null,
 )
 
 /**
@@ -112,6 +119,28 @@ object SessionStore {
     private val epoch = AtomicInteger(0)
 
     val sessionEpoch: Int get() = epoch.get()
+
+    /**
+     * 프로필 개정 번호. **프로필이 바뀔 때마다 올라간다.** (이슈 #287 · #290 리뷰)
+     *
+     * [epoch] 는 로그인 세대라 **같은 세션 안의 순서를 못 지킨다.** 계정 관리에 들어가
+     * `GET /me` 가 나간 사이에 사용자가 닉네임을 바꾸면 이런 순서가 가능하다.
+     *
+     * ```
+     * GET /me 출발 (느림)          프로필 = {닉네임 A, 마케팅 ?}
+     * PATCH /me 성공               프로필 = {닉네임 B, 마케팅 true}
+     * 늦은 GET 도착                프로필 = {닉네임 A, 마케팅 true}   ← 되돌아간다
+     * ```
+     *
+     * 세대는 그동안 안 바뀌므로 [updateProfile] 의 검사를 통과한다. **서버 저장 결과는
+     * 그대로인데 앱 세션만 과거로 간다**(#290 리뷰 · 선경님이 재현하셨다).
+     *
+     * 조회를 시작할 때 이 값을 들고 갔다가, 돌아왔을 때 그대로면 그 사이 아무도 프로필을
+     * 안 고친 것이다.
+     */
+    private val profileRevision = AtomicInteger(0)
+
+    val profileRev: Int get() = profileRevision.get()
 
     /**
      * 토큰과 세대를 **한 번에** 읽는다. (#74 리뷰)
@@ -270,6 +299,7 @@ object SessionStore {
             epoch.incrementAndGet()
         }
         _session.value = profile
+        profileRevision.incrementAndGet()
         schedulePersist()
     }
 
@@ -308,6 +338,32 @@ object SessionStore {
     fun updateProfile(expectedEpoch: Int, profile: SessionProfile): Boolean {
         if (epoch.get() != expectedEpoch) return false
         _session.value = profile
+        profileRevision.incrementAndGet()
+        schedulePersist()
+        return true
+    }
+
+    /**
+     * **조회 결과**를 반영한다. 세대와 개정 번호가 둘 다 그대로일 때만 넣는다. (#290 리뷰)
+     *
+     * `PATCH` 로 서버를 바꾼 결과와 `GET` 으로 읽어 온 결과는 무게가 다르다. 전자는
+     * **방금 사용자가 만든 최신 상태**라 무조건 이겨야 하고, 후자는 **출발할 때의 상태**라
+     * 그 사이에 더 새 것이 들어왔으면 버려야 한다.
+     *
+     * 그래서 쓰는 자리를 갈랐다 — `PATCH` 는 [updateProfile], `GET` 은 이 함수다.
+     *
+     * @return 반영했으면 true. false 면 그 사이 프로필이 바뀐 것이라 **조용히 버린다**
+     */
+    @Synchronized
+    fun applyFetchedProfile(
+        expectedEpoch: Int,
+        expectedRevision: Int,
+        profile: SessionProfile,
+    ): Boolean {
+        if (epoch.get() != expectedEpoch) return false
+        if (profileRevision.get() != expectedRevision) return false
+        _session.value = profile
+        profileRevision.incrementAndGet()
         schedulePersist()
         return true
     }
@@ -355,6 +411,7 @@ object SessionStore {
         // 진행 중이던 재발급이 끝나도 이 세대에는 반영되지 않는다
         epoch.incrementAndGet()
         _session.value = null
+        profileRevision.incrementAndGet()
         schedulePersist()
     }
 }
