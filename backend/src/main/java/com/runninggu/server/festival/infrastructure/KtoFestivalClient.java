@@ -3,6 +3,8 @@ package com.runninggu.server.festival.infrastructure;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamEndpoint;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
 import com.runninggu.server.festival.application.FestivalProvider;
 import com.runninggu.server.festival.application.FestivalProviderException;
 import com.runninggu.server.festival.application.FestivalProviderException.Reason;
@@ -15,6 +17,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,14 +39,19 @@ public class KtoFestivalClient implements FestivalProvider {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String serviceKey;
+    private final UpstreamLoadGuard upstreamLoadGuard;
 
     public KtoFestivalClient(
             RestClient restClient,
             ObjectMapper objectMapper,
-            String serviceKey) {
+            String serviceKey,
+            UpstreamLoadGuard upstreamLoadGuard) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.serviceKey = serviceKey;
+        this.upstreamLoadGuard = Objects.requireNonNull(
+                upstreamLoadGuard,
+                "upstreamLoadGuard");
     }
 
     @Override
@@ -101,14 +109,20 @@ public class KtoFestivalClient implements FestivalProvider {
 
     private SearchPage parsePage(String responseBody) {
         if (!StringUtils.hasText(responseBody)) {
+            tripKtoResultCode();
             throw new FestivalProviderException(Reason.ERROR);
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
+            if (root == null || !root.isObject()) {
+                tripKtoResultCode();
+                throw new FestivalProviderException(Reason.ERROR);
+            }
             JsonNode response = root.path("response");
             String resultCode = textOrNull(response.path("header").path("resultCode"));
             if (!SUCCESS_CODE.equals(resultCode)) {
-                log.warn("KTO 축제 API가 실패 코드를 반환했습니다. resultCode={}", resultCode);
+                tripKtoResultCode();
+                log.warn("KTO 축제 API가 실패 코드를 반환했습니다.");
                 throw new FestivalProviderException(Reason.ERROR);
             }
 
@@ -125,9 +139,14 @@ public class KtoFestivalClient implements FestivalProvider {
                     .toList();
             return new SearchPage(festivals, rawItems.size(), totalCount);
         } catch (JsonProcessingException exception) {
+            tripKtoResultCode();
             log.warn("KTO 축제 API가 JSON이 아닌 응답을 반환했습니다.");
             throw new FestivalProviderException(Reason.ERROR, exception);
         }
+    }
+
+    private void tripKtoResultCode() {
+        upstreamLoadGuard.tripKtoResultCode(UpstreamEndpoint.KTO_SEARCH_FESTIVAL);
     }
 
     private List<JsonNode> itemNodes(JsonNode itemNode) {

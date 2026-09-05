@@ -60,6 +60,21 @@ logging:
     level: "%5p [traceId=%X{traceId:-}]"
 
 runninggu:
+  upstream-load-guard:
+    # staging 앱 API 부하 시험에서만 명시적으로 켠다. 기본 실행과 production은 비활성이다.
+    enabled: ${UPSTREAM_LOAD_GUARD_ENABLED:false}
+    deployment-environment: ${RUNNINGGU_DEPLOYMENT_ENVIRONMENT:local}
+    run-id: ${UPSTREAM_LOAD_GUARD_RUN_ID:}
+    kakao-total-limit: ${UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT:0}
+    endpoints:
+      kakao-category: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
+      kakao-keyword: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
+      kakao-access-token-info: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
+      kakao-user-me: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
+      kto-search-festival: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
+      kto-kor-location: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
+      kto-wellness-location: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
+      kto-durunubi-course: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
   course:
     catalog:
       bundle-resource: classpath:data/courses.json

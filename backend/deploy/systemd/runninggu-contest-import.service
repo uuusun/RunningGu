@@ -12,12 +12,13 @@ User=runninggu
 Group=runninggu
 WorkingDirectory=/opt/runninggu/current
 EnvironmentFile=/etc/runninggu/application.env
-# 비웹 Importer에서는 코스 동기화와 웹 전용 시크릿을 사용하지 않는다. Importer가 먼저
-# 기동하면서 Flyway를 적용한 뒤 같은 snapshot의 재실행을 NO_OP으로 처리한다.
+# 비웹 Importer에서는 코스 동기화·웹 전용 시크릿·staging 부하 가드를 사용하지 않는다.
+# Importer가 먼저 기동하면서 Flyway를 적용한 뒤 같은 snapshot의 재실행을 NO_OP으로 처리한다.
 UnsetEnvironment=JWT_SECRET KAKAO_APP_ID KAKAO_REST_KEY KTO_SERVICE_KEY SMTP_HOST SMTP_USERNAME SMTP_PASSWORD
-# EnvironmentFile의 COURSE_SYNC_ENABLED·MAIL_ENABLED보다 우선하는 시스템 프로퍼티로
-# 배포 환경파일의 값과 무관하게 Importer 부수 작업을 끈다.
-ExecStart=/usr/bin/java -Xms128m -Xmx1g -Drunninggu.course.sync.enabled=false -Drunninggu.mail.enabled=false -jar /opt/runninggu/current/runninggu-contest-import.jar
+UnsetEnvironment=RUNNINGGU_DEPLOYMENT_ENVIRONMENT UPSTREAM_LOAD_GUARD_ENABLED UPSTREAM_LOAD_GUARD_RUN_ID UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT
+# EnvironmentFile보다 우선하는 시스템 프로퍼티로 배포 환경파일의 값과 무관하게
+# Importer 부수 작업과 staging 부하 가드를 끈다.
+ExecStart=/usr/bin/java -Xms128m -Xmx1g -Drunninggu.course.sync.enabled=false -Drunninggu.mail.enabled=false -Drunninggu.upstream-load-guard.enabled=false -jar /opt/runninggu/current/runninggu-contest-import.jar
 
 NoNewPrivileges=true
 PrivateTmp=true

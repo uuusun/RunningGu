@@ -6,6 +6,12 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.runninggu.server.common.upstream.UpstreamLoadGuard;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardException;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardInterceptor;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties;
+import com.runninggu.server.common.upstream.UpstreamLoadGuardProperties.EndpointLimits;
+import com.runninggu.server.common.upstream.UpstreamProvider;
 import com.runninggu.server.course.application.CourseMetadataBatch;
 import com.runninggu.server.course.application.CourseMetadataSyncException;
 import com.runninggu.server.course.application.CourseMetadataSyncException.Reason;
@@ -15,6 +21,8 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.ResourceAccessException;
@@ -33,7 +41,8 @@ class KtoCourseClientTest {
         client = new KtoCourseClient(
                 builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
                 new ObjectMapper(),
-                "decoded+/=key");
+                "decoded+/=key",
+                disabledGuard());
     }
 
     @Test
@@ -102,7 +111,8 @@ class KtoCourseClientTest {
         KtoCourseClient xmlClient = new KtoCourseClient(
                 builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
                 new ObjectMapper(),
-                "key");
+                "key",
+                disabledGuard());
         xmlServer.expect(request -> {})
                 .andRespond(withSuccess("<OpenAPI_ServiceResponse/>", MediaType.APPLICATION_XML));
 
@@ -118,7 +128,8 @@ class KtoCourseClientTest {
         KtoCourseClient missingKeyClient = new KtoCourseClient(
                 RestClient.create("https://apis.data.test"),
                 new ObjectMapper(),
-                " ");
+                " ",
+                disabledGuard());
 
         assertThatThrownBy(missingKeyClient::fetchAll)
                 .isInstanceOfSatisfying(
@@ -137,7 +148,8 @@ class KtoCourseClientTest {
         KtoCourseClient timeoutClient = new KtoCourseClient(
                 builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
                 new ObjectMapper(),
-                "key");
+                "key",
+                disabledGuard());
         timeoutServer.expect(request -> {}).andRespond(request -> {
             throw new ResourceAccessException("timeout", new SocketTimeoutException());
         });
@@ -164,7 +176,8 @@ class KtoCourseClientTest {
         KtoCourseClient changingTotalClient = new KtoCourseClient(
                 builder.baseUrl("https://apis.data.test/B551011/Durunubi").build(),
                 new ObjectMapper(),
-                "key");
+                "key",
+                disabledGuard());
         changingTotalServer.expect(request -> {})
                 .andRespond(withSuccess(successBody(2, rawItem("C1")), MediaType.APPLICATION_JSON));
         changingTotalServer.expect(request -> {})
@@ -175,6 +188,70 @@ class KtoCourseClientTest {
                         CourseMetadataSyncException.class,
                         exception -> assertThat(exception.reason()).isEqualTo(Reason.INVALID_RESPONSE));
         changingTotalServer.verify();
+    }
+
+    @Test
+    void guard가_켜지면_KTO_오류코드는_전체_시험을_trip한다() {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
+        KtoCourseClient guardedClient = new KtoCourseClient(
+                builder
+                        .baseUrl("https://apis.data.go.kr/B551011/Durunubi")
+                        .requestInterceptor(new UpstreamLoadGuardInterceptor(
+                                guard,
+                                UpstreamProvider.KTO))
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedServer.expect(request -> {})
+                .andRespond(withSuccess(
+                        """
+                        {"response":{"header":{"resultCode":"30","resultMsg":"KEY ERROR"}}}
+                        """,
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(guardedClient::fetchAll)
+                .isInstanceOf(UpstreamLoadGuardException.class);
+        guardedServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_켜지면_resultCode를_판독할_수_없는_본문도_trip한다(String responseBody) {
+        UpstreamLoadGuard guard = enabledGuard();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
+        KtoCourseClient guardedClient = new KtoCourseClient(
+                builder
+                        .baseUrl("https://apis.data.go.kr/B551011/Durunubi")
+                        .requestInterceptor(new UpstreamLoadGuardInterceptor(
+                                guard,
+                                UpstreamProvider.KTO))
+                        .build(),
+                new ObjectMapper(),
+                "key",
+                guard);
+        guardedServer.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(guardedClient::fetchAll)
+                .isInstanceOfSatisfying(
+                        UpstreamLoadGuardException.class,
+                        exception -> assertThat(exception.reason())
+                                .isEqualTo(UpstreamLoadGuardException.Reason.KTO_RESULT_CODE));
+        guardedServer.verify();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{", "null", "[]"})
+    void guard가_꺼지면_resultCode를_판독할_수_없는_본문은_기존_외부오류다(String responseBody) {
+        server.expect(request -> {})
+                .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+        assertReason(Reason.INVALID_RESPONSE);
+        server.verify();
     }
 
     private void assertReason(Reason expected) {
@@ -213,5 +290,23 @@ class KtoCourseClientTest {
         return """
                 {"crsIdx":"%s","crsKorNm":"코스","crsLevel":"1","crsCycle":"순환형","crsSummary":"요약"}
                 """.formatted(id);
+    }
+
+    private UpstreamLoadGuard disabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                false,
+                "local",
+                null,
+                null,
+                null));
+    }
+
+    private UpstreamLoadGuard enabledGuard() {
+        return new UpstreamLoadGuard(new UpstreamLoadGuardProperties(
+                true,
+                "staging",
+                "course-test",
+                100,
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
     }
 }
