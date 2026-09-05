@@ -773,6 +773,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `attributions` 는 해당 코스 원천의 완성 문구 배열이며 앱은 변형하지 않는다(결정-44).
 - 현재 snapshot 에 없는 ID 는 `404 COURSE_NOT_FOUND`.
 
+서버는 목록과 동일한 불변 catalog snapshot에서 코스와 출처를 함께 읽는다.
+상세 조회 때문에 KTO·카카오·GraphHopper를 호출하거나 DB에 새로 저장하지 않는다.
+
 ### 6-3 `GET /api/courses/regions` → `{"items": [{"region": "부산", "count": 27}]}`
 
 같은 catalog snapshot의 서비스 대상 코스를 `sido`별로 세고 `count DESC, region ASC`로
@@ -947,6 +950,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | `RATE_LIMITED` | 429 | 공개 중복 확인 또는 이메일 로그인 시도 제한 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
 | `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
+| `COURSE_NOT_FOUND` | 404 | `/courses/{courseId}`의 현재 catalog snapshot에 해당 코스가 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
 | `EXTERNAL_API_TIMEOUT` | 504 | 외부 API 제한시간 초과(동선 생성 제외 — NFR-3) |
 

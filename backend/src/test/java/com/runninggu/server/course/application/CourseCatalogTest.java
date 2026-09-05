@@ -67,6 +67,30 @@ class CourseCatalogTest {
         assertValidationFailed(() -> catalog.find(null, 0, 51));
     }
 
+    @Test
+    void 상세는_선택한_코스의_원천만_반환하고_snapshot_교체를_따른다() {
+        CourseDetail before = catalog.detail("C3");
+        assertThat(before.course().courseId()).isEqualTo("C3");
+        assertThat(before.attributions()).containsExactly("원천 B");
+
+        Course replacement = course("C3", "new", "제주", "6.0");
+        catalog.replace(new CourseCatalogSnapshot(
+                List.of(new CourseSource("new", "새 원천", "새 라이선스")),
+                List.of(replacement)));
+        CourseDetail after = catalog.detail("C3");
+        assertThat(after.course()).isEqualTo(replacement);
+        assertThat(after.attributions()).containsExactly("새 원천");
+        assertThat(before.attributions()).containsExactly("원천 B");
+    }
+
+    @Test
+    void 현재_snapshot에_없는_ID는_번들에_있었어도_찾을_수_없다() {
+        catalog.replace(new CourseCatalogSnapshot(List.of(), List.of()));
+        assertThatThrownBy(() -> catalog.detail("C1"))
+                .isInstanceOfSatisfying(ApiException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(ErrorCode.COURSE_NOT_FOUND));
+    }
+
     private void assertValidationFailed(Runnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(ApiException.class, exception ->

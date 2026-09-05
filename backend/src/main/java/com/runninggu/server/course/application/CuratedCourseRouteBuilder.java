@@ -2,6 +2,7 @@ package com.runninggu.server.course.application;
 
 import com.runninggu.server.course.domain.Course;
 import com.runninggu.server.course.domain.CourseDifficulty;
+import com.runninggu.server.course.domain.CourseElevationProfile;
 import com.runninggu.server.course.domain.CoursePoint;
 import com.runninggu.server.course.domain.E5PolylineEncoder;
 import com.runninggu.server.course.domain.GeoDistance;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class CuratedCourseRouteBuilder {
 
-    private static final int MAX_ELEVATION_SAMPLES = 100;
     private static final double HARD_GAIN_PER_KM = 50.0;
     private static final double EASY_GAIN_PER_KM = 15.0;
 
@@ -106,7 +106,7 @@ public class CuratedCourseRouteBuilder {
                 routeKm,
                 durationMin,
                 gainM,
-                elevationProfile(routePoints),
+                CourseElevationProfile.sample(routePoints),
                 picked.distanceM() * 2.0 < targetKm.doubleValue() * 1_000.0 - 300.0,
                 polylineEncoder.encode(routePoints),
                 course.courseId(),
@@ -184,21 +184,6 @@ public class CuratedCourseRouteBuilder {
             route.add(outbound.get(index));
         }
         return List.copyOf(route);
-    }
-
-    private List<Integer> elevationProfile(List<CoursePoint> points) {
-        int sampleCount = Math.min(points.size(), MAX_ELEVATION_SAMPLES);
-        List<Integer> samples = new ArrayList<>(sampleCount);
-        for (int sample = 0; sample < sampleCount; sample++) {
-            int index = sampleCount == 1
-                    ? 0
-                    : Math.toIntExact(Math.round(
-                            (double) sample * (points.size() - 1) / (sampleCount - 1)));
-            samples.add(points.get(index).elevationM()
-                    .setScale(0, RoundingMode.HALF_UP)
-                    .intValueExact());
-        }
-        return List.copyOf(samples);
     }
 
     private record Nearest(int index, double distanceM) {}

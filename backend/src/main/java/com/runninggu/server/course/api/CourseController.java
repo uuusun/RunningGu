@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +59,13 @@ public class CourseController {
                     @RequestParam(defaultValue = "20")
                     int size) {
         return CourseListResponse.from(catalog.find(region, page, size));
+    }
+
+    @Operation(summary = "큐레이션 코스 전체 상세 조회",
+            description = "게스트 허용. 원본 전체 경로를 반환하며 현재 snapshot에 없는 ID는 404 COURSE_NOT_FOUND다.")
+    @GetMapping("/{courseId}")
+    public CourseDetailResponse detail(@PathVariable String courseId) {
+        return CourseDetailResponse.from(catalog.detail(courseId));
     }
 
     @Operation(summary = "코스 지역별 건수 조회")
