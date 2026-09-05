@@ -102,6 +102,68 @@ data class BlockDto(
 )
 
 /**
+ * 블록 추가 요청. (§5-7)
+ *
+ * **`startTime` 기본값이 계약에 박혀 있다** 🔒(`"13:00"`). 안 보내면 서버가 이 값을
+ * 쓰므로 앱도 같은 값을 기본으로 둔다 — 여기서 다른 값을 쓰면 화면이 보여 준 시각과
+ * 저장된 시각이 갈린다.
+ *
+ * 장소가 없는 블록도 정상이다(§5-1 과 같다). 그래서 `placeName`·좌표가 전부 nullable 이다.
+ */
+@Serializable
+data class BlockCreateRequestDto(
+    val title: String,
+    val category: String,
+    val startTime: String = DEFAULT_BLOCK_START_TIME,
+    val placeName: String? = null,
+    val address: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val description: String = "",
+)
+
+/** `POST .../blocks` 응답. 새 블록의 id 와 끝에 붙은 순서만 온다 (§5-7). */
+@Serializable
+data class BlockCreatedDto(val blockId: Long, val orderNo: Int)
+
+/**
+ * 블록 수정 요청. (§5-8)
+ *
+ * **보낸 필드만 반영된다.** 그래서 전부 nullable 이고 기본값이 `null` 이다 — 안 건드릴
+ * 필드를 현재 값으로 채워 보내면, 그 사이 서버 값이 바뀌었을 때 덮어쓰게 된다.
+ *
+ * `null` 을 "이 필드를 비워 달라" 는 뜻으로 쓸 수 없다는 뜻이기도 하다. 장소를 지우는
+ * 계약은 §5-8 에 없다 — 필요해지면 계약부터다.
+ */
+@Serializable
+data class BlockPatchRequestDto(
+    val startTime: String? = null,
+    val title: String? = null,
+    val category: String? = null,
+    val placeName: String? = null,
+    val address: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val description: String? = null,
+)
+
+/**
+ * 블록 순서 변경 요청. (§5-10)
+ *
+ * **해당 일자의 USER 블록 전체 집합과 정확히 일치해야 한다.** 일부만 보내거나 RACE 를
+ * 섞으면 `400 BLOCK_SET_MISMATCH` 다. 부분 갱신이 아니라 전체 교체다.
+ */
+@Serializable
+data class BlockOrderRequestDto(val blockIds: List<Long>)
+
+/** `PUT .../blocks/order` 응답. 그 일자의 **전체** 블록이 `orderNo` 오름차순으로 온다 (§5-10). */
+@Serializable
+data class DayBlocksDto(val dayId: Long, val blocks: List<BlockDto> = emptyList())
+
+/** 블록 추가 기본 시각 🔒(§5-7). 서버 기본값과 같아야 한다. */
+const val DEFAULT_BLOCK_START_TIME: String = "13:00"
+
+/**
  * `GET /api/itineraries` 목록 항목. (API 명세 §5-4)
  *
  * **상세(§5-5)와 다른 모양이다.** 목록은 카드가 쓰는 값만 오고 `days`·`blocks` 는 없다 —

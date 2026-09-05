@@ -5,6 +5,12 @@ import com.runninggu.app.data.model.ItineraryRequestSnapshot
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.ItineraryApi
+import com.runninggu.app.data.remote.dto.BlockCreateRequestDto
+import com.runninggu.app.data.remote.dto.BlockCreatedDto
+import com.runninggu.app.data.remote.dto.BlockDto
+import com.runninggu.app.data.remote.dto.BlockOrderRequestDto
+import com.runninggu.app.data.remote.dto.BlockPatchRequestDto
+import com.runninggu.app.data.remote.dto.DayBlocksDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryRequestDto
 import com.runninggu.app.data.remote.dto.GenerateItineraryResponse
 import com.runninggu.app.data.remote.dto.ItineraryDetailDto
@@ -59,6 +65,29 @@ class ItinerarySaveRestoreTest {
             error("이 테스트는 목록을 부르지 않는다")
 
         override suspend fun delete(id: Long) = error("이 테스트는 삭제를 부르지 않는다")
+
+        // 저장 후 편집(§5-7 ~ §5-10)은 ItineraryBlockEditTest 가 본다
+        override suspend fun addBlock(
+            itineraryId: Long,
+            dayId: Long,
+            body: BlockCreateRequestDto,
+        ): BlockCreatedDto = error("이 테스트는 블록 추가를 부르지 않는다")
+
+        override suspend fun updateBlock(
+            itineraryId: Long,
+            dayId: Long,
+            blockId: Long,
+            body: BlockPatchRequestDto,
+        ): BlockDto = error("이 테스트는 블록 수정을 부르지 않는다")
+
+        override suspend fun deleteBlock(itineraryId: Long, dayId: Long, blockId: Long) =
+            error("이 테스트는 블록 삭제를 부르지 않는다")
+
+        override suspend fun reorderBlocks(
+            itineraryId: Long,
+            dayId: Long,
+            body: BlockOrderRequestDto,
+        ): DayBlocksDto = error("이 테스트는 순서 변경을 부르지 않는다")
     }
 
     // ── 저장 (§5-2) ────────────────────────────────────────────
