@@ -106,7 +106,8 @@ data class BlockDto(
  *
  * **`startTime` 기본값이 계약에 박혀 있다** 🔒(`"13:00"`). 안 보내면 서버가 이 값을
  * 쓰므로 앱도 같은 값을 기본으로 둔다 — 여기서 다른 값을 쓰면 화면이 보여 준 시각과
- * 저장된 시각이 갈린다.
+ * 저장된 시각이 갈린다. **이 기본값은 추가(§5-7)에만 있다** — 수정(§5-8)에서 시각을
+ * 생략하면 기존 값이 유지되고, 빈 값을 보내면 `400 VALIDATION_FAILED` 다.
  *
  * 장소가 없는 블록도 정상이다(§5-1 과 같다). 그래서 `placeName`·좌표가 전부 nullable 이다.
  */
@@ -134,8 +135,13 @@ data class BlockCreatedDto(val blockId: Long, val orderNo: Int)
  *
  * **서버는 명시적 `null` 을 "그 값을 지워라" 로 읽는다**(§5-8 · #213). 그런데 `ApiJson` 이
  * `explicitNulls = false` 라 여기 `null` 을 넣어도 본문에서 빠지므로 **지우는 요청이 되지
- * 않는다.** 그게 이 타입에서는 맞는 동작이다 — 안 바꿀 필드가 전부 `null` 이라, `null` 이
- * 실려 나가면 제목만 바꾸는 요청이 장소를 지운다. `BlockPatchWireTest` 가 그 줄을 지킨다.
+ * 않는다.** 그게 이 타입에서는 맞는 동작이다.
+ *
+ * `explicitNulls` 를 `true` 로 뒤집으면 **안 바꿀 필드가 전부 `null` 로 실려 나가 PATCH 의
+ * 의미가 달라진다.** 어떻게 달라지는지는 서버가 어느 필드를 먼저 보느냐에 달렸다 —
+ * `startTime`·`title`·`category` 의 `null` 은 `400 VALIDATION_FAILED` 로 거절될 수 있고,
+ * 거기서 안 걸리면 `placeName`·`address`·`description` 이 지워진다. **어느 쪽이든 앱이
+ * 의도한 요청이 아니다.** `BlockPatchWireTest` 가 그 한 줄을 지킨다.
  */
 @Serializable
 data class BlockPatchRequestDto(
@@ -162,7 +168,12 @@ data class BlockOrderRequestDto(val blockIds: List<Long>)
 @Serializable
 data class DayBlocksDto(val dayId: Long, val blocks: List<BlockDto> = emptyList())
 
-/** 블록 추가 기본 시각 🔒(§5-7). 서버 기본값과 같아야 한다. */
+/**
+ * 블록 **추가** 기본 시각 🔒(§5-7). 서버 기본값과 같아야 한다.
+ *
+ * **수정(§5-8)에는 이 기본값이 없다.** 거기서 시각을 안 정했다고 이 값을 채우면,
+ * 사용자가 고르지 않은 시각이 말없이 저장된다.
+ */
 const val DEFAULT_BLOCK_START_TIME: String = "13:00"
 
 /**
