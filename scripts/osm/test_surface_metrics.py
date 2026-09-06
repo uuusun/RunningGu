@@ -29,13 +29,29 @@ _steep_share 에서 abs() 를 뺀다
 
 details 요청에서 surface 를 뺀다
   → 요청에_노면과_환경과_경사를_함께_싣는다                 FAILED
+
+observation_evidence 의 metrics 에서 다섯 줄을 뺀다
+  → 잰_지표는_증거_JSON_에_남는다                           FAILED
+    노면을_못_받으면_증거에도_null_로_남는다                 ERROR
+
+show() 에서 다섯 칸을 뺀다
+  → 잰_지표는_표에도_찍힌다                                 FAILED
+    못_받은_값은_표에서_0퍼센트로_안_보인다                  FAILED
 ```
+
+## 왜 `_parse` 만 보는 테스트로는 부족했나
+
+처음에는 `_parse` 를 직접 불러 값만 확인했다. 그래서 **계산은 맞는데 그 값이 아무
+출력에도 실리지 않는 상태**에서 22개가 전부 통과했다(#299 리뷰). 재는 것과 남기는
+것은 다른 일이라, 아래 둘은 `_parse` 가 아니라 **내보내는 자리**를 부른다.
 """
 
 from __future__ import annotations
 
+import io
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -173,6 +189,76 @@ class SurfaceMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(parsed["alley"], 50.0, places=1)
         self.assertAlmostEqual(parsed["good"], 50.0, places=1)
         self.assertAlmostEqual(parsed["paved"], 100.0, places=1)
+
+
+    # ── 잰 값이 실제로 나오는가 (#299 리뷰) ──────────────────────
+    #
+    # 계산과 출력은 다른 일이다. _parse 만 보는 테스트는 지표가 어디에도
+    # 안 실려도 통과한다 — 실제로 그런 상태로 올라갔다.
+
+    def test_잰_지표는_증거_JSON_에_남는다(self) -> None:
+        candidate = roundtrip._parse(path({
+            "road_class": [[0, 4, "footway"]],
+            "surface": [[0, 3, "ground"], [3, 4, "asphalt"]],
+            "road_environment": [[0, 1, "tunnel"], [1, 4, "road"]],
+        }), seed=0)
+        evidence = roundtrip.observation_evidence(
+            {
+                "seed": 0, "status": 200, "elapsedSeconds": 0.1,
+                "errorType": None, "candidate": candidate,
+            },
+            target_km=5.0,
+        )
+
+        metrics = evidence["metrics"]
+        for key in ("softPercent", "pavedPercent", "tunnelPercent",
+                    "bridgePercent", "steepPercent"):
+            self.assertIn(key, metrics, f"{key} 가 증거에 없다")
+        self.assertAlmostEqual(metrics["softPercent"], 75.0, places=1)
+        self.assertAlmostEqual(metrics["pavedPercent"], 25.0, places=1)
+        self.assertAlmostEqual(metrics["tunnelPercent"], 25.0, places=1)
+
+    def test_노면을_못_받으면_증거에도_null_로_남는다(self) -> None:
+        candidate = roundtrip._parse(path({
+            "road_class": [[0, 4, "footway"]],
+        }), seed=0)
+        evidence = roundtrip.observation_evidence(
+            {
+                "seed": 0, "status": 200, "elapsedSeconds": 0.1,
+                "errorType": None, "candidate": candidate,
+            },
+            target_km=5.0,
+        )
+
+        # 0 으로 채우면 "포장이 하나도 없다" 로 읽힌다.
+        self.assertIsNone(evidence["metrics"]["softPercent"])
+        self.assertIsNone(evidence["metrics"]["pavedPercent"])
+
+    def test_잰_지표는_표에도_찍힌다(self) -> None:
+        candidate = roundtrip._parse(path({
+            "road_class": [[0, 4, "footway"]],
+            "surface": [[0, 3, "ground"], [3, 4, "asphalt"]],
+        }), seed=0)
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            roundtrip.show("테스트", 5.0, candidate)
+        line = buffer.getvalue()
+
+        self.assertIn("75.0", line, "흙길 비율이 표에 없다")
+        self.assertIn("25.0", line, "포장 비율이 표에 없다")
+
+    def test_못_받은_값은_표에서_0퍼센트로_안_보인다(self) -> None:
+        candidate = roundtrip._parse(path({
+            "road_class": [[0, 4, "footway"]],
+        }), seed=0)
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            roundtrip.show("테스트", 5.0, candidate)
+
+        # 노면 칸이 "-" 여야 한다. 0.0% 로 찍으면 흙길이 없다는 뜻이 된다.
+        self.assertIn("-", buffer.getvalue())
 
 
 if __name__ == "__main__":

@@ -270,12 +270,19 @@ def best(lat: float, lng: float, km: float, profile: str = "run", seeds: int = 1
     return min(clean, key=lambda c: (abs(c["km"] - km), c["turns"]))
 
 
+def _pct(v: float | None) -> str:
+    """비율 한 칸. **못 받은 것과 0% 를 구분한다** — 둘 다 `0.0%` 로 찍으면
+    "포장이 하나도 없다" 와 "노면 정보를 못 받았다" 가 같아 보인다."""
+    return "    -" if v is None else f"{v:5.1f}"
+
+
 def header() -> None:
     print(
         f"{'지점':13} {'목표':>5} {'실제':>8} {'품질':>5} {'좋은길':>6} {'골목':>6} {'차도':>6} "
-        f"{'계단':>6} {'턴/km':>6} {'상승':>7}"
+        f"{'계단':>6} {'턴/km':>6} {'상승':>7} {'흙길':>6} {'포장':>6} {'터널':>6} "
+        f"{'교량':>6} {'급경사':>6}"
     )
-    print("-" * 84)
+    print("-" * 119)
 
 
 def show(name: str, km: float, b: dict | None) -> None:
@@ -285,7 +292,9 @@ def show(name: str, km: float, b: dict | None) -> None:
     print(
         f"{name:13} {km:4.0f}km {b['km']:7.2f}km {b['qual']:4.0f}  {b['good']:5.1f}% "
         f"{b['alley']:5.1f}% {b['road']:5.1f}% {b['stair']:5.1f}% "
-        f"{b['turns'] / max(b['km'], 0.1):6.1f} {b['gain']:5.0f}m"
+        f"{b['turns'] / max(b['km'], 0.1):6.1f} {b['gain']:5.0f}m "
+        f"{_pct(b['soft'])}% {_pct(b['paved'])}% {_pct(b['tunnel'])}% "
+        f"{_pct(b['bridge'])}% {_pct(b['steep'])}%"
     )
 
 
@@ -351,6 +360,14 @@ def observation_evidence(item: dict, target_km: float) -> dict:
             "roadPercent": candidate["road"],
             "turnsPerKm": candidate["turns"] / max(candidate["km"], 0.1),
             "stairPercent": candidate["stair"],
+            # 이름표가 못 가르는 것 (이슈 #224). GraphHopper 가 details 를 안 주면
+            # null 이다 — 0 으로 채우지 않는다. 판단하려고 재는 값이라
+            # **증거 파일에 남아야 나중에 대조할 수 있다.**
+            "softPercent": candidate["soft"],
+            "pavedPercent": candidate["paved"],
+            "tunnelPercent": candidate["tunnel"],
+            "bridgePercent": candidate["bridge"],
+            "steepPercent": candidate["steep"],
         },
     }
 
