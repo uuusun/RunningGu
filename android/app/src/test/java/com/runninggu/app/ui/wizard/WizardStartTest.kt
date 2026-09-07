@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.data.repository.ContestDetailResult
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiErrorCode
@@ -268,10 +269,10 @@ private class FakeContestRepository(
     var detailCalls = 0
         private set
 
-    override suspend fun detail(id: Long): Contest {
+    override suspend fun detail(id: Long): ContestDetailResult {
         detailCalls++
         detailFailure?.let { if (!failOnce || detailCalls == 1) throw it }
-        return contest(id)
+        return ContestDetailResult(contest(id))
     }
 
     override suspend fun festivals(id: Long): List<NearbyFestival> =

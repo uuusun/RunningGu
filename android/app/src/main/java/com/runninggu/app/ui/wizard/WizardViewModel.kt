@@ -119,7 +119,8 @@ class WizardViewModel(
         viewModelScope.launch {
             _uiState.value = WizardUiState(contestPhase = WizardUiState.Phase.LOADING)
             val race = try {
-                repository.detail(serverId).toRaceSummary()
+                // 위저드는 출처를 그리지 않는다 — 대회 본문만 쓴다 (#307)
+                repository.detail(serverId).contest.toRaceSummary()
             } catch (e: ApiException) {
                 _uiState.value = if (e.apiErrorCode() == ApiErrorCode.NOT_FOUND) {
                     // 404 CONTEST_NOT_FOUND — 다시 눌러도 생기지 않는다 (§3-4)

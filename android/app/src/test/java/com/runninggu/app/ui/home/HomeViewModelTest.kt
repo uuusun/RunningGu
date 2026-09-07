@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.home
 
+import com.runninggu.app.data.repository.ContestDetailResult
 import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.Festival
@@ -289,7 +290,7 @@ private class RecordingContestRepository(
         filter: ContestFilter,
     ): Map<LocalDate, Int> = throw UnsupportedOperationException("홈은 부르지 않는다")
 
-    override suspend fun detail(id: Long): Contest =
+    override suspend fun detail(id: Long): ContestDetailResult =
         throw UnsupportedOperationException("홈은 부르지 않는다")
 
     override suspend fun festivals(id: Long): List<NearbyFestival> =
