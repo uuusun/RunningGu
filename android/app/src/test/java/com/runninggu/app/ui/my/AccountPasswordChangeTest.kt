@@ -219,6 +219,8 @@ class AccountPasswordChangeTest {
 }
 
 private class FakePasswordRepository(private val result: Result<AuthTokens>) : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
+
     var calls = 0
         private set
     var sent: Pair<String, String>? = null
@@ -242,6 +244,8 @@ private class FakePasswordRepository(private val result: Result<AuthTokens>) : M
 
 /** 응답을 붙들어 둔다. "바꾸는 중" 상태를 실제로 만들어 보려면 필요하다. */
 private class BlockingPasswordRepository : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
+
     val gate = CompletableDeferred<Unit>()
     var calls = 0
         private set

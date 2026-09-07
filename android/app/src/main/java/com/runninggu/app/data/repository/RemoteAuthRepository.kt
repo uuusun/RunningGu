@@ -180,6 +180,9 @@ private fun KakaoLoginResponseDto.toSession(): AuthSession {
                 ?: throw ApiException.Malformed(
                     IllegalArgumentException("모르는 loginProvider: ${member.loginProvider}"),
                 ),
+            // **약관은 이 응답에 없다.** `user` 는 요약이라(§1-7) 여기서 값을 지어내면
+            // 서버가 ON 인 사용자에게 OFF 를 보여 준다(#287). `GET /me` 가 채운다
+            marketingAgreed = null,
         ),
     )
 }
@@ -193,5 +196,7 @@ private fun AuthTokenResponseDto.toSession(): AuthSession = AuthSession(
         email = user.email,
         loginProvider = LoginProvider.entries.firstOrNull { it.name == user.loginProvider }
             ?: throw IllegalArgumentException("모르는 loginProvider: ${user.loginProvider}"),
+        // **약관은 이 응답에 없다** — 위 카카오 매퍼와 같은 이유다(#287)
+        marketingAgreed = null,
     ),
 )
