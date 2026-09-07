@@ -22,6 +22,8 @@
     export RUNNINGGU_JUDGE_PASSWORD=...
     python seed_judge_account.py --out seed-summary.json
     python seed_judge_account.py --dry-run  # 표본 저장 안 함. 로그인·조회는 실제로 보낸다
+
+종료 코드: 0 정상 · 1 실패 · 2 설정 없음 · 3 채웠지만 되읽기에서 확인되지 않음
 """
 
 from __future__ import annotations
@@ -58,6 +60,12 @@ COURSE_ORIGIN = {"lat": "35.114545", "lng": "129.040763", "targetKm": "5", "radi
 # 동선 생성 표본. 테마는 §4.8 의 "1개 이상" 을 채우는 최소 조합이다.
 # 좌표 있는 대회를 찾으려고 목록을 이어 볼 최대 장수. 앞쪽이 죄다 좌표가 없을 수 있다.
 MAX_LIST_PAGES = 3
+
+# 되읽기용. 개인 목록은 Spring Pageable 이라 `createdAt DESC, id DESC` 로 온다(§0-4).
+# **첫 장만 보면 안 된다** — 계정에 표본이 쌓이면 이번에 저장한 것이 뒤로 밀린다.
+# 없는 것을 "누락" 이라고 잘못 말하는 자리다.
+PERSONAL_PAGE_SIZE = 20
+MAX_PERSONAL_PAGES = 10
 
 ITINERARY_THEMES = ["TOUR", "FOOD"]
 ITINERARY_EVENT_FALLBACK = "K10"
@@ -327,18 +335,6 @@ def seed(client: Client, dry_run: bool = False) -> dict:
     return summary
 
 
-def verify(client: Client) -> dict:
-    """채운 뒤 목록으로 되읽는다. 쓰기가 200 을 준 것과 화면에 보이는 것은 다른 말이다."""
-    favorites = client.json("GET", "/api/me/favorites")
-    courses = client.json("GET", "/api/me/courses")
-    itineraries = client.json("GET", "/api/itineraries")
-    return {
-        "favoriteCount": len(rows(favorites)),
-        "savedCourseCount": len(rows(courses)),
-        "itineraryCount": len(rows(itineraries)),
-    }
-
-
 def rows(payload: object) -> list:
     """목록 응답의 행. 개인 목록은 `content`, 공개 목록은 `items` 다 (§0-4)."""
     if not isinstance(payload, dict):
@@ -348,6 +344,126 @@ def rows(payload: object) -> list:
         if isinstance(value, list):
             return value
     return []
+
+
+def row_ids(items: list) -> set:
+    """행에서 id 만 꺼낸다. 개인 목록의 행은 객체이고 `id` 를 반드시 갖는다 (§5-4 · §7-A).
+
+    `id` 없는 행은 **세지 않는다.** 응답 모양이 바뀌면 조용히 통과하는 것보다 전부
+    누락으로 시끄럽게 터지는 편이 낫다 — 되읽기는 그걸 잡으라고 있는 것이다.
+    """
+    found = set()
+    for item in items:
+        if isinstance(item, dict) and item.get("id") is not None:
+            found.add(item["id"])
+    return found
+
+
+def fetch_all_rows(client: Client, path: str, max_pages: int = MAX_PERSONAL_PAGES) -> list:
+    """개인 목록을 끝까지 읽는다. (§0-4 Spring Pageable)
+
+    첫 장만 보면 이번에 저장한 것이 뒤 장에 있을 때 "없다" 고 말한다. 정렬이
+    `createdAt DESC` 라 보통은 앞에 오지만, 심사 기간에 다시 채우거나 사람이 앱에서
+    먼저 만져 두면 밀린다.
+    """
+    collected: list = []
+    for page_no in range(max_pages):
+        separator = "&" if "?" in path else "?"
+        payload = client.json(
+            "GET",
+            path + separator + "page=" + str(page_no) + "&size=" + str(PERSONAL_PAGE_SIZE))
+        page_rows = rows(payload)
+        collected.extend(page_rows)
+        page = payload.get("page") if isinstance(payload, dict) else None
+        has_next = bool(page.get("hasNext")) if isinstance(page, dict) else False
+        if not page_rows or not has_next:
+            break
+    return collected
+
+
+def check_ids(saved: list, present: set, wanted: int) -> dict:
+    """이번에 저장한 id 가 실제로 목록에 있는가. **개수를 세지 않고 id 를 대조한다.**
+
+    개수만 세면 무관한 id 가 같은 수만큼 와도 통과하고, 같은 id 가 두 번 저장돼도
+    "2건" 으로 보인다(#305 리뷰). 그래서 셋을 나눠 적는다.
+
+      누락(`missing`)      저장했다는데 목록에 없다 — 쓰기가 실제로 안 먹혔다
+      중복(`duplicated`)   같은 id 를 두 번 저장했다 — 표본 개수는 그만큼 준다
+      부족(`shortfall`)    확인된 고유 표본이 목표보다 적다 — 화면이 덜 찬다
+    """
+    unique: list = []
+    duplicated: list = []
+    for value in saved:
+        if value in unique:
+            if value not in duplicated:
+                duplicated.append(value)
+            continue
+        unique.append(value)
+    missing = [value for value in unique if value not in present]
+    confirmed = len(unique) - len(missing)
+    return {
+        "saved": len(saved),
+        "unique": len(unique),
+        "confirmed": confirmed,
+        "listed": len(present),
+        "duplicated": duplicated,
+        "missing": missing,
+        "shortfall": max(0, wanted - confirmed),
+        "ok": not missing and not duplicated and confirmed >= wanted,
+    }
+
+
+VERIFY_LABELS = (
+    ("favorites", "찜", "/api/me/favorites", FAVORITE_COUNT),
+    ("savedCourses", "저장 코스", "/api/me/courses", SAVED_COURSE_COUNT),
+    ("itineraries", "저장 동선", "/api/itineraries", 1),
+)
+
+
+def verify(client: Client, summary: dict) -> dict:
+    """채운 뒤 목록으로 되읽어 **이번에 저장한 id 를 대조한다.**
+
+    쓰기가 200 을 준 것과 화면에 보이는 것은 다른 말이다. 그런데 개수만 세면 그
+    "다른 말" 을 못 잡는다 — 무관한 id 가 같은 수만큼 와도 통과한다(#305 리뷰).
+    """
+    itinerary_id = summary.get("itineraryId")
+    saved_by_key = {
+        "favorites": list(summary.get("favorites") or []),
+        "savedCourses": list(summary.get("savedCourseIds") or []),
+        "itineraries": [itinerary_id] if itinerary_id is not None else [],
+    }
+    checked: dict = {}
+    for key, _label, path, wanted in VERIFY_LABELS:
+        present = row_ids(fetch_all_rows(client, path))
+        checked[key] = check_ids(saved_by_key[key], present, wanted)
+    checked["ok"] = all(checked[key]["ok"] for key, _l, _p, _w in VERIFY_LABELS)
+    return checked
+
+
+def verify_warnings(checked: dict) -> list:
+    """되읽기 결과를 사람이 읽는 문장으로. 누락·중복·부족을 **섞지 않는다** — 할 일이 다르다."""
+    messages = []
+    for key, label, _path, wanted in VERIFY_LABELS:
+        part = checked.get(key)
+        if not isinstance(part, dict):
+            continue
+        if part["duplicated"]:
+            messages.append(
+                label + " 표본이 겹친다 — id " + join_ids(part["duplicated"]) +
+                " 를 두 번 저장했다. 고르는 규칙을 봐야 한다")
+        if part["missing"]:
+            messages.append(
+                label + " 로 저장한 id " + join_ids(part["missing"]) +
+                " 가 목록에 없다 — 쓰기가 실제로 안 먹혔다")
+        elif part["shortfall"]:
+            messages.append(
+                label + " 표본이 " + str(part["confirmed"]) + "건뿐이다 (목표 " +
+                str(wanted) + "건) — 화면이 덜 찬 채로 심사위원에게 보인다")
+    return messages
+
+
+def join_ids(values: list) -> str:
+    return ", ".join(str(value) for value in values)
 
 
 def main() -> int:
@@ -372,7 +488,8 @@ def main() -> int:
         login(client, email, password)
         summary = seed(client, dry_run=args.dry_run)
         if not args.dry_run:
-            summary["verified"] = verify(client)
+            summary["verified"] = verify(client, summary)
+            summary["warnings"].extend(verify_warnings(summary["verified"]))
     except SeedError as error:
         print("실패: " + str(error), file=sys.stderr)
         return 1
@@ -386,6 +503,14 @@ def main() -> int:
             handle.write(text + "\n")
     for warning in summary["warnings"]:
         print("경고: " + warning, file=sys.stderr)
+
+    # 되읽기가 어긋났는데 0 으로 끝내면 "채웠다" 로 읽힌다. 이 스크립트는 계정이
+    # 준비됐다고 말하려고 있는 것이라, 준비가 안 됐으면 그렇게 끝나야 한다.
+    verified = summary.get("verified")
+    if isinstance(verified, dict) and not verified.get("ok"):
+        print("검증 실패: 저장한 표본이 목록에서 확인되지 않는다 — 요약의 verified 를 본다",
+              file=sys.stderr)
+        return 3
     return 0
 
 
