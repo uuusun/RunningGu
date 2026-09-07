@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.racedetail
 
+import com.runninggu.app.ui.common.DataOrigin
 import com.runninggu.app.ui.model.NearbyFestival
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.ui.model.hasLocation
@@ -18,7 +19,19 @@ data class RaceDetailUiState(
     val festivalPhase: FestivalPhase = FestivalPhase.LOADING,
     val festivals: List<NearbyFestival> = emptyList(),
     val isFavorite: Boolean = false,
+    /**
+     * 본문([race])이 어디서 왔는가. (SPEC §6.1 · 이슈 #307)
+     *
+     * **인근 축제는 이 출처를 쓰지 않는다.** 축제는 캐시하지 않아서 오프라인이면 아예
+     * [FestivalPhase.ERROR] 다 — 두 영역이 서로 다른 출처를 가질 수 있으므로 하나로
+     * 묶지 않는다.
+     */
+    val origin: DataOrigin = DataOrigin.Server,
 ) {
+
+    /** 캐시로 되살린 화면인가. 화면은 이때만 "언제 것" 인지를 함께 그린다. */
+    val cachedAt: java.time.Instant?
+        get() = (origin as? DataOrigin.LocalCache)?.cachedAt
     /**
      * [NOT_FOUND]는 `404 CONTEST_NOT_FOUND`(API 명세 §3-4) 전용이다.
      * 재시도해도 소용없으므로 [ERROR]와 달리 [다시 시도]를 주지 않는다.

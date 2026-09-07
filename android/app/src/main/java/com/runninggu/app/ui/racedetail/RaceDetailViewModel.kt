@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.ServiceLocator
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
+import com.runninggu.app.ui.common.DataOrigin
 import com.runninggu.app.data.repository.ContestRepository
 import com.runninggu.app.data.remote.apiErrorCode
 import com.runninggu.app.ui.favorite.FavoriteStore
@@ -75,8 +76,8 @@ class RaceDetailViewModel(
             _uiState.update {
                 it.copy(phase = RaceDetailUiState.Phase.LOADING, errorMessage = null)
             }
-            val race = try {
-                repository.detail(serverId).toRaceSummary()
+            val result = try {
+                repository.detail(serverId)
             } catch (e: ApiException) {
                 _uiState.update {
                     if (e.apiErrorCode() == ApiErrorCode.NOT_FOUND) {
@@ -94,7 +95,10 @@ class RaceDetailViewModel(
             _uiState.update {
                 it.copy(
                     phase = RaceDetailUiState.Phase.LOADED,
-                    race = race,
+                    race = result.contest.toRaceSummary(),
+                    // 캐시로 되살렸으면 화면이 "언제 것" 인지 말해야 한다. 여기서 떨어뜨리면
+                    // repository 가 준 cachedAt 이 사라진다(#283 리뷰와 같은 자리 · #307)
+                    origin = result.cachedAt?.let { at -> DataOrigin.LocalCache(at) } ?: DataOrigin.Server,
                     isFavorite = FavoriteStore.isFavorite(id),
                 )
             }
