@@ -413,6 +413,7 @@ cd ..\backend
   - 추가 [읽기 전용 검증](deploy/evidence/api-readonly-boundaries-20260904.md): 공개·미인증 경계 14항목 2회 및 앱 재시작 후 GET `/me` 200 확인. 마케팅 결함은 민지 태그 이슈 #287로 분리했으며, 두 번째 계정·재설정·전체 혼합 부하는 여전히 미완료
   - 같은 후속 기록에서 두 번째 정상 가입도 확인했다. 테스트 계정 2개가 준비됐으며, 데이터 분리·제한된 쓰기·재설정·전체 혼합 부하는 계속 미완료다
 - [ ] 로그에 토큰·비밀번호·이메일·좌표가 없는지 샘플 검사
+- [x] **nginx 파일 로그 14일 정책 적용(2026-09-07):** 저장소 관리 logrotate 정책(`daily`, `rotate 14`, `maxage 14`, 압축, `0640`)을 `/etc/logrotate.d/nginx`에 설치하고 `nginx -t`, timer·1회 실행, 현재 파일 권한, HTTPS API를 확인했다. [적용 기록](deploy/evidence/nginx-log-location-audit-20260907.md)을 따른다(결정-61)
 - [ ] 장애 감지·담당자 알림·운영사무국 심사 기간 대응 체계 확정
 - [ ] 배포 직전 DB 백업과 직전 앱/서버 artifact 보관
 
@@ -472,7 +473,7 @@ GraphHopper graph 생산·manifest·활성화 계약은
 | **REQUIRED** | 릴리스 버전 정책 | `versionCode=1`, `versionName=1.0` 초기값 | 태그·스토어 버전·변경기록 일치, 업데이트마다 code 증가 |
 | **REQUIRED** | 릴리스 검증 경로 | CI 는 여전히 debug test/build 만 수행한다 | 서명 없는 release 컴파일 검증을 CI 에 넣거나, 로컬 릴리스 검증 절차의 증거를 남기는 것 중 하나를 고른다 |
 | **REQUIRED** | 스토어 등록자료 | 원스토어 상품 생성·아이콘·그래픽 업로드·IARC 등급 저장이 진행됐다 | 실제 화면 이미지·공개 연락처·수집정보 답변·방침 URL·최종 APK (#261 · #253) |
-| **REQUIRED** | 운영 프로필 보강 | EC2 스테이징 예시는 springdoc을 기본 비활성화하지만 운영 관측·보존 정책은 미정 | 프로덕션 설정과 접근 통제 검증 |
+| **REQUIRED** | 운영 프로필 보강 | EC2 스테이징은 springdoc 기본 비활성화, nginx 파일 로그 14일 정책 적용 | 프로덕션 설정·접근 통제와 nginx 외 journal·container 로그의 최종 보존 기준 검증 |
 
 새 라이브러리, 공개 API, DB 스키마, 배포 사업자 선택은 담당자 합의 없이 이 표를 구현으로 먼저 확정하지 않는다.
 

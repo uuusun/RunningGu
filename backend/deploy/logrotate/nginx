@@ -1,0 +1,21 @@
+# 이 파일을 /etc/logrotate.d/nginx에 설치해 Ubuntu 기본 nginx 정책을 교체한다.
+# 같은 /var/log/nginx/*.log를 가리키는 별도 파일을 추가하면 중복 정의 오류가 난다.
+/var/log/nginx/*.log {
+    daily
+    rotate 14
+    maxage 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    prerotate
+        if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+            run-parts /etc/logrotate.d/httpd-prerotate; \
+        fi
+    endscript
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1
+    endscript
+}
