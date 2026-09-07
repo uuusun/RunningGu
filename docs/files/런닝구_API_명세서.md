@@ -631,11 +631,32 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
 | 5-7 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. **필드 부재와 명시적 `null` 을 가른다** — 없으면 기존 값 유지, `"placeName": null` 은 그 값을 **제거**한다(이슈 #213). 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-9 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-10 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
 
 5-8의 block 응답은 5-5 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
+
+**서버는 문자열 값을 정규화해 저장한다** 🔒확정(이슈 #213 · 2026-09-05). `title` 은 앞뒤 공백을
+제거하며 비면 `400 VALIDATION_FAILED` 이고, `placeName`·`address`·`description` 은 공백만 있는
+값을 `null` 로 바꾼다. 공백 판정은 Java `String.strip()`·`isBlank()` 기준이라 U+3000·U+2003 같은
+유니코드 공백도 지우고 `NBSP`(U+00A0)는 남긴다. 앱의 Kotlin `trim()` 은 `NBSP` 까지 지우므로 **앱이
+서버보다 조금 더 지운다** — 보낸 값을 서버가 다시 깎지는 않으니 저장값과 화면은 갈리지 않지만,
+`NBSP` 만으로 된 `title` 은 앱이 먼저 거절한다.
+
+**`startTime` 기본값 `"13:00"` 은 5-7 추가에만 적용된다.** 5-8 수정에서는 필드를 생략하면 기존
+시각이 유지되고, 명시적 `null` 이나 빈 문자열은 `400 VALIDATION_FAILED` 다. 기본값으로 채워지지
+않는다.
+
+**5-8 에서는 앱이 공백을 `null` 로 줄이지 않는다.** 빈 문자열은 그 값을 **지우라는 신호**이고
+필드 생략은 **유지**라, 앱이 공백을 `null` 로 바꾸면 와이어에서 키가 빠져 지우기가 유지로
+바뀐다. 앱은 `explicitNulls=false` 라 `"placeName": null` 을 보낼 수 없으므로 **빈 문자열이
+유일한 지우기 수단**이다. 5-7 추가에는 지울 값이 없어 `null` 과 `""` 의 결과가 같다.
+
+**5-7 응답은 `201 {blockId, orderNo}` 를 유지하고, 앱이 보내기 전에 같은 정규화를 한다**
+🔒확정(2026-09-06 · #301). 응답을 블록 전체로 넓히지 않는다. 5-7 응답에는 저장된 문자열이 없어서
+앱이 보낸 값으로 행을 그리는데, 정규화를 안 하면 화면에 공백이 남거나 화면의 빈 문자열이 서버의
+`null` 과 어긋난다. 5-8 · 5-10 은 원래 계약대로 서버의 갱신 응답으로 상태를 교체한다.
 
 ---
 

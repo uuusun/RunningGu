@@ -74,8 +74,26 @@ data class NewBlock(
  * **`null` 은 "이 필드를 안 건드린다" 다.** 서버가 보낸 필드만 반영하므로, 안 바꿀 값을
  * 현재 값으로 채워 보내면 그 사이 서버에서 바뀐 값을 덮어쓴다.
  *
- * 그래서 **`null` 로 장소를 지울 수는 없다.** 지우는 계약이 §5-8 에 없다 — 필요해지면
- * 계약부터다(AGENTS 4장).
+ * ## 장소 비우기 — 계약에는 있는데 이 타입으로는 못 보낸다 (#213 · 건모님 확인)
+ *
+ * 제가 처음에 "지우는 계약이 §5-8 에 없다" 고 적었는데 **틀렸다.** 서버는 **필드 부재**와
+ * **명시적 `null`** 을 가른다(`PatchItineraryBlockRequest` 의 `present` 플래그).
+ *
+ * ```
+ * 필드 없음           → 기존 값 유지
+ * "placeName": null  → 장소를 지운다      ← 계약에 있다
+ * ```
+ *
+ * 다만 앱은 `ApiJson` 이 `explicitNulls = false` 라 **`null` 필드가 본문에서 통째로 빠진다.**
+ * 그래서 여기 `null` 을 넣어도 "지워라" 가 아니라 "안 건드린다" 로 나간다.
+ *
+ * **이건 사고가 아니라 안전장치다.** 안 바꿀 필드가 전부 `null` 인 타입에서 `null` 이 실려
+ * 나가면 **PATCH 의 의미가 달라진다** — `startTime`·`title`·`category` 의 `null` 에서
+ * `400 VALIDATION_FAILED` 로 먼저 막힐 수도 있고, 거기서 안 걸리면 장소·설명이 지워진다.
+ * `BlockPatchWireTest` 가 그 한 줄이 뒤집히는 것을 막는다.
+ *
+ * **장소 비우기 화면이 필요해지면** 여기 `null` 을 넣는 것으로는 안 되고 별도 신호
+ * (예: `clearPlace: Boolean`)를 계약에 더해야 한다. 지금은 그 화면이 없다.
  */
 data class BlockPatch(
     val startTime: String? = null,
@@ -87,6 +105,71 @@ data class BlockPatch(
 
 /** 추가된 블록의 id 와 순서. 맨 끝에 붙는다 (§5-7). */
 data class AddedBlock(val blockId: Long, val orderNo: Int)
+
+/**
+ * 보내기 전에 서버와 같은 정규화를 한다 🔒확정(#213 · 2026-09-06 선경 결정).
+ *
+ * §5-7 응답은 `{blockId, orderNo}` 뿐이라 **앱은 방금 보낸 값으로 행을 그린다.** 그런데
+ * 서버는 저장하면서 문자열을 정규화한다 — 앞뒤 공백을 지우고, 공백만 있는 값을 `null` 로
+ * 바꾼다. 그대로 두면 화면에 남은 공백이 저장된 값과 어긋나고, 화면의 `""` 가 서버의
+ * `null` 과 어긋난다.
+ *
+ * **응답을 블록 전체로 넓히는 대신 앱이 맞추기로 했다.** 계약을 안 바꾸는 쪽이다.
+ *
+ * ## 서버와 같은 함수인가 — 정확히 같지는 않다
+ *
+ * 서버는 Java `strip()`/`isBlank()`, 앱은 Kotlin `trim()`/`isEmpty()` 다. 전각 공백
+ * (U+3000)·EM space 처럼 거의 모든 자리에서 같지만 **`NBSP`(U+00A0) 하나가 다르다** —
+ * Kotlin 은 `isSpaceChar` 까지 보므로 지우고, Java `strip()` 은 남긴다.
+ *
+ * **앱이 더 지우는 쪽이라 어긋나지는 않는다.** 지켜야 하는 것은 "앱이 보낸 값을 서버가
+ * 또 깎지 않는다" 이고, 이미 지운 값에는 서버가 할 일이 없다. 다만 **`NBSP` 만으로 된
+ * 제목은 앱이 먼저 거절한다** — 서버라면 통과시킬 값이다. 웹 폼 붙여넣기로 들어올 수
+ * 있어서 적어 둔다. `BlockRequestNormalizeTest` 가 실제 `java.lang.String.strip()` 을
+ * 불러 이 두 가지를 대조한다.
+ */
+internal object BlockText {
+
+    /** 비면 요청을 만들지 않는다. 서버는 `400 VALIDATION_FAILED` 로 거절한다. */
+    fun required(value: String, field: String): String {
+        val stripped = value.trim()
+        require(stripped.isNotEmpty()) { "$field 값이 필요하다 — 빈 값은 서버가 거절한다 (§5-7 · §5-8)" }
+        return stripped
+    }
+
+    /** 서버 `normalizeNullable` 과 같다 — 공백만 있으면 `null`, 아니면 앞뒤를 지운다. */
+    fun nullable(value: String?): String? = value?.trim()?.ifEmpty { null }
+}
+
+/**
+ * 서버가 저장할 값으로 맞춘 사본. (§5-7)
+ *
+ * 화면이 추가한 행을 그릴 때도 이 값을 쓴다 — 보낸 값과 그린 값이 갈리지 않는다.
+ * `startTime` 이 비면 계약 기본값 `"13:00"` 이다(§5-7 **추가에만** 해당한다).
+ */
+fun NewBlock.normalized(): NewBlock = copy(
+    title = BlockText.required(title, "title"),
+    startTime = startTime.trim().ifEmpty { DEFAULT_BLOCK_START_TIME },
+    place = place?.copy(name = place.name.trim(), addr = place.addr.trim()),
+    description = description.trim(),
+)
+
+/**
+ * 서버가 저장할 값으로 맞춘 사본. (§5-8)
+ *
+ * [NewBlock.normalized] 와 달리 **`startTime` 에 기본값을 채우지 않는다.** 수정에서 시각을
+ * 비워 보내면 서버가 `400` 이다 — 기본값 13:00 은 추가(§5-7)에만 있는 규칙이라, 여기서
+ * 채우면 사용자가 안 정한 시각이 말없이 들어간다.
+ *
+ * **공백을 `null` 로 줄이지도 않는다.** 여기서 빈 문자열은 "지워라" 라서, `null` 로 바꾸면
+ * 와이어에서 키가 빠져 "안 건드린다" 가 된다([BlockPatch.toDto]).
+ */
+fun BlockPatch.normalized(): BlockPatch = copy(
+    startTime = startTime?.let { BlockText.required(it, "startTime") },
+    title = title?.let { BlockText.required(it, "title") },
+    place = place?.copy(name = place.name.trim(), addr = place.addr.trim()),
+    description = description?.trim(),
+)
 
 /**
  * 동선 생성 창구. (SPEC 결정-41)
@@ -268,33 +351,57 @@ class RemoteItineraryRepository(private val api: ItineraryApi) : ItineraryReposi
  * `startTime` 을 안 넘기면 계약 기본값 `"13:00"` 이 실린다 — 서버 기본값과 같은 값을
  * 앱도 들고 있어야 화면이 보여 준 시각과 저장된 시각이 갈리지 않는다.
  */
-internal fun NewBlock.toDto(): BlockCreateRequestDto = BlockCreateRequestDto(
-    title = title,
-    category = category.name,
-    startTime = startTime,
-    placeName = place?.name,
-    address = place?.addr?.ifBlank { null },
-    lat = place?.lat,
-    lng = place?.lng,
-    description = description,
-)
+internal fun NewBlock.toDto(): BlockCreateRequestDto {
+    val block = normalized()
+    return BlockCreateRequestDto(
+        title = block.title,
+        category = block.category.name,
+        startTime = block.startTime,
+        placeName = BlockText.nullable(block.place?.name),
+        address = BlockText.nullable(block.place?.addr),
+        lat = block.place?.lat,
+        lng = block.place?.lng,
+        description = block.description,
+    )
+}
 
 /**
  * 수정 요청으로. (§5-8)
  *
  * **`null` 은 "안 건드린다" 이지 "비운다" 가 아니다.** 서버가 보낸 필드만 반영하므로,
  * 안 바꿀 값을 현재 값으로 채워 보내면 그 사이 서버에서 바뀐 값을 덮어쓴다.
+ *
+ * ## 여기서는 공백을 `null` 로 바꾸지 않는다 — 추가(§5-7)와 다른 자리다 (#301 리뷰)
+ *
+ * 처음에 추가와 같은 정규화를 넣었다가 **장소를 지우는 길을 막았다.**
+ *
+ * ```
+ * 빈 문자열 ""   → 서버가 blank → null 로 저장   = 지운다
+ * Kotlin null    → explicitNulls=false 라 키가 빠짐 = 안 건드린다
+ * ```
+ *
+ * 공백을 `null` 로 바꾸면 **"지워라" 가 "그대로 둬라" 로 조용히 바뀐다.** 앱이 서버에
+ * `"placeName": null` 을 못 보내므로(와이어에서 빠진다) 빈 문자열이 유일한 지우기
+ * 수단인데, 그것마저 없애면 장소를 비울 방법이 사라진다.
+ *
+ * 그래서 여기서는 **앞뒤 공백만 지운다.** 추가(§5-7)는 지울 값이 애초에 없어서 `null`
+ * 로 보내든 `""` 로 보내든 결과가 같다 — 그쪽만 `null` 로 줄인다.
  */
-internal fun BlockPatch.toDto(): BlockPatchRequestDto = BlockPatchRequestDto(
-    startTime = startTime,
-    title = title,
-    category = category?.name,
-    placeName = place?.name,
-    address = place?.addr?.ifBlank { null },
-    lat = place?.lat,
-    lng = place?.lng,
-    description = description,
-)
+internal fun BlockPatch.toDto(): BlockPatchRequestDto {
+    val patch = normalized()
+    return BlockPatchRequestDto(
+        startTime = patch.startTime,
+        title = patch.title,
+        category = patch.category?.name,
+        // normalized() 가 이미 앞뒤 공백을 지웠다. 여기서 blank → null 을 더 하면
+        // 장소를 지우는 요청이 "안 건드린다" 로 바뀐다 (#301 리뷰).
+        placeName = patch.place?.name,
+        address = patch.place?.addr,
+        lat = patch.place?.lat,
+        lng = patch.place?.lng,
+        description = patch.description,
+    )
+}
 
 internal fun GenerateItineraryRequest.toDto() = GenerateItineraryRequestDto(
     contestId = contestId,
