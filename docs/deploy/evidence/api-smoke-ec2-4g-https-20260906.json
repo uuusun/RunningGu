@@ -1,0 +1,55 @@
+{
+  "phase": "after_guard_disabled",
+  "ssmFinishCommandId": "42727340-10aa-4ed9-a54f-f5d6f0ea34e9",
+  "result": {
+    "checks": [
+      {
+        "caseId": "contest_list",
+        "count": 20,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_detail",
+        "generationLocationPresent": true,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_closing",
+        "count": 4,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_daily",
+        "count": 5,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "course_regions",
+        "count": 11,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "course_list",
+        "catalogCount": 261,
+        "count": 20,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "anonymous_me_denied",
+        "passed": true,
+        "status": 401
+      }
+    ],
+    "fullRequestSetFrozen": false,
+    "loadExecuted": false,
+    "passed": true,
+    "scope": "public_readiness_only",
+    "yearMonth": "2026-09"
+  }
+}

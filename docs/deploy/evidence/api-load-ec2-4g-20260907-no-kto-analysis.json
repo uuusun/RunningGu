@@ -1,0 +1,918 @@
+{
+  "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+  "capacityVerdict": "current_4g_maintainable_for_selected_scope",
+  "verdictScope": "selected_requests_without_kto",
+  "fullAppLoadPassed": false,
+  "subsetChecksPassed": true,
+  "counts": {
+    "planned": 1855,
+    "dispatched": 1855,
+    "completed": 1855,
+    "successful": 1855,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "phases": [
+    {
+      "phase": "warmup",
+      "planned": 265,
+      "dispatched": 265,
+      "completed": 265,
+      "successful": 265,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0
+    },
+    {
+      "phase": "measurement",
+      "planned": 1590,
+      "dispatched": 1590,
+      "completed": 1590,
+      "successful": 1590,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0
+    }
+  ],
+  "auxiliaryCounts": {
+    "planned": 37,
+    "dispatched": 37,
+    "completed": 37,
+    "successful": 37,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "excludedRequestCount": 245,
+  "missedStarts": 0,
+  "lateDispatches": 0,
+  "maxDispatchDelayMs": 63.0,
+  "groups": [
+    {
+      "group": "simple",
+      "planned": 1350,
+      "completed": 1350,
+      "successful": 1350,
+      "failed": 0,
+      "p50Ms": 51.277,
+      "p95Ms": 102.805,
+      "maxMs": 1148.299,
+      "p95LimitMs": 1000,
+      "maxLimitMs": 3000,
+      "passed": true,
+      "dispatched": 1350,
+      "notExecuted": 0,
+      "inFlight": 0
+    },
+    {
+      "group": "external",
+      "planned": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "p50Ms": 53.606,
+      "p95Ms": 110.032,
+      "maxMs": 295.113,
+      "p95LimitMs": 3000,
+      "maxLimitMs": 10000,
+      "passed": true,
+      "dispatched": 60,
+      "notExecuted": 0,
+      "inFlight": 0
+    },
+    {
+      "group": "heavy",
+      "planned": 180,
+      "completed": 180,
+      "successful": 180,
+      "failed": 0,
+      "p50Ms": 124.216,
+      "p95Ms": 338.913,
+      "maxMs": 487.655,
+      "p95LimitMs": 5000,
+      "maxLimitMs": 15000,
+      "passed": true,
+      "dispatched": 180,
+      "notExecuted": 0,
+      "inFlight": 0
+    }
+  ],
+  "apiCases": [
+    {
+      "caseId": "contest_list",
+      "planned": 360,
+      "dispatched": 360,
+      "completed": 360,
+      "successful": 360,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 50.987,
+      "p95Ms": 96.244,
+      "maxMs": 300.796
+    },
+    {
+      "caseId": "contest_detail",
+      "planned": 240,
+      "dispatched": 240,
+      "completed": 240,
+      "successful": 240,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 50.562,
+      "p95Ms": 95.416,
+      "maxMs": 219.937
+    },
+    {
+      "caseId": "contest_closing",
+      "planned": 150,
+      "dispatched": 150,
+      "completed": 150,
+      "successful": 150,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 51.604,
+      "p95Ms": 102.252,
+      "maxMs": 1068.276
+    },
+    {
+      "caseId": "contest_daily",
+      "planned": 150,
+      "dispatched": 150,
+      "completed": 150,
+      "successful": 150,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 55.258,
+      "p95Ms": 142.0,
+      "maxMs": 313.985
+    },
+    {
+      "caseId": "course_list",
+      "planned": 180,
+      "dispatched": 180,
+      "completed": 180,
+      "successful": 180,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 50.696,
+      "p95Ms": 110.149,
+      "maxMs": 467.051
+    },
+    {
+      "caseId": "course_regions",
+      "planned": 90,
+      "dispatched": 90,
+      "completed": 90,
+      "successful": 90,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 47.728,
+      "p95Ms": 89.325,
+      "maxMs": 586.985
+    },
+    {
+      "caseId": "near_curated",
+      "planned": 90,
+      "dispatched": 90,
+      "completed": 90,
+      "successful": 90,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 51.162,
+      "p95Ms": 312.144,
+      "maxMs": 398.234
+    },
+    {
+      "caseId": "near_osm",
+      "planned": 90,
+      "dispatched": 90,
+      "completed": 90,
+      "successful": 90,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 179.046,
+      "p95Ms": 457.251,
+      "maxMs": 487.655
+    },
+    {
+      "caseId": "festival",
+      "planned": 0,
+      "dispatched": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null
+    },
+    {
+      "caseId": "poi",
+      "planned": 0,
+      "dispatched": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null
+    },
+    {
+      "caseId": "geocode",
+      "planned": 60,
+      "dispatched": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 53.606,
+      "p95Ms": 110.032,
+      "maxMs": 295.113
+    },
+    {
+      "caseId": "itinerary_generate",
+      "planned": 0,
+      "dispatched": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null
+    },
+    {
+      "caseId": "me",
+      "planned": 60,
+      "dispatched": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 52.66,
+      "p95Ms": 98.331,
+      "maxMs": 141.547
+    },
+    {
+      "caseId": "favorite_list",
+      "planned": 60,
+      "dispatched": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 50.877,
+      "p95Ms": 128.118,
+      "maxMs": 1148.299
+    },
+    {
+      "caseId": "favorite_add",
+      "planned": 30,
+      "dispatched": 30,
+      "completed": 30,
+      "successful": 30,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 48.414,
+      "p95Ms": 115.47,
+      "maxMs": 121.244
+    },
+    {
+      "caseId": "favorite_delete",
+      "planned": 30,
+      "dispatched": 30,
+      "completed": 30,
+      "successful": 30,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 49.421,
+      "p95Ms": 90.839,
+      "maxMs": 91.647
+    }
+  ],
+  "loadWindow": {
+    "start": "2026-09-07T00:01:32.248372+00:00",
+    "end": "2026-09-07T00:36:31.324187+00:00",
+    "samples": 420,
+    "minimumAvailableKiB": 1034204,
+    "minimumAvailablePercent": 26.493,
+    "firstAvailableKiB": 1084804,
+    "lastAvailableKiB": 1041280,
+    "swapFirstKiB": 120,
+    "swapLastKiB": 120,
+    "swapPeakKiB": 120,
+    "swapInPages": 0,
+    "swapOutPages": 0,
+    "cpu": {
+      "mean": 4.349,
+      "p95": 7.571,
+      "max": 12.392,
+      "top": [
+        {
+          "at": "2026-09-07T00:05:05+00:00",
+          "busyPercent": 12.392,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:10:05+00:00",
+          "busyPercent": 10.884,
+          "iowaitPercent": 0.097,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:17:15+00:00",
+          "busyPercent": 10.108,
+          "iowaitPercent": 0.294,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:20:05+00:00",
+          "busyPercent": 10.108,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:18:05+00:00",
+          "busyPercent": 10.029,
+          "iowaitPercent": 0.197,
+          "counterReset": false
+        }
+      ]
+    }
+  },
+  "serviceMemory": {
+    "backend": {
+      "firstMiB": 361.2578125,
+      "lastMiB": 398.46484375,
+      "maxMiB": 416.5390625
+    },
+    "graphhopper": {
+      "firstMiB": 1719.296,
+      "lastMiB": 1727.488,
+      "maxMiB": 1728.512,
+      "restartCounts": [
+        "0"
+      ],
+      "maxCpuPercent": 26.05
+    },
+    "postgres": {
+      "firstMiB": 60.79,
+      "lastMiB": 59.88,
+      "maxMiB": 76.16,
+      "restartCounts": [
+        "0"
+      ],
+      "maxCpuPercent": 7.43
+    }
+  },
+  "fullGcCorrelations": [
+    {
+      "gc": {
+        "at": "2026-09-07T00:35:31.473086+00:00",
+        "service": "backend",
+        "invocationId": "654a1c0497c04570a52143efefd96877",
+        "gcId": 33,
+        "kind": "Pause Full (CodeCache GC Threshold)",
+        "full": true,
+        "pauseMs": 116.94,
+        "heapMiB": [
+          87,
+          49,
+          247
+        ],
+        "window": "normal_observation"
+      },
+      "nearbyWithin5Seconds": [
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2036",
+          "phase": "measurement",
+          "caseId": "contest_closing",
+          "dispatchedAt": "2026-09-07T00:35:27.251858+00:00",
+          "completedAt": "2026-09-07T00:35:27.307694+00:00",
+          "status": 200,
+          "durationMs": 55.454,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2037",
+          "phase": "measurement",
+          "caseId": "contest_daily",
+          "dispatchedAt": "2026-09-07T00:35:28.241881+00:00",
+          "completedAt": "2026-09-07T00:35:28.281161+00:00",
+          "status": 200,
+          "durationMs": 38.299,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2038",
+          "phase": "measurement",
+          "caseId": "course_list",
+          "dispatchedAt": "2026-09-07T00:35:29.245573+00:00",
+          "completedAt": "2026-09-07T00:35:29.288872+00:00",
+          "status": 200,
+          "durationMs": 43.194,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2039",
+          "phase": "measurement",
+          "caseId": "contest_detail",
+          "dispatchedAt": "2026-09-07T00:35:30.250318+00:00",
+          "completedAt": "2026-09-07T00:35:30.307025+00:00",
+          "status": 200,
+          "durationMs": 57.063,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2040",
+          "phase": "measurement",
+          "caseId": "contest_list",
+          "dispatchedAt": "2026-09-07T00:35:31.239972+00:00",
+          "completedAt": "2026-09-07T00:35:31.305378+00:00",
+          "status": 200,
+          "durationMs": 65.103,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2041",
+          "phase": "measurement",
+          "caseId": "contest_list",
+          "dispatchedAt": "2026-09-07T00:35:32.243954+00:00",
+          "completedAt": "2026-09-07T00:35:32.318626+00:00",
+          "status": 200,
+          "durationMs": 73.521,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2042",
+          "phase": "measurement",
+          "caseId": "contest_detail",
+          "dispatchedAt": "2026-09-07T00:35:33.248345+00:00",
+          "completedAt": "2026-09-07T00:35:33.295751+00:00",
+          "status": 200,
+          "durationMs": 46.683,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2043",
+          "phase": "measurement",
+          "caseId": "course_list",
+          "dispatchedAt": "2026-09-07T00:35:34.239549+00:00",
+          "completedAt": "2026-09-07T00:35:34.300131+00:00",
+          "status": 200,
+          "durationMs": 59.713,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2044",
+          "phase": "measurement",
+          "caseId": "contest_closing",
+          "dispatchedAt": "2026-09-07T00:35:35.244409+00:00",
+          "completedAt": "2026-09-07T00:35:35.329301+00:00",
+          "status": 200,
+          "durationMs": 84.57,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-2045",
+          "phase": "measurement",
+          "caseId": "contest_daily",
+          "dispatchedAt": "2026-09-07T00:35:36.248548+00:00",
+          "completedAt": "2026-09-07T00:35:36.311072+00:00",
+          "status": 200,
+          "durationMs": 61.435,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        }
+      ],
+      "heapAfterThisFullGc": {
+        "firstMiB": 49,
+        "lastMiB": 49,
+        "minMiB": 49,
+        "maxMiB": 49
+      }
+    },
+    {
+      "gc": {
+        "at": "2026-09-07T00:02:24.463607141Z",
+        "service": "graphhopper",
+        "invocationId": null,
+        "gcId": 140,
+        "kind": "Pause Full (G1 Compaction Pause)",
+        "full": true,
+        "pauseMs": 27.373,
+        "heapMiB": [
+          2043,
+          1059,
+          2048
+        ],
+        "window": "normal_observation"
+      },
+      "nearbyWithin5Seconds": [
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0049",
+          "phase": "warmup",
+          "caseId": "favorite_list",
+          "dispatchedAt": "2026-09-07T00:02:20.244806+00:00",
+          "completedAt": "2026-09-07T00:02:20.290155+00:00",
+          "status": 200,
+          "durationMs": 44.131,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0050",
+          "phase": "warmup",
+          "caseId": "contest_detail",
+          "dispatchedAt": "2026-09-07T00:02:21.249537+00:00",
+          "completedAt": "2026-09-07T00:02:21.315293+00:00",
+          "status": 200,
+          "durationMs": 65.296,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0051",
+          "phase": "warmup",
+          "caseId": "favorite_delete",
+          "dispatchedAt": "2026-09-07T00:02:22.238931+00:00",
+          "completedAt": "2026-09-07T00:02:22.277279+00:00",
+          "status": 204,
+          "durationMs": 37.819,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0052",
+          "phase": "warmup",
+          "caseId": "near_curated",
+          "dispatchedAt": "2026-09-07T00:02:23.242637+00:00",
+          "completedAt": "2026-09-07T00:02:23.284245+00:00",
+          "status": 200,
+          "durationMs": 40.905,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0053",
+          "phase": "warmup",
+          "caseId": "near_osm",
+          "dispatchedAt": "2026-09-07T00:02:24.246107+00:00",
+          "completedAt": "2026-09-07T00:02:24.506070+00:00",
+          "status": 200,
+          "durationMs": 259.746,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0054",
+          "phase": "warmup",
+          "caseId": "contest_list",
+          "dispatchedAt": "2026-09-07T00:02:25.249908+00:00",
+          "completedAt": "2026-09-07T00:02:25.588549+00:00",
+          "status": 200,
+          "durationMs": 338.118,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0056",
+          "phase": "warmup",
+          "caseId": "contest_closing",
+          "dispatchedAt": "2026-09-07T00:02:27.244376+00:00",
+          "completedAt": "2026-09-07T00:02:27.292376+00:00",
+          "status": 200,
+          "durationMs": 46.858,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0057",
+          "phase": "warmup",
+          "caseId": "contest_daily",
+          "dispatchedAt": "2026-09-07T00:02:28.247888+00:00",
+          "completedAt": "2026-09-07T00:02:28.298801+00:00",
+          "status": 200,
+          "durationMs": 50.399,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        },
+        {
+          "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0058",
+          "phase": "warmup",
+          "caseId": "course_list",
+          "dispatchedAt": "2026-09-07T00:02:29.251500+00:00",
+          "completedAt": "2026-09-07T00:02:29.292597+00:00",
+          "status": 200,
+          "durationMs": 41.253,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        }
+      ],
+      "heapAfterThisFullGc": {
+        "firstMiB": 1059,
+        "lastMiB": 1227,
+        "minMiB": 1059,
+        "maxMiB": 2001
+      }
+    }
+  ],
+  "backupWal": [
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:10:30.589602+00:00",
+      "offsetSeconds": 600,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "63c4a878186848c2a3c5c106f7657b37",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:10:30.860472+00:00",
+      "durationSeconds": 0.27087,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    },
+    {
+      "kind": "backup",
+      "startedAt": "2026-09-07T00:17:10.589193+00:00",
+      "offsetSeconds": 1000,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "8242679cbc35400195a144f199d53231",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:18:00.926700+00:00",
+      "durationSeconds": 50.337507,
+      "requestsDuring": {
+        "count": 45,
+        "failed": 0,
+        "p95Ms": 124.216,
+        "maxMs": 487.655
+      }
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:20:30.590544+00:00",
+      "offsetSeconds": 1200,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "8291ea3b5eb2461d8346523b76fea66e",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:20:30.927629+00:00",
+      "durationSeconds": 0.337085,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:30:30.589318+00:00",
+      "offsetSeconds": 1800,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "b134ee0485e54432b4e606b9abf69ca6",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:30:30.861146+00:00",
+      "durationSeconds": 0.271828,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    }
+  ],
+  "slowestRequests": [
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0649",
+      "phase": "measurement",
+      "caseId": "favorite_list",
+      "dispatchedAt": "2026-09-07T00:12:20.261860+00:00",
+      "completedAt": "2026-09-07T00:12:21.417633+00:00",
+      "status": 200,
+      "durationMs": 1148.299,
+      "success": true,
+      "dispatchDelayMs": 16.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-1301",
+      "phase": "measurement",
+      "caseId": "contest_closing",
+      "dispatchedAt": "2026-09-07T00:23:12.250904+00:00",
+      "completedAt": "2026-09-07T00:23:13.319091+00:00",
+      "status": 200,
+      "durationMs": 1068.276,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0666",
+      "phase": "measurement",
+      "caseId": "course_regions",
+      "dispatchedAt": "2026-09-07T00:12:37.269295+00:00",
+      "completedAt": "2026-09-07T00:12:37.856489+00:00",
+      "status": 200,
+      "durationMs": 586.985,
+      "success": true,
+      "dispatchDelayMs": 16.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0953",
+      "phase": "measurement",
+      "caseId": "near_osm",
+      "dispatchedAt": "2026-09-07T00:17:24.246615+00:00",
+      "completedAt": "2026-09-07T00:17:24.734643+00:00",
+      "status": 200,
+      "durationMs": 487.655,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-1913",
+      "phase": "measurement",
+      "caseId": "near_osm",
+      "dispatchedAt": "2026-09-07T00:33:24.247416+00:00",
+      "completedAt": "2026-09-07T00:33:24.729586+00:00",
+      "status": 200,
+      "durationMs": 480.64,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0309",
+      "phase": "measurement",
+      "caseId": "near_osm",
+      "dispatchedAt": "2026-09-07T00:06:40.241522+00:00",
+      "completedAt": "2026-09-07T00:06:40.710607+00:00",
+      "status": 200,
+      "durationMs": 469.291,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0465",
+      "phase": "measurement",
+      "caseId": "course_list",
+      "dispatchedAt": "2026-09-07T00:09:16.245443+00:00",
+      "completedAt": "2026-09-07T00:09:16.712592+00:00",
+      "status": 200,
+      "durationMs": 467.051,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0000Z-v4nokto-load-0633",
+      "phase": "measurement",
+      "caseId": "near_osm",
+      "dispatchedAt": "2026-09-07T00:12:04.245119+00:00",
+      "completedAt": "2026-09-07T00:12:04.706571+00:00",
+      "status": 200,
+      "durationMs": 460.956,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    }
+  ],
+  "cpuPeaksDuringLoad": [
+    {
+      "cpu": {
+        "at": "2026-09-07T00:05:05+00:00",
+        "busyPercent": 12.392,
+        "iowaitPercent": 0.0,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 9,
+        "failed": 0,
+        "p95Ms": 271.238,
+        "maxMs": 271.238
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T00:10:05+00:00",
+        "busyPercent": 10.884,
+        "iowaitPercent": 0.097,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 9,
+        "failed": 0,
+        "p95Ms": 208.44,
+        "maxMs": 208.44
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T00:17:15+00:00",
+        "busyPercent": 10.108,
+        "iowaitPercent": 0.294,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 8,
+        "failed": 0,
+        "p95Ms": 77.594,
+        "maxMs": 77.594
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T00:20:05+00:00",
+        "busyPercent": 10.108,
+        "iowaitPercent": 0.0,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 9,
+        "failed": 0,
+        "p95Ms": 129.5,
+        "maxMs": 129.5
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T00:18:05+00:00",
+        "busyPercent": 10.029,
+        "iowaitPercent": 0.197,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 9,
+        "failed": 0,
+        "p95Ms": 245.719,
+        "maxMs": 245.719
+      }
+    }
+  ],
+  "nic": {
+    "complete": true,
+    "counterGrowth": {
+      "outboundDiscarded": 0,
+      "outboundErrors": 0,
+      "receivedBytes": 148179532,
+      "receivedDiscarded": 0,
+      "receivedErrors": 0,
+      "sentBytes": 39700324
+    },
+    "counterResetIntervals": 0,
+    "expectedSamples": 480,
+    "firstAt": "2026-09-07T00:01:04.3376074Z",
+    "interfaceIndex": 15,
+    "lastAt": "2026-09-07T00:40:59.3639309Z",
+    "maximumIntervalSeconds": 5.389,
+    "maximumRxUtilizationPercent": 7.814054,
+    "maximumTxUtilizationPercent": 0.42684,
+    "minimumLinkSpeedBps": 780000000,
+    "notUpSamples": 0,
+    "observedSaturation": false,
+    "samples": 480
+  },
+  "cleanupSucceeded": true,
+  "logoutSucceeded": true,
+  "inputsDiscarded": true,
+  "sourceHashes": {
+    "-api.json": "2f38075956d4a65330f550f5ebd3f8741a33d30673b382e01dcff47a34aca6b2",
+    "-requests.jsonl": "cd4b65acdb2c2d6bc44c18e7d0a7b6d8098b5b4116b1dbdeab5c8df4e72e7f3f",
+    "-server.json": "7d7b3145e92c993b28b397648752c65bfa5b858530e73e34036c60e0ab0e264a",
+    "-nic.json": "b29dc41fe81032378e882981592e82c24d9554e81a954c4e626b12c9e7357f74",
+    "-completion.json": "a5eb39ee9681a6c56dc076ebe491594c46d05aa879cd786e2f7806e699eeb342"
+  },
+  "serverFullRawSha256": "e45e277437cb3099fe1993eb3be9a3923d60e1a35262b65cac9e82783ed02363"
+}

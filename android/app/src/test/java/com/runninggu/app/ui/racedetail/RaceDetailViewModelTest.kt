@@ -1,5 +1,7 @@
 package com.runninggu.app.ui.racedetail
 
+import com.runninggu.app.ui.common.DataOrigin
+import com.runninggu.app.data.repository.ContestDetailResult
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
 import com.runninggu.app.data.remote.ApiErrorCode
@@ -155,13 +157,42 @@ class RaceDetailViewModelTest {
         imageUrl = null,
         address = "세종특별자치시",
     )
+
+    @Test
+    fun `캐시로 되살린 상세는 언제 것인지를 화면까지 들고 온다`() = runTest(dispatcher) {
+        // 대회 상세는 접수 마감이 걸려 있다. 캐시된 값을 지금 값처럼 그리면 이미 끝난
+        // 접수를 열려 있다고 보여주게 된다 (#307)
+        val viewModel = RaceDetailViewModel(FakeContestRepository(detailCachedAt = CACHED_AT))
+
+        viewModel.start("7")
+        advanceUntilIdle()
+
+        assertEquals(DataOrigin.LocalCache(CACHED_AT), viewModel.uiState.value.origin)
+        assertEquals(CACHED_AT, viewModel.uiState.value.cachedAt)
+    }
+
+    @Test
+    fun `서버에서 막 받은 상세에는 출처 표시가 없다`() = runTest(dispatcher) {
+        val viewModel = RaceDetailViewModel(FakeContestRepository())
+
+        viewModel.start("7")
+        advanceUntilIdle()
+
+        assertEquals(DataOrigin.Server, viewModel.uiState.value.origin)
+        assertNull(viewModel.uiState.value.cachedAt)
+    }
 }
+
+/** 고정 시각. 되살린 상세가 이 값을 화면까지 들고 오는지 본다 (#307). */
+private val CACHED_AT: java.time.Instant = java.time.Instant.parse("2026-09-06T12:00:00Z")
 
 private class FakeContestRepository(
     private val festivals: List<NearbyFestival> = emptyList(),
     private val detailFailure: ApiException? = null,
     private val festivalFailure: ApiException? = null,
     private val active: Boolean = true,
+    /** 캐시로 되살린 상세면 저장 시각. null 이면 서버에서 막 받은 것이다 (#307). */
+    private val detailCachedAt: java.time.Instant? = null,
 ) : ContestRepository {
 
     var lastDetailId: Long? = null
@@ -169,10 +200,10 @@ private class FakeContestRepository(
     var lastFestivalsId: Long? = null
         private set
 
-    override suspend fun detail(id: Long): Contest {
+    override suspend fun detail(id: Long): ContestDetailResult {
         detailFailure?.let { throw it }
         lastDetailId = id
-        return contest(id, active)
+        return ContestDetailResult(contest(id, active), detailCachedAt)
     }
 
     override suspend fun festivals(id: Long): List<NearbyFestival> {

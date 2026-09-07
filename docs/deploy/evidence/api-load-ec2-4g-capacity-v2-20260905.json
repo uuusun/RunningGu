@@ -1,0 +1,236 @@
+{
+  "runId": "api4g-673a2f7-20260905T1107Z",
+  "acceptancePolicy": "capacity-v2",
+  "passed": false,
+  "verdict": "aborted_repeated_graphhopper_full_gc",
+  "instance": {
+    "id": "i-07aa483968f4daddc",
+    "type": "c7i-flex.large",
+    "availabilityZone": "ap-northeast-2b",
+    "memTotalKiB": 3903756
+  },
+  "backendCommit": "673a2f796052f4553113d5cd25608fb3821222ac",
+  "validatorCommit": "398d7dbb4fd13070adfe336a8c90d60ad03e8263",
+  "artifactId": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+  "requestSetSha256": "6811484a70d406e555c9bdce8273744ef5be597795a73186c9ed9ea42a818ef1",
+  "scheduleSha256": "88bd5580cc00ca57796b6ba98cbe4e54b727e02924f773561e7b4a638abd097d",
+  "metricsStartedAt": "2026-09-05T12:24:14.338345Z",
+  "launcherStartedAt": "2026-09-05T12:25:21.146504Z",
+  "launcherCompleted": {
+    "runId": "api4g-673a2f7-20260905T1107Z",
+    "exitCode": 130,
+    "completedAt": "2026-09-05T12:47:36.556156+00:00"
+  },
+  "runnerSummary": {
+    "error": "operator_interrupted",
+    "loadExecuted": true,
+    "passed": false
+  },
+  "requests": {
+    "planned": 2100,
+    "mainPlanned": 1800,
+    "completedFullSchedule": false,
+    "scheduledSent": null,
+    "scheduledCompleted": null,
+    "mainSucceeded": null,
+    "missedStarts": null,
+    "lateDispatches": null,
+    "maxDispatchDelayMs": null,
+    "latencyStatisticsAvailable": false,
+    "reason": "실행기가 KeyboardInterrupt 종료 시 부분 통계를 저장하지 않음"
+  },
+  "nginxEvidence": {
+    "userAgent": "RunningGu-ApiLoad/1",
+    "firstAt": "2026-09-05T12:25:21Z",
+    "lastAt": "2026-09-05T12:47:36Z",
+    "scope": "login_preflight_scheduled_refresh_cleanup_logout_combined",
+    "total": 1365,
+    "statusCounts": {
+      "200": 1311,
+      "204": 54
+    },
+    "responseTimesLogged": false
+  },
+  "resources": {
+    "expectedSamples": 480,
+    "actualSamples": 289,
+    "minimumMemAvailablePercent": 27.383,
+    "maximumSwapGrowthKiB": 60,
+    "pswpinGrowth": 0,
+    "pswpoutGrowth": 16,
+    "swapActiveIntervals": 3,
+    "longestSwapActiveIntervalStreak": 1,
+    "kernelOomEvents": 0,
+    "oomKilledSamples": 0,
+    "systemdRestartGrowth": {
+      "backend": 0,
+      "graphhopper": 0
+    },
+    "containerRestartGrowth": {
+      "postgres": 0,
+      "graphhopper": 0
+    },
+    "collectionComplete": false
+  },
+  "fullGc": {
+    "normalBackendInvocationCompleted": 0,
+    "graphhopperCompleted": 2,
+    "graphhopperEvents": [
+      {
+        "at": "2026-09-05T12:38:35.705Z",
+        "gcId": 92,
+        "cause": "G1 Compaction Pause",
+        "pauseMs": 32.152,
+        "heapBeforeMiB": 2040,
+        "heapAfterMiB": 1059,
+        "heapCapacityMiB": 2048
+      },
+      {
+        "at": "2026-09-05T12:42:59.626Z",
+        "gcId": 114,
+        "cause": "G1 Compaction Pause",
+        "pauseMs": 36.316,
+        "heapBeforeMiB": 2025,
+        "heapAfterMiB": 1059,
+        "heapCapacityMiB": 2048
+      }
+    ],
+    "graphhopperEvacuationFailureLines": 28,
+    "rawMetricsBackendCount": 4,
+    "rawMetricsBackendCountIncludesOperatorRestart": true
+  },
+  "maintenance": [
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-05T12:34:14.338659Z",
+      "finishedAt": "2026-09-05T12:34:14.637908Z",
+      "invocationId": "f0d466fea6b74b569e9ac88b2c384bf8",
+      "passed": true
+    },
+    {
+      "kind": "backup",
+      "startedAt": "2026-09-05T12:40:54.338494Z",
+      "finishedAt": "2026-09-05T12:41:45.329052Z",
+      "invocationId": "0cf4fcc8d6514d0e86a02ca648723587",
+      "passed": true
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-05T12:44:14.338480Z",
+      "finishedAt": "2026-09-05T12:44:14.638460Z",
+      "invocationId": "873aa4fb78284653a39394e4c461ca1d",
+      "passed": true
+    }
+  ],
+  "guard": {
+    "disabledAt": "2026-09-05T12:48:31.313894Z",
+    "disabled": true,
+    "readiness": true,
+    "guardLines": 103,
+    "kakaoAttempts": 75,
+    "ktoAttempts": 28,
+    "unsafeEvents": 0,
+    "non2xxResults": 0,
+    "counterGaps": 0,
+    "overLimit": 0,
+    "invocationUnchangedBeforeOperatorRestart": true
+  },
+  "nic": {
+    "complete": false,
+    "counterGrowth": {
+      "outboundDiscarded": 0,
+      "outboundErrors": 0,
+      "receivedBytes": 274658406,
+      "receivedDiscarded": 0,
+      "receivedErrors": 0,
+      "sentBytes": 56807799
+    },
+    "counterResetIntervals": 0,
+    "expectedSamples": 480,
+    "firstAt": "2026-09-05T12:23:45.6804724Z",
+    "interfaceIndex": 15,
+    "lastAt": "2026-09-05T12:49:40.8565284Z",
+    "maximumIntervalSeconds": 5.069,
+    "maximumRxUtilizationPercent": 0.841426,
+    "maximumTxUtilizationPercent": 0.330654,
+    "minimumLinkSpeedBps": 433300000,
+    "notUpSamples": 0,
+    "observedSaturation": false,
+    "samples": 312
+  },
+  "httpsAfterAbort": {
+    "checks": [
+      {
+        "caseId": "contest_list",
+        "count": 20,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_detail",
+        "generationLocationPresent": true,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_closing",
+        "count": 4,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "contest_daily",
+        "count": 6,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "course_regions",
+        "count": 11,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "course_list",
+        "catalogCount": 261,
+        "count": 20,
+        "passed": true,
+        "status": 200
+      },
+      {
+        "caseId": "anonymous_me_denied",
+        "passed": true,
+        "status": 401
+      }
+    ],
+    "fullRequestSetFrozen": false,
+    "loadExecuted": false,
+    "passed": true,
+    "scope": "public_readiness_only",
+    "yearMonth": "2026-09"
+  },
+  "ssmCommands": {
+    "cleanBootAndFailedInstall": "9cebfa73-f562-464c-9a51-19404b4a050a",
+    "controllerInstall": "7c53c675-1a6e-4341-b408-053478a18ff7",
+    "guardActivation": "5f9d8e24-ef78-42ec-9ffd-ff7261a324a2",
+    "metricsStart": "a95e168e-e166-4585-b001-100c123607c8",
+    "fullGcDetected": "104cb183-b2a4-468e-8607-8da778963228",
+    "abortAndGuardOff": "1ec0d321-fecb-4eaf-a0a6-3f6ad34252fe",
+    "failureDiagnosis": "853bcdbe-9e9e-442e-aa60-322fee2d290f",
+    "normalWindowAudit": "d9978a74-296f-449d-866f-a612625c973f"
+  },
+  "remoteEvidenceDirectory": "/opt/runninggu-validation/api4g-673a2f7-20260905T1107Z",
+  "followingTests": {
+    "threeCompleteCyclesStarted": false,
+    "observation24hStarted": false
+  },
+  "finalCleanup": {
+    "at": "2026-09-05T13:00:17.457323Z",
+    "ssmCommandId": "966fd0a6-9c5f-4b3d-95a1-b65a0e29820a",
+    "passed": true,
+    "guardDisabled": true,
+    "remainingLoadOrCollectorProcesses": 0,
+    "temporaryBootObserverDisabled": true,
+    "servicesAndTimersActive": true
+  }
+}

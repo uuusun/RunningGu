@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "runId": "api4g-673a2f7-20260906T0729Z-v3",
+  "acceptancePolicy": "app-capacity-v3",
+  "status": "not_started_guard_preflight_failed",
+  "capacityVerdict": "deferred_external_path_timeout",
+  "capacityPassed": null,
+  "reason": "KTO_DURUNUBI_COURSE first call attempt TIMEOUT 2707ms; guard TRIP before application login/load gate; counter does not prove HTTP transmission",
+  "countsSource": "launcher cancelled while waiting for start-authorized.json; start gate and load output never created",
+  "counts": {
+    "planned": 2100,
+    "dispatched": 0,
+    "completed": 0,
+    "successful": 0,
+    "failed": 0,
+    "notExecuted": 2100,
+    "inFlight": 0
+  },
+  "phases": [
+    {
+      "phase": "warmup",
+      "planned": 300,
+      "dispatched": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "notExecuted": 300,
+      "inFlight": 0
+    },
+    {
+      "phase": "measurement",
+      "planned": 1800,
+      "dispatched": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "notExecuted": 1800,
+      "inFlight": 0
+    }
+  ],
+  "auxiliaryCounts": {
+    "planned": 0,
+    "dispatched": 0,
+    "completed": 0,
+    "successful": 0,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "publicReadinessProbes": {
+    "before": {
+      "checks": [
+        {
+          "caseId": "contest_list",
+          "count": 20,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_detail",
+          "generationLocationPresent": true,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_closing",
+          "count": 4,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_daily",
+          "count": 5,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "course_regions",
+          "count": 11,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "course_list",
+          "catalogCount": 261,
+          "count": 20,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "anonymous_me_denied",
+          "passed": true,
+          "status": 401
+        }
+      ],
+      "fullRequestSetFrozen": false,
+      "loadExecuted": false,
+      "passed": true,
+      "scope": "public_readiness_only",
+      "yearMonth": "2026-09"
+    },
+    "after": {
+      "checks": [
+        {
+          "caseId": "contest_list",
+          "count": 20,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_detail",
+          "generationLocationPresent": true,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_closing",
+          "count": 4,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "contest_daily",
+          "count": 5,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "course_regions",
+          "count": 11,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "course_list",
+          "catalogCount": 261,
+          "count": 20,
+          "passed": true,
+          "status": 200
+        },
+        {
+          "caseId": "anonymous_me_denied",
+          "passed": true,
+          "status": 401
+        }
+      ],
+      "fullRequestSetFrozen": false,
+      "loadExecuted": false,
+      "passed": true,
+      "scope": "public_readiness_only",
+      "yearMonth": "2026-09"
+    },
+    "requests": 14,
+    "outsidePlannedLoad": true
+  },
+  "requestSetSha256": "6811484a70d406e555c9bdce8273744ef5be597795a73186c9ed9ea42a818ef1",
+  "scheduleSha256": "88bd5580cc00ca57796b6ba98cbe4e54b727e02924f773561e7b4a638abd097d",
+  "missedStarts": null,
+  "lateDispatches": null,
+  "maxDispatchDelayMs": null,
+  "apiGroups": [],
+  "requestErrors": {
+    "unexpectedHttp": 0,
+    "timeout": 0,
+    "contentValidation": 0,
+    "scope": "no scheduled application request dispatched"
+  },
+  "serverCollection": {
+    "started": false,
+    "expectedSamples": 480,
+    "observedSamples": 0,
+    "durationSeconds": null,
+    "gcSwapRequestCorrelation": null
+  },
+  "maintenanceDuringLoad": {
+    "fullBackup": {
+      "planned": 1,
+      "executed": 0
+    },
+    "walCheck": {
+      "planned": 3,
+      "executed": 0
+    }
+  },
+  "gcObservationWindows": [
+    {
+      "window": "guard_activation_before_readiness",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcCount": 18,
+      "pauseTotalMs": 325.999,
+      "fullGcCount": 3,
+      "fullPauseTotalMs": 143.685,
+      "fullGcEvents": [
+        {
+          "at": "2026-09-06T07:47:32.954661+00:00",
+          "service": "backend",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "gcId": 3,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 25.236,
+          "heapMiB": [
+            31,
+            10,
+            247
+          ]
+        },
+        {
+          "at": "2026-09-06T07:47:34.908331+00:00",
+          "service": "backend",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "gcId": 6,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 66.93,
+          "heapMiB": [
+            72,
+            18,
+            247
+          ]
+        },
+        {
+          "at": "2026-09-06T07:47:37.077117+00:00",
+          "service": "backend",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "gcId": 10,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 51.519,
+          "heapMiB": [
+            39,
+            25,
+            247
+          ]
+        }
+      ],
+      "maxPauseMs": 66.93
+    },
+    {
+      "window": "planned_guard_cleanup",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcCount": 19,
+      "pauseTotalMs": 414.487,
+      "fullGcCount": 4,
+      "fullPauseTotalMs": 240.542,
+      "fullGcEvents": [
+        {
+          "at": "2026-09-06T07:49:46.404962+00:00",
+          "service": "backend",
+          "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+          "gcId": 3,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 25.488,
+          "heapMiB": [
+            29,
+            10,
+            247
+          ]
+        },
+        {
+          "at": "2026-09-06T07:49:48.217540+00:00",
+          "service": "backend",
+          "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+          "gcId": 6,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 50.302,
+          "heapMiB": [
+            74,
+            18,
+            247
+          ]
+        },
+        {
+          "at": "2026-09-06T07:49:50.249115+00:00",
+          "service": "backend",
+          "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+          "gcId": 10,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 60.041,
+          "heapMiB": [
+            38,
+            25,
+            247
+          ]
+        },
+        {
+          "at": "2026-09-06T07:49:54.409241+00:00",
+          "service": "backend",
+          "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+          "gcId": 18,
+          "kind": "Pause Full (Metadata GC Threshold)",
+          "full": true,
+          "pauseMs": 104.711,
+          "heapMiB": [
+            102,
+            45,
+            247
+          ]
+        }
+      ],
+      "maxPauseMs": 104.711
+    }
+  ],
+  "normalLoadGcWindow": null,
+  "nicPreparationOnly": {
+    "complete": false,
+    "counterGrowth": {
+      "outboundDiscarded": 0,
+      "outboundErrors": 0,
+      "receivedBytes": 8928267,
+      "receivedDiscarded": 0,
+      "receivedErrors": 0,
+      "sentBytes": 4087309
+    },
+    "counterResetIntervals": 0,
+    "expectedSamples": 480,
+    "firstAt": "2026-09-06T07:47:48.9153564Z",
+    "interfaceIndex": 15,
+    "lastAt": "2026-09-06T07:50:23.9445073Z",
+    "maximumIntervalSeconds": 5.069,
+    "maximumRxUtilizationPercent": 1.285587,
+    "maximumTxUtilizationPercent": 0.40895,
+    "minimumLinkSpeedBps": 229000000,
+    "notUpSamples": 0,
+    "observedSaturation": false,
+    "samples": 32
+  },
+  "credentials": {
+    "loginRequests": 0,
+    "logoutRequests": 0,
+    "cleanupRequests": 0,
+    "reason": "no login or data writes before cancelled gate",
+    "inputsDiscarded": true,
+    "discardedAt": "2026-09-06T07:50:28.351916+00:00",
+    "launcherOriginalError": "control_gate_timeout"
+  },
+  "runtimeAuditFile": "api-load-ec2-4g-20260906-v3-runtime.json",
+  "runtimeAuditSha256": "3a0039f8cbbb3e2b3911728812bd85b9a5d3477ddcf4e3bd277152806e3f9371",
+  "installedToolPackageSha256": "76db83174c27a8d0d284b1a3f18cf1f0151739833cedf32869b445d7452fc4e4",
+  "postRunLocalImprovements": [
+    "startup guard trip polling before course sync completion",
+    "pre-start cancelled summary and cancellation reason",
+    "schedule digest also verified at direct execute entry"
+  ],
+  "fixedServerConfigurationPreserved": true,
+  "finalGuardOff": true,
+  "readiness": true,
+  "timers": {
+    "runninggu-load-guard-expiry.timer": "inactive",
+    "runninggu-postgres-backup.timer": "active",
+    "runninggu-postgres-wal-archive-check.timer": "active",
+    "certbot.timer": "active"
+  },
+  "finalCheck": {
+    "at": "2026-09-06T08:04:55.552592+00:00",
+    "runId": "api4g-673a2f7-20260906T0729Z-v3",
+    "sourceSsmCommandId": "de9d6ea9-fa3e-4289-9957-0e6e45469983",
+    "graphhopperGcEventsBothStreams": [],
+    "graphhopperJvmOomLines": 0,
+    "memoryPoint": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1149484,
+      "SwapTotal": 4194300,
+      "SwapFree": 4194248
+    },
+    "swapCountersPoint": {
+      "pswpin": 0,
+      "pswpout": 16
+    },
+    "swappiness": 10,
+    "guardFileOff": true,
+    "guardProcessOff": true,
+    "readiness": true,
+    "nginx": "active",
+    "graphhopperInvocationId": "09d01169c51f44749b0e353f1c2d8f7a",
+    "metricsUnit": "inactive",
+    "expiryTimer": "inactive"
+  },
+  "followupDiagnosis": {
+    "reportFile": "kto-tls-diagnosis-20260906.md",
+    "serverEvidenceFile": "kto-tls-diagnosis-20260906-server.json",
+    "serverEvidenceSha256": "91d651f1589db64ab260324db9a8f205067967539bb3ed533a3263b1268c79d1",
+    "pcEvidenceFile": "kto-tls-diagnosis-20260906-pc.json",
+    "observedFailurePhase": "TLS handshake",
+    "originalFailurePhaseProven": false,
+    "httpRequestsDuringDiagnosis": 0,
+    "originalGuardCountMeaning": "reserved call attempts before network execution, not confirmed HTTP transmission",
+    "sameConfigurationSyncSuccessAt": "2026-09-06T07:49:54.688777+00:00",
+    "sameConfigurationSyncSuccessDurationMs": 832
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "runId": "api4g-673a2f7-20260906T2345Z-v4nokto",
+  "acceptancePolicy": "app-capacity-v4-no-kto",
+  "startedAt": "2026-09-06T23:52:35.189753+00:00",
+  "finishedAt": "2026-09-06T23:56:04.086277+00:00",
+  "status": "needs_attention",
+  "error": "authentication_failed",
+  "counts": {
+    "planned": 1855,
+    "dispatched": 0,
+    "completed": 0,
+    "successful": 0,
+    "failed": 0,
+    "notExecuted": 1855,
+    "inFlight": 0
+  },
+  "auxiliaryCounts": {
+    "planned": 1,
+    "dispatched": 1,
+    "completed": 1,
+    "successful": 0,
+    "failed": 1,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "auxiliaryRequests": [
+    {
+      "requestId": "api4g-673a2f7-20260906T2345Z-v4nokto-aux-0001",
+      "phase": "login",
+      "caseId": "auth_login",
+      "group": "maintenance",
+      "account": null,
+      "dispatchedAt": "2026-09-06T23:52:35.242707+00:00",
+      "completedAt": "2026-09-06T23:52:35.587146+00:00",
+      "state": "completed",
+      "status": 401,
+      "durationMs": 343.452,
+      "success": false,
+      "error": "unexpected_http",
+      "responseBytes": 269,
+      "expectedStatus": 200
+    }
+  ],
+  "requestSetSha256": "6811484a70d406e555c9bdce8273744ef5be597795a73186c9ed9ea42a818ef1",
+  "scheduleSha256": "b77612c1a5c918ceb12cf1d51ca359447be6b00ea47dc9b9cfc402803608c767",
+  "referenceScheduleSha256": "88bd5580cc00ca57796b6ba98cbe4e54b727e02924f773561e7b4a638abd097d",
+  "excludedRequestCount": 245,
+  "fullAppLoadPassed": false,
+  "sourceSha256": "91b319f1a18ad714cd284eae018dbd6dd21a2b3cc37dd39f9314ff8cc8eb5d49"
+}

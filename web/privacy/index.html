@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보처리방침 · 런닝구</title>
+<meta name="description" content="런닝구(區) 개인정보처리방침">
+<meta name="robots" content="noindex">
+<!-- ↑ 게시 확정 전까지 noindex. 공개할 때 이 줄을 지운다. -->
+<style>
+  :root{
+    --blue:#2B5CFF; --blue-ink:#1E40D8; --blue-soft:#EEF2FF;
+    --ink:#15161B; --ink2:#54565E; --ink3:#71747C;
+    --surface:#FFFFFF; --page:#EDECE8; --fill:#F7F7F5;
+    --line:#E4E4E6; --line2:#ECECEE;
+    --todo-bg:#FFF3CC; --todo-fg:#8A5A00; --todo-line:#E8C86A;
+    --font-body:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:var(--font-body); font-size:16px; line-height:1.75;
+    word-break:keep-all; overflow-wrap:anywhere;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:0 20px 96px}
+
+  /* ── 게시 전 안내 ─────────────────────────────────────────
+     배포 확정 시 이 <aside> 통째로 삭제. head 의 noindex 도 함께 지운다. */
+  .draft{
+    background:#2A2C33; color:#F4F5F7; border-radius:14px;
+    padding:18px 20px; margin:24px 0 0; font-size:14.5px; line-height:1.65;
+  }
+  .draft b{color:#FFD98A}
+  .draft ul{margin:10px 0 0; padding-left:18px}
+  .draft li{margin:4px 0}
+  /* ──────────────────────────────────────────────────────── */
+
+  header.doc{padding:44px 0 28px; border-bottom:1px solid var(--line)}
+  .brand{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:14px; font-weight:700; color:var(--blue);
+    letter-spacing:-.01em; margin-bottom:14px;
+  }
+  .brand::before{
+    content:""; width:9px; height:9px; border-radius:50%;
+    background:var(--blue); display:block;
+  }
+  h1{font-size:30px; line-height:1.3; margin:0 0 14px; letter-spacing:-.02em}
+  .meta{color:var(--ink3); font-size:14px; margin:0}
+  .meta span{white-space:nowrap}
+  .meta .sep{margin:0 8px; color:var(--line)}
+
+  nav.toc{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:16px; padding:20px 22px; margin:28px 0 0;
+  }
+  nav.toc h2{font-size:13px; color:var(--ink3); margin:0 0 12px; font-weight:700; letter-spacing:.02em}
+  nav.toc ol{margin:0; padding-left:20px; columns:2; column-gap:28px}
+  @media (max-width:560px){ nav.toc ol{columns:1} }
+  nav.toc li{margin:5px 0; break-inside:avoid}
+  nav.toc a{color:var(--ink2); text-decoration:none; font-size:14.5px}
+  nav.toc a:hover{color:var(--blue); text-decoration:underline}
+
+  section{padding-top:40px}
+  h2.sec{
+    font-size:20px; margin:0 0 16px; letter-spacing:-.015em;
+    padding-bottom:10px; border-bottom:2px solid var(--ink);
+  }
+  h3{font-size:16.5px; margin:26px 0 10px; letter-spacing:-.01em}
+  h4{font-size:15px; margin:20px 0 8px; letter-spacing:-.01em; color:var(--ink2)}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0; padding-left:22px}
+  li{margin:6px 0}
+  strong{font-weight:700}
+
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:16px 18px; margin:16px 0;
+  }
+  .card.quiet{background:var(--fill); border-color:var(--line2)}
+  .card p:first-child{margin-top:0}
+  .card p:last-child{margin-bottom:0}
+
+  .tablewrap{overflow-x:auto; margin:16px 0; border:1px solid var(--line); border-radius:14px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; min-width:460px; font-size:14.5px}
+  th,td{text-align:left; padding:12px 14px; border-bottom:1px solid var(--line2); vertical-align:top}
+  thead th{background:var(--fill); font-size:13px; color:var(--ink2); white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td:first-child{white-space:nowrap}
+  @media (max-width:560px){ td:first-child{white-space:normal} }
+
+  .todo{
+    display:inline; background:var(--todo-bg); color:var(--todo-fg);
+    border-bottom:1.5px dashed var(--todo-line); border-radius:3px;
+    padding:1px 5px; font-size:.94em; font-weight:600;
+  }
+
+  a{color:var(--blue-ink)}
+  footer.doc{
+    margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
+    color:var(--ink3); font-size:13.5px;
+  }
+  .backlink{display:inline-block; margin-top:8px}
+
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ink:#F2F3F5; --ink2:#B9BCC4; --ink3:#8E9199;
+      --surface:#1A1C22; --page:#111319; --fill:#22242B;
+      --line:#2E313A; --line2:#282B33;
+      --blue:#7D9BFF; --blue-ink:#9DB2FF;
+      --todo-bg:#3A3018; --todo-fg:#F2CE7A; --todo-line:#7A6428;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ═══ 게시 전 안내 · 공개 배포 시 이 블록을 삭제한다 ═══════════════ -->
+<aside class="draft">
+  <b>게시 전 초안입니다.</b> 저장소 <code>docs/agreements/v1.2/privacy.md</code> 를 바탕으로
+  개인정보 보호법 제30조의 처리방침 형식에 맞춰 옮긴 것입니다. 아직 법률 검토를 받지 않았고,
+  아래 두 가지가 정해지기 전에는 공개하지 않습니다.
+  <ul>
+    <li>노란색으로 표시한 <span class="todo">[확인 필요]</span> 값 — Google 이전 국가 표기(#230) ·
+        버전 · 시행일 · 변경 고지 기간</li>
+    <li>최종 공개 문안 확정 — 유선경</li>
+  </ul>
+  게시할 때는 이 안내 블록과 <code>&lt;head&gt;</code> 의 <code>noindex</code> 를 함께 지웁니다.
+</aside>
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<header class="doc">
+  <div class="brand">런닝구</div>
+  <h1>개인정보처리방침</h1>
+  <p class="meta">
+    <span>버전 <span class="todo">[확인 필요]</span></span>
+    <span class="sep">·</span>
+    <span>시행일 <span class="todo">[확인 필요] YYYY-MM-DD</span></span>
+  </p>
+</header>
+
+<nav class="toc">
+  <h2>목차</h2>
+  <ol>
+    <li><a href="#s1">개인정보의 처리 목적</a></li>
+    <li><a href="#s2">처리하는 개인정보의 항목</a></li>
+    <li><a href="#s3">개인정보의 처리 및 보유 기간</a></li>
+    <li><a href="#s4">개인정보의 제3자 제공</a></li>
+    <li><a href="#s5">개인정보 처리의 위탁</a></li>
+    <li><a href="#s6">개인정보의 국외 이전</a></li>
+    <li><a href="#s7">개인정보의 파기 절차 및 방법</a></li>
+    <li><a href="#s8">정보주체의 권리와 행사 방법</a></li>
+    <li><a href="#s9">개인정보의 안전성 확보 조치</a></li>
+    <li><a href="#s10">자동 수집 장치의 설치·운영 및 거부</a></li>
+    <li><a href="#s11">개인정보 보호책임자</a></li>
+    <li><a href="#s12">권익침해 구제방법</a></li>
+    <li><a href="#s13">처리방침의 변경</a></li>
+  </ol>
+</nav>
+
+<section>
+  <p>
+    <strong>루트메이트</strong>(이하 “운영팀”)는 런닝구(區)
+    서비스(이하 “서비스”)를 운영하면서 이용자의 개인정보를 소중히 다루며,
+    「개인정보 보호법」 등 관계 법령을 준수합니다. 운영팀이 어떤 개인정보를 어떤 목적으로
+    처리하는지, 얼마나 보관하고 어떻게 파기하는지를 아래와 같이 알려드립니다.
+  </p>
+  <div class="card quiet">
+    <p>
+      <strong>서비스는 기기의 위치를 수집하지 않습니다.</strong> 앱은 위치 권한을 요청하지 않으며,
+      GPS·Wi-Fi·이동통신 기지국·블루투스·IP 주소 등 어떤 방법으로도 이용자가 지금 어디에 있는지를
+      자동으로 알아내지 않습니다. 러닝코스와 여행 동선은 <strong>이용자가 직접 검색하거나 눌러서 고른
+      장소</strong>의 좌표만으로 찾습니다. 자세한 내용은 <a href="#s2">2. 처리하는 개인정보의 항목</a>에
+      적었습니다.
+    </p>
+  </div>
+</section>
+
+<section id="s1">
+  <h2 class="sec">1. 개인정보의 처리 목적</h2>
+  <p>운영팀은 아래 목적으로만 개인정보를 처리하며, 목적이 바뀌면 미리 알리고 동의를 받습니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>목적</th><th>처리하는 항목</th></tr></thead>
+      <tbody>
+        <tr><td>회원 식별과 로그인</td><td>이메일 주소 또는 카카오 회원번호, 비밀번호 해시</td></tr>
+        <tr><td>가입 가능 연령 확인</td><td>만 14세 이상 확인값, 이용약관 동의 버전·시각</td></tr>
+        <tr><td>본인 확인, 비밀번호 재설정</td><td>이메일 주소, 인증 코드</td></tr>
+        <tr><td>개인정보 문의 접수·답변</td><td>발신 이메일 주소, 이용자가 직접 적은 이름·닉네임, 문의 내용·첨부파일</td></tr>
+        <tr><td>찜·여행 동선·러닝코스를 다른 기기에서도 보기</td><td>이용자가 저장한 내용 전부</td></tr>
+        <tr><td>주변 러닝코스·장소 추천</td><td>이용자가 고른 장소의 좌표 (회원 정보와 연결하지 않으며 5분 뒤 만료)</td></tr>
+        <tr><td>저장한 코스·동선을 다시 보기</td><td>저장한 코스의 출발 지점·경로 좌표, 저장한 동선의 장소·숙소 좌표</td></tr>
+        <tr><td>부정 이용 방지</td><td>접속 기록, 인증 시도 횟수, IP 주소(로그인·중복 확인 횟수 계산)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>법령에서 요구하는 경우를 제외하고, 위에 적지 않은 목적으로는 개인정보를 이용하지 않습니다.</strong></p>
+</section>
+
+<section id="s2">
+  <h2 class="sec">2. 처리하는 개인정보의 항목</h2>
+
+  <h3>가입할 때</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>가입 방식</th><th>항목</th></tr></thead>
+      <tbody>
+        <tr><td>이메일</td><td>이메일 주소, 비밀번호, 닉네임</td></tr>
+        <tr><td>카카오</td><td>카카오 회원번호, 닉네임, 이메일 주소(카카오가 제공한 경우에만)</td></tr>
+        <tr><td>공통</td><td>만 14세 이상 확인값</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    카카오 로그인은 카카오가 제공하는 정보 중 <strong>회원번호·닉네임·이메일만</strong> 받습니다.
+    카카오가 이메일을 제공하지 않아도 가입할 수 있습니다.
+  </p>
+  <p>
+    만 14세 이상 확인은 가입 화면의 별도 필수 항목입니다. 약관 전체 동의로 자동 선택되지 않으며,
+    확인하지 않으면 가입할 수 없습니다. 이 확인값은 가입 요청을 검증할 때만 사용하고
+    <strong>생년월일이나 실제 나이는 수집하지 않습니다.</strong> 별도의 연령 값을 저장하지 않으며,
+    가입이 완료되면 동의한 이용약관의 버전과 시각만 기록합니다.
+  </p>
+  <div class="card quiet">
+    <p>
+      <strong>비밀번호는 원문으로 보관하지 않습니다.</strong> 되돌릴 수 없는 값(BCrypt 해시)으로 바꿔
+      저장하며, 운영팀도 원래 비밀번호를 알 수 없습니다.
+    </p>
+  </div>
+
+  <h3>서비스를 이용하면서 생기는 것</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>항목</th><th>생기는 때</th></tr></thead>
+      <tbody>
+        <tr><td>찜한 대회</td><td>대회를 찜할 때</td></tr>
+        <tr><td>저장한 여행 동선 (일정·장소·지역, <strong>장소와 숙소의 좌표</strong>)</td><td>동선을 저장할 때</td></tr>
+        <tr><td>저장한 러닝코스 (경로 좌표·출발 지점 좌표·거리·상승고도)</td><td>코스를 저장할 때</td></tr>
+        <tr><td>약관 동의 이력 (동의 항목·버전·시각)</td><td>가입할 때, 동의를 바꿀 때</td></tr>
+        <tr><td>이메일 인증 기록 (인증 코드 해시·시각·시도 횟수)</td><td>인증 메일을 받을 때</td></tr>
+        <tr><td>접속 기록 (마지막 로그인 시각)</td><td>로그인할 때</td></tr>
+        <tr><td>IP 주소</td><td>로그인할 때, 가입 화면에서 중복 확인을 할 때, 그리고 <strong>서버에 요청을 보낼 때마다</strong>(접속 기록)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>IP 주소 — 두 가지가 서로 다릅니다</h3>
+  <p>IP 주소가 남는 자리가 <strong>둘</strong>이고 성격이 다릅니다. 나눠서 설명합니다.</p>
+
+  <h4>① 요청 횟수를 세는 데 쓰는 IP — 서버 메모리에만</h4>
+  <p><strong>두 자리에서</strong> 접속한 IP 주소를 <strong>요청 횟수를 세는 데만</strong> 사용합니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>언제</th><th>무엇을 막기 위해</th><th>한도</th></tr></thead>
+      <tbody>
+        <tr><td>로그인할 때</td><td>다른 사람의 비밀번호를 반복해서 시도하는 것</td><td>1분에 30회</td></tr>
+        <tr><td>가입 화면에서 중복 확인을 누를 때</td><td>가입된 이메일·닉네임을 알아내려는 시도</td><td>1분에 30회</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>데이터베이스에 저장하지 않습니다.</strong> 서버 메모리에만 둡니다.</li>
+    <li><strong>마지막 사용 후 2분이 지나면 만료</strong>되어 더는 사용되지 않으며, 이후 메모리 정리 시점에 제거됩니다.</li>
+    <li>요청 횟수 외의 용도로 사용하지 않고, 회원 정보와 연결해 보관하지도 않습니다.</li>
+    <li><strong>IP 주소로 지역을 알아내지 않습니다.</strong> 지역·좌표로 변환하는 조회를 사용하지 않으며 추천·검색·개인화에도 쓰지 않습니다.</li>
+    <li>확인하려는 이메일·닉네임 자체는 되돌릴 수 없는 값(SHA-256)으로 바꿔 계산합니다.</li>
+    <li>로그인은 IP 와 별개로 이메일 주소로도 횟수를 셉니다(1분에 5회). 이 값 역시 서버 메모리에만 두고 저장하지 않습니다.</li>
+  </ul>
+
+  <h4>② 서버 접속 기록 — 파일로 남습니다</h4>
+  <p>
+    서버 앞단(리버스 프록시)이 <strong>모든 요청의 접속 기록을 서버의 로그 파일에 남깁니다.</strong>
+    장애를 확인하고 공격을 파악하기 위한 일반적인 서버 운영 기록입니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>남는 것</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td>접속한 IP 주소</td><td></td></tr>
+        <tr><td>접속 시각</td><td></td></tr>
+        <tr><td>요청 방식과 경로</td><td><code>GET /api/courses</code></td></tr>
+        <tr><td>응답 상태 코드·응답 크기</td><td><code>200</code></td></tr>
+        <tr><td>접속 프로그램 정보(User-Agent)</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>①과 달리 파일에 기록되며, 메모리에서 2분에 사라지는 값이 아닙니다.</strong></p>
+  <ul>
+    <li><strong>지금까지 확인한 것은 암호화된 연결(HTTPS)의 접속 기록 하나입니다.</strong> 거기에는 주소 뒤에 붙는 질의 문자열(<code>?</code> 뒤)이 남지 않고 경로만 남습니다.</li>
+    <li><strong>오류가 났을 때의 기록과, 암호화되지 않은 주소로 들어온 요청의 기록은 아직 확인하지 못했습니다.</strong> 그쪽에는 요청 주소가 통째로 적힐 수 있고, 그 경우 질의 문자열이 함께 남습니다. <span class="todo">[확인 필요]</span> 공개 전에 실제 서버에서 적용된 설정을 확인합니다.</li>
+    <li>로그인 정보·토큰·인증 코드·요청 본문은 남기지 않습니다.</li>
+    <li>회원 정보와 연결해 보관하지 않으며, 추천·검색·개인화에 쓰지 않습니다.</li>
+  </ul>
+
+  <h3>위치 정보 — 기기 위치를 수집하지 않습니다</h3>
+  <p>
+    앱은 <strong>위치 권한을 요청하지 않습니다.</strong> 지금 어디에 있는지를 자동으로 알아내지 않고,
+    이동한 경로를 기록하지도 않습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>사용하지 않는 것</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>GPS·기기 위치</td><td>위치 권한을 선언하지도, 요청하지도 않습니다</td></tr>
+        <tr><td>Wi-Fi 정보</td><td>주변 공유기 이름·주소(SSID/BSSID)나 검색 결과를 읽지 않습니다</td></tr>
+        <tr><td>이동통신 기지국</td><td>어느 기지국에 연결돼 있는지(Cell-ID)를 읽지 않습니다</td></tr>
+        <tr><td>블루투스(BLE)</td><td>주변 기기로 위치를 추정하지 않습니다</td></tr>
+        <tr><td>IP 주소로 지역 알아내기</td><td>IP 주소를 지역·좌표로 변환하지 않습니다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    <strong>동·구 단위의 대략적인 위치도 알아내지 않습니다.</strong> 정밀한 위치만 사용하지 않는 것이 아닙니다.
+  </p>
+  <p>러닝코스는 <strong>이용자가 직접 고른 장소</strong>를 기준으로 찾습니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>좌표의 출처</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td>검색한 장소</td><td>“여의도공원”을 검색해 고른 곳</td></tr>
+        <tr><td>추천 지역 버튼</td><td>부산 해운대·여수·강릉·인천 강화</td></tr>
+        <tr><td>여행 동선의 숙소</td><td>동선에서 고른 숙소 위치</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>셋 모두 이용자가 눌러서 고른 곳이며, 그 순간 기기가 어디에 있는지와는 무관합니다.</strong></p>
+
+  <h3>좌표가 쓰이는 두 자리</h3>
+  <p>좌표는 쓰이는 자리가 둘이고, 남는 기간이 서로 다릅니다.</p>
+  <p><strong>① 주변을 찾을 때 쓰는 좌표 — 회원 정보와 연결하지 않고, 5분 뒤 사라집니다.</strong></p>
+  <ul>
+    <li><strong>회원 데이터로 저장하지 않습니다.</strong> 서버의 데이터베이스·파일에 남기지 않고, 서비스 기록에도 남기지 않습니다.</li>
+    <li>다만 <strong>서버 메모리에 5분간 둡니다.</strong> 같은 자리를 다시 찾을 때 외부 서비스에 같은 질문을 반복하지 않기 위한 것으로, 5분이 지나면 더는 사용되지 않으며 이후 메모리 정리 시점에 지워집니다.</li>
+    <li><strong>누가 요청했는지는 함께 두지 않습니다.</strong> 회원번호·이메일·로그인 토큰을 이 값과 묶지 않으므로, 남아 있는 동안에도 어떤 이용자가 찾은 곳인지 알 수 없습니다.</li>
+  </ul>
+  <p><strong>② 직접 저장한 것의 좌표 — 회원 정보로 보관합니다.</strong></p>
+  <p>
+    <strong>이용자가 [저장]을 누른 경우에만</strong> 좌표가 회원 데이터로 남습니다.
+    <strong>저장하는 것이 두 가지</strong>라 남는 좌표도 두 가지입니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>저장한 것</th><th>남는 좌표</th></tr></thead>
+      <tbody>
+        <tr><td>러닝코스</td><td>출발 지점 좌표, 경로 좌표</td></tr>
+        <tr><td>여행 동선</td><td>동선에 담긴 장소 블록의 좌표, 고른 숙소의 좌표</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    여행 동선은 일정·장소 이름만이 아니라 <strong>그 장소들이 어디인지도 함께</strong> 저장합니다.
+    저장한 동선을 다시 불러와 <strong>지도에 그리기 위한 것</strong>입니다.
+  </p>
+  <ul>
+    <li>저장한 코스나 동선을 삭제하면 함께 삭제됩니다.</li>
+    <li>회원 탈퇴 시 삭제됩니다.</li>
+  </ul>
+  <p>
+    즉 ①은 찾는 동안에만 사용되고 ②만 남습니다.
+    <strong>[저장]을 누르지 않으면 좌표는 회원 정보로 보관되지 않습니다.</strong>
+  </p>
+
+  <div class="card quiet">
+    <p>
+      <strong>자동으로 수집하지 않는 것</strong> — 광고 식별자, 연락처, 사진, 통화 기록,
+      기기에 설치된 앱 목록은 수집하지 않습니다.
+    </p>
+  </div>
+</section>
+
+<section id="s3">
+  <h2 class="sec">3. 개인정보의 처리 및 보유 기간</h2>
+  <p>
+    <strong>회원 탈퇴 시 운영 데이터베이스에서 지체 없이 파기합니다.</strong> 계정과 함께 찜·여행 동선·
+    러닝코스·동의 이력이 모두 삭제되며, 기기에 남아 있던 사본도 지웁니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>항목</th><th>보유 기간</th></tr></thead>
+      <tbody>
+        <tr><td>회원 정보와 저장한 내용</td><td>탈퇴 시 삭제</td></tr>
+        <tr><td>만 14세 이상 확인값</td><td>가입 요청을 검증할 때만 사용하고 별도로 저장하지 않음. 가입 완료 뒤에는 이용약관 동의 버전·시각만 보관</td></tr>
+        <tr><td>저장한 코스의 출발 지점·경로 좌표</td><td>해당 코스를 삭제할 때 또는 탈퇴 시 삭제</td></tr>
+        <tr><td>저장한 동선의 장소·숙소 좌표</td><td>해당 동선을 삭제할 때 또는 탈퇴 시 삭제</td></tr>
+        <tr><td>주변을 찾을 때 보낸 좌표(이용자가 고른 장소)</td><td>회원 데이터로 저장하지 않음. 서버 메모리에서 5분에 만료되며 이후 메모리 정리 시 제거</td></tr>
+        <tr><td>로그인 유지 토큰 해시</td><td>발급 후 14일. 폐기된 토큰도 재사용 탐지를 위해 원래 만료 시각까지 보관한 뒤 정리. 탈퇴 시 즉시 삭제</td></tr>
+        <tr><td>이메일 인증 기록</td><td>가입·비밀번호 재설정 성공 시 즉시 삭제. 그 밖의 기록은 각 만료 시각을 기준으로 정기 정리하며 최대 24시간 안에 삭제. 탈퇴 대상 이메일의 기록은 즉시 삭제</td></tr>
+        <tr><td>IP 주소 (로그인·중복 확인 횟수 계산)</td><td>마지막 사용 후 2분에 만료되며 이후 캐시 정리 시 제거</td></tr>
+        <tr><td><strong>서버 접속 기록</strong> (IP·시각·요청 경로·상태·User-Agent)</td><td><span class="todo">[확인 필요]</span> 로그 정리 주기를 정한 뒤 이 칸에 적습니다</td></tr>
+        <tr><td>개인정보 문의 기록</td><td>문의 처리 완료일(최종 답변일)부터 1년. 이후 받은편지함·보낸편지함·휴지통과 별도 사본에서 삭제</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    문의 내용에 주민등록번호나 신분증처럼 처리에 필요하지 않은 민감한 정보가 포함되면 확인 즉시
+    삭제합니다. 법령상 보존 의무가 있거나 진행 중인 분쟁으로 더 보관해야 하는 경우에는 그 목적에
+    필요한 최소 항목만 다른 문의 기록과 분리해 해당 기간 동안 보관합니다.
+  </p>
+
+  <h3>유효시간과 보유 기간은 다릅니다</h3>
+  <p>아래는 <strong>그 값을 언제까지 사용할 수 있는지</strong>(유효시간)이며, 기록이 언제 삭제되는지(보유 기간)와 다릅니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>값</th><th>유효시간</th></tr></thead>
+      <tbody>
+        <tr><td>이메일 인증 코드</td><td>발송 후 10분</td></tr>
+        <tr><td>인증 성공 뒤 가입 자격</td><td>인증 성공 후 30분</td></tr>
+        <tr><td>비밀번호 재설정 토큰</td><td>발급 후 30분</td></tr>
+        <tr><td>접속 토큰</td><td>발급 후 최대 30분</td></tr>
+        <tr><td>로그인 유지 토큰</td><td>발급 후 14일. 로그아웃·비밀번호 재설정·탈퇴 시에는 그보다 먼저 무효화될 수 있음</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    유효 여부는 정리 작업의 실행 여부가 아니라 <strong>요청을 받은 시각과 각 만료 시각을 비교해</strong>
+    판단합니다. 만료된 기록이 정리 대기 중이더라도 인증이나 로그인을 허용하지 않습니다.
+  </p>
+</section>
+
+<section id="s4">
+  <h2 class="sec">4. 개인정보의 제3자 제공</h2>
+  <p>
+    <strong>운영팀은 이용자의 개인정보를 제3자에게 제공하지 않습니다.</strong> 회원 정보를 다른 곳에
+    넘기거나 판매하는 일은 없습니다.
+  </p>
+  <p>다만 <strong>주변 장소를 찾는 과정에서 좌표가 외부 서비스로 전달됩니다.</strong></p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>받는 곳</th><th>언제</th><th>전달되는 것</th></tr></thead>
+      <tbody>
+        <tr><td>카카오 (로컬 검색)</td><td>주변 장소·주소를 찾을 때</td><td>이용자가 고른 장소의 좌표 또는 검색어</td></tr>
+        <tr><td>한국관광공사</td><td>주변 관광지·축제를 찾을 때</td><td>이용자가 고른 장소의 좌표</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    <strong>여기서 전달되는 좌표는 기기의 위치가 아닙니다.</strong> 이용자가 검색하거나 눌러서 고른
+    지점이며, 앱은 기기 위치를 읽지 않습니다.
+  </p>
+  <p>
+    <strong>두 곳 모두에 회원번호·이메일·로그인 토큰을 보내지 않습니다.</strong> 요청하는 주체는 런닝구
+    서버이며, 외부 서비스는 누가 요청했는지 알 수 없습니다.
+  </p>
+  <p>
+    경로를 계산하는 부분은 런닝구 서버 안에서 처리되므로 좌표가 외부로 나가지 않습니다.
+    대회 목록처럼 위치와 무관하게 받아오는 정보에는 좌표를 보내지 않습니다.
+  </p>
+</section>
+
+<section id="s5">
+  <h2 class="sec">5. 개인정보 처리의 위탁</h2>
+  <p>운영팀은 서비스 제공을 위해 아래와 같이 개인정보 처리 업무를 위탁하고 있습니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>수탁자</th><th>위탁하는 업무</th><th>제공하는 항목</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>카카오</td>
+          <td>카카오 로그인</td>
+          <td>카카오가 발급한 토큰 (이용자를 특정할 정보를 새로 보내지 않음)</td>
+        </tr>
+        <tr>
+          <td>Amazon Web Services Korea LLC</td>
+          <td>서버·데이터베이스 호스팅, 인증·재설정 메일 발송</td>
+          <td>서비스에 저장된 개인정보, 이메일 주소, 인증 코드·재설정 링크</td>
+        </tr>
+        <tr>
+          <td>Google LLC</td>
+          <td>개인정보 문의 수신·보관·답변, 스팸·보안 처리</td>
+          <td>발신 이메일 주소, 이용자가 직접 적은 이름·닉네임, 문의 내용·첨부파일</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    인증·재설정 메일은 <code>no-reply@runninggu.store</code> 에서 <strong>가입 인증과 비밀번호 재설정 같은
+    거래성 메일만</strong> 발송합니다. 현재 서비스에서는 마케팅 메일을 보내지 않습니다.
+  </p>
+  <p>
+    운영팀은 위탁계약 시 개인정보가 안전하게 관리되도록 필요한 사항을 규정하고 있으며,
+    수탁자가 변경되면 이 처리방침을 통해 알려드립니다.
+  </p>
+</section>
+
+<section id="s6">
+  <h2 class="sec">6. 개인정보의 국외 이전</h2>
+  <p>
+    <code>runninggu.play@gmail.com</code> 으로 문의하시면 다음과 같이 국외 서버에서 처리될 수 있습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>구분</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td>이전받는 자</td><td>Google LLC (1600 Amphitheatre Parkway, Mountain View, CA 94043, USA) — <a href="https://policies.google.com/privacy?hl=ko" rel="noopener">개인정보처리방침</a></td></tr>
+        <tr><td>이전되는 항목</td><td>발신 이메일 주소, 이용자가 직접 적은 이름·닉네임, 문의 내용·첨부파일</td></tr>
+        <tr><td>이전 국가</td><td><span class="todo">[확인 필요 · #230]</span> 미국 및 Google 데이터센터가 위치한 국가</td></tr>
+        <tr><td>이전 시기·방법</td><td>이메일을 주고받는 때에 암호화된 네트워크로 전송</td></tr>
+        <tr><td>이용 목적</td><td>문의 수신·보관·답변과 스팸·보안 처리</td></tr>
+        <tr><td>보유·이용 기간</td><td>운영팀이 문의 처리 완료일부터 1년 뒤 삭제할 때까지. 삭제 후 활성·백업 시스템에 반영되기까지는 Google 정책에 따른 시간이 걸릴 수 있으며, 보안·법적 의무에 필요한 정보는 Google 정책에 따라 더 보관될 수 있습니다</td></tr>
+        <tr><td>거부 방법·효과</td><td>이메일을 보내지 않는 방법으로 국외 처리를 거부할 수 있습니다. 앱의 정보 조회·수정·탈퇴 기능은 계속 이용할 수 있으나 이메일 문의와 답변은 이용할 수 없습니다</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s7">
+  <h2 class="sec">7. 개인정보의 파기 절차 및 방법</h2>
+  <p>
+    운영팀은 개인정보의 보유 기간이 지나거나 처리 목적이 달성되면 지체 없이 해당 개인정보를 파기합니다.
+  </p>
+  <h3>파기 절차</h3>
+  <ul>
+    <li>회원 탈퇴 요청을 받으면 본인 확인 후 운영 데이터베이스에서 계정과 관련 데이터를 즉시 삭제합니다.</li>
+    <li>보유 기간이 정해진 기록(인증 기록, 로그인 유지 토큰 등)은 만료 시각을 기준으로 정기 정리 작업이 삭제합니다.</li>
+    <li>법령에 따라 보존해야 하는 정보는 다른 개인정보와 분리해 보관한 뒤, 보존 기간이 끝나면 파기합니다.</li>
+  </ul>
+  <h3>파기 방법</h3>
+  <ul>
+    <li>전자적 파일 형태의 정보는 복구할 수 없는 방법으로 삭제합니다.</li>
+    <li>서버 메모리에만 두는 값(요청 횟수 계산용 IP 주소, 주변 검색 좌표)은 만료 후 메모리에서 제거됩니다.</li>
+  </ul>
+  <h3>백업에 남은 탈퇴 데이터</h3>
+  <ul>
+    <li>운영 데이터베이스는 매일 암호화해 백업하며 <strong>최대 7일</strong> 보관한 뒤 자동 삭제합니다.</li>
+    <li>백업에는 인프라 운영책임자만 접근할 수 있습니다.</li>
+    <li>백업을 복원하는 경우 탈퇴 이후의 삭제 내역과 만료 기록 정리를 다시 반영합니다.</li>
+    <li>그 결과를 확인하기 전에는 복원된 서비스를 외부에 공개하지 않습니다.</li>
+  </ul>
+</section>
+
+<section id="s8">
+  <h2 class="sec">8. 정보주체의 권리와 행사 방법</h2>
+  <p>이용자는 언제든지 아래의 권리를 행사할 수 있습니다.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>권리</th><th>행사 방법</th></tr></thead>
+      <tbody>
+        <tr><td>열람·정정</td><td>앱의 마이 &gt; 설정에서 닉네임과 동의 상태를 확인하고 변경합니다</td></tr>
+        <tr><td>동의 철회</td><td>마케팅 수신 동의는 마이 &gt; 설정에서 해제합니다. 필수 항목의 동의 철회는 회원 탈퇴로 처리됩니다</td></tr>
+        <tr><td>삭제(회원 탈퇴)</td><td>마이 &gt; 설정 &gt; 회원 탈퇴. 본인 확인 후 삭제되며 되돌릴 수 없습니다</td></tr>
+        <tr><td>처리 정지</td><td>아래 개인정보 보호책임자에게 이메일로 요청할 수 있습니다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    권리 행사는 이메일을 통해서도 요청할 수 있으며, 운영팀은 지체 없이 조치합니다.
+    법정대리인이나 위임을 받은 사람을 통해서도 요청할 수 있습니다.
+  </p>
+  <p>
+    마케팅 수신 동의는 이용자의 선택 상태로만 보관합니다. 현재 서비스에서는 이 동의를 근거로 메일을
+    보내지 않으며, 찜한 대회의 지역 등으로 관심 지역을 추정해 발송하지도 않습니다.
+  </p>
+</section>
+
+<section id="s9">
+  <h2 class="sec">9. 개인정보의 안전성 확보 조치</h2>
+  <ul>
+    <li>비밀번호는 되돌릴 수 없는 해시로만 저장합니다.</li>
+    <li>앱과 서버 사이의 통신은 암호화(HTTPS)합니다.</li>
+    <li><strong>앱과 서버는</strong> 비밀번호·토큰·인증 코드·이메일 주소·이용자 좌표를 로그에 남기지 않습니다 — 저희가 짠 코드에서 보장하는 범위입니다.</li>
+    <li><strong>서버 앞단(리버스 프록시)의 기록은 아직 그렇게 보장하지 못합니다.</strong> 이메일 중복 확인과 주변 코스 조회는 그 값을 주소 뒤 질의 문자열로 보내는데, 오류 기록과 암호화되지 않은 주소의 기록에 그것이 남는지 <span class="todo">[확인 필요]</span> 공개 전에 확인해 이 문장을 결과에 맞춥니다.</li>
+    <li><strong>비밀키는 서버에만 둡니다.</strong> 뜯어내면 남이 대신 호출할 수 있는 키(한국관광공사·카카오 REST)는 앱에 넣지 않습니다. 앱에 들어가는 것은 카카오 <strong>네이티브 앱 키</strong> 하나이며, 이 키는 앱에 넣도록 설계된 공개 식별자이고 등록된 앱 서명에서만 동작합니다.</li>
+    <li>운영 데이터베이스 백업은 암호화하고 접근 권한을 인프라 운영책임자로 제한합니다.</li>
+    <li>비밀번호를 변경하면 로그인 유지 토큰을 모두 폐기합니다.</li>
+  </ul>
+</section>
+
+<section id="s10">
+  <h2 class="sec">10. 자동 수집 장치의 설치·운영 및 거부</h2>
+  <p>
+    <strong>서비스는 쿠키를 비롯한 개인정보 자동 수집 장치를 사용하지 않습니다.</strong>
+    앱은 광고 식별자를 수집하지 않으며, 이용자의 행동을 추적하는 분석 도구나 제3자 광고 SDK를
+    사용하지 않습니다.
+  </p>
+  <p>
+    로그인 상태를 유지하기 위한 토큰은 이용자의 기기 안에만 저장되며, 로그아웃하거나 앱을 삭제하면
+    함께 지워집니다.
+  </p>
+  <p>
+    다만 서버는 요청을 받을 때 <strong>접속 기록</strong>(IP 주소·시각·요청 경로 등)을 남깁니다.
+    이는 이용자의 기기에 무엇을 설치해 수집하는 것이 아니라 서버가 자체적으로 남기는 운영 기록이며,
+    자세한 내용은 <a href="#s2">2. 처리하는 개인정보의 항목</a>에 적었습니다.
+  </p>
+</section>
+
+<section id="s11">
+  <h2 class="sec">11. 개인정보 보호책임자</h2>
+  <p>
+    운영팀은 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 이용자의 불만
+    처리와 피해 구제를 위하여 아래와 같이 담당을 지정하고 있습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>구분</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td>개인정보 보호·고충처리 담당</td><td>루트메이트 개인정보보호 담당</td></tr>
+        <tr><td>이메일</td><td><a href="mailto:runninggu.play@gmail.com">runninggu.play@gmail.com</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    개인정보 열람 청구도 위 연락처로 접수합니다. 운영팀은 이용자의 문의에 지체 없이 답변하고
+    처리하겠습니다.
+  </p>
+</section>
+
+<section id="s12">
+  <h2 class="sec">12. 권익침해 구제방법</h2>
+  <p>
+    개인정보 침해로 인한 신고나 상담이 필요한 경우 아래 기관에 문의할 수 있습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>기관</th><th>전화</th><th>홈페이지</th></tr></thead>
+      <tbody>
+        <tr><td>개인정보분쟁조정위원회</td><td>1833-6972</td><td><a href="https://www.kopico.go.kr" rel="noopener">www.kopico.go.kr</a></td></tr>
+        <tr><td>개인정보침해신고센터</td><td>(국번없이) 118</td><td><a href="https://privacy.kisa.or.kr" rel="noopener">privacy.kisa.or.kr</a></td></tr>
+        <tr><td>대검찰청 사이버수사과</td><td>(국번없이) 1301</td><td><a href="https://www.spo.go.kr" rel="noopener">www.spo.go.kr</a></td></tr>
+        <tr><td>경찰청 사이버수사국</td><td>(국번없이) 182</td><td><a href="https://ecrm.police.go.kr" rel="noopener">ecrm.police.go.kr</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    「개인정보 보호법」 제35조(개인정보의 열람), 제36조(개인정보의 정정·삭제), 제37조(개인정보의
+    처리정지 등)에 따른 요구에 대해 운영팀이 한 처분 또는 부작위로 권리나 이익을 침해받은 경우에는
+    행정심판법에 따라 행정심판을 청구할 수 있습니다.
+  </p>
+</section>
+
+<section id="s13">
+  <h2 class="sec">13. 처리방침의 변경</h2>
+  <p>
+    이 개인정보처리방침은 <span class="todo">[확인 필요] 시행일</span>부터 적용됩니다.
+  </p>
+  <p>
+    법령·정책 또는 서비스의 변경에 따라 내용이 바뀌는 경우, 변경 사항의 시행
+    <span class="todo">[확인 필요] 7일</span> 전부터 이 페이지와 앱 공지를 통해 알려드립니다.
+    이용자에게 불리하게 변경되는 경우에는 <span class="todo">[확인 필요] 30일</span> 전에 알리고,
+    필요한 경우 동의를 다시 받습니다.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>버전</th><th>시행일</th><th>변경 내용</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="todo">[확인 필요]</span></td>
+          <td><span class="todo">[확인 필요]</span></td>
+          <td>최초 공개</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="doc">
+  <p>런닝구(區) · 개인정보 문의 <a href="mailto:runninggu.play@gmail.com">runninggu.play@gmail.com</a></p>
+  <p class="backlink"><a href="/">런닝구 홈으로</a></p>
+</footer>
+
+</div>
+</body>
+</html>

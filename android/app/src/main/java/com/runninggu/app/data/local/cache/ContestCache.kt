@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import com.runninggu.app.data.remote.ApiJson
 import com.runninggu.app.data.remote.dto.ContestDto
+import java.time.Instant
 
 /**
  * 마지막으로 성공한 대회 응답. (SPEC §6.1 · §9.3 · 매핑표 S1·S3 오프라인 · 이슈 #105)
@@ -30,11 +31,16 @@ interface ContestCache {
     /** 성공 응답을 덮어쓴다. 같은 id 는 갱신된다. */
     suspend fun save(contests: List<ContestDto>)
 
-    /** 가까운 대회부터. 서버 목록과 같은 순서다. */
-    suspend fun list(limit: Int = DEFAULT_LIMIT): List<ContestDto>
+    /**
+     * 가까운 대회부터. 서버 목록과 같은 순서다.
+     *
+     * **저장한 시각을 함께 준다.** 되살린 목록을 화면이 "언제 것" 이라고 말해야 하는데,
+     * `List` 만 넘기면 그 사실이 여기서 사라진다(SPEC §6.1 · 이슈 #307). 비었으면 `null` 이다.
+     */
+    suspend fun list(limit: Int = DEFAULT_LIMIT): CachedContests?
 
-    /** 상세 폴백. 목록에서 본 대회만 있다. */
-    suspend fun byId(id: Long): ContestDto?
+    /** 상세 폴백. 목록에서 본 대회만 있다. 저장 시각을 함께 준다. */
+    suspend fun byId(id: Long): CachedContest?
 
     /** 로그아웃·계정 전환에서 부른다. 지금은 대회라 계정 데이터가 아니지만 규칙을 맞춰 둔다. */
     suspend fun clear()
@@ -86,6 +92,18 @@ interface ContestCacheDao {
     suspend fun clear()
 }
 
+/**
+ * 되살린 목록과 **그것을 저장한 시각**. (이슈 #307)
+ *
+ * [cachedAt] 은 담긴 행들 중 **가장 오래된** 값이다. 행마다 시각이 다를 수 있는데
+ * (`byId` 로 상세만 갱신되면 그 행만 새것이 된다) 가장 새 값을 쓰면 화면이 실제보다
+ * 최신인 것처럼 말한다. 낡은 쪽으로 기우는 것이 안전하다.
+ */
+data class CachedContests(val contests: List<ContestDto>, val cachedAt: Instant)
+
+/** 되살린 상세 하나와 저장 시각. (이슈 #307) */
+data class CachedContest(val contest: ContestDto, val cachedAt: Instant)
+
 /** Room 구현. 직렬화 규칙은 네트워크와 같은 [ApiJson] 을 쓴다. */
 class RoomContestCache(
     private val dao: ContestCacheDao,
@@ -108,9 +126,21 @@ class RoomContestCache(
         )
     }
 
-    override suspend fun list(limit: Int): List<ContestDto> = dao.list(limit).mapNotNull { it.decode() }
+    override suspend fun list(limit: Int): CachedContests? {
+        val rows = dao.list(limit)
+        // 못 읽는 행은 버리되 **시각은 살아남은 행에서만** 센다. 버린 행의 시각까지 세면
+        // 화면에 없는 내용의 시각을 말하게 된다
+        val usable = rows.mapNotNull { row -> row.decode()?.let { row.cachedAt to it } }
+        if (usable.isEmpty()) return null
+        return CachedContests(
+            contests = usable.map { it.second },
+            cachedAt = Instant.ofEpochMilli(usable.minOf { it.first }),
+        )
+    }
 
-    override suspend fun byId(id: Long): ContestDto? = dao.byId(id)?.decode()
+    override suspend fun byId(id: Long): CachedContest? = dao.byId(id)?.let { row ->
+        row.decode()?.let { CachedContest(it, Instant.ofEpochMilli(row.cachedAt)) }
+    }
 
     override suspend fun clear() = dao.clear()
 

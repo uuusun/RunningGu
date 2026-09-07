@@ -1,5 +1,8 @@
 package com.runninggu.app.data.repository
 
+import java.time.Instant
+import com.runninggu.app.data.local.cache.CachedContests
+import com.runninggu.app.data.local.cache.CachedContest
 import com.runninggu.app.data.local.cache.ContestCache
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
@@ -87,7 +90,11 @@ class ContestOfflineFallbackTest {
     }
 
     /** 인메모리 캐시. Room 없이 저장소 쪽 판단만 본다. */
-    private class FakeCache(initial: List<ContestDto> = emptyList()) : ContestCache {
+    private class FakeCache(
+        initial: List<ContestDto> = emptyList(),
+        /** 되살린 값에 붙는 저장 시각. 화면이 "언제 것" 인지 말하는 근거다 (#307). */
+        private val cachedAt: Instant = CACHED_AT,
+    ) : ContestCache {
         val saved = mutableMapOf<Long, ContestDto>()
 
         init {
@@ -98,10 +105,13 @@ class ContestOfflineFallbackTest {
             contests.forEach { saved[it.id] = it }
         }
 
-        override suspend fun list(limit: Int): List<ContestDto> =
+        override suspend fun list(limit: Int): CachedContests? =
             saved.values.sortedWith(compareBy({ it.contestDate }, { it.id })).take(limit)
+                .takeIf { it.isNotEmpty() }
+                ?.let { CachedContests(it, cachedAt) }
 
-        override suspend fun byId(id: Long): ContestDto? = saved[id]
+        override suspend fun byId(id: Long): CachedContest? =
+            saved[id]?.let { CachedContest(it, cachedAt) }
 
         override suspend fun clear() = saved.clear()
     }
@@ -110,6 +120,11 @@ class ContestOfflineFallbackTest {
         ContestDto(id = id, name = "대회$id", contestDate = date)
 
     private val offline = ApiException.Network(IOException("offline"))
+
+    private companion object {
+        /** 고정 시각. 되살린 결과가 이 값을 그대로 들고 나오는지 본다 (#307). */
+        val CACHED_AT: Instant = Instant.parse("2026-09-06T12:00:00Z")
+    }
 
     // ── 되살아나는 자리 ────────────────────────────────────────
 
@@ -129,13 +144,57 @@ class ContestOfflineFallbackTest {
     }
 
     @Test
+    fun `되살린 목록은 언제 것인지를 함께 준다`() = runBlocking {
+        // 화면이 "오프라인 · 09.06 21:00 기준" 을 그리려면 이 값이 여기서 살아 나가야 한다.
+        // 떨어뜨리면 캐시된 마감 D-0 이 지금 값처럼 보인다 (#307)
+        val repository = RemoteContestRepository(
+            api = StubApi(failure = IOException("offline")),
+            cache = FakeCache(listOf(contest(1))),
+        )
+
+        assertEquals(CACHED_AT, repository.list(ContestFilter()).cachedAt)
+    }
+
+    @Test
+    fun `서버에서_막_받은_목록은_시각이_없다`() = runBlocking {
+        // null 이 "서버에서 방금 받았다" 는 신호다. 아무 값이나 채우면 온라인 화면에도
+        // 오프라인 안내가 붙는다
+        val repository = RemoteContestRepository(
+            api = StubApi(items = listOf(contest(1))),
+            cache = FakeCache(),
+        )
+
+        assertNull(repository.list(ContestFilter()).cachedAt)
+    }
+
+    @Test
+    fun `되살린 상세도 언제 것인지를 함께 준다`() = runBlocking {
+        val repository = RemoteContestRepository(
+            api = StubApi(failure = IOException("offline")),
+            cache = FakeCache(listOf(contest(7))),
+        )
+
+        assertEquals(CACHED_AT, repository.detail(7).cachedAt)
+    }
+
+    @Test
+    fun `서버에서_막_받은_상세는_시각이_없다`() = runBlocking {
+        val repository = RemoteContestRepository(
+            api = StubApi(items = listOf(contest(7))),
+            cache = FakeCache(),
+        )
+
+        assertNull(repository.detail(7).cachedAt)
+    }
+
+    @Test
     fun `상세도 목록에서 본 대회면 되살아난다`() = runBlocking {
         val repository = RemoteContestRepository(
             api = StubApi(failure = IOException("offline")),
             cache = FakeCache(listOf(contest(7))),
         )
 
-        assertEquals("7", repository.detail(7).id)
+        assertEquals("7", repository.detail(7).contest.id)
     }
 
     @Test

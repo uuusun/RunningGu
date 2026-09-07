@@ -86,6 +86,13 @@ class RoundTripEvidenceTest(unittest.TestCase):
                     "turns": 1,
                     "steps": 1,
                     "gain": 0.0,
+                    # 노면·환경·경사는 GraphHopper 가 details 를 줄 때만 나온다.
+                    # 안 준 서버를 흉내내 None 으로 둔다 (#224 · #299).
+                    "soft": None,
+                    "paved": None,
+                    "tunnel": None,
+                    "bridge": None,
+                    "steep": None,
                     "seed": seed,
                 },
             }

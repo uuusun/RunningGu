@@ -1,0 +1,25 @@
+{
+  "maxCpuSample": {
+    "at": "2026-09-07T01:56:55+00:00",
+    "busyPercent": 97.473,
+    "iowaitPercent": 0,
+    "counterReset": false
+  },
+  "nonFiveSecondGaps": [
+    {
+      "from": "2026-09-07T01:23:00+00:00",
+      "to": "2026-09-07T01:23:06+00:00",
+      "seconds": 6
+    },
+    {
+      "from": "2026-09-07T01:23:06+00:00",
+      "to": "2026-09-07T01:23:10+00:00",
+      "seconds": 4
+    }
+  ],
+  "serverLoadEnded": {
+    "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+    "at": "2026-09-07T01:56:46.068318+00:00",
+    "reason": "guard_finish_requested"
+  }
+}
