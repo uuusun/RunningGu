@@ -713,7 +713,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
       "courseId": "T_CRS_MNG0000005117",
       "courseName": "해파랑길 1코스",
       "sido": "부산",
-      "sigun": "남구",
+      "sigun": "부산 남구",
       "distanceKm": 17.8,
       "difficulty": "NORMAL",
       "gainM": 312,
@@ -735,6 +735,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
 - `courseId`는 번들·KTO 결합에 사용하는 안정적 유일키다. `dataSource`는 지역별 응답에서
   `API_GPX|GPX_ONLY`만 가능하다.
+- **`sigun`은 시도를 포함한 전체 표기다** — 현재 catalog 261건이 전부 `"{sido} {시군}"` 형태다(#300).
+  앱은 `sigun`이 `sido`로 시작하면 그대로 쓰고, 아니면 `sido`를 앞에 붙여 한 줄로 그린다.
+  둘 다 nullable이므로 없는 쪽은 뺀다.
 - `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
   `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
@@ -750,7 +753,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
   "courseId": "T_CRS_MNG0000005117",
   "courseName": "해파랑길 1코스",
   "sido": "부산",
-  "sigun": "남구",
+  "sigun": "부산 남구",
   "distanceKm": 17.8,
   "difficulty": "NORMAL",
   "gainM": 312,

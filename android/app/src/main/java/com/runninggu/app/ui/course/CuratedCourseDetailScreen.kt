@@ -185,11 +185,37 @@ private fun Stat(label: String, value: String) {
 private fun regionOf(detail: CuratedCourseDetail): String =
     regionLabel(sido = detail.sido, sigun = detail.sigun)
 
-/** 화면 밖에서 고정할 수 있게 값만 받는다 — Compose 안에 두면 단위 테스트가 안 닿는다. */
-internal fun regionLabel(sido: String?, sigun: String?): String =
-    sigun?.takeIf { it.isNotBlank() }
-        ?: sido?.takeIf { it.isNotBlank() }
-        ?: "지역 정보 없음"
+/**
+ * 지역 한 줄. **두 형태를 다 받는다** (#300 리뷰 · 선경님).
+ *
+ * 명세 예시(§6-2 · §6-4)와 실제 데이터가 다르다.
+ *
+ * ```
+ * 명세 예시   sido = "부산"   sigun = "남구"          → "부산 남구"
+ * 실제 261건   sido = "부산"   sigun = "부산 중구"      → "부산 중구"
+ * ```
+ *
+ * **`sigun` 이 `sido` 로 시작할 때만 접두사를 안 붙인다.** 무조건 `sigun` 만 쓰면 명세
+ * 형태에서 시도가 사라지고("남구"), 무조건 이어붙이면 실제 데이터가 겹친다("부산 부산 중구").
+ * 어느 쪽이 계약인지 정하지 않고도 둘 다 맞게 그리려면 이 방법뿐이다.
+ *
+ * 실제 데이터는 **261건 전수**가 `sido` 로 시작한다(#300 리뷰에서 민지님이 전수 확인).
+ * 그래도 명세 형태를 버리지 않는 것은, 서버가 나중에 명세대로 줘도 화면이 안 깨지게 하기
+ * 위해서다 — 이 함수가 계약을 확정하는 자리가 아니다.
+ *
+ * 화면 밖에 둔 이유는 따로다. Compose 안에 있으면 이 겹침을 **기기에서만** 볼 수 있다.
+ */
+internal fun regionLabel(sido: String?, sigun: String?): String {
+    val si = sido?.takeIf { it.isNotBlank() }?.trim()
+    val gun = sigun?.takeIf { it.isNotBlank() }?.trim()
+    return when {
+        gun == null -> si ?: "지역 정보 없음"
+        si == null -> gun
+        // 이미 품고 있으면 그대로 — 아니면 앞에 붙인다
+        gun.startsWith(si) -> gun
+        else -> "$si $gun"
+    }
+}
 
 /**
  * 코스 경로선. **핀 없이 선만** 그린다 (SPEC §3-8).

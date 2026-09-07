@@ -146,9 +146,17 @@ class CuratedCourseDetailTest {
 
     // **`sigun` 이 시도를 품고 있다** — 서버가 두루누비 catalog 를 그대로 준다(#286 기기 확인).
     // 이어붙이면 `강원 강원 양구군` 이 된다. 지역별 목록은 처음부터 `sigun` 만 썼다.
+    // 실제 데이터 261건 전수가 이 형태다 — sigun 이 sido 를 품고 있다.
     @Test
-    fun `지역은 시군만 쓴다 - 시도를 겹쳐 적지 않는다`() {
+    fun `시군이 시도를 품고 있으면 겹쳐 적지 않는다`() {
         assertEquals("강원 양구군", regionLabel(sido = "강원", sigun = "강원 양구군"))
+        assertEquals("부산 중구", regionLabel(sido = "부산", sigun = "부산 중구"))
+    }
+
+    // 명세 예시(§6-2 · §6-4)의 형태다. 무조건 sigun 만 쓰면 여기서 시도가 사라진다.
+    @Test
+    fun `시군이 시도를 안 품고 있으면 앞에 붙인다`() {
+        assertEquals("부산 남구", regionLabel(sido = "부산", sigun = "남구"))
     }
 
     @Test
