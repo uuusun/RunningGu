@@ -1,0 +1,190 @@
+{
+  "at": "2026-09-06T08:27:41.582503+00:00",
+  "sourceFiles": {
+    "kto-historical-diagnosis.json": {
+      "at": "2026-09-06T08:17:34.199027+00:00",
+      "settings": {
+        "base-url": "https://apis.data.go.kr/B551011/Durunubi",
+        "connect-timeout": "1s",
+        "read-timeout": "2500ms"
+      },
+      "timeoutOrBaseUrlOverrideNames": [],
+      "keyPresent": true,
+      "events": [
+        {
+          "at": "2026-09-06T06:02:50.576343+00:00",
+          "invocationId": "9c71a6835ff342b5a1954330b3eaf7e5",
+          "event": "두루누비 메타 동기화 완료. success=true bundleCount=261 ktoCount=142 matched=140 gpxOnly=121 apiOnly=2 invalidFields=0 durationMs=857"
+        },
+        {
+          "at": "2026-09-06T06:05:57.504127+00:00",
+          "invocationId": "cfe2a95ecfcc48689e75ff74f830ea01",
+          "event": "두루누비 메타 동기화 완료. success=true bundleCount=261 ktoCount=142 matched=140 gpxOnly=121 apiOnly=2 invalidFields=0 durationMs=692"
+        },
+        {
+          "at": "2026-09-06T07:47:43.847449+00:00",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "event": "com.runninggu.server.common.upstream.UpstreamLoadGuardException"
+        },
+        {
+          "at": "2026-09-06T07:47:43.847449+00:00",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "event": "com.runninggu.server.common.upstream.UpstreamLoadGuard.recordTimeout(UpstreamLoadGuard.java:143)"
+        },
+        {
+          "at": "2026-09-06T07:47:43.847449+00:00",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "event": "com.runninggu.server.common.upstream.UpstreamLoadGuardInterceptor.intercept(UpstreamLoadGuardInterceptor.java:54)"
+        },
+        {
+          "at": "2026-09-06T07:47:43.847754+00:00",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "event": "com.runninggu.server.course.application.CourseSyncService.synchronizeOnce(CourseSyncService.java:57)"
+        },
+        {
+          "at": "2026-09-06T07:47:43.847754+00:00",
+          "invocationId": "63de006d54f94c5ebc762301098107be",
+          "event": "com.runninggu.server.course.application.CourseSyncService.synchronize(CourseSyncService.java:47)"
+        },
+        {
+          "at": "2026-09-06T07:49:54.688777+00:00",
+          "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+          "event": "두루누비 메타 동기화 완료. success=true bundleCount=261 ktoCount=142 matched=140 gpxOnly=121 apiOnly=2 invalidFields=0 durationMs=832"
+        }
+      ]
+    },
+    "kto-live-diagnosis.json": {
+      "at": "2026-09-06T08:20:09.505478+00:00",
+      "completed": false,
+      "connectTimeoutSeconds": 1,
+      "diagnosticReadTimeoutSeconds": 15,
+      "dnsAddressCount": 1,
+      "dnsMs": 3.828,
+      "errorType": "TimeoutError",
+      "failedPhase": "tls_handshake",
+      "maxRequests": 1,
+      "numOfRows": 100,
+      "pageNo": 1,
+      "productReadTimeoutSeconds": 2.5,
+      "retryCount": 0,
+      "scope": "single_read_diagnostic_not_load_retry",
+      "tcpConnectMs": 28.672,
+      "timeout": true,
+      "totalMs": 2535.461
+    },
+    "kto-tls-versions.json": [
+      {
+        "at": "2026-09-06T08:23:11.109874+00:00",
+        "host": "apis.data.go.kr",
+        "offered": "TLS1.2",
+        "httpRequests": 0,
+        "tcpMs": 25.829,
+        "passed": false,
+        "failedPhase": "tls",
+        "errorType": "TimeoutError",
+        "tcpStats": {
+          "rtt": [
+            "35.874/29.833"
+          ],
+          "retrans": [],
+          "bytes_sent": [
+            "212"
+          ],
+          "bytes_acked": [
+            "213"
+          ],
+          "bytes_received": [],
+          "data_segs_out": [
+            "1"
+          ],
+          "data_segs_in": [],
+          "unacked": [],
+          "lost": []
+        }
+      },
+      {
+        "at": "2026-09-06T08:23:16.179031+00:00",
+        "host": "apis.data.go.kr",
+        "offered": "TLS1.3",
+        "httpRequests": 0,
+        "tcpMs": 26.39,
+        "passed": false,
+        "failedPhase": "tls",
+        "errorType": "TimeoutError",
+        "tcpStats": {
+          "rtt": [
+            "36.404/30.007"
+          ],
+          "retrans": [],
+          "bytes_sent": [
+            "249"
+          ],
+          "bytes_acked": [
+            "250"
+          ],
+          "bytes_received": [],
+          "data_segs_out": [
+            "1"
+          ],
+          "data_segs_in": [],
+          "unacked": [],
+          "lost": []
+        }
+      },
+      {
+        "at": "2026-09-06T08:23:21.243764+00:00",
+        "host": "api.visitkorea.or.kr",
+        "offered": "default",
+        "httpRequests": 0,
+        "tcpMs": 3.027,
+        "tlsMs": 9.199,
+        "passed": true,
+        "negotiated": "TLSv1.3",
+        "tcpStats": {
+          "rtt": [
+            "2.95/1.162"
+          ],
+          "retrans": [],
+          "bytes_sent": [
+            "597"
+          ],
+          "bytes_acked": [
+            "518"
+          ],
+          "bytes_received": [
+            "4496"
+          ],
+          "data_segs_out": [
+            "2"
+          ],
+          "data_segs_in": [
+            "4"
+          ],
+          "unacked": [
+            "1"
+          ],
+          "lost": []
+        }
+      }
+    ],
+    "kto-java-tls.json": {
+      "at": "2026-09-06T08:25:36.207524865Z",
+      "runtime": "21.0.12",
+      "httpRequests": 0,
+      "passed": false,
+      "tcpMs": 54.662,
+      "failedPhase": "tls",
+      "errorType": "java.net.SocketTimeoutException"
+    }
+  },
+  "sourceSha256": {
+    "kto-historical-diagnosis.json": "b3cbf0c24d5562db06b42cac3c1101c25c613b8ba0a4f721177f7ff178a6acce",
+    "kto-live-diagnosis.json": "4176fce55b1321c6b3ebda5347eaaa571ba25fba831841e29f0034ff7f4ab0d1",
+    "kto-tls-versions.json": "3c479da8a3cd9de8fda3fdc1a7774f24b407af7f704d5d86e56aab7a1b920d30",
+    "kto-java-tls.json": "dcd3581bb574d14d251c4a5062973f94cf859d85472a151eaa3be4f73a8ab819"
+  },
+  "finalGuardOff": true,
+  "backendActive": "active",
+  "backendNRestarts": "0",
+  "backendInvocationId": "44a631b7add84c63b46257c04cf2fe4d"
+}

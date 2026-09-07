@@ -488,6 +488,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | D-34 / SPEC 결정-58 | 이메일·카카오 가입은 전체 동의 밖의 별도 `ageOver14` 필수 확인을 사용한다. 요청 최상위 필드이며 누락은 `VALIDATION_FAILED`, false는 `AGE_REQUIREMENT_NOT_MET`("만 14세 이상만 가입할 수 있습니다.")이다. 생년월일·별도 연령 저장은 없다 |
 | D-35 / SPEC 결정-57 | 이메일 가입은 활성 미인증 행만 `EMAIL_NOT_VERIFIED`, 인증 후 30분 만료나 인증 이력 없음은 `CODE_EXPIRED`다. 앱은 `CODE_EXPIRED`를 일반 가입 실패로 처리하지 않고 `mustResend=true`로 바꿔 A2에서 재발송·재인증을 안내한다(#228). Refresh는 14일이며 회전 토큰 재사용 시 같은 family 전체를 폐기하고 재로그인한다 |
 | D-36 / SPEC 결정-59 | P0는 마케팅 메일을 보내지 않고 선택 동의 상태만 유지한다. 발송 범위를 열 때 수신거부 API·토큰·페이지와 MARKETING 1.1을 계약부터 추가한다 |
+| D-36a / 이슈 #287 | 로그인·가입 응답의 `user` 에는 `agreements` 가 없다. 앱 세션의 마케팅 동의는 **`Boolean?`** 이고 `null` 은 "아직 안 물었다" 다 — S10 계정 관리가 `GET /me` 로 채우며, 채워지기 전까지 토글을 잠근다. 안 받은 값을 `false` 로 확정하면 재로그인한 사용자의 동의가 화면에서 철회된 것처럼 보인다 |
 | DB-02 / SPEC 결정-44 | 저장 코스 attribution은 서버 생성 완성 문구 배열을 `JSONB NOT NULL DEFAULT '[]'` snapshot으로 보존. 상세에만 반환하고 목록·fingerprint에서 제외하며 문구 변경을 소급하지 않음. `GET /api/courses`도 실제 응답 코스 원천의 `attributions[]` 반환 |
 | DB-01 / SPEC 결정-33(08-23 재개정) | 저장 코스 polyline은 2D Google Encoded Polyline precision 5(E5). 고정 `lat,lng` canonical geometry로 fingerprint를 계산하고, `elevationProfileM`은 최대 100개 정수·미보유 `[]`·PostgreSQL `JSONB NOT NULL DEFAULT '[]'`로 저장 |
 | DB-04 / SPEC 결정-45 | 저장 동선은 region·recovery·전체 트리와 RACE를 snapshot으로 보존. contestName·현재 대회 메타는 조회 시 파생하고 일정·시간·장소·지역·좌표 변경만 needsRegeneration=true. 재생성 최종 저장은 `PUT /itineraries/{id}`로 같은 id 교체 |

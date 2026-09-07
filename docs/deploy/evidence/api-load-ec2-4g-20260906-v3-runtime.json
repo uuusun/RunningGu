@@ -1,0 +1,723 @@
+{
+  "runId": "api4g-673a2f7-20260906T0729Z-v3",
+  "at": "2026-09-06T07:52:15.393621+00:00",
+  "acceptancePolicy": "app-capacity-v3",
+  "loadStarted": false,
+  "resourceCollectionStarted": false,
+  "baseline": {
+    "at": "2026-09-06T07:44:42.053909+00:00",
+    "runId": "api4g-673a2f7-20260906T0729Z-v3",
+    "acceptancePolicy": "app-capacity-v3",
+    "instance": {
+      "instanceId": "i-07aa483968f4daddc",
+      "instanceType": "c7i-flex.large",
+      "availabilityZone": "ap-northeast-2b",
+      "region": "ap-northeast-2"
+    },
+    "backendSha": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "release": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graph": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "backend": {
+      "ActiveState": "active",
+      "SubState": "running",
+      "NRestarts": "0",
+      "InvocationID": "cfe2a95ecfcc48689e75ff74f830ea01",
+      "MemoryHigh": "671088640",
+      "MemoryMax": "805306368",
+      "MemoryCurrent": "405884928"
+    },
+    "backendJvm": [
+      "-Xms256m",
+      "-Xmx512m",
+      "-Xlog:gc*:stdout:time,uptime,level,tags"
+    ],
+    "containers": [
+      {
+        "name": "backend-graphhopper-1",
+        "id": "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf",
+        "image": "sha256:16b3618f3e69a094990e6c9360ee92972beec643ca26bc5d9b61404172910753",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:42.010825586Z"
+        },
+        "limits": {
+          "Memory": 2684354560,
+          "MemorySwap": 2684354560,
+          "MemoryReservation": 2147483648
+        },
+        "jvm": [
+          "-Xms512m",
+          "-Xmx2g"
+        ]
+      },
+      {
+        "name": "backend-postgres-1",
+        "id": "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd",
+        "image": "sha256:547c41760b4112de392c4a290292a760252b0a07360b22ce75c31484bc2a322a",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:36.355930733Z"
+        },
+        "limits": {
+          "Memory": 0,
+          "MemorySwap": 0,
+          "MemoryReservation": 0
+        }
+      }
+    ],
+    "swappiness": 10,
+    "mem": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1087828,
+      "SwapTotal": 4194300,
+      "SwapFree": 4194248
+    },
+    "guardOff": true,
+    "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+    "graphhopperInvocation": "09d01169c51f44749b0e353f1c2d8f7a",
+    "nginx": "active",
+    "readiness": true,
+    "passed": true
+  },
+  "guardState": {
+    "runId": "api4g-673a2f7-20260906T0729Z-v3",
+    "startedAt": "2026-09-06T07:47:30.133040+00:00",
+    "readyAt": "2026-09-06T07:47:42.803452+00:00",
+    "invocationId": "63de006d54f94c5ebc762301098107be",
+    "nRestarts": "0"
+  },
+  "guardDisabled": {
+    "runId": "api4g-673a2f7-20260906T0729Z-v3",
+    "finishedAt": "2026-09-06T07:49:54.518996+00:00",
+    "guardDisabled": true,
+    "readiness": true,
+    "backendNRestarts": "0",
+    "guardSummary": {
+      "runId": "api4g-673a2f7-20260906T0729Z-v3",
+      "guardLines": 1,
+      "malformedLines": 0,
+      "unsafeEvents": 1,
+      "non2xxResults": 1,
+      "counterGaps": 0,
+      "overLimit": 0,
+      "requiredEndpoint": "KTO_SEARCH_FESTIVAL",
+      "requiredEndpointSeen": false,
+      "endpoints": [
+        {
+          "endpoint": "KTO_DURUNUBI_COURSE",
+          "attempts": 1,
+          "finalCount": 1,
+          "limit": 100
+        }
+      ],
+      "providers": [
+        {
+          "provider": "KTO",
+          "attempts": 1,
+          "finalCount": 1,
+          "limit": "NONE"
+        }
+      ],
+      "passed": false,
+      "invocationUnchanged": true,
+      "nRestartsUnchanged": true
+    }
+  },
+  "guardEvents": [
+    {
+      "at": "2026-09-06T07:47:43.844041+00:00",
+      "runId": "api4g-673a2f7-20260906T0729Z-v3",
+      "provider": "KTO",
+      "endpoint": "KTO_DURUNUBI_COURSE",
+      "event": "TRIP",
+      "class": "TIMEOUT",
+      "elapsedMs": "2707",
+      "endpointCount": "1",
+      "endpointLimit": "100",
+      "providerCount": "1",
+      "providerLimit": "NONE"
+    }
+  ],
+  "gcEvents": [
+    {
+      "at": "2026-09-06T07:47:31.769790+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 0,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 6.952,
+      "heapMiB": [
+        69,
+        4,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:32.304351+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 1,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 9.771,
+      "heapMiB": [
+        72,
+        6,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:32.789812+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 2,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 19.622,
+      "heapMiB": [
+        74,
+        9,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:32.954661+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 3,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 25.236,
+      "heapMiB": [
+        31,
+        10,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:33.481817+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 4,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 8.299,
+      "heapMiB": [
+        78,
+        14,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:34.188803+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 5,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 10.529,
+      "heapMiB": [
+        82,
+        16,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:34.908331+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 6,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 66.93,
+      "heapMiB": [
+        72,
+        18,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:35.908125+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 7,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 11.887,
+      "heapMiB": [
+        87,
+        21,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:36.391925+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 8,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 7.836,
+      "heapMiB": [
+        90,
+        23,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:36.942540+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 9,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 10.609,
+      "heapMiB": [
+        91,
+        24,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:37.077117+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 10,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 51.519,
+      "heapMiB": [
+        39,
+        25,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:37.592511+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 11,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 4.431,
+      "heapMiB": [
+        93,
+        26,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:38.172404+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 12,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 9.603,
+      "heapMiB": [
+        94,
+        29,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:38.691867+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 13,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 10.909,
+      "heapMiB": [
+        97,
+        32,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:39.573651+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 14,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 18.633,
+      "heapMiB": [
+        100,
+        35,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:39.955216+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 15,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 17.906,
+      "heapMiB": [
+        104,
+        43,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:40.337934+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 16,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 21.107,
+      "heapMiB": [
+        112,
+        45,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:47:40.959829+00:00",
+      "service": "backend",
+      "invocationId": "63de006d54f94c5ebc762301098107be",
+      "gcId": 17,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 14.22,
+      "heapMiB": [
+        114,
+        48,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:45.199078+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 0,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 6.886,
+      "heapMiB": [
+        69,
+        4,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:45.778977+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 1,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 10.16,
+      "heapMiB": [
+        72,
+        6,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:46.233320+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 2,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 13.223,
+      "heapMiB": [
+        74,
+        9,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:46.404962+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 3,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 25.488,
+      "heapMiB": [
+        29,
+        10,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:46.981216+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 4,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 7.732,
+      "heapMiB": [
+        78,
+        14,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:47.632421+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 5,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 11.394,
+      "heapMiB": [
+        82,
+        16,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:48.217540+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 6,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 50.302,
+      "heapMiB": [
+        74,
+        18,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:49.073406+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 7,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 11.659,
+      "heapMiB": [
+        87,
+        21,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:49.531942+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 8,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 7.79,
+      "heapMiB": [
+        90,
+        23,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:50.098617+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 9,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 11.517,
+      "heapMiB": [
+        91,
+        24,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:50.249115+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 10,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 60.041,
+      "heapMiB": [
+        38,
+        25,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:50.677257+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 11,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 4.398,
+      "heapMiB": [
+        93,
+        26,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:51.210645+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 12,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 9.403,
+      "heapMiB": [
+        94,
+        29,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:51.775120+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 13,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 10.452,
+      "heapMiB": [
+        97,
+        32,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:52.426394+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 14,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 24.996,
+      "heapMiB": [
+        100,
+        35,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:52.837655+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 15,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 17.006,
+      "heapMiB": [
+        104,
+        43,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:53.156349+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 16,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 15.54,
+      "heapMiB": [
+        112,
+        45,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:53.724531+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 17,
+      "kind": "Pause Young (Allocation Failure)",
+      "full": false,
+      "pauseMs": 11.789,
+      "heapMiB": [
+        114,
+        48,
+        247
+      ]
+    },
+    {
+      "at": "2026-09-06T07:49:54.409241+00:00",
+      "service": "backend",
+      "invocationId": "44a631b7add84c63b46257c04cf2fe4d",
+      "gcId": 18,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 104.711,
+      "heapMiB": [
+        102,
+        45,
+        247
+      ]
+    }
+  ],
+  "jvmOomIndicatorLines": 0,
+  "kernelOomIndicatorLines": 0,
+  "finalGuardOff": true,
+  "readiness": true,
+  "backend": {
+    "ActiveState": "active",
+    "SubState": "running",
+    "NRestarts": "0",
+    "InvocationID": "44a631b7add84c63b46257c04cf2fe4d",
+    "MemoryHigh": "671088640",
+    "MemoryMax": "805306368",
+    "MemoryCurrent": "392122368"
+  },
+  "containers": [
+    {
+      "name": "backend-graphhopper-1",
+      "id": "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf",
+      "restartCount": 0,
+      "state": {
+        "Status": "running",
+        "Running": true,
+        "OOMKilled": false,
+        "StartedAt": "2026-09-05T12:17:42.010825586Z"
+      },
+      "limits": {
+        "Memory": 2684354560,
+        "MemorySwap": 2684354560,
+        "MemoryReservation": 2147483648
+      }
+    },
+    {
+      "name": "backend-postgres-1",
+      "id": "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd",
+      "restartCount": 0,
+      "state": {
+        "Status": "running",
+        "Running": true,
+        "OOMKilled": false,
+        "StartedAt": "2026-09-05T12:17:36.355930733Z"
+      },
+      "limits": {
+        "Memory": 0,
+        "MemorySwap": 0,
+        "MemoryReservation": 0
+      }
+    }
+  ],
+  "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+  "timers": {
+    "runninggu-load-guard-expiry.timer": "inactive",
+    "runninggu-postgres-backup.timer": "active",
+    "runninggu-postgres-wal-archive-check.timer": "active",
+    "certbot.timer": "active"
+  },
+  "backendSha": "673a2f796052f4553113d5cd25608fb3821222ac",
+  "graph": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc"
+}

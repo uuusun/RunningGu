@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import com.runninggu.app.ui.common.DataOrigin
 import com.runninggu.app.ui.model.RaceSummary
 import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.ui.model.registrationStatus
@@ -91,8 +92,23 @@ data class CalendarUiState(
      * 대회 없는 달과 구분이 안 된다.
      */
     val dailyCounts: DailyCountsState = DailyCountsState.Loading,
+    /**
+     * 목록([allRaces])이 어디서 왔는가. (SPEC §6.1 · 이슈 #307)
+     *
+     * **캐시로 되살린 목록은 [hasNext] 가 항상 false 다.** 커서는 서버 것이라 캐시가
+     * 어디에 이어 붙어야 할지 모르기 때문이다 — 화면은 "더 보기" 가 없는 것을 목록이
+     * 끝났다는 뜻으로 읽으면 안 된다.
+     *
+     * **월간 점([dailyCounts])은 이 출처를 따르지 않는다.** 집계는 캐시 대상이 아니라
+     * 오프라인이면 [DailyCountsState.Error] 다.
+     */
+    val origin: DataOrigin = DataOrigin.Server,
 ) {
     enum class Phase { LOADING, ERROR, LOADED }
+
+    /** 캐시로 되살린 목록인가. 화면은 이때만 "언제 것" 인지를 함께 그린다. */
+    val cachedAt: java.time.Instant?
+        get() = (origin as? DataOrigin.LocalCache)?.cachedAt
 
     /** 검색어 ∧ 종목 ∧ 접수 가능 ∧ 지역. 개최일 오름차순. (SPEC §4.5) */
     val filteredRaces: List<RaceSummary>

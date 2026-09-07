@@ -26,13 +26,11 @@ runs:
         PGBACKREST_S3_BUCKET: runninggu-compose-check
         PGBACKREST_S3_KMS_KEY_ID: arn:aws:kms:ap-northeast-2:000000000000:key/compose-check
         PGBACKREST_S3_ROLE: runninggu-compose-check
-        # Compose 보간 검증용 값이며 운영 heap 후보값이 아니다.
-        GRAPHHOPPER_XMS: 1g
-        GRAPHHOPPER_XMX: 1g
       shell: bash
       working-directory: backend
       run: |
         docker compose \
+          --env-file deploy/env/compose.env.example \
           --profile routing \
           -f compose.yaml \
           -f compose.ec2.yaml \

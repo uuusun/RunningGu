@@ -68,7 +68,8 @@ class DataStoreSessionPersistence(context: Context) : SessionPersistence {
                 // 카카오 가입자는 이메일이 없을 수 있다. 없는 것과 못 읽은 것을 구분하지 않는다
                 email = prefs[KEY_EMAIL],
                 loginProvider = provider,
-                marketingAgreed = prefs[KEY_MARKETING] ?: false,
+                // **키가 없으면 null 이다** — 안 물어본 것과 꺼져 있는 것은 다르다(#287)
+                marketingAgreed = prefs[KEY_MARKETING],
             ),
         )
     }
@@ -79,7 +80,9 @@ class DataStoreSessionPersistence(context: Context) : SessionPersistence {
             prefs[KEY_REFRESH_TOKEN] = session.tokens.refreshToken
             prefs[KEY_NICKNAME] = session.profile.nickname
             prefs[KEY_LOGIN_PROVIDER] = session.profile.loginProvider.name
-            prefs[KEY_MARKETING] = session.profile.marketingAgreed
+            // 모르는 값을 false 로 굳혀 저장하지 않는다. 다음 실행이 그걸 서버 값으로 믿는다
+            val marketing = session.profile.marketingAgreed
+            if (marketing != null) prefs[KEY_MARKETING] = marketing else prefs.remove(KEY_MARKETING)
 
             val email = session.profile.email
             // null 을 빈 문자열로 저장하면 "이메일 없음" 과 "빈 이메일" 이 같아진다

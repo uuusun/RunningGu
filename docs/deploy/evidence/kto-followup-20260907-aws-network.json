@@ -1,0 +1,33 @@
+{
+  "source": "authenticated AWS CloudShell CLI responses",
+  "cloudTrail": {
+    "region": "ap-northeast-2",
+    "from": "2026-09-06T06:00:00Z",
+    "through": "2026-09-06T23:00:00Z",
+    "lookupAttribute": {"AttributeKey": "ReadOnly", "AttributeValue": "false"},
+    "allWriteCount": 326,
+    "selectedEventSources": ["ec2.amazonaws.com", "network-firewall.amazonaws.com", "route53resolver.amazonaws.com"],
+    "selectedEvents": [],
+    "cloudShellResultFile": "/tmp/kto-network-change-audit.json"
+  },
+  "instance": {
+    "id": "i-07aa483968f4daddc",
+    "state": "running",
+    "type": "c7i-flex.large",
+    "vpc": "vpc-068918dc475f40175",
+    "subnet": "subnet-0f36b63f8f8959070",
+    "eni": "eni-00026764b4f2a66d5"
+  },
+  "flowLogs": {
+    "queryResources": ["vpc-068918dc475f40175", "subnet-0f36b63f8f8959070", "eni-00026764b4f2a66d5"],
+    "returned": [],
+    "cloudShellResultFile": "/tmp/kto-flow-log-audit.json",
+    "note": "현재 해당 리소스에 연결된 Flow Log가 없음. 이 조회만으로 삭제된 과거 로그의 존재까지 부정하지 않음"
+  },
+  "mutationsPerformed": false,
+  "ssmCommands": {
+    "tlsAndJournal": "b259a8dc-782e-43f0-aa35-446791f8014c",
+    "singleApiRequest": "259f028c-ad82-46b9-9ef4-38f80c562f04",
+    "finalAuditAndBundle": "27a764e4-0810-4198-9ea2-6b7413cdc23d"
+  }
+}

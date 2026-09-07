@@ -393,6 +393,7 @@ private class FakeWithdrawRepository(
     private val reauthResult: Result<String> = Result.success(REAUTH_TOKEN),
     private val withdrawResult: Result<Unit> = Result.success(Unit),
 ) : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
     var reauthCalls = 0
         private set
     var withdrawCalls = 0
@@ -434,6 +435,8 @@ private class FakeWithdrawRepository(
 
 /** 응답을 붙들어 둔다. "탈퇴하는 중" 상태를 실제로 만들어 보려면 필요하다. */
 private class BlockingWithdrawRepository : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
+
     val gate = CompletableDeferred<Unit>()
     var reauthCalls = 0
         private set

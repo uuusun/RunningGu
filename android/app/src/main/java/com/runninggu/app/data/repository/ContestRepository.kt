@@ -45,7 +45,7 @@ interface ContestRepository {
      * 번들 항목의 id 는 크롤 원천 문자열이라 여기 넣을 수 없다 — 타입이 그걸 막는다.
      * 호출부는 [Contest.serverId] 를 쓰고, null 이면 서버를 부르지 않는다.
      */
-    suspend fun detail(id: Long): Contest
+    suspend fun detail(id: Long): ContestDetailResult
 
     /**
      * 대회 인근 축제. (§3-5)
@@ -78,6 +78,27 @@ data class ContestPage(
     /** 불투명 커서. null 이면 마지막 페이지다. 앱은 해석하지 않는다(§0-4). */
     val nextCursor: String? = null,
     val hasNext: Boolean = false,
+    /**
+     * **캐시로 되살린 것이면** 앱이 그 응답을 저장한 시각, 서버에서 막 받은 것이면 `null`.
+     *
+     * [ClosingSoonResult.cachedAt] 과 같은 뜻이다. 목록에도 이것이 필요한 이유는 캘린더가
+     * 접수 마감을 보여주기 때문이다 — 캐시된 `마감 D-0` 을 보고 신청하러 갔는데 이미
+     * 끝났을 수 있다(이슈 #307).
+     */
+    val cachedAt: Instant? = null,
+)
+
+/**
+ * 대회 상세 조회 결과. (§3-4 · 이슈 #307)
+ *
+ * [Contest] 를 그대로 돌려주지 않고 감싸는 이유는 [ClosingSoonResult] 와 같다 —
+ * **출처는 대회의 속성이 아니라 이 조회의 속성**이다. 도메인 모델에 `cachedAt` 을 달면
+ * 같은 대회가 어디서 왔느냐에 따라 다른 값이 되어, 저장·비교에서 엉킨다.
+ */
+data class ContestDetailResult(
+    val contest: Contest,
+    /** 캐시로 되살린 것이면 저장 시각, 서버에서 막 받은 것이면 `null`. */
+    val cachedAt: Instant? = null,
 )
 
 /**
@@ -147,9 +168,14 @@ class RemoteContestRepository(
             if (cursor != null) {
                 null
             } else {
-                cache?.list().orEmpty().takeIf { it.isNotEmpty() }?.let { cached ->
+                cache?.list()?.let { cached ->
                     // 오프라인 목록은 **더 볼 것이 없다.** 커서를 지어내면 [더 보기] 가 헛돈다
-                    ContestPage(contests = cached.map { it.toContest() }, nextCursor = null, hasNext = false)
+                    ContestPage(
+                        contests = cached.contests.map { it.toContest() },
+                        nextCursor = null,
+                        hasNext = false,
+                        cachedAt = cached.cachedAt,
+                    )
                 }
             }
         },
@@ -199,14 +225,14 @@ class RemoteContestRepository(
         )
     }
 
-    override suspend fun detail(id: Long): Contest = withCacheFallback(
+    override suspend fun detail(id: Long): ContestDetailResult = withCacheFallback(
         remote = {
             val dto = api.detail(id)
             cache?.save(listOf(dto))
-            dto.toContest()
+            ContestDetailResult(dto.toContest())
         },
         // 목록에서 한 번이라도 본 대회만 있다. 못 본 것은 폴백이 없다
-        cached = { cache?.byId(id)?.toContest() },
+        cached = { cache?.byId(id)?.let { ContestDetailResult(it.contest.toContest(), it.cachedAt) } },
     )
 
     /**

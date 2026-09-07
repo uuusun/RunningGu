@@ -84,17 +84,18 @@ while [ "$(date +%s)" -lt "$end_epoch" ]; do
     END { printf "pswpin=%d pswpout=%d", in_count, out_count }
   ' /proc/vmstat)
 
-  write_line "sample sequence=$sequence at=$(date -Iseconds) epoch=$now_epoch $mem_values $swap_counters"
+  cpu_counters=$(awk '/^cpu / { printf "cpu_user=%s cpu_nice=%s cpu_system=%s cpu_idle=%s cpu_iowait=%s cpu_irq=%s cpu_softirq=%s cpu_steal=%s", $2,$3,$4,$5,$6,$7,$8,$9 }' /proc/stat)
+  write_line "sample sequence=$sequence at=$(date -Iseconds) epoch=$now_epoch $mem_values $swap_counters $cpu_counters"
   {
     systemctl show runninggu-backend.service \
-      -p ActiveState -p SubState -p NRestarts -p MemoryCurrent -p MemoryPeak \
+      -p ActiveState -p SubState -p NRestarts -p MemoryCurrent -p MemoryPeak -p InvocationID -p CPUUsageNSec \
       --no-pager \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//' \
       | sed 's/^/systemd service=runninggu-backend.service /'
     printf '\n'
     systemctl show runninggu-graphhopper.service \
-      -p ActiveState -p SubState -p NRestarts \
+      -p ActiveState -p SubState -p NRestarts -p InvocationID \
       --no-pager \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//' \

@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-07T00:38:42.992622+00:00",
+  "url": "https://staging-api.runninggu.store/api/contests?size=1",
+  "status": 200,
+  "responseBytes": 545,
+  "jsonValid": true,
+  "priorProbe": {
+    "path": "/actuator/health/readiness",
+    "status": 401,
+    "classification": "protected_path_probe_outside_load"
+  }
+}

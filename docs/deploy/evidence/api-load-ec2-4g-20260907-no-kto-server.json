@@ -1,0 +1,2890 @@
+{
+  "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+  "acceptancePolicy": "app-capacity-v4-no-kto",
+  "capacityVerdict": "requires_api_correlation",
+  "guard": {
+    "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+    "finishedAt": "2026-09-07T00:37:03.507246+00:00",
+    "guardDisabled": true,
+    "readiness": true,
+    "backendNRestarts": "0",
+    "guardSummary": {
+      "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+      "guardLines": 91,
+      "malformedLines": 0,
+      "unsafeEvents": 0,
+      "non2xxResults": 0,
+      "counterGaps": 0,
+      "overLimit": 0,
+      "requiredEndpoint": "KAKAO_KEYWORD",
+      "requiredEndpointSeen": true,
+      "endpoints": [
+        {
+          "endpoint": "KAKAO_KEYWORD",
+          "attempts": 91,
+          "finalCount": 91,
+          "limit": 2000
+        }
+      ],
+      "providers": [
+        {
+          "provider": "KAKAO",
+          "attempts": 91,
+          "finalCount": 91,
+          "limit": "5000"
+        }
+      ],
+      "passed": true,
+      "invocationUnchanged": true,
+      "nRestartsUnchanged": true,
+      "ktoAttempts": 0
+    },
+    "courseSyncRestored": true
+  },
+  "collection": {
+    "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+    "startedAt": "2026-09-07T00:00:30.583587+00:00",
+    "finishedAt": "2026-09-07T00:40:30.387848+00:00",
+    "collectorExitCode": 0
+  },
+  "backupWal": [
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:10:30.589602+00:00",
+      "offsetSeconds": 600,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "63c4a878186848c2a3c5c106f7657b37",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:10:30.860472+00:00"
+    },
+    {
+      "kind": "backup",
+      "startedAt": "2026-09-07T00:17:10.589193+00:00",
+      "offsetSeconds": 1000,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "8242679cbc35400195a144f199d53231",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:18:00.926700+00:00"
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:20:30.590544+00:00",
+      "offsetSeconds": 1200,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "8291ea3b5eb2461d8346523b76fea66e",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:20:30.927629+00:00"
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T00:30:30.589318+00:00",
+      "offsetSeconds": 1800,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "b134ee0485e54432b4e606b9abf69ca6",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T00:30:30.861146+00:00"
+    }
+  ],
+  "rawMetricsSha256": "2367a4c49b498b5a10f53d4cc6e7f4fff72c873f8d50fae8904ecce91b731465",
+  "sampleCount": 480,
+  "expectedSamples": 480,
+  "completeSequences": true,
+  "endMarkerPresent": true,
+  "maxSampleGapSeconds": 5,
+  "minimumMemAvailablePercent": 26.465,
+  "firstMemAvailablePercent": 28.435,
+  "lastMemAvailablePercent": 27.983,
+  "swapFirstKiB": 120,
+  "swapLastKiB": 372,
+  "swapPeakKiB": 372,
+  "swapIntervals": [
+    {
+      "at": "2026-09-07T00:36:35+00:00",
+      "pswpin": 0,
+      "pswpout": 63
+    }
+  ],
+  "normalFullGcCount": 3,
+  "normalFullGcPauseTotalMs": 245.674,
+  "jvmOomIndicatorLines": 0,
+  "kernelOomIndicatorLines": 0,
+  "normalUnhealthySystemdSamples": 0,
+  "normalOomContainerSamples": 0,
+  "normalUnhealthyContainers": 0,
+  "sourceRuntimeSha256": "e45e277437cb3099fe1993eb3be9a3923d60e1a35262b65cac9e82783ed02363",
+  "sourceRuntimePath": "/opt/runninggu-validation/api4g-673a2f7-20260907T0000Z-v4nokto/runtime-evidence.json",
+  "artifactKind": "derived_summary_full_raw_retained_on_ec2_and_cloudshell",
+  "loadWindow": {
+    "start": "2026-09-07T00:01:32.248372+00:00",
+    "end": "2026-09-07T00:36:31.324187+00:00",
+    "samples": 420,
+    "minimumAvailableKiB": 1034204,
+    "minimumAvailablePercent": 26.493,
+    "firstAvailableKiB": 1084804,
+    "lastAvailableKiB": 1041280,
+    "swapFirstKiB": 120,
+    "swapLastKiB": 120,
+    "swapPeakKiB": 120,
+    "swapInPages": 0,
+    "swapOutPages": 0,
+    "cpu": {
+      "mean": 4.349,
+      "p95": 7.571,
+      "max": 12.392,
+      "top": [
+        {
+          "at": "2026-09-07T00:05:05+00:00",
+          "busyPercent": 12.392,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:10:05+00:00",
+          "busyPercent": 10.884,
+          "iowaitPercent": 0.097,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:17:15+00:00",
+          "busyPercent": 10.108,
+          "iowaitPercent": 0.294,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:20:05+00:00",
+          "busyPercent": 10.108,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T00:18:05+00:00",
+          "busyPercent": 10.029,
+          "iowaitPercent": 0.197,
+          "counterReset": false
+        }
+      ]
+    }
+  },
+  "fullObservationCpuTop": [
+    {
+      "at": "2026-09-07T00:37:00+00:00",
+      "busyPercent": 97.533,
+      "iowaitPercent": 0.0,
+      "counterReset": false
+    },
+    {
+      "at": "2026-09-07T00:37:05+00:00",
+      "busyPercent": 56.16,
+      "iowaitPercent": 0.0,
+      "counterReset": false
+    },
+    {
+      "at": "2026-09-07T00:36:55+00:00",
+      "busyPercent": 53.945,
+      "iowaitPercent": 0.69,
+      "counterReset": false
+    },
+    {
+      "at": "2026-09-07T00:01:30+00:00",
+      "busyPercent": 25.073,
+      "iowaitPercent": 0.098,
+      "counterReset": false
+    },
+    {
+      "at": "2026-09-07T00:05:05+00:00",
+      "busyPercent": 12.392,
+      "iowaitPercent": 0.0,
+      "counterReset": false
+    }
+  ],
+  "serviceMemory": {
+    "backend": {
+      "firstMiB": 361.2578125,
+      "lastMiB": 398.46484375,
+      "maxMiB": 416.5390625
+    },
+    "graphhopper": {
+      "firstMiB": 1719.296,
+      "lastMiB": 1727.488,
+      "maxMiB": 1728.512,
+      "restartCounts": [
+        "0"
+      ],
+      "maxCpuPercent": 26.05
+    },
+    "postgres": {
+      "firstMiB": 60.79,
+      "lastMiB": 59.88,
+      "maxMiB": 76.16,
+      "restartCounts": [
+        "0"
+      ],
+      "maxCpuPercent": 7.43
+    }
+  },
+  "loadGc": {
+    "backend": {
+      "count": 14,
+      "totalPauseMs": 237.264,
+      "maxPauseMs": 116.94,
+      "heapAfterFirstMiB": 48,
+      "heapAfterLastMiB": 49,
+      "heapAfterMinMiB": 48,
+      "heapAfterMaxMiB": 49,
+      "events": [
+        {
+          "at": "2026-09-07T00:03:24.361633+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 20,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 7.686,
+          "heapMiB": [
+            115,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:05:40.489735+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 21,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.504,
+          "heapMiB": [
+            116,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:19.315382+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 22,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 7.178,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:10:40.446234+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 23,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 10.428,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:24.347337+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 24,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 7.807,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:16:01.331795+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 25,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.001,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:25.320547+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 26,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.352,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:05.329208+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 27,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.113,
+          "heapMiB": [
+            117,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:40.360452+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 28,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.688,
+          "heapMiB": [
+            117,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:26:20.320108+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 29,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 8.759,
+          "heapMiB": [
+            117,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:40.414295+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 30,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 11.065,
+          "heapMiB": [
+            117,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:31:24.408492+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 31,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 13.349,
+          "heapMiB": [
+            117,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:04.401461+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 32,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 12.394,
+          "heapMiB": [
+            117,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:31.473086+00:00",
+          "service": "backend",
+          "invocationId": "654a1c0497c04570a52143efefd96877",
+          "gcId": 33,
+          "kind": "Pause Full (CodeCache GC Threshold)",
+          "full": true,
+          "pauseMs": 116.94,
+          "heapMiB": [
+            87,
+            49,
+            247
+          ],
+          "window": "normal_observation"
+        }
+      ]
+    },
+    "graphhopper": {
+      "count": 148,
+      "totalPauseMs": 3170.685,
+      "maxPauseMs": 89.919,
+      "heapAfterFirstMiB": 1706,
+      "heapAfterLastMiB": 1227,
+      "heapAfterMinMiB": 1059,
+      "heapAfterMaxMiB": 2043,
+      "events": [
+        {
+          "at": "2026-09-07T00:02:04.376350228Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 133,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 58.252,
+          "heapMiB": [
+            2042,
+            1706,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.341537590Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 134,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 31.197,
+          "heapMiB": [
+            2045,
+            1917,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.392653692Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 135,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 9.482,
+          "heapMiB": [
+            2044,
+            1994,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.397099572Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 136,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 4.105,
+          "heapMiB": [
+            1997,
+            1996,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.432353056Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 138,
+          "kind": "Pause Young (Normal) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 6.978,
+          "heapMiB": [
+            2045,
+            2025,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.436112305Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 139,
+          "kind": "Pause Young (Normal) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.839,
+          "heapMiB": [
+            2044,
+            2043,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.463607141Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 140,
+          "kind": "Pause Full (G1 Compaction Pause)",
+          "full": true,
+          "pauseMs": 27.373,
+          "heapMiB": [
+            2043,
+            1059,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.470782982Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 141,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.506,
+          "heapMiB": [
+            1061,
+            1061,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.493441504Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 142,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 2.633,
+          "heapMiB": [
+            1113,
+            1103,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:02:24.505114837Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 142,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.196,
+          "heapMiB": [
+            1135,
+            1135,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:03:24.466735065Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 143,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 69.419,
+          "heapMiB": [
+            2046,
+            1670,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:03:40.387972452Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 144,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 24.055,
+          "heapMiB": [
+            2043,
+            1889,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:03:40.393379180Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 145,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 5.227,
+          "heapMiB": [
+            1891,
+            1891,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:03:40.424679998Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 146,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.487,
+          "heapMiB": [
+            1939,
+            1164,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:03:40.437625019Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 146,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.231,
+          "heapMiB": [
+            1205,
+            1205,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:04:40.429033240Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 147,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 42.96,
+          "heapMiB": [
+            2045,
+            1688,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:05:04.420849974Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 148,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 31.518,
+          "heapMiB": [
+            2046,
+            1909,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:05:04.424198696Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 149,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 2.564,
+          "heapMiB": [
+            1911,
+            1911,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:05:04.462307227Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 150,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 5.868,
+          "heapMiB": [
+            1941,
+            1196,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:05:04.476720044Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 150,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.466,
+          "heapMiB": [
+            1217,
+            1217,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:06:04.353138614Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 151,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 39.756,
+          "heapMiB": [
+            2045,
+            1715,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:06:24.354790447Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 152,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 26.778,
+          "heapMiB": [
+            2046,
+            1921,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:06:24.357039749Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 153,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.753,
+          "heapMiB": [
+            1923,
+            1923,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:06:24.389682580Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 154,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.457,
+          "heapMiB": [
+            1948,
+            1251,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:06:24.405842861Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 154,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.364,
+          "heapMiB": [
+            1272,
+            1272,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:07:04.387299711Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 155,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 33.301,
+          "heapMiB": [
+            2045,
+            1736,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:07:24.395950270Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 156,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 26.034,
+          "heapMiB": [
+            2046,
+            1930,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:07:24.398037511Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 157,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.589,
+          "heapMiB": [
+            1932,
+            1932,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:07:24.426178368Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 158,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.646,
+          "heapMiB": [
+            1991,
+            1337,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:07:24.440177090Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 158,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.314,
+          "heapMiB": [
+            1379,
+            1379,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:04.452245983Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 159,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 50.153,
+          "heapMiB": [
+            2043,
+            1735,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:24.399661203Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 160,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 33.757,
+          "heapMiB": [
+            2043,
+            1806,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:24.413029177Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 161,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 9.643,
+          "heapMiB": [
+            1809,
+            1806,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:24.443571751Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 162,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.675,
+          "heapMiB": [
+            1890,
+            1259,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:08:24.458618882Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 162,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.311,
+          "heapMiB": [
+            1301,
+            1301,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:24.354793092Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 163,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 31.193,
+          "heapMiB": [
+            2030,
+            1663,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.372258576Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 164,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 40.21,
+          "heapMiB": [
+            2038,
+            1872,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.444996347Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 165,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 33.486,
+          "heapMiB": [
+            2041,
+            1962,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.466048711Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 166,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 20.605,
+          "heapMiB": [
+            1964,
+            1965,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.514067972Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 168,
+          "kind": "Pause Young (Normal) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 24.72,
+          "heapMiB": [
+            2028,
+            2001,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.521223088Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 167,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.761,
+          "heapMiB": [
+            2019,
+            1220,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:09:40.536255435Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 167,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.296,
+          "heapMiB": [
+            1242,
+            1242,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:10:40.402665238Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 169,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 35.578,
+          "heapMiB": [
+            2040,
+            1678,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:11:04.421354726Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 170,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 39.811,
+          "heapMiB": [
+            2040,
+            1872,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:11:04.445071473Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 171,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 20.027,
+          "heapMiB": [
+            1876,
+            1873,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:11:04.474261174Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 172,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.808,
+          "heapMiB": [
+            1947,
+            1224,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:11:04.507089150Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 172,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.322,
+          "heapMiB": [
+            1319,
+            1319,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:12:04.390620094Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 173,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 57.651,
+          "heapMiB": [
+            2040,
+            1654,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:12:24.425538204Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 174,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 43.89,
+          "heapMiB": [
+            2042,
+            1897,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:12:24.440359158Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 175,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 13.688,
+          "heapMiB": [
+            1900,
+            1897,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:12:24.469213327Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 176,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 5.107,
+          "heapMiB": [
+            1929,
+            1188,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:12:24.482090596Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 176,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.333,
+          "heapMiB": [
+            1209,
+            1209,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:04.548442254Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 177,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 54.339,
+          "heapMiB": [
+            2040,
+            1662,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:24.454203670Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 178,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 42.451,
+          "heapMiB": [
+            2045,
+            1898,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:24.466481468Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 179,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 10.366,
+          "heapMiB": [
+            1901,
+            1899,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:24.489102143Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 180,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.994,
+          "heapMiB": [
+            1910,
+            1169,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:13:24.495786367Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 180,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.263,
+          "heapMiB": [
+            1169,
+            1169,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:14:24.422660321Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 181,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 58.968,
+          "heapMiB": [
+            2043,
+            1701,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:14:40.428477759Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 182,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 37.358,
+          "heapMiB": [
+            2045,
+            1902,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:14:40.434386086Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 183,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 5.641,
+          "heapMiB": [
+            1904,
+            1905,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:14:40.464487602Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 184,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.814,
+          "heapMiB": [
+            1965,
+            1209,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:14:40.478106337Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 184,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.273,
+          "heapMiB": [
+            1251,
+            1251,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:15:40.394506069Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 185,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 58.982,
+          "heapMiB": [
+            2038,
+            1656,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:16:04.395135139Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 186,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 42.535,
+          "heapMiB": [
+            2042,
+            1882,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:16:04.419957843Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 187,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 22.152,
+          "heapMiB": [
+            1885,
+            1882,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:16:04.451388844Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 188,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.653,
+          "heapMiB": [
+            1967,
+            1226,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:16:04.465810276Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 188,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.285,
+          "heapMiB": [
+            1268,
+            1268,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:17:04.398180368Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 189,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 58.992,
+          "heapMiB": [
+            2038,
+            1654,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:17:24.374221453Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 190,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 42.084,
+          "heapMiB": [
+            2042,
+            1881,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:17:24.393124347Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 191,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 18.591,
+          "heapMiB": [
+            1883,
+            1883,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:17:24.437161986Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 192,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.185,
+          "heapMiB": [
+            1931,
+            1193,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:17:24.451096939Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 192,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.265,
+          "heapMiB": [
+            1214,
+            1214,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:04.498999418Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 193,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 60.294,
+          "heapMiB": [
+            2042,
+            1676,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:24.413949133Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 194,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 36.025,
+          "heapMiB": [
+            2045,
+            1899,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:24.419047380Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 195,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 4.708,
+          "heapMiB": [
+            1901,
+            1901,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:24.452120296Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 196,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 7.867,
+          "heapMiB": [
+            1931,
+            1176,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:18:24.462583149Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 196,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.316,
+          "heapMiB": [
+            1176,
+            1176,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:19:24.456737240Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 197,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 62.118,
+          "heapMiB": [
+            2045,
+            1702,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:19:40.403126052Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 198,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 26.854,
+          "heapMiB": [
+            2046,
+            1914,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:19:40.405326404Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 199,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.91,
+          "heapMiB": [
+            1916,
+            1916,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:19:40.437620376Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 200,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.276,
+          "heapMiB": [
+            2013,
+            1255,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:19:40.454264825Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 200,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.336,
+          "heapMiB": [
+            1297,
+            1297,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:20:40.421537339Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 201,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 56.039,
+          "heapMiB": [
+            2042,
+            1674,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:04.385290715Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 202,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 41.129,
+          "heapMiB": [
+            2045,
+            1906,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:04.390444965Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 203,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 4.893,
+          "heapMiB": [
+            1908,
+            1908,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:04.421931686Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 204,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.949,
+          "heapMiB": [
+            1988,
+            1252,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:04.437426114Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 204,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.264,
+          "heapMiB": [
+            1304,
+            1304,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:21:40.463317596Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 205,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 57.75,
+          "heapMiB": [
+            2042,
+            1689,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:22:04.420355302Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 206,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 35.839,
+          "heapMiB": [
+            2041,
+            1897,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:22:04.433096202Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 207,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 11.929,
+          "heapMiB": [
+            1899,
+            1899,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:22:04.458580808Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 208,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.698,
+          "heapMiB": [
+            1929,
+            1203,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:22:04.466550294Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 208,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.289,
+          "heapMiB": [
+            1203,
+            1203,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:04.409779137Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 209,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 56.975,
+          "heapMiB": [
+            2041,
+            1703,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:24.418953613Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 210,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 33.907,
+          "heapMiB": [
+            2045,
+            1917,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:24.421055906Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 211,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.768,
+          "heapMiB": [
+            1919,
+            1918,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:24.450325143Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 212,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.473,
+          "heapMiB": [
+            1986,
+            1253,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:23:24.464640171Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 212,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.313,
+          "heapMiB": [
+            1295,
+            1295,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:24:24.373340160Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 213,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 55.823,
+          "heapMiB": [
+            2039,
+            1676,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:24:40.486612136Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 214,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 41.283,
+          "heapMiB": [
+            2041,
+            1871,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:24:40.503567069Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 215,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 16.631,
+          "heapMiB": [
+            1873,
+            1873,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:24:40.547043035Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 216,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 7.178,
+          "heapMiB": [
+            1929,
+            1229,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:24:40.564680444Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 216,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.271,
+          "heapMiB": [
+            1271,
+            1271,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:25:24.420759986Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 217,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 56.63,
+          "heapMiB": [
+            2039,
+            1664,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:25:40.419660061Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 218,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 40.816,
+          "heapMiB": [
+            2041,
+            1877,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:25:40.435848769Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 219,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 15.947,
+          "heapMiB": [
+            1879,
+            1880,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:25:40.467143196Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 220,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.783,
+          "heapMiB": [
+            1961,
+            1244,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:25:40.477333338Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 220,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.316,
+          "heapMiB": [
+            1244,
+            1244,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:26:40.462712740Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 221,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 89.919,
+          "heapMiB": [
+            2035,
+            1660,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:27:04.418655403Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 222,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 43.244,
+          "heapMiB": [
+            2044,
+            1897,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:27:04.424859075Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 223,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 4.557,
+          "heapMiB": [
+            1899,
+            1900,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:27:04.453130938Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 224,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.647,
+          "heapMiB": [
+            1971,
+            1250,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:27:04.468337016Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 224,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.349,
+          "heapMiB": [
+            1292,
+            1292,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:04.378268504Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 225,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 53.532,
+          "heapMiB": [
+            2041,
+            1683,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:24.398989083Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 226,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 39.444,
+          "heapMiB": [
+            2044,
+            1891,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:24.407349275Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 227,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 4.855,
+          "heapMiB": [
+            1894,
+            1891,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:24.439054133Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 228,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.868,
+          "heapMiB": [
+            1986,
+            1264,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:28:24.454511376Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 228,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.285,
+          "heapMiB": [
+            1307,
+            1307,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:29:04.436056818Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 229,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 57.895,
+          "heapMiB": [
+            2044,
+            1713,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:29:24.414670307Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 230,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 26.924,
+          "heapMiB": [
+            2045,
+            1918,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:29:24.416660494Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 231,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.687,
+          "heapMiB": [
+            1920,
+            1920,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:29:24.446312219Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 232,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.111,
+          "heapMiB": [
+            2001,
+            1221,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:29:24.463369295Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 232,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.27,
+          "heapMiB": [
+            1254,
+            1254,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:30:24.403832654Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 233,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 57.885,
+          "heapMiB": [
+            2038,
+            1656,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:30:40.404450743Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 234,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 41.831,
+          "heapMiB": [
+            2040,
+            1881,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:30:40.425088475Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 235,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 16.136,
+          "heapMiB": [
+            1883,
+            1883,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:30:40.465186935Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 236,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.584,
+          "heapMiB": [
+            1963,
+            1226,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:30:40.490039567Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 236,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.314,
+          "heapMiB": [
+            1257,
+            1257,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:31:40.414032143Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 237,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 57.611,
+          "heapMiB": [
+            2038,
+            1651,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:32:04.412156203Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 238,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 65.946,
+          "heapMiB": [
+            2043,
+            1886,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:32:04.423017026Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 239,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 10.869,
+          "heapMiB": [
+            1889,
+            1886,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:32:04.472847925Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 240,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.965,
+          "heapMiB": [
+            1949,
+            1199,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:32:04.500086532Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 240,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.262,
+          "heapMiB": [
+            1231,
+            1231,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:32:40.499704313Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 241,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 57.666,
+          "heapMiB": [
+            2038,
+            1652,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:33:24.381598631Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 242,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 44.462,
+          "heapMiB": [
+            2044,
+            1895,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:33:24.383575702Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 243,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.753,
+          "heapMiB": [
+            1897,
+            1897,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:33:24.414066599Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 244,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.814,
+          "heapMiB": [
+            1967,
+            1218,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:33:24.427324512Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 244,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.306,
+          "heapMiB": [
+            1270,
+            1270,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:04.476191741Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 245,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 60.854,
+          "heapMiB": [
+            2043,
+            1703,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:24.427180769Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 246,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation) (Evacuation Failure)",
+          "full": false,
+          "pauseMs": 36.913,
+          "heapMiB": [
+            2044,
+            1915,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:24.429617705Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 247,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 1.716,
+          "heapMiB": [
+            1918,
+            1917,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:24.461666813Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 248,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 4.381,
+          "heapMiB": [
+            2007,
+            1264,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:34:24.472387471Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 248,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.292,
+          "heapMiB": [
+            1264,
+            1264,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:24.426776251Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 249,
+          "kind": "Pause Young (Prepare Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 80.863,
+          "heapMiB": [
+            2034,
+            1671,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:40.398275983Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 250,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 50.519,
+          "heapMiB": [
+            2034,
+            1873,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:40.472220761Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 251,
+          "kind": "Pause Young (Mixed) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 38.944,
+          "heapMiB": [
+            2036,
+            1955,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:40.497346535Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 252,
+          "kind": "Pause Young (Concurrent Start) (G1 Humongous Allocation)",
+          "full": false,
+          "pauseMs": 24.782,
+          "heapMiB": [
+            1957,
+            1957,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:40.549966038Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 253,
+          "kind": "Pause Remark",
+          "full": false,
+          "pauseMs": 3.854,
+          "heapMiB": [
+            2012,
+            1227,
+            2048
+          ],
+          "window": "normal_observation"
+        },
+        {
+          "at": "2026-09-07T00:35:40.562844737Z",
+          "service": "graphhopper",
+          "invocationId": null,
+          "gcId": 253,
+          "kind": "Pause Cleanup",
+          "full": false,
+          "pauseMs": 0.415,
+          "heapMiB": [
+            1227,
+            1227,
+            2048
+          ],
+          "window": "normal_observation"
+        }
+      ]
+    }
+  },
+  "outsideLoadFullGc": [
+    {
+      "at": "2026-09-06T23:59:35.640390+00:00",
+      "service": "backend",
+      "invocationId": "654a1c0497c04570a52143efefd96877",
+      "gcId": 3,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 21.915,
+      "heapMiB": [
+        26,
+        9,
+        247
+      ],
+      "window": "before_readiness"
+    },
+    {
+      "at": "2026-09-06T23:59:37.402086+00:00",
+      "service": "backend",
+      "invocationId": "654a1c0497c04570a52143efefd96877",
+      "gcId": 6,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 52.305,
+      "heapMiB": [
+        76,
+        18,
+        247
+      ],
+      "window": "before_readiness"
+    },
+    {
+      "at": "2026-09-06T23:59:39.247284+00:00",
+      "service": "backend",
+      "invocationId": "654a1c0497c04570a52143efefd96877",
+      "gcId": 10,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 49.407,
+      "heapMiB": [
+        39,
+        25,
+        247
+      ],
+      "window": "before_readiness"
+    },
+    {
+      "at": "2026-09-06T23:59:44.169189+00:00",
+      "service": "backend",
+      "invocationId": "654a1c0497c04570a52143efefd96877",
+      "gcId": 18,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 101.361,
+      "heapMiB": [
+        105,
+        45,
+        247
+      ],
+      "window": "normal_observation"
+    },
+    {
+      "at": "2026-09-07T00:36:55.129109+00:00",
+      "service": "backend",
+      "invocationId": "8cf138f0152f49da91e0c2b6236e4c94",
+      "gcId": 3,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 21.458,
+      "heapMiB": [
+        26,
+        9,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T00:36:57.026188+00:00",
+      "service": "backend",
+      "invocationId": "8cf138f0152f49da91e0c2b6236e4c94",
+      "gcId": 6,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 53.113,
+      "heapMiB": [
+        77,
+        18,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T00:36:58.916119+00:00",
+      "service": "backend",
+      "invocationId": "8cf138f0152f49da91e0c2b6236e4c94",
+      "gcId": 10,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 48.361,
+      "heapMiB": [
+        38,
+        25,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T00:37:03.408826+00:00",
+      "service": "backend",
+      "invocationId": "8cf138f0152f49da91e0c2b6236e4c94",
+      "gcId": 18,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 112.897,
+      "heapMiB": [
+        103,
+        45,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    }
+  ],
+  "baseline": {
+    "at": "2026-09-06T23:59:32.951351+00:00",
+    "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+    "acceptancePolicy": "app-capacity-v4-no-kto",
+    "instance": {
+      "instanceId": "i-07aa483968f4daddc",
+      "instanceType": "c7i-flex.large",
+      "availabilityZone": "ap-northeast-2b",
+      "region": "ap-northeast-2"
+    },
+    "backendSha": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "release": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graph": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "backend": {
+      "ActiveState": "active",
+      "SubState": "running",
+      "NRestarts": "0",
+      "InvocationID": "cf19bbe15237483ea336f7145c6fdfe6",
+      "MemoryHigh": "671088640",
+      "MemoryMax": "805306368",
+      "MemoryCurrent": "369815552"
+    },
+    "backendJvm": [
+      "-Xms256m",
+      "-Xmx512m",
+      "-Xlog:gc*:stdout:time,uptime,level,tags"
+    ],
+    "containers": [
+      {
+        "name": "backend-graphhopper-1",
+        "id": "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf",
+        "image": "sha256:16b3618f3e69a094990e6c9360ee92972beec643ca26bc5d9b61404172910753",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:42.010825586Z"
+        },
+        "limits": {
+          "Memory": 2684354560,
+          "MemorySwap": 2684354560,
+          "MemoryReservation": 2147483648
+        },
+        "jvm": [
+          "-Xms512m",
+          "-Xmx2g"
+        ]
+      },
+      {
+        "name": "backend-postgres-1",
+        "id": "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd",
+        "image": "sha256:547c41760b4112de392c4a290292a760252b0a07360b22ce75c31484bc2a322a",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:36.355930733Z"
+        },
+        "limits": {
+          "Memory": 0,
+          "MemorySwap": 0,
+          "MemoryReservation": 0
+        }
+      }
+    ],
+    "swappiness": 10,
+    "mem": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1104284,
+      "SwapTotal": 4194300,
+      "SwapFree": 4194180
+    },
+    "guardOff": true,
+    "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+    "graphhopperInvocation": "09d01169c51f44749b0e353f1c2d8f7a",
+    "nginx": "active",
+    "readiness": true,
+    "passed": true
+  }
+}

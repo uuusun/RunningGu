@@ -179,6 +179,8 @@ A2에서 인증 코드 재발송·재인증을 안내한다. 같은 가입 버�
   }
 }
 ```
+**응답의 `user` 는 요약이며 `agreements` 를 포함하지 않는다** 🔒확정(이슈 #287 · 2026-09-05). 1-5 가입·1-7 카카오 로그인·1-8 카카오 가입 응답도 같다. 앱은 이 값으로 약관 동의 상태를 확정하면 안 되고, 필요하면 `GET /api/me`(§2)로 읽는다 — 요약을 완전한 프로필처럼 쓰면 **서버가 ON 인 마케팅 동의가 앱에서 OFF 로 보인다.** 이 필드를 로그인 응답에 추가하지 않는 이유는 §2 의 프로필이 이미 단일 출처이고, 두 곳에서 같은 값을 주면 갈릴 자리가 생기기 때문이다.
+
 오류: `401 LOGIN_FAILED` — 메시지 "이메일 또는 비밀번호를 확인해 주세요" 🔒(§4.1, 계정 존재 여부 비노출).
 
 로그인 공격 방어는 단일 서버 Caffeine의 고정 1분 창 두 개를 함께 적용한다(결정-55, 이슈 #112).
@@ -303,6 +305,10 @@ A2에서 인증 코드 재발송·재인증을 안내한다. 같은 가입 버�
 
 `PATCH /api/me/agreements`는 같은 `marketing` 값을 다시 보내도 멱등 `200`이며 약관 이력을
 중복 추가하지 않는다. 값이 바뀐 경우에만 활성 `MARKETING` 버전으로 append-only 이력을 추가한다.
+
+**`agreements` 를 주는 곳은 이 세 응답뿐이다** 🔒확정(이슈 #287). 로그인·가입 응답의 `user`
+(§1-5 ~ §1-8)에는 없으므로, 앱은 **안 받은 값을 `false` 로 확정하지 않고 "모름" 으로 들고
+있다가** `GET /api/me` 로 채운다. 재로그인 직후 계정 관리 화면이 그 자리다.
 
 가입 수단 정책:
 
@@ -625,11 +631,32 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 | # | 메서드/경로 | 규칙 |
 |---|---|---|
 | 5-7 | `POST /itineraries/{id}/days/{dayId}/blocks` | 추가 — body `{startTime(기본 "13:00" 🔒), title, category, placeName, address, lat, lng, description}` → `201 {blockId, orderNo}` (맨 끝) |
-| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
+| 5-8 | `PATCH /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록의 장소 교체·수정 — 보낸 필드만 반영. **필드 부재와 명시적 `null` 을 가른다** — 없으면 기존 값 유지, `"placeName": null` 은 그 값을 **제거**한다(이슈 #213). 성공 `200` + 갱신된 block 전체. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-9 | `DELETE /itineraries/{id}/days/{dayId}/blocks/{blockId}` | USER 블록 삭제 `204`. RACE면 `409 SYSTEM_BLOCK_IMMUTABLE` |
 | 5-10 | `PUT /itineraries/{id}/days/{dayId}/blocks/order` | USER 블록끼리만 순서 변경 — body `{"blockIds": [21, 19, 23]}`. 해당 day의 **USER 블록 전체 집합**과 정확히 일치해야 함(`400 BLOCK_SET_MISMATCH`). RACE의 고정 위치를 넘나드는 요청은 `409 SYSTEM_BLOCK_IMMUTABLE`. 성공 `200 {"dayId":7,"blocks":[...]}`로 해당 일자의 전체 블록을 `orderNo` 오름차순 반환 |
 
 5-8의 block 응답은 5-5 `blocks[]`와 같은 필드(`id, orderNo, startTime, title, category, placeName, address, lat, lng, description, blockType, systemManaged`)를 사용한다. 앱은 PATCH·order 응답으로 해당 블록 또는 일자의 상태를 교체한다.
+
+**서버는 문자열 값을 정규화해 저장한다** 🔒확정(이슈 #213 · 2026-09-05). `title` 은 앞뒤 공백을
+제거하며 비면 `400 VALIDATION_FAILED` 이고, `placeName`·`address`·`description` 은 공백만 있는
+값을 `null` 로 바꾼다. 공백 판정은 Java `String.strip()`·`isBlank()` 기준이라 U+3000·U+2003 같은
+유니코드 공백도 지우고 `NBSP`(U+00A0)는 남긴다. 앱의 Kotlin `trim()` 은 `NBSP` 까지 지우므로 **앱이
+서버보다 조금 더 지운다** — 보낸 값을 서버가 다시 깎지는 않으니 저장값과 화면은 갈리지 않지만,
+`NBSP` 만으로 된 `title` 은 앱이 먼저 거절한다.
+
+**`startTime` 기본값 `"13:00"` 은 5-7 추가에만 적용된다.** 5-8 수정에서는 필드를 생략하면 기존
+시각이 유지되고, 명시적 `null` 이나 빈 문자열은 `400 VALIDATION_FAILED` 다. 기본값으로 채워지지
+않는다.
+
+**5-8 에서는 앱이 공백을 `null` 로 줄이지 않는다.** 빈 문자열은 그 값을 **지우라는 신호**이고
+필드 생략은 **유지**라, 앱이 공백을 `null` 로 바꾸면 와이어에서 키가 빠져 지우기가 유지로
+바뀐다. 앱은 `explicitNulls=false` 라 `"placeName": null` 을 보낼 수 없으므로 **빈 문자열이
+유일한 지우기 수단**이다. 5-7 추가에는 지울 값이 없어 `null` 과 `""` 의 결과가 같다.
+
+**5-7 응답은 `201 {blockId, orderNo}` 를 유지하고, 앱이 보내기 전에 같은 정규화를 한다**
+🔒확정(2026-09-06 · #301). 응답을 블록 전체로 넓히지 않는다. 5-7 응답에는 저장된 문자열이 없어서
+앱이 보낸 값으로 행을 그리는데, 정규화를 안 하면 화면에 공백이 남거나 화면의 빈 문자열이 서버의
+`null` 과 어긋난다. 5-8 · 5-10 은 원래 계약대로 서버의 갱신 응답으로 상태를 교체한다.
 
 ---
 
@@ -713,7 +740,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
       "courseId": "T_CRS_MNG0000005117",
       "courseName": "해파랑길 1코스",
       "sido": "부산",
-      "sigun": "남구",
+      "sigun": "부산 남구",
       "distanceKm": 17.8,
       "difficulty": "NORMAL",
       "gainM": 312,
@@ -735,6 +762,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - `difficulty`는 전체 원본 코스의 정규화 등급으로, `/courses/near`에서 잘라 만든 왕복 구간의 등급과 달라도 정상이다.
 - `courseId`는 번들·KTO 결합에 사용하는 안정적 유일키다. `dataSource`는 지역별 응답에서
   `API_GPX|GPX_ONLY`만 가능하다.
+- **`sigun`은 시도를 포함한 전체 표기다** — 현재 catalog 261건이 전부 `"{sido} {시군}"` 형태다(#300).
+  앱은 `sigun`이 `sido`로 시작하면 그대로 쓰고, 아니면 `sido`를 앞에 붙여 한 줄로 그린다.
+  둘 다 nullable이므로 없는 쪽은 뺀다.
 - `syncedAt`은 nullable UTC `Z`다. 현재 서버 프로세스에서 전체 KTO 동기화에 성공해 결합한
   `API_GPX` 항목만 완료 시각을 가지며, 번들 fallback과 `GPX_ONLY`는 `null`이다.
 - `attributions`는 현재 응답 `content[]`에 실제 사용된 원천의 검증 완료 완성 문구만 중복 없이 담는다. 빈 페이지는 `[]`이다. 앱은 문자열을 변형하지 않고 배열 순서대로 `" · "`로 연결해 목록 하단에 표시한다.
@@ -750,7 +780,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
   "courseId": "T_CRS_MNG0000005117",
   "courseName": "해파랑길 1코스",
   "sido": "부산",
-  "sigun": "남구",
+  "sigun": "부산 남구",
   "distanceKm": 17.8,
   "difficulty": "NORMAL",
   "gainM": 312,

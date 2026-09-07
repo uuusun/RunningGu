@@ -1,0 +1,399 @@
+{
+  "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+  "acceptancePolicy": "app-capacity-v3",
+  "guard": {
+    "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+    "finishedAt": "2026-09-07T01:56:57.370441+00:00",
+    "guardDisabled": true,
+    "readiness": true,
+    "backendNRestarts": "0",
+    "guardSummary": {
+      "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+      "guardLines": 52,
+      "malformedLines": 0,
+      "unsafeEvents": 0,
+      "non2xxResults": 0,
+      "counterGaps": 0,
+      "overLimit": 0,
+      "requiredEndpoint": "KTO_SEARCH_FESTIVAL",
+      "requiredEndpointSeen": true,
+      "endpoints": [
+        {
+          "endpoint": "KAKAO_CATEGORY",
+          "attempts": 7,
+          "finalCount": 7,
+          "limit": 2000
+        },
+        {
+          "endpoint": "KAKAO_KEYWORD",
+          "attempts": 7,
+          "finalCount": 7,
+          "limit": 2000
+        },
+        {
+          "endpoint": "KTO_SEARCH_FESTIVAL",
+          "attempts": 8,
+          "finalCount": 8,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_KOR_LOCATION",
+          "attempts": 14,
+          "finalCount": 14,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_WELLNESS_LOCATION",
+          "attempts": 14,
+          "finalCount": 14,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_DURUNUBI_COURSE",
+          "attempts": 2,
+          "finalCount": 2,
+          "limit": 100
+        }
+      ],
+      "providers": [
+        {
+          "provider": "KAKAO",
+          "attempts": 14,
+          "finalCount": 14,
+          "limit": "5000"
+        },
+        {
+          "provider": "KTO",
+          "attempts": 38,
+          "finalCount": 38,
+          "limit": "NONE"
+        }
+      ],
+      "passed": true,
+      "invocationUnchanged": true,
+      "nRestartsUnchanged": true,
+      "ktoAttempts": 38
+    }
+  },
+  "collection": {
+    "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+    "startedAt": "2026-09-07T01:17:10.616834+00:00",
+    "finishedAt": "2026-09-07T01:57:10.880413+00:00",
+    "collectorExitCode": 0
+  },
+  "backupWal": [
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:27:10.624214+00:00",
+      "offsetSeconds": 600,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "393ac1eb245540e79da17f4bf170c308",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:27:10.900135+00:00"
+    },
+    {
+      "kind": "backup",
+      "startedAt": "2026-09-07T01:33:50.623069+00:00",
+      "offsetSeconds": 1000,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "047311e54c4a49528c11e5868f4733ca",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:34:43.318576+00:00"
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:37:10.623146+00:00",
+      "offsetSeconds": 1200,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "df292b5780c5420b941704f6047a128d",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:37:10.916347+00:00"
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:47:10.622665+00:00",
+      "offsetSeconds": 1800,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "a2d3533f41ad4f60822597734ac978e1",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:47:10.899130+00:00"
+    }
+  ],
+  "rawMetricsSha256": "cfdb59f108ae543b5a58369b5c94ab3dcd3431e6072ce2410446c35f08c146c6",
+  "sampleCount": 480,
+  "expectedSamples": 480,
+  "completeSequences": true,
+  "endMarkerPresent": true,
+  "maxSampleGapSeconds": 6,
+  "minimumMemAvailablePercent": 26.922,
+  "firstMemAvailablePercent": 28.288,
+  "lastMemAvailablePercent": 27.827,
+  "swapFirstKiB": 372,
+  "swapLastKiB": 372,
+  "swapPeakKiB": 372,
+  "jvmOomIndicatorLines": 0,
+  "kernelOomIndicatorLines": 0,
+  "normalUnhealthySystemdSamples": 0,
+  "normalOomContainerSamples": 0,
+  "normalUnhealthyContainers": 0,
+  "sourceRuntimeSha256": "15d1068208b464f0df5eef981d16417f08a0bac3bde1e39b32cec7b8fabf15ca",
+  "sourceRuntimePath": "/opt/runninggu-validation/api4g-673a2f7-20260907T0115Z-ktosupp/runtime-evidence.json",
+  "derivation": "Actual PC load window; full samples and GC retained on EC2",
+  "baseline": {
+    "at": "2026-09-07T01:15:27.520942+00:00",
+    "passed": true,
+    "backendSha": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graph": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "backendJvm": [
+      "-Xms256m",
+      "-Xmx512m",
+      "-Xlog:gc*:stdout:time,uptime,level,tags"
+    ],
+    "backend": {
+      "ActiveState": "active",
+      "SubState": "running",
+      "NRestarts": "0",
+      "InvocationID": "8cf138f0152f49da91e0c2b6236e4c94",
+      "MemoryHigh": "671088640",
+      "MemoryMax": "805306368",
+      "MemoryCurrent": "378306560"
+    },
+    "swappiness": 10,
+    "mem": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1078208,
+      "SwapTotal": 4194300,
+      "SwapFree": 4193928
+    },
+    "guardOff": true
+  },
+  "loadWindow": {
+    "start": "2026-09-07T01:21:35.332297+00:00",
+    "end": "2026-09-07T01:56:29.361999+00:00",
+    "sampleCount": 418,
+    "memAvailableKiB": {
+      "first": 1091456,
+      "last": 1067376,
+      "min": 1050968,
+      "max": 1105352
+    },
+    "memAvailablePercentMin": 26.922,
+    "swapKiB": {
+      "first": 372,
+      "last": 372,
+      "min": 372,
+      "max": 372
+    },
+    "pswpinDeltaInsideSamples": 0,
+    "pswpoutDeltaInsideSamples": 0,
+    "cpu": {
+      "mean": 3.343,
+      "p95": 4.31,
+      "max": 9.507,
+      "top": [
+        {
+          "at": "2026-09-07T01:50:05+00:00",
+          "busyPercent": 9.507,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:34:45+00:00",
+          "busyPercent": 8.161,
+          "iowaitPercent": 0.197,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:33:55+00:00",
+          "busyPercent": 8.145,
+          "iowaitPercent": 0.393,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:47:45+00:00",
+          "busyPercent": 6.913,
+          "iowaitPercent": 1.168,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:27:15+00:00",
+          "busyPercent": 6.849,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        }
+      ]
+    }
+  },
+  "serviceMemory": {
+    "runninggu-backend.service": {
+      "memoryMiB": {
+        "first": 353.703125,
+        "last": 370.9140625,
+        "min": 353.703125,
+        "max": 371.1328125
+      },
+      "invocations": [
+        "efcca52bd0c547cda8790a2254bb19fb"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0
+    },
+    "runninggu-graphhopper.service": {
+      "memoryMiB": null,
+      "invocations": [
+        "09d01169c51f44749b0e353f1c2d8f7a"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0
+    },
+    "graphhopper": {
+      "memoryMiB": {
+        "first": 1727.488,
+        "last": 1727.488,
+        "min": 1727.488,
+        "max": 1727.488
+      },
+      "ids": [
+        "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0,
+      "oomSamples": 0
+    },
+    "postgres": {
+      "memoryMiB": {
+        "first": 60.76,
+        "last": 58.86,
+        "min": 58.49,
+        "max": 75.06
+      },
+      "ids": [
+        "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0,
+      "oomSamples": 0
+    }
+  },
+  "loadGc": {
+    "backend": {
+      "count": 1,
+      "pauseTotalMs": 7.857,
+      "pauseMaxMs": 7.857,
+      "fullEvents": [],
+      "heapAfterMiB": {
+        "first": 48,
+        "last": 48,
+        "min": 48,
+        "max": 48
+      },
+      "afterEachFullGc": [],
+      "lastEvents": [
+        {
+          "at": "2026-09-07T01:47:29.468837+00:00",
+          "service": "backend",
+          "invocationId": "efcca52bd0c547cda8790a2254bb19fb",
+          "gcId": 19,
+          "kind": "Pause Young (Allocation Failure)",
+          "full": false,
+          "pauseMs": 7.857,
+          "heapMiB": [
+            114,
+            48,
+            247
+          ],
+          "window": "normal_observation"
+        }
+      ]
+    },
+    "graphhopper": {
+      "count": 0,
+      "pauseTotalMs": 0,
+      "pauseMaxMs": 0,
+      "fullEvents": [],
+      "heapAfterMiB": null,
+      "afterEachFullGc": [],
+      "lastEvents": []
+    }
+  },
+  "swapIntervals": [],
+  "plannedCleanupGc": [
+    {
+      "at": "2026-09-07T01:56:48.880306+00:00",
+      "service": "backend",
+      "invocationId": "4029ba3f5e4a41568a90837acb65d79c",
+      "gcId": 3,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 24.486,
+      "heapMiB": [
+        28,
+        9,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T01:56:50.583643+00:00",
+      "service": "backend",
+      "invocationId": "4029ba3f5e4a41568a90837acb65d79c",
+      "gcId": 6,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 72.775,
+      "heapMiB": [
+        75,
+        18,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T01:56:52.525117+00:00",
+      "service": "backend",
+      "invocationId": "4029ba3f5e4a41568a90837acb65d79c",
+      "gcId": 10,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 49.283,
+      "heapMiB": [
+        39,
+        25,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    },
+    {
+      "at": "2026-09-07T01:56:57.290134+00:00",
+      "service": "backend",
+      "invocationId": "4029ba3f5e4a41568a90837acb65d79c",
+      "gcId": 18,
+      "kind": "Pause Full (Metadata GC Threshold)",
+      "full": true,
+      "pauseMs": 101.461,
+      "heapMiB": [
+        107,
+        45,
+        247
+      ],
+      "window": "planned_guard_cleanup"
+    }
+  ],
+  "maxOverallHostCpuPercent": 97.473
+}

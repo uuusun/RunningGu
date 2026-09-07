@@ -65,7 +65,7 @@ class BundleContestRepository(
      * 번들 항목은 크롤 원천의 externalId 만 갖고 있어 서버 상세와 같은 키로 조회할 수 없다.
      * 오프라인에서 상세를 그릴 때는 목록에서 이미 받은 [Contest] 를 쓰거나 [findByKey] 를 쓴다.
      */
-    override suspend fun detail(id: Long): Contest =
+    override suspend fun detail(id: Long): ContestDetailResult =
         throw NoSuchElementException("번들에는 canonical id 가 없다: $id")
 
     /**

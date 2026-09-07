@@ -1,0 +1,528 @@
+{
+  "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+  "capacityVerdict": "current_4g_maintainable_for_selected_scope",
+  "verdictScope": "kto_dependent_requests_only",
+  "fullAppLoadPassed": false,
+  "subsetChecksPassed": true,
+  "counts": {
+    "planned": 245,
+    "dispatched": 245,
+    "completed": 245,
+    "successful": 245,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "phases": [
+    {
+      "phase": "warmup",
+      "planned": 35,
+      "dispatched": 35,
+      "completed": 35,
+      "successful": 35,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0
+    },
+    {
+      "phase": "measurement",
+      "planned": 210,
+      "dispatched": 210,
+      "completed": 210,
+      "successful": 210,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0
+    }
+  ],
+  "auxiliaryCounts": {
+    "planned": 3,
+    "dispatched": 3,
+    "completed": 3,
+    "successful": 3,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "missedStarts": 0,
+  "lateDispatches": 0,
+  "maxDispatchDelayMs": 32.0,
+  "groups": [
+    {
+      "group": "simple",
+      "planned": 0,
+      "completed": 0,
+      "successful": 0,
+      "failed": 0,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "p95LimitMs": 1000,
+      "maxLimitMs": 3000,
+      "passed": false
+    },
+    {
+      "group": "external",
+      "planned": 120,
+      "completed": 120,
+      "successful": 120,
+      "failed": 0,
+      "p50Ms": 56.072,
+      "p95Ms": 255.219,
+      "maxMs": 326.9,
+      "p95LimitMs": 3000,
+      "maxLimitMs": 10000,
+      "passed": true
+    },
+    {
+      "group": "heavy",
+      "planned": 90,
+      "completed": 90,
+      "successful": 90,
+      "failed": 0,
+      "p50Ms": 63.575,
+      "p95Ms": 343.815,
+      "maxMs": 381.715,
+      "p95LimitMs": 5000,
+      "maxLimitMs": 15000,
+      "passed": true
+    }
+  ],
+  "apiCases": [
+    {
+      "caseId": "festival",
+      "planned": 60,
+      "dispatched": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 57.135,
+      "p95Ms": 287.117,
+      "maxMs": 326.9
+    },
+    {
+      "caseId": "poi",
+      "planned": 60,
+      "dispatched": 60,
+      "completed": 60,
+      "successful": 60,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 54.148,
+      "p95Ms": 185.324,
+      "maxMs": 273.992
+    },
+    {
+      "caseId": "itinerary_generate",
+      "planned": 90,
+      "dispatched": 90,
+      "completed": 90,
+      "successful": 90,
+      "failed": 0,
+      "notExecuted": 0,
+      "inFlight": 0,
+      "p50Ms": 63.575,
+      "p95Ms": 343.815,
+      "maxMs": 381.715
+    }
+  ],
+  "loadWindow": {
+    "start": "2026-09-07T01:21:35.332297+00:00",
+    "end": "2026-09-07T01:56:29.361999+00:00",
+    "sampleCount": 418,
+    "memAvailableKiB": {
+      "first": 1091456,
+      "last": 1067376,
+      "min": 1050968,
+      "max": 1105352
+    },
+    "memAvailablePercentMin": 26.922,
+    "swapKiB": {
+      "first": 372,
+      "last": 372,
+      "min": 372,
+      "max": 372
+    },
+    "pswpinDeltaInsideSamples": 0,
+    "pswpoutDeltaInsideSamples": 0,
+    "cpu": {
+      "mean": 3.343,
+      "p95": 4.31,
+      "max": 9.507,
+      "top": [
+        {
+          "at": "2026-09-07T01:50:05+00:00",
+          "busyPercent": 9.507,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:34:45+00:00",
+          "busyPercent": 8.161,
+          "iowaitPercent": 0.197,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:33:55+00:00",
+          "busyPercent": 8.145,
+          "iowaitPercent": 0.393,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:47:45+00:00",
+          "busyPercent": 6.913,
+          "iowaitPercent": 1.168,
+          "counterReset": false
+        },
+        {
+          "at": "2026-09-07T01:27:15+00:00",
+          "busyPercent": 6.849,
+          "iowaitPercent": 0.0,
+          "counterReset": false
+        }
+      ]
+    }
+  },
+  "serviceMemory": {
+    "runninggu-backend.service": {
+      "memoryMiB": {
+        "first": 353.703125,
+        "last": 370.9140625,
+        "min": 353.703125,
+        "max": 371.1328125
+      },
+      "invocations": [
+        "efcca52bd0c547cda8790a2254bb19fb"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0
+    },
+    "runninggu-graphhopper.service": {
+      "memoryMiB": null,
+      "invocations": [
+        "09d01169c51f44749b0e353f1c2d8f7a"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0
+    },
+    "graphhopper": {
+      "memoryMiB": {
+        "first": 1727.488,
+        "last": 1727.488,
+        "min": 1727.488,
+        "max": 1727.488
+      },
+      "ids": [
+        "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0,
+      "oomSamples": 0
+    },
+    "postgres": {
+      "memoryMiB": {
+        "first": 60.76,
+        "last": 58.86,
+        "min": 58.49,
+        "max": 75.06
+      },
+      "ids": [
+        "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd"
+      ],
+      "restartCounts": [
+        "0"
+      ],
+      "unhealthySamples": 0,
+      "oomSamples": 0
+    }
+  },
+  "fullGcCorrelations": [],
+  "backupWal": [
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:27:10.624214+00:00",
+      "offsetSeconds": 600,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "393ac1eb245540e79da17f4bf170c308",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:27:10.900135+00:00",
+      "durationSeconds": 0.275921,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    },
+    {
+      "kind": "backup",
+      "startedAt": "2026-09-07T01:33:50.623069+00:00",
+      "offsetSeconds": 1000,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "047311e54c4a49528c11e5868f4733ca",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:34:43.318576+00:00",
+      "durationSeconds": 52.695507,
+      "requestsDuring": {
+        "count": 4,
+        "failed": 0,
+        "p95Ms": 70.393,
+        "maxMs": 70.393
+      }
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:37:10.623146+00:00",
+      "offsetSeconds": 1200,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "df292b5780c5420b941704f6047a128d",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:37:10.916347+00:00",
+      "durationSeconds": 0.293201,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    },
+    {
+      "kind": "wal",
+      "startedAt": "2026-09-07T01:47:10.622665+00:00",
+      "offsetSeconds": 1800,
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "a2d3533f41ad4f60822597734ac978e1",
+      "newInvocation": true,
+      "passed": true,
+      "finishedAt": "2026-09-07T01:47:10.899130+00:00",
+      "durationSeconds": 0.276465,
+      "requestsDuring": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    }
+  ],
+  "slowestRequests": [
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-1595",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:48:09.331643+00:00",
+      "completedAt": "2026-09-07T01:48:09.714133+00:00",
+      "status": 200,
+      "durationMs": 381.715,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-0635",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:32:09.325111+00:00",
+      "completedAt": "2026-09-07T01:32:09.704345+00:00",
+      "status": 200,
+      "durationMs": 378.577,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-1915",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:53:29.329691+00:00",
+      "completedAt": "2026-09-07T01:53:29.685719+00:00",
+      "status": 200,
+      "durationMs": 355.081,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-0955",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:37:29.321648+00:00",
+      "completedAt": "2026-09-07T01:37:29.677080+00:00",
+      "status": 200,
+      "durationMs": 354.76,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-0310",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:26:44.325079+00:00",
+      "completedAt": "2026-09-07T01:26:44.669361+00:00",
+      "status": 200,
+      "durationMs": 343.815,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-0973",
+      "phase": "measurement",
+      "caseId": "festival",
+      "dispatchedAt": "2026-09-07T01:37:47.327575+00:00",
+      "completedAt": "2026-09-07T01:37:47.654888+00:00",
+      "status": 200,
+      "durationMs": 326.9,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-1270",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:42:44.320121+00:00",
+      "completedAt": "2026-09-07T01:42:44.644693+00:00",
+      "status": 200,
+      "durationMs": 324.336,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    },
+    {
+      "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-0335",
+      "phase": "measurement",
+      "caseId": "itinerary_generate",
+      "dispatchedAt": "2026-09-07T01:27:09.330256+00:00",
+      "completedAt": "2026-09-07T01:27:09.654066+00:00",
+      "status": 200,
+      "durationMs": 323.556,
+      "success": true,
+      "dispatchDelayMs": 0.0
+    }
+  ],
+  "cpuPeaksDuringLoad": [
+    {
+      "cpu": {
+        "at": "2026-09-07T01:50:05+00:00",
+        "busyPercent": 9.507,
+        "iowaitPercent": 0.0,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 1,
+        "failed": 0,
+        "p95Ms": 39.779,
+        "maxMs": 39.779
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T01:34:45+00:00",
+        "busyPercent": 8.161,
+        "iowaitPercent": 0.197,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 3,
+        "failed": 0,
+        "p95Ms": 58.938,
+        "maxMs": 58.938
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T01:33:55+00:00",
+        "busyPercent": 8.145,
+        "iowaitPercent": 0.393,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 0,
+        "failed": 0,
+        "p95Ms": null,
+        "maxMs": null
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T01:47:45+00:00",
+        "busyPercent": 6.913,
+        "iowaitPercent": 1.168,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 3,
+        "failed": 0,
+        "p95Ms": 89.518,
+        "maxMs": 89.518
+      }
+    },
+    {
+      "cpu": {
+        "at": "2026-09-07T01:27:15+00:00",
+        "busyPercent": 6.849,
+        "iowaitPercent": 0.0,
+        "counterReset": false
+      },
+      "requests": {
+        "count": 2,
+        "failed": 0,
+        "p95Ms": 59.305,
+        "maxMs": 59.305
+      }
+    }
+  ],
+  "noCredentialsCollected": true,
+  "sourceHashes": {
+    "-api.json": "3b7c571424df07017ab565bf8ee10ab5a1bb6e66f3dc1d35d74fc3a67385382c",
+    "-requests.jsonl": "ce49a3a1f0ee4d2a3dac9031ffa5ce6e8aa8462c75cce82a025b07913d43e279",
+    "-server.json": "60b0a3f7387151a54033cfc0db106c3d163ab2f956a62f1159908205f58ea7de",
+    "-completion.json": "41c3907d33719aa1a717660cdda813dd2bcd7fb4b770428a693464a550ce1670",
+    "-https.json": "7f14456be2660bae996033ea2a7d05b3a81b74999a2d1f6b59b972d467177f2d",
+    "-postflight.json": "2858f3c631e154e1269f7a7d5e4e00595b06d888da97b8be28a4256b21327c3f"
+  },
+  "serverFullRawSha256": "15d1068208b464f0df5eef981d16417f08a0bac3bde1e39b32cec7b8fabf15ca",
+  "gcCorrelations": [
+    {
+      "gc": {
+        "at": "2026-09-07T01:47:29.468837+00:00",
+        "service": "backend",
+        "invocationId": "efcca52bd0c547cda8790a2254bb19fb",
+        "gcId": 19,
+        "kind": "Pause Young (Allocation Failure)",
+        "full": false,
+        "pauseMs": 7.857,
+        "heapMiB": [
+          114,
+          48,
+          247
+        ],
+        "window": "normal_observation"
+      },
+      "nearbyWithin5Seconds": [
+        {
+          "requestId": "api4g-673a2f7-20260907T0115Z-ktosupp-load-1555",
+          "phase": "measurement",
+          "caseId": "itinerary_generate",
+          "dispatchedAt": "2026-09-07T01:47:29.331043+00:00",
+          "completedAt": "2026-09-07T01:47:29.415616+00:00",
+          "status": 200,
+          "durationMs": 84.879,
+          "success": true,
+          "dispatchDelayMs": 0.0
+        }
+      ]
+    }
+  ],
+  "reviewBasis": "All selected requests and latency targets passed; no OOM, restart, swap activity, or sustained recovery failure; full mixed scope remains unverified."
+}

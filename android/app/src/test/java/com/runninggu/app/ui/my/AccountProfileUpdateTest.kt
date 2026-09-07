@@ -222,6 +222,8 @@ class AccountProfileUpdateTest {
 // ── 가짜 ────────────────────────────────────────────────────────
 
 private class FakeMemberRepository(private val result: Result<SessionProfile>) : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
+
     var calls = 0
         private set
     var sentNickname: String? = null
@@ -253,6 +255,8 @@ private class FakeMemberRepository(private val result: Result<SessionProfile>) :
 
 /** 응답을 붙들어 둔다. "보내는 중" 상태를 실제로 만들어 보려면 필요하다. */
 private class BlockingMemberRepository(private val profile: SessionProfile) : MemberRepository {
+    override suspend fun me(): SessionProfile = error("안 쓴다")
+
     val gate = CompletableDeferred<Unit>()
     var calls = 0
         private set

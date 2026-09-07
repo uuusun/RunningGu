@@ -1,5 +1,7 @@
 package com.runninggu.app.ui.calendar
 
+import com.runninggu.app.ui.common.DataOrigin
+import com.runninggu.app.data.repository.ContestDetailResult
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
@@ -297,7 +299,35 @@ class CalendarViewModelTest {
         checked = null,
         regStatusFallback = RegistrationStatus.OPEN,
     )
+
+    @Test
+    fun `캐시로 되살린 목록은 언제 것인지를 화면까지 들고 온다`() = runTest(dispatcher) {
+        // 캘린더는 접수 마감을 보여준다. 캐시된 "마감 D-0" 을 보고 신청하러 갔는데 이미
+        // 끝났을 수 있어서, 언제 것인지가 화면까지 가야 한다 (#307)
+        repository.cachedAt = CACHED_AT
+        val viewModel = newViewModel()
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals(DataOrigin.LocalCache(CACHED_AT), viewModel.uiState.value.origin)
+        assertEquals(CACHED_AT, viewModel.uiState.value.cachedAt)
+    }
+
+    @Test
+    fun `서버에서 막 받은 목록에는 출처 표시가 없다`() = runTest(dispatcher) {
+        val viewModel = newViewModel()
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals(DataOrigin.Server, viewModel.uiState.value.origin)
+        assertNull(viewModel.uiState.value.cachedAt)
+    }
 }
+
+/** 고정 시각. 되살린 목록이 이 값을 화면까지 들고 오는지 본다 (#307). */
+private val CACHED_AT: java.time.Instant = java.time.Instant.parse("2026-09-06T12:00:00Z")
 
 /** 넘겨받은 조건을 기록하는 가짜 저장소. */
 private class RecordingContestRepository : ContestRepository {
@@ -330,6 +360,9 @@ private class RecordingContestRepository : ContestRepository {
     /** true 면 다음 장 조회만 실패시킨다. */
     var failNextPage = false
 
+    /** 첫 장을 캐시로 되살린 것으로 준다. null 이면 서버에서 막 받은 것이다 (#307). */
+    var cachedAt: java.time.Instant? = null
+
     override suspend fun list(filter: ContestFilter, cursor: String?): ContestPage {
         listCalls++
         lastFilter = filter
@@ -338,6 +371,7 @@ private class RecordingContestRepository : ContestRepository {
                 contests = listOf(contest("1", firstDate)),
                 nextCursor = if (hasSecondPage) "cursor-2" else null,
                 hasNext = hasSecondPage,
+                cachedAt = cachedAt,
             )
         } else {
             if (failNextPage) throw ApiException.Network(java.io.IOException("끊김"))
@@ -361,7 +395,8 @@ private class RecordingContestRepository : ContestRepository {
 
     override suspend fun closingSoon(limit: Int): ClosingSoonResult = ClosingSoonResult()
 
-    override suspend fun detail(id: Long): Contest = contest(id.toString(), firstDate)
+    override suspend fun detail(id: Long): ContestDetailResult =
+        ContestDetailResult(contest(id.toString(), firstDate))
 
     /** 캘린더는 인근 축제를 쓰지 않는다. S3 상세 전용이다(§3-5). */
     override suspend fun festivals(id: Long): List<NearbyFestival> = emptyList()

@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import com.runninggu.app.ui.common.DataOrigin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -118,6 +119,9 @@ class CalendarViewModel(
                         allRaces = upcoming,
                         nextCursor = page.nextCursor,
                         hasNext = page.hasNext,
+                        // 캐시로 되살렸으면 화면이 "언제 것" 인지 말해야 한다 (#307)
+                        origin = page.cachedAt?.let { at -> DataOrigin.LocalCache(at) }
+                            ?: DataOrigin.Server,
                         // **보고 있던 달을 유지한다.** 매번 첫 결과의 달로 옮기면, 10월 날짜를
                         // 눌렀다 재탭으로 해제했을 때 8월로 튄다 — 해제는 달을 바꾸는 동작이
                         // 아니다(SPEC §4.5 · #85 리뷰). 첫 조회에서만 옮긴다
