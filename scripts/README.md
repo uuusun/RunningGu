@@ -13,6 +13,7 @@
 | `test_races_pipeline.py` | 종목 정규식·NFC 병합 키 회귀 테스트 (`python -m unittest test_races_pipeline`) |
 | `geocode.py` | 장소명→좌표 단건 조회 (카카오, `geocode_cache.json` 캐시) |
 | `build_courses.py` | 러닝코스 소스(두루누비 API+GPX · 로컬 GPX 폴더) → 정규화 `data/courses.json`. 파일 계약은 [`docs/course-bundle-contract.md`](../docs/course-bundle-contract.md), 어댑터는 `courses/sources/` |
+| `judge/seed_judge_account.py` | 공모전 심사 계정에 찜·저장 코스·저장 동선 표본 채우기 (이슈 #293). 사용법은 [`judge/README.md`](judge/README.md) |
 
 ## 사용법
 
