@@ -1,8 +1,5 @@
-package com.runninggu.app.ui.home
+package com.runninggu.app.ui.common
 
-import com.runninggu.app.ui.common.DataOrigin
-import com.runninggu.app.ui.common.SectionState
-import com.runninggu.app.ui.common.cachedAt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

@@ -1,4 +1,4 @@
-package com.runninggu.app.ui.home
+package com.runninggu.app.ui.common
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -19,7 +19,12 @@ private val CACHED_AT: DateTimeFormatter = DateTimeFormatter.ofPattern("MM.dd HH
 internal fun cachedAtLabel(at: Instant): String = CACHED_AT.format(at.atZone(KST))
 
 /**
- * 캐시로 그린 영역임을 알리는 한 줄. (매핑표 171행 · SPEC §6.1 · 이슈 #276)
+ * 캐시로 그린 영역임을 알리는 한 줄.
+ *
+ * **`ui/home` 에 있다가 `ui/common` 으로 옮겼다** (#307). 캘린더·대회 상세도 같은 것을
+ * 쓰게 되면서(#309) 홈에 묶어 둘 이유가 없어졌다 — 의존이 `KST` 와 Compose 기본뿐이다.
+ * `ui/home` 을 캘린더가 import 하면 **화면끼리 서로를 보게 된다.** `UiMessages` 를
+ * `ui/course` 에서 올렸을 때와 같은 자리다. (매핑표 171행 · SPEC §6.1 · 이슈 #276)
  *
  * ## 왜 필요한가
  *

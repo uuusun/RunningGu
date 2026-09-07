@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.calendar
 
+import com.runninggu.app.ui.common.CachedNotice
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -230,6 +231,13 @@ private fun RaceList(
                     )
                 }
             }
+        }
+
+        // **캐시로 그린 목록이면 언제 것인지 적는다** (#307 · 홈과 같은 규칙).
+        // 대회는 접수 마감이 걸려 있어서, 낡은 목록을 최신인 것처럼 보여주면
+        // 이미 끝난 접수를 보고 신청하러 간다.
+        uiState.cachedAt?.let {
+            item { CachedNotice(cachedAt = it, modifier = Modifier.padding(horizontal = 16.dp)) }
         }
 
         item { ListHeader(uiState = uiState) }

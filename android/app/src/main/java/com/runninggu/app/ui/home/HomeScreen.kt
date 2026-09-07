@@ -62,6 +62,7 @@ import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
+import com.runninggu.app.ui.common.CachedNotice
 import com.runninggu.app.ui.common.SectionState
 import com.runninggu.app.ui.common.cachedAt
 import com.runninggu.app.ui.model.FestivalSummary

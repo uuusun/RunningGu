@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.racedetail
 
+import com.runninggu.app.ui.common.CachedNotice
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -199,6 +200,7 @@ fun RaceDetailScreen(
                             showFestivals = state.showFestivalSection,
                             onRetryFestivals = viewModel::loadFestivals,
                             onCannotOpenOfficialPage = viewModel::onCannotOpenOfficialPage,
+                            cachedAt = state.cachedAt,
                         )
                     }
             }
@@ -214,6 +216,8 @@ private fun RaceDetailContent(
     showFestivals: Boolean,
     onRetryFestivals: () -> Unit,
     onCannotOpenOfficialPage: () -> Unit,
+    /** 캐시로 그린 것이면 저장 시각. 서버에서 막 받았으면 null. (#307) */
+    cachedAt: java.time.Instant? = null,
 ) {
     Column(
         modifier = Modifier
@@ -221,6 +225,17 @@ private fun RaceDetailContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
+        // **캐시로 그린 상세면 언제 것인지 적는다** (#307 · 홈·캘린더와 같은 규칙).
+        // 오프라인에서 마감일이 그대로 보이는데 지금 값인지 어제 값인지 알 수 없으면,
+        // 마감이 지난 대회를 접수 중으로 보고 신청하러 간다.
+        //
+        // **흐리게 하지 않는다** — 아래 `isDimmed()` 블록 밖에 둔다. 왜 흐린지 설명하는
+        // 줄까지 흐려지면 안 읽히는 것과 같은 이유다.
+        cachedAt?.let {
+            CachedNotice(cachedAt = it)
+            Spacer(Modifier.height(8.dp))
+        }
+
         // 안내는 흐리게 하지 않는다 — 왜 흐린지 설명하는 줄이라 이것까지 흐려지면 안 읽힌다.
         if (!race.active) {
             InactiveNotice()
