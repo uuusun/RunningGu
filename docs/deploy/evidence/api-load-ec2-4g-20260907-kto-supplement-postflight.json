@@ -1,0 +1,94 @@
+{
+  "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+  "at": "2026-09-07T01:59:45.254280+00:00",
+  "baseline": {
+    "at": "2026-09-07T01:59:45.109988+00:00",
+    "runId": "api4g-673a2f7-20260907T0115Z-ktosupp-final",
+    "acceptancePolicy": "app-capacity-v3",
+    "instance": {
+      "instanceId": "i-07aa483968f4daddc",
+      "instanceType": "c7i-flex.large",
+      "availabilityZone": "ap-northeast-2b",
+      "region": "ap-northeast-2"
+    },
+    "backendSha": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "release": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graph": "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "backend": {
+      "ActiveState": "active",
+      "SubState": "running",
+      "NRestarts": "0",
+      "InvocationID": "4029ba3f5e4a41568a90837acb65d79c",
+      "MemoryHigh": "671088640",
+      "MemoryMax": "805306368",
+      "MemoryCurrent": "363290624"
+    },
+    "backendJvm": [
+      "-Xms256m",
+      "-Xmx512m",
+      "-Xlog:gc*:stdout:time,uptime,level,tags"
+    ],
+    "containers": [
+      {
+        "name": "backend-graphhopper-1",
+        "id": "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf",
+        "image": "sha256:16b3618f3e69a094990e6c9360ee92972beec643ca26bc5d9b61404172910753",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:42.010825586Z"
+        },
+        "limits": {
+          "Memory": 2684354560,
+          "MemorySwap": 2684354560,
+          "MemoryReservation": 2147483648
+        },
+        "jvm": [
+          "-Xms512m",
+          "-Xmx2g"
+        ]
+      },
+      {
+        "name": "backend-postgres-1",
+        "id": "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd",
+        "image": "sha256:547c41760b4112de392c4a290292a760252b0a07360b22ce75c31484bc2a322a",
+        "restartCount": 0,
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "OOMKilled": false,
+          "StartedAt": "2026-09-05T12:17:36.355930733Z"
+        },
+        "limits": {
+          "Memory": 0,
+          "MemorySwap": 0,
+          "MemoryReservation": 0
+        }
+      }
+    ],
+    "swappiness": 10,
+    "mem": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1095892,
+      "SwapTotal": 4194300,
+      "SwapFree": 4193928
+    },
+    "guardOff": true,
+    "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+    "graphhopperInvocation": "09d01169c51f44749b0e353f1c2d8f7a",
+    "nginx": "active",
+    "readiness": true,
+    "passed": true
+  },
+  "guardDisabled": true,
+  "courseSyncEnabled": true,
+  "ntpSynchronized": "yes",
+  "temporaryUnits": {
+    "runninggu-app-capacity-v5.service": "inactive",
+    "runninggu-load-guard-expiry.timer": "inactive"
+  },
+  "collectorExitCode": 0,
+  "passed": true
+}

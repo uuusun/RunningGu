@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-07T00:59:11.055693+00:00",
+  "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+  "configurationPassed": true,
+  "guardOff": true,
+  "readiness": true,
+  "courseSyncEnabled": "true",
+  "courseSyncOriginal": {
+    "value": "true"
+  },
+  "backendNRestarts": "0",
+  "backendInvocation": "8cf138f0152f49da91e0c2b6236e4c94",
+  "containers": [
+    {
+      "name": "backend-graphhopper-1",
+      "running": true,
+      "restarts": 0,
+      "oomKilled": false
+    },
+    {
+      "name": "backend-postgres-1",
+      "running": true,
+      "restarts": 0,
+      "oomKilled": false
+    }
+  ],
+  "temporaryUnits": {
+    "runninggu-app-capacity-v4b.service": [
+      "Result=success",
+      "ExecMainStatus=0",
+      "ActiveState=inactive",
+      "SubState=dead"
+    ],
+    "runninggu-load-guard-expiry.timer": [
+      "Result=success",
+      "ActiveState=inactive",
+      "SubState=dead"
+    ]
+  },
+  "ntpSynchronized": "yes",
+  "ssmCommandId": "2ecdedf7-d6cc-4c4c-aca1-78fc02036f73"
+}

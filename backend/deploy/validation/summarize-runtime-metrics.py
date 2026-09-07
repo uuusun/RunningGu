@@ -24,7 +24,9 @@ def values(line: str) -> dict[str, str]:
     return {match.group("key"): match.group("value") for match in KEY_VALUE.finditer(line)}
 
 
-def summarize(lines: list[str]) -> dict[str, object]:
+def summarize(lines: list[str], policy: str = ACCEPTANCE_POLICY) -> dict[str, object]:
+    if policy not in {"capacity-v2", "app-capacity-v3"}:
+        raise ValueError("unknown_policy")
     headers: dict[str, str] = {}
     sample_groups: list[dict[str, object]] = []
     current_group: dict[str, object] | None = None
@@ -109,7 +111,9 @@ def summarize(lines: list[str]) -> dict[str, object]:
             pswpout.append(int(sample["pswpout"]))
             # §9.2: 정상 swap 활동과 계측 오류·counter 초기화는 구분한다.
             if (
-                min(swap_used[-1], pswpin[-1], pswpout[-1]) < 0
+                not math.isfinite(memory_percent[-1])
+                or not 0 <= memory_percent[-1] <= 100
+                or min(swap_used[-1], pswpin[-1], pswpout[-1]) < 0
                 or (len(pswpin) > 1 and pswpin[-1] < pswpin[-2])
                 or (len(pswpout) > 1 and pswpout[-1] < pswpout[-2])
             ):
@@ -190,7 +194,7 @@ def summarize(lines: list[str]) -> dict[str, object]:
         and malformed_observations == 0
         and invalid_sample_values == 0
         and minimum_memory is not None
-        and minimum_memory >= 20.0
+        and (policy == "app-capacity-v3" or minimum_memory >= 20.0)
         and all(count == expected_samples for count in systemd_observation_counts.values())
         and all(count == expected_samples for count in container_observation_counts.values())
         and unhealthy_systemd_service_samples == 0
@@ -200,7 +204,10 @@ def summarize(lines: list[str]) -> dict[str, object]:
         and all(growth == 0 for growth in container_restart_growth.values())
     )
     return {
-        "acceptancePolicy": ACCEPTANCE_POLICY,
+        "acceptancePolicy": policy,
+        "verdictScope": "measurement_and_service_checks_only",
+        "capacityVerdict": "requires_api_gc_swap_backup_review",
+        "memoryBelow20PercentSamples": sum(value < 20 for value in memory_percent),
         "expectedSamples": expected_samples,
         "actualSamples": len(sample_groups),
         "malformedObservations": malformed_observations,
@@ -228,12 +235,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="런닝구 EC2 runtime metrics 합격 항목 요약")
     parser.add_argument("--metrics", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--policy", choices=("capacity-v2", "app-capacity-v3"), default=ACCEPTANCE_POLICY)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    summary = summarize(args.metrics.read_text(encoding="utf-8").splitlines())
+    summary = summarize(args.metrics.read_text(encoding="utf-8").splitlines(), args.policy)
     rendered = json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         if args.output.exists():

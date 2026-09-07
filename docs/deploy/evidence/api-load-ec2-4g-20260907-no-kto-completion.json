@@ -1,0 +1,16 @@
+{
+  "runId": "api4g-673a2f7-20260907T0000Z-v4nokto",
+  "status": "completed",
+  "passed": true,
+  "counts": {
+    "planned": 1855,
+    "dispatched": 1855,
+    "completed": 1855,
+    "successful": 1855,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "at": "2026-09-07T00:37:29.149945+00:00",
+  "inputsDiscarded": true
+}

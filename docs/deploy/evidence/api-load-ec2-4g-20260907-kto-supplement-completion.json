@@ -1,0 +1,16 @@
+{
+  "runId": "api4g-673a2f7-20260907T0115Z-ktosupp",
+  "status": "completed",
+  "counts": {
+    "planned": 245,
+    "dispatched": 245,
+    "completed": 245,
+    "successful": 245,
+    "failed": 0,
+    "notExecuted": 0,
+    "inFlight": 0
+  },
+  "passed": true,
+  "credentialsCollected": false,
+  "at": "2026-09-07T01:56:29.389754+00:00"
+}

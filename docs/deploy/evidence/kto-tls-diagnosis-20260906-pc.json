@@ -1,0 +1,58 @@
+{
+  "sourceFiles": {
+    "kto-pc-tls.json": {
+      "at": "2026-09-06T08:20:57.348748+00:00",
+      "scope": "PC DNS TCP TLS only; no HTTP request or key",
+      "dnsMs": 55.084,
+      "tcpMs": 47.415,
+      "passed": false,
+      "errorType": "TimeoutError",
+      "failedPhase": "tls"
+    },
+    "kto-pc-tls-versions.json": [
+      {
+        "at": "2026-09-06T08:22:24.490727+00:00",
+        "host": "apis.data.go.kr",
+        "offered": "TLS1.2",
+        "httpRequests": 0,
+        "tcpMs": 65.925,
+        "passed": false,
+        "failedPhase": "tls",
+        "errorType": "TimeoutError"
+      },
+      {
+        "at": "2026-09-06T08:22:29.598736+00:00",
+        "host": "apis.data.go.kr",
+        "offered": "TLS1.3",
+        "httpRequests": 0,
+        "tcpMs": 42.756,
+        "passed": false,
+        "failedPhase": "tls",
+        "errorType": "TimeoutError"
+      },
+      {
+        "at": "2026-09-06T08:22:34.667198+00:00",
+        "host": "staging-api.runninggu.store",
+        "offered": "default",
+        "httpRequests": 0,
+        "tcpMs": 47.163,
+        "tlsMs": 44.146,
+        "passed": true,
+        "negotiated": "TLSv1.3"
+      }
+    ],
+    "kto-pc-dns.json": {
+      "at": "2026-09-06T08:29:03.591088+00:00",
+      "host": "apis.data.go.kr",
+      "addresses": [
+        "27.101.236.63",
+        "64:ff9b::1b65:ec3f"
+      ]
+    }
+  },
+  "sourceSha256": {
+    "kto-pc-tls.json": "dc5c44cabeff28b4a867da4052b532b908fc6217d79406b85d1412aa5f5cb366",
+    "kto-pc-tls-versions.json": "a8185848620e1e2c8f8eb9807bb939431fd63a05f2168113fc342c96465705c4",
+    "kto-pc-dns.json": "da5c8562f8aa454f1d1e918c60d13711b0900ce7344abc4444b62e2dac99ec11"
+  }
+}

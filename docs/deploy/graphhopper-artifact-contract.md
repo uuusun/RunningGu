@@ -1,5 +1,31 @@
 # GraphHopper 그래프 artifact 계약·배포 절차
 
+> **2026-09-07 보완 검증 완료:** 제외했던 공공데이터·동선 생성 245건도 별도 시험에서 모두 성공했다.
+> 동일 graph·4GiB 설정을 유지했고 OOM·비정상 재시작이 없었다. 현재 4GiB를 유지한다.
+> 두 부분 시험을 원래 2,100건 혼합 부하 합격으로 합산하지 않는다.
+> [상세 결과와 한계](evidence/api-load-ec2-4g-20260907-kto-supplement.md).
+
+> **2026-09-07 앞선 부분 부하 결과:** 공공데이터·동선 생성 245건을 제외한 **1,855건 모두 성공**.
+> 이번 53요청/분 범위에서는 **현재 4GiB 유지 가능**으로 판단했다.
+> 부하 내부 최저 가용 메모리 26.493%, OOM·비정상 재시작 0, 백업/WAL·계정 정리·복귀 완료.
+> 원래 2,100건 전체 용량 합격은 아니다. [상세 결과와 한계](evidence/api-load-ec2-4g-20260907-no-kto.md).
+
+> **2026-09-07 실행 기준 이력:** [공공데이터 제외 기준](staging-4g-no-kto-plan.md)의 1,855건 부분 부하다.
+> GraphHopper 주변 코스는 유지하고 KTO를 사용하는 동선 생성 등 245건을 제외한다.
+>
+> **2026-09-06 앱 API 2,100건 재시험 승인 — 이전 실행 기준:** 당시 1회 부하에는
+> [앱 API 계획 §5.3](api-load-test-plan.md#53-2026-09-06-승인-앱-api-1회-종합-판정)의
+> `app-capacity-v3`를 적용한다. Full GC 횟수·swap 증가·순간 MemAvailable 20% 미만은
+> 단독 중단·불합격 조건이 아니다. 요청 성능·회복·GC/heap·swap 시계열을 함께 판정한다.
+> OOM으로 서비스 종료·미복구, 데이터 손상/계정 분리 위반, 가드 trip/차단은 중단·정리한다.
+> 과거 `capacity-v2` 조건과 결과는 이력이며 소급 합격시키지 않는다.
+> 이번 범위는 동일 fixture/schedule의 부하 1회와 분석이다. 전체 시나리오 3회·새 24시간 관찰은 추가하지 않는다.
+>
+> **9월 6일 이전 시도 결과:** run `api4g-673a2f7-20260906T0729Z-v3`는 첫 KTO 두루누비 호출의
+> TIMEOUT(2,707ms)·가드 TRIP으로 시작 전 중단했다. 예정 2,100건 모두 미실행이며
+> 용량 판정은 보류다. 가드 OFF·readiness·HTTPS 복귀와 입력 폐기는 완료했다.
+> [별도 실행 증거](evidence/api-load-ec2-4g-20260906-v3.md)를 따른다.
+
 > 상태: **계약 확정·PR 2 구현 중**. PR 2가 이 문서의 builder·검증 스크립트·systemd unit·Compose
 > 변경을 제공한다. 실제 운영 release descriptor와 아래 합격 기준 검증 전에는 EC2 실행 절차를
 > 목표 구조로 활성화하지 않는다.
@@ -509,13 +535,47 @@ verify oneshot을 실행해 journal에서 확인한다.
 재시도하되 10분 window에서 start 시도 3회를 소진하면 멈추고 알린다. Spring Boot도 §8.2에서 같은
 `StartLimitIntervalSec=600`, `StartLimitBurst=3`을 사용한다.
 
-첫 8GiB 측정에는 GraphHopper hard limit을 바로 켜지 않는다. 실제 peak를 얻은 뒤 §9.3의 별도
-fault-isolation을 통과해야 hard limit을 활성화한다. Docker restart guard 같은 별도 daemon은 P0에
-추가하지 않는다.
+첫 8GiB 측정 당시에는 hard limit 없이 peak를 얻고 §9.3의 별도 fault-isolation을 수행했다.
+현재 배포는 §8.1의 승인된 4GiB 값과 기존 재시작 정책을 사용한다. Docker restart guard 같은
+별도 daemon은 P0에 추가하지 않는다.
 
 ## 8. 메모리 격리와 재시작 정책
 
 ### 8.1 적용 순서
+
+**현재 배포 기준 — 2026-09-07 사용자 확정:** EC2는 `c7i-flex.large` **4GiB**로 유지한다.
+운영 중인 값과 저장소 배포 예시·systemd unit을 아래와 같이 일치시킨다. 인스턴스를 새로
+변경하는 작업이 아니라, 검증에 사용한 설정을 다음 배포에서도 재현하기 위한 결정이다.
+
+| 대상 | 배포 값 | 의미 |
+|---|---|---|
+| GraphHopper heap | `GRAPHHOPPER_XMS=512m`, `GRAPHHOPPER_XMX=2g` | 초기 512MiB, 최대 2GiB |
+| GraphHopper reservation | `GRAPHHOPPER_MEMORY_RESERVATION=2g` | 2,147,483,648바이트, hard limit과 구분 |
+| GraphHopper RAM·RAM+swap 상한 | `GRAPHHOPPER_MEMORY_LIMIT=2560m` | 두 상한 모두 2,684,354,560바이트, container swap 금지 |
+| Spring Boot heap | `BACKEND_XMS=256m`, `BACKEND_XMX=512m` | 초기 256MiB, 최대 512MiB |
+| Spring Boot systemd | `MemoryHigh=640M`, `MemoryMax=768M` | 671,088,640 / 805,306,368바이트 |
+| 호스트 | swap 4GiB, `vm.swappiness=10` | 기존 설정 유지 |
+| PostgreSQL | 추가 hard limit 없음 | 기존 백업·WAL 정책 유지 |
+
+근거는 [1,855건 부분 부하](evidence/api-load-ec2-4g-20260907-no-kto.md)와
+[245건 보완 부하](evidence/api-load-ec2-4g-20260907-kto-supplement.md)의 전건 성공·자원 여유·복귀
+확인이다. 서로 다른 시각에 실행했으므로 **2,100건 동시 혼합 부하의 합격, 최소 RAM 또는 최대
+사용자 수를 증명한 것은 아니다.** 당시 중단·미완료 결과를 소급 합격시키지 않는다. 이번 확정에
+전체 시나리오 3회·새 24시간 관찰을 추가하지 않으며, 상세 판정은 앱 API 계획 §5.3과 각 실행
+기준을 따른다. 짧은 Full GC·swap 증가·순간 메모리 값만으로 증설하지 않는다.
+
+배포 예시의 heap·상한을 사용하고, EC2 Compose는 메모리 변수의 누락·빈 값을 거부한다.
+과거 무제한 측정의 명시적 `0`은 이력 재현용이며 현재 배포값이 아니다. CI는 실제 예시를 보간해
+위 값, GraphHopper swap 제한, backend heap과 unit을 검사한다. 설치 후에는 기존 drop-in의
+우선순위를 포함한 **실효 값**을 [실행서 §10.1](aws-ec2-staging-runbook.md#101-4gib-운영-메모리-확인)에서 확인한다.
+이미 같은 값인 서버는 이번 저장소 정리만을 위해 재시작하지 않는다.
+
+GraphHopper graph import용 로컬 Compose·외부 builder heap은 이 표의 적용 대상이 아니다.
+EC2에서는 graph를 생성하지 않는다. 대회 snapshot Importer는 §8.3의 Spring 중지 후 순차 실행을
+유지한다. 이후 heap·상한·artifact·동시 작업 구성이 달라지면 변경 근거와 자원·응답 성능을 다시
+검증하고, hard limit 변경은 고장 격리도 함께 확인한다.
+
+**초기 8GiB → 4GiB 후보 선정 절차 — 이력:** 아래는 현재 값을 정하기 전의 측정 절차다.
 
 1. 8GiB에서 JVM heap을 환경변수화하고 hard cgroup 상한 없이 실제 peak를 측정한다.
 2. GraphHopper·Spring Boot의 heap, process working set, PostgreSQL과 backup peak, host
@@ -542,8 +602,9 @@ exact systemd unit을 관측값으로 함께 바꾸고 다시 같은 검증을 �
 뜻하지 않는다. 호스트 전체 swap과 PostgreSQL의 기존 정책은 유지한다. Docker inspect의
 `HostConfig.MemorySwap == HostConfig.Memory > 0`과 실제 cgroup v2의 `memory.swap.max=0`을
 둘 다 확인하고 기록한다. §9.3에서도 운영 후보와 동일한 reservation·memory·memory+swap
-조합을 사용하며, 고의 OOM 유발용 heap만 일시적으로 높인다. 제한 적용 뒤 §9.1 전체 시험을
-다시 통과하기 전에는 후보를 운영 확정값으로 표시하지 않는다.
+조합을 사용하며, 고의 OOM 유발용 heap만 일시적으로 높인다. 초기 계획에서는 제한 적용 뒤
+§9.1 전체 시험 재통과를 요구했다. 현재 4GiB 운영 결정은 이 절 첫머리의 사용자 승인 범위를
+따르며, 미완료인 과거 전체 시험의 합격을 뜻하지 않는다.
 ([Docker memory-swap 계약](https://docs.docker.com/engine/containers/resource_constraints/#--memory-swap-details))
 
 PostgreSQL은 첫 격리 대상이 아니라 보호 대상이므로 최초 시험에는 hard limit을 두지 않고 peak와
@@ -578,6 +639,10 @@ Importer 실패 시에도 기존 Spring Boot를 다시 시작할 수 있는지 �
 말고 사양 또는 배포 구조를 다시 결정한다.
 
 ## 9. 사전 합격 기준
+
+> **적용 범위:** 이 절은 초기 8GiB·4GiB 전체 비교 시험의 기준과 이력이다. 현재 4GiB 운영
+> 확정 범위는 §8.1, 2026-09-07 앱 API 시험의 상세 판정은 각 부분·보완 실행 증거를 따른다.
+> 아래 3회 반복·새 24시간 관찰·반복 Full GC 0건을 이번 운영 확정의 추가 필수 단계로 적용하지 않는다.
 
 시작 heap과 hard limit 후보값은 측정하며 바꿀 수 있지만 다음 합격 기준은 측정 전에 고정한다.
 
@@ -625,6 +690,13 @@ artifact·server image·profile·요청 옵션 중 하나가 바뀌면 로컬 �
 간주하지 않는다.
 
 ### 9.2 합격 조건
+
+> **2026-09-06 적용 범위 변경:** 운영책임자는 기존 4GiB를 유지하고
+> [기본 운영 점검 마무리 계획](staging-4g-closeout-plan.md)을 실행하도록 승인했다.
+> [기본 운영 점검을 완료](evidence/staging-4g-closeout-20260906.md)했으며 현재 4GiB를 유지한다.
+> 아래 표와 3회 반복·24시간 관찰은 전체 부하 비교의 기존 계약으로 보존하며 이번 기본 점검에
+> 자동 적용하지 않는다. 짧은 Full GC·swap 증가·순간 MemAvailable은 진단 자료로 사용하고,
+> 실제 서비스 중단·기능/데이터 오류·백업/WAL 문제를 조치한다. 이전 부하 미완료 기록은 유지한다.
 
 | 영역 | 합격 조건 |
 |---|---|

@@ -1,12 +1,56 @@
 # AWS EC2 스테이징 배포 실행서
 
+> **2026-09-07 운영 사양 확정:** EC2 **4GiB**와 [메모리 계약 §8.1](graphhopper-artifact-contract.md#81-적용-순서)의
+> heap·프로세스 상한을 현재 배포 기준으로 사용한다. 저장소 배포 예시·systemd·CI도 같은 값을 검사한다.
+> 기존 서버는 이미 이 값이므로 이번 문서·설정 정리만을 위한 재시작은 필요 없다.
+> [배포 기준 반영 파일과 로컬 검증 결과](evidence/staging-4g-deployment-baseline-20260907.md)를 함께 남겼다.
+
+> **2026-09-07 보완 검증 완료:** 공공데이터·동선 생성 **245건 모두 성공**.
+> KTO 실제 송신 38회 정상, 최저 가용 RAM 26.922%, OOM·비정상 재시작·swap 증가 없음.
+> 백업 1회·WAL 3회와 가드 OFF·정상 동기화·HTTPS 복귀를 확인했고 **현재 4GiB를 유지**한다.
+> 앞선 1,855건과 별도 시각의 분당 7건 시험이므로 2,100건 혼합 부하 합격과는 구분한다.
+> [245건 상세 결과와 한계](evidence/api-load-ec2-4g-20260907-kto-supplement.md).
+
+> **2026-09-07 앞선 부분 부하 결과:** 공공데이터·동선 생성 245건을 제외한 **1,855건 모두 성공**.
+> 이번 53요청/분 범위에서는 **현재 4GiB 유지 가능**으로 판단했다.
+> 부하 내부 최저 가용 메모리 26.493%, OOM·비정상 재시작 0, 백업/WAL·계정 정리·복귀 완료.
+> 원래 2,100건 전체 용량 합격은 아니다. [상세 결과와 한계](evidence/api-load-ec2-4g-20260907-no-kto.md).
+
+> **2026-09-07 실행 기준 이력:** [공공데이터 제외 기준](staging-4g-no-kto-plan.md)을 적용한다.
+> PC 실행기는 `--exclude-kto`, 서버 제어기는 모든 단계에 `--no-kto`를 사용한다.
+> 245건을 제외한 1,855건이며 두루누비 자동 동기화는 시험 동안만 끄고 finally에서 복원한다.
+>
+> **2026-09-06 앱 API 2,100건 재시험 승인 — 이전 실행 기준:** 당시 1회 부하에는
+> [앱 API 계획 §5.3](api-load-test-plan.md#53-2026-09-06-승인-앱-api-1회-종합-판정)의
+> `app-capacity-v3`를 적용한다. Full GC 횟수·swap 증가·순간 MemAvailable 20% 미만은
+> 단독 중단·불합격 조건이 아니다. 요청 성능·회복·GC/heap·swap 시계열을 함께 판정한다.
+> OOM으로 서비스 종료·미복구, 데이터 손상/계정 분리 위반, 가드 trip/차단은 중단·정리한다.
+> 과거 `capacity-v2` 조건과 결과는 이력이며 소급 합격시키지 않는다.
+> 이번 범위는 동일 fixture/schedule의 부하 1회와 분석이다. 전체 시나리오 3회·새 24시간 관찰은 추가하지 않는다.
+>
+> **9월 6일 이전 시도 결과:** run `api4g-673a2f7-20260906T0729Z-v3`는 첫 KTO 두루누비 호출의
+> TIMEOUT(2,707ms)·가드 TRIP으로 시작 전 중단했다. 예정 2,100건 모두 미실행이며
+> 용량 판정은 보류다. 가드 OFF·readiness·HTTPS 복귀와 입력 폐기는 완료했다.
+> [별도 실행 증거](evidence/api-load-ec2-4g-20260906-v3.md)를 따른다.
+
+> **2026-09-06 기본 운영 점검 완료:** 기존 4GiB에서 14종 API·계정 분리·총 34요청 정상,
+> 15분 180표본·최저 MemAvailable 27.628%, 백업/WAL·가드 OFF·HTTPS 복귀를 확인했다.
+> 현재 4GiB를 유지한다. [실행 증거](evidence/staging-4g-closeout-20260906.md)를 따르며
+> 아래 전체 부하 비교의 미완료 기록은 유지한다.
+
+> **이전 전체 부하 상태 — 2026-09-05 13:00Z:** 기존 2b 인스턴스 `i-07aa483968f4daddc`의
+> `c7i-flex.large` 4GiB에서 `capacity-v2` 앱 API 재시험을 실행했으나 GraphHopper Full GC 2회로
+> 반복 GC 금지 조건에 미달해 중단했다. backend `673a2f7`과 기존 graph artifact를 유지한다.
+> 가드 해제·backend 재기동·readiness·HTTPS·DB 점검을 마쳤고 현재 4GiB staging은 정상 응답한다.
+> 당시 전체 부하 판정·3회 반복·24시간 관찰은 미완료이며 [실행 증거](evidence/staging-4g-validation-20260905.md)를 따른다.
+
 > 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)의
 > AWS EC2 스테이징 구현 실행서다. 정책이나 절차가 충돌하면 상위 §7이 우선한다.
 >
-> **PR 2 구현 주의:** GraphHopper 관련 목표 구조는
-> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. PR 2 구현만으로
-> EC2 크기가 승인되는 것은 아니다. 실제 운영 release descriptor를 확정하고 8GiB 합격 기준을
-> 통과하기 전에는 이 실행서의 GraphHopper 활성화 단계를 운영에 적용하지 않는다.
+> GraphHopper 배포 구조와 현재 4GiB 운영값은
+> [`graphhopper-artifact-contract.md`](graphhopper-artifact-contract.md)에 정의했다. 초기 PR 2는
+> 구현만으로 사양을 승인하지 않았으며, 8GiB 시험 이후 4GiB의 부분·보완 부하 결과와 사용자 결정으로
+> 현재 값을 확정했다. 과거 전체 시험 미완료와 프로덕션 출시 승인 여부는 별도 기록이다.
 
 이 실행서는 `staging-api.runninggu.store` 단일 EC2에 Spring Boot JAR, PostgreSQL 17,
 GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator를 추가하지 않으며 기존
@@ -20,9 +64,9 @@ GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator�
 | 리전 | 서울 `ap-northeast-2` |
 | 도메인 | `staging-api.runninggu.store` |
 | 프로세스 | Spring Boot는 host systemd. PostgreSQL은 Docker `unless-stopped`, GraphHopper container는 systemd가 foreground Compose로 단일 소유 |
-| 인스턴스 크기 | PR 2 구현 뒤 x86_64 8GiB에서 먼저 검증. 4GiB는 계약 시나리오 3회 연속 통과 뒤에만 사용 |
+| 인스턴스 크기 | `ap-northeast-2b`의 `c7i-flex.large` **4GiB 확정**(2026-09-07). 1,855건·245건의 별도 부하 근거이며 2,100건 혼합 부하 합격과 구분 |
 | GraphHopper | graph import는 저장소 고정 Linux builder로 EC2 밖에서 수행. EC2는 검증된 graph server만 실행 |
-| 메모리 | 현재 고정값 GraphHopper `-Xmx6g` + Spring Boot `-Xmx2g`는 그대로 배포하지 않음. heap 환경변수화·재시작 상한·실측이 선행, swap 4GB는 긴급 완충용 |
+| 메모리 | 현재 GH heap 512MiB~2GiB·container 상한 2.5GiB, backend heap 256~512MiB·MemoryHigh 640MiB/Max 768MiB. host swap 4GiB |
 | 외부 포트 | Nginx 80·443만 허용. 5432·8080·8989는 loopback |
 | 접속 | SSM Session Manager. SSH 22는 열지 않음 |
 | 운영책임자 | 유선경 — AWS·결제·도메인·Google Play·인프라 |
@@ -35,8 +79,11 @@ GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator�
 EBS·공인 IPv4·S3·KMS 등 남는 비용을 포함해 생성 직전 계산한다. 공개 앱이 사용할 프로덕션
 상시 서버는 출시 전에 실측 사양과 별도 월 예상비용을 다시 승인한다. GraphHopper import peak는
 EC2 사양에 포함하지 않는다. 8GiB에서 heap 환경변수화, cold start, 30분 부하, 전체 백업 동시
-실행, 재부팅을 먼저 검증하고, 4GiB는 같은 시나리오를 3회 연속 통과한 뒤에만 사용한다. 현재
-고정값 `-Xmx6g` + `-Xmx2g` 상태에서는 8GiB·4GiB 어느 쪽에도 배포하지 않는다.
+실행, 재부팅을 먼저 검증했다. 2026-09-06 [기본 운영 점검](staging-4g-closeout-plan.md) 뒤
+2026-09-07의 1,855건 부분 부하와 245건 보완 부하를 완료했고, 사용자는 **4GiB 유지와
+배포 설정·운영 문서의 동일 값 반영**을 확정했다.
+3회 반복·새 24시간 관찰은 추가 검증으로 보류하며 기존 전체 부하를 소급 합격시키지 않는다.
+과거 고정값 `-Xmx6g` + `-Xmx2g`는 사용하지 않고 현재 GH 2GiB·backend 512MiB를 유지한다.
 
 메모리 부족을 16GiB 임시 증설로 먼저 숨기지 않는다. 합격 기준을 통과하지 못하면 heap·실제
 working set·GC·동시 프로세스를 기록하고 사양 또는 구조를 다시 결정한다. 더 큰 사양을 승인할
@@ -195,7 +242,10 @@ sudo -u runninggu git checkout --detach <artifact의_git_commit>
 sudo -u runninggu git rev-parse HEAD
 ```
 
-배포 환경 예시를 `/etc`에 복사한 뒤 `sudoedit`으로 실제 값을 채운다.
+**아래 복사는 첫 설치 전용이다.** 환경 파일이 이미 있으면 예시로 덮어쓰지 않는다.
+재배포에서는 접근 제한된 위치에 기존 파일을 백업하고, 변경할 항목만 `sudoedit`으로 반영한다.
+이렇게 DB·JWT·SMTP·외부 API 비밀값과 기존 메일 설정을 보존한다. 첫 설치에서는 예시를 `/etc`에
+복사한 뒤 실제 값을 채운다. 메모리 항목은 예시의 승인된 4GiB 값을 사용한다.
 
 ```bash
 sudo install -m 0640 -o root -g runninggu \
@@ -575,34 +625,56 @@ unit·주 service의
 `ExecStartPre` 또는 내부 스모크가 실패하면 Spring Boot를 시작하지 않는다. 운영자가 직접
 `docker compose up -d graphhopper`로 systemd를 우회하지 않는다.
 
-첫 8GiB baseline에서는 `docker inspect`의 GraphHopper `HostConfig.Memory`가 `0`,
-`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`가 `infinity`인지 확인한다.
-이는 상한 누락이 아니라 실제 peak를 얻기 위한 명시적 무제한 상태다. 계약 §9.3 합격 뒤에만
-`compose.env`의 `GRAPHHOPPER_MEMORY_RESERVATION`·`GRAPHHOPPER_MEMORY_LIMIT`과 backend unit의
-`MemoryHigh`·`MemoryMax`를 관측값으로 함께 바꾸고 `daemon-reload` 후 전체 시험을 반복한다.
+### 10.1 4GiB 운영 메모리 확인
 
-양수 `GRAPHHOPPER_MEMORY_LIMIT`은 Compose의 `mem_limit`와 `memswap_limit`에 같은 값으로
-적용되어 GraphHopper container만 swap을 금지한다. baseline 값 0은 이 금지를 적용하지 않는다.
-호스트 swap을 끄거나 PostgreSQL의 메모리 정책을 바꾸지 않는다. 변경 전 private `compose.env`와
-backend unit을 접근 제한된 검증 디렉터리에 백업하고, 기존 release·graph·image를 보존한다.
-backend의 측정 상한은 `/etc/systemd/system/runninggu-backend.service.d/memory.conf`에
-`[Service]`, `MemoryHigh=...`, `MemoryMax=...`만 둔 drop-in으로 적용할 수 있다.
-기존 동명 drop-in이 있으면 덮어쓰지 말고 먼저 확인·백업한다. 실패 시 이번에 바꾼 env와 unit 또는
-drop-in만 원복한 뒤 `daemon-reload`하고 서비스를 복구한다. 다른 drop-in은 지우지 않는다.
+현재 기준은 [계약 §8.1](graphhopper-artifact-contract.md#81-적용-순서)의 표다.
+GraphHopper heap `512m/2g`, reservation `2g`, RAM·RAM+swap 상한 `2560m`,
+backend heap `256m/512m`, systemd `MemoryHigh=640M`·`MemoryMax=768M`을 사용한다.
+호스트 swap 4GiB·swappiness 10과 PostgreSQL 정책은 유지한다. 누락·빈 값인 Compose 메모리
+변수는 배포 전에 실패하며, 명시적 `0`이나 systemd `infinity`는 현재 운영 기준에 맞지 않는다.
 
-GraphHopper는 systemd로 중지·시작해 Compose가 변경된 container 설정을 반영하게 한다.
-`docker inspect`의 `HostConfig.MemoryReservation`, `Memory`, `MemorySwap`을 기록하고,
-`MemorySwap == Memory > 0`인지 확인한다. 해당 container PID의 `/proc/<PID>/cgroup` 경로로
-cgroup v2의 `memory.max`와 `memory.swap.max=0`을 직접 대조한다. backend는
-`systemctl show runninggu-backend.service -p MemoryHigh -p MemoryMax`로 적용값을 확인한다.
-후보값·기존값·실측 근거를 배포 증거에 남기고 같은 고정 요청 30분 부하·백업·재부팅·§9.3 격리를
-반복한다. 격리 시험의 reservation·memory·memory+swap은 실제 후보와 같아야 한다.
+환경 파일 전체나 보간된 Compose 모델에는 시크릿이 있으므로 출력하지 않는다. 아래는 메모리
+항목만 읽는 점검이다. GraphHopper와 Spring이 실행된 상태에서 수행한다.
 
+```bash
+sudo awk -F= '/^GRAPHHOPPER_(XMS|XMX|MEMORY_RESERVATION|MEMORY_LIMIT)=/ {print}' /etc/runninggu/compose.env
+sudo awk -F= '/^BACKEND_(XMS|XMX)=/ {print}' /etc/runninggu/application.env
+sudo systemctl show runninggu-backend.service \
+  -p MemoryHigh -p MemoryMax -p DropInPaths
+
+cd /opt/runninggu/repository/backend
+gh_id=$(sudo docker compose --env-file /etc/runninggu/compose.env \
+  --profile routing -f compose.yaml -f compose.ec2.yaml ps -q graphhopper)
+test -n "$gh_id"
+sudo docker inspect --format \
+  'reservation={{.HostConfig.MemoryReservation}} memory={{.HostConfig.Memory}} memorySwap={{.HostConfig.MemorySwap}}' "$gh_id"
+gh_pid=$(sudo docker inspect --format '{{.State.Pid}}' "$gh_id")
+gh_cgroup=$(sudo awk -F: '$1 == "0" {print $3}' "/proc/$gh_pid/cgroup")
+test -n "$gh_cgroup"
+sudo cat "/sys/fs/cgroup${gh_cgroup}/memory.max" "/sys/fs/cgroup${gh_cgroup}/memory.swap.max"
+```
+
+예상 실효 값은 backend `MemoryHigh=671088640`·`MemoryMax=805306368`, GraphHopper
+`reservation=2147483648 memory=2684354560 memorySwap=2684354560`, cgroup
+`memory.max=2684354560`·`memory.swap.max=0`이다. env의 heap과 실제 JVM 기동 인자의
+`-Xms`·`-Xmx`도 대조한다. 인자 전체나 환경 전체를 로그에 복사하지 않는다.
+
+기존 `/etc/systemd/system/runninggu-backend.service.d/memory.conf` 등 drop-in은 base unit보다
+우선하므로 `DropInPaths`와 실효 값을 함께 확인한다. 같은 값이면 보존한다. 다른 값이면 변경 전
+private env·unit·해당 drop-in을 접근 제한된 위치에 백업하고 필요한 메모리 항목만 수정한다.
+다른 drop-in을 지우지 않는다. 실제 설정 변경이 필요할 때만 `daemon-reload` 후 backend를
+재시작하고, GraphHopper는 systemd로 중지·시작해 Compose가 container를 갱신하게 한다.
+실패 시 이번에 바꾼 파일만 원복하고 서비스를 복구한다. 변경 전후 값·readiness·HTTPS·자원
+관측을 배포 증거에 남긴다. **이미 같은 값인 현재 EC2는 이번 저장소 정리 때문에 재시작하지 않는다.**
+
+**이전 측정 이력:** 첫 8GiB baseline은 GraphHopper `0`·backend `infinity`로 peak를 관측했다.
 2026-09-04 8GiB staging은 GraphHopper Xms1g/Xmx4g·reservation3g·memory5g·memory+swap5g,
 Spring Xms256m/Xmx1g·MemoryHigh1G/MemoryMax1536M으로 위 재시험을 통과했다.
 정확한 source/image·고정 부하·미승인 첫 후보·최종 결과는
 [8GiB 실측 기록](evidence/graphhopper-ec2-8g-20260904.md#최종-설정과-검증-범위)을 따른다.
-이는 해당 staging의 확정값이며 새 환경의 baseline 기본값이나 4GiB 합격을 뜻하지 않는다.
+이는 당시 8GiB 측정값이며 현재 4GiB 배포 기본값이 아니다.
+
+### 10.2 최초 Flyway·Importer 실행
 
 빈 DB의 첫 배포에서는 Importer 비웹 컨텍스트가 Flyway V1부터 적용한 뒤 snapshot을 적재한다.
 Importer에는 `COURSE_SYNC_ENABLED=false`가 강제되며 JWT·Kakao·SMTP 시크릿을 전달하지 않는다.
@@ -944,10 +1016,11 @@ PR 2 unit 검증에서는 다음 여섯 경로를 별도 Compose project로 확�
 6. container stderr 표식은 Docker `local`에 남되 주 service journal에는 중복되지 않는다. 직접
    Compose에서 중복되면 계약 §7의 wrapper 적용 뒤 다시 통과해야 한다.
 
-인스턴스 크기 판정은 [`graphhopper-artifact-contract.md` §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의
+전체 부하 비교 판정은 [`graphhopper-artifact-contract.md` §9](graphhopper-artifact-contract.md#9-사전-합격-기준)의
 고정 정상 요청 30분 부하, 전체 라우팅 회귀, 백업·OOM·GC·swap·재부팅 기준을 모두 사용한다.
-8GiB 한 번 통과를 4GiB 승인 근거로 쓰지 않으며 4GiB는 같은 요청 목록·요청률·동시성과 전체
-시나리오를 3회 연속 통과해야 한다.
+8GiB 한 번 통과를 4GiB 전체 부하 통과 근거로 쓰지 않으며 해당 비교를 완료하려면 같은 요청
+목록·요청률·동시성과 전체 시나리오 3회 증거가 필요하다. 현재 4GiB 유지와 기본 운영 점검은
+2026-09-06 별도 승인한 [마무리 계획](staging-4g-closeout-plan.md)에 따른다.
 
 ### 15.3 staging 앱 API 부하 시험의 외부 호출 가드
 
@@ -1163,6 +1236,16 @@ sudo python3 \
   --output "$VALIDATION_RUN_DIR/app-runtime-summary.json"
 ```
 
+**2026-09-06 실행 경로:** 위 배포 저장소의 구형 요약기를 이번 run에 호출하지 않는다.
+검증 전용 경로에 설치한 `summarize-runtime-metrics.py --policy app-capacity-v3`와
+`analyze_capacity_runtime.py`로 자원·GC·swap·계획 재기동을 분석한다.
+실제 PC 실행은 `start_capacity_interactive.py --run-id $RunId --output $ResultDir`를 사용한다.
+숨김 입력 뒤 `start-authorized.json`의 실제 가드 preflight·송신 계측·수집 시작·만료 시각을
+확인해야 로그인과 부하를 시작한다. `load-finished.json`이 생기면 즉시 제어기의 `finish`를
+실행하고 가드 OFF/readiness를 확인해 `guard-off.json`으로 전달한다. 이후 데이터 정리·logout을 수행한다.
+파일 형식과 부분 통계 의미는 [실행기 README](../../scripts/api/README.md)를 따른다.
+
+아래 직접 실행 예시는 감독자가 같은 종료·복귀 절차를 수행할 때만 사용한다.
 자원 수집이 시작된 것을 확인한 뒤 부하 생성기에서 실제 실행을 시작한다. 이메일·비밀번호는 Python의
 숨김 prompt에만 입력하고 명령행·파일·채팅에 넣지 않는다. stdout은 비밀 없는 최종 JSON 한 건뿐이다.
 두 계정 로그인 이후부터는 실패·중단 때도 `loadExecuted=true`가 남아야 한다.
@@ -1170,14 +1253,14 @@ sudo python3 \
 ```powershell
 $ResultDir = Join-Path $env:TEMP "runninggu-api-load-$RunId"
 if (Test-Path -LiteralPath $ResultDir) { throw '이미 사용한 로컬 run ID입니다.' }
-New-Item -ItemType Directory -Path $ResultDir | Out-Null
-
-$Summary = & $Python scripts/api/run_api_load.py --fixture $Fixture --execute --run-id $RunId
+$GateFile = Join-Path $env:TEMP "runninggu-api-load-$RunId-gate.json"
+# 실제 preflight 결과를 확인한 gate 파일을 지정한다. 실행기가 결과 폴더를 생성한다.
+$Summary = & $Python scripts/api/run_api_load.py --fixture $Fixture --execute --run-id $RunId `
+  --output $ResultDir --guard-evidence $GateFile
 $LoadExit = $LASTEXITCODE
-$Summary | Set-Content -Encoding utf8 (Join-Path $ResultDir 'api-load-summary.json')
 $Summary
 if ($LoadExit -ne 0) { throw "앱 API 부하 실패: exit=$LoadExit" }
-$ParsedSummary = $Summary | ConvertFrom-Json
+$ParsedSummary = Get-Content -Raw (Join-Path $ResultDir 'api-load-summary.json') | ConvertFrom-Json
 if (-not $ParsedSummary.passed -or $ParsedSummary.runId -ne $RunId) {
   throw '앱 API 부하 요약의 합격 상태 또는 run ID가 일치하지 않습니다.'
 }
@@ -1548,5 +1631,5 @@ GraphHopper graph rollback은 §17.1과 같은 stop → 직전 상대 symlink �
 - certbot 자동 갱신 dry-run
 - DB 백업과 실제 복원 리허설
 - 8GiB 재부팅 자동 복구, 로컬 고정 정상 요청의 30분 메모리·백업 동시 부하, 전체 라우팅 회귀 합격 기록
-- 4GiB를 사용한다면 같은 요청 목록·도착률·동시성과 시나리오의 3회 연속 합격 기록
+- 현재 4GiB 기본 운영 점검 결과와 미검증 범위. 전체 부하 비교 완료를 주장하려면 같은 요청 목록·도착률·동시성과 시나리오 3회 증거를 별도로 확보
 - Android 스테이징 `BASE_URL` E2E
