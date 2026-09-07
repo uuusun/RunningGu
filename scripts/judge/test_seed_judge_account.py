@@ -14,9 +14,11 @@ from seed_judge_account import (
     Client,
     SeedError,
     course_payload,
+    find_contests_with_location,
+    has_location,
     itinerary_request,
     mask_email,
-    pick_contests,
+    pick_candidates,
     pick_routes,
     rows,
     seed,
@@ -62,18 +64,28 @@ class FakeOpener:
         return FakeResponse(status, payload)
 
 
+# 실제 `GET /api/contests` 응답 모양. **좌표가 없다** — `ContestCardResponse` 에 `lat`·`lng`
+# 가 없고 §3-1 응답 예시에도 없다. 처음에 여기에 좌표를 넣어 두는 바람에 테스트가 헛돌았다
+# (#305 리뷰).
 CONTEST_PAGE = {
     "items": [
-        {"id": 11, "contestDate": "2026-10-10", "events": ["HALF", "K10"],
-         "lat": 37.5, "lng": 127.0},
-        {"id": 12, "contestDate": "2026-10-11", "events": [], "lat": None, "lng": None},
-        {"id": 13, "contestDate": "2026-10-12", "events": ["FULL"],
-         "lat": 35.1, "lng": 129.0},
-        {"id": 14, "contestDate": "2026-10-13", "events": ["K5"],
-         "lat": 36.3, "lng": 127.4},
-        {"id": 15, "contestDate": "2026-10-14", "events": ["K10"],
-         "lat": 37.4, "lng": 126.7},
+        {"id": 11, "name": "대회11", "contestDate": "2026-10-10", "events": ["HALF", "K10"]},
+        {"id": 12, "name": "대회12", "contestDate": "2026-10-11", "events": []},
+        {"id": 13, "name": "대회13", "contestDate": "2026-10-12", "events": ["FULL"]},
+        {"id": 14, "name": "대회14", "contestDate": "2026-10-13", "events": ["K5"]},
+        {"id": 15, "name": "대회15", "contestDate": "2026-10-14", "events": ["K10"]},
     ],
+    "hasNext": False,
+}
+
+# 실제 `GET /api/contests/{id}` 응답 모양. **여기에만 좌표가 있다.** (§3-4)
+# 12번은 좌표가 없어서 동선 생성이 409 다 — 표본에 섞이면 안 된다.
+CONTEST_DETAILS = {
+    11: {"id": 11, "contestDate": "2026-10-10", "events": ["HALF", "K10"], "lat": 37.5, "lng": 127.0},
+    12: {"id": 12, "contestDate": "2026-10-11", "events": [], "lat": None, "lng": None},
+    13: {"id": 13, "contestDate": "2026-10-12", "events": ["FULL"], "lat": 35.1, "lng": 129.0},
+    14: {"id": 14, "contestDate": "2026-10-13", "events": ["K5"], "lat": 36.3, "lng": 127.4},
+    15: {"id": 15, "contestDate": "2026-10-14", "events": ["K10"], "lat": 37.4, "lng": 126.7},
 }
 
 NEAR_PAGE = {
@@ -83,7 +95,7 @@ NEAR_PAGE = {
          "gainM": 12, "elevationProfileM": [1, 2], "pathPolyline": "aaa",
          "dataSource": "API_GPX", "difficulty": "EASY", "sido": "서울",
          "sourceCourseId": "DN-2"},
-        {"kind": "SPOT", "name": "걷기 스팟", "distanceM": 100, "lat": 37.5,
+        {"kind": "PLACE", "name": "걷기 장소", "distanceM": 100, "lat": 37.5,
          "lng": 126.98},
         {"kind": "ROUTE", "routeId": "a", "name": "남산 코스", "distanceM": 400,
          "lat": 37.55, "lng": 126.98, "routeKm": 4.2, "durationMin": 35,
@@ -96,34 +108,43 @@ NEAR_PAGE = {
 }
 
 
+NEAR_QUERY = "lat=35.114545&lng=129.040763&targetKm=5&radiusKm=8"
+
+
 def seeded_opener() -> FakeOpener:
-    return FakeOpener({
+    routes = {
         ("POST", "/api/auth/login"): (200, {"accessToken": "T0KEN"}),
         ("GET", "/api/contests?size=20"): (200, CONTEST_PAGE),
-        ("GET", "/api/courses/near?lat=37.5663&lng=126.9779&targetKm=5&radiusKm=8"):
-            (200, NEAR_PAGE),
+        ("GET", "/api/courses/near?" + NEAR_QUERY): (200, NEAR_PAGE),
         ("PUT", "/api/me/favorites/11"): (204, None),
         ("PUT", "/api/me/favorites/13"): (204, None),
         ("PUT", "/api/me/favorites/14"): (204, None),
+        ("PUT", "/api/me/favorites/15"): (204, None),
         ("POST", "/api/me/courses"): (201, {"id": 77}),
         ("POST", "/api/itineraries/generate"): (200, {"contestId": 11, "days": []}),
         ("POST", "/api/itineraries"): (201, {"id": 42}),
         ("GET", "/api/me/favorites"): (200, {"items": [1, 2, 3]}),
         ("GET", "/api/me/courses"): (200, {"content": [1, 2]}),
         ("GET", "/api/itineraries"): (200, {"content": [1]}),
-    })
+    }
+    for contest_id, detail in CONTEST_DETAILS.items():
+        routes[("GET", "/api/contests/" + str(contest_id))] = (200, detail)
+    return FakeOpener(routes)
 
 
 class PickTest(unittest.TestCase):
 
-    def test_좌표_없는_대회는_안_고른다(self):
-        # 찜은 되는데 동선 생성이 409 인 대회가 표본에 섞이면, 심사위원이 그 대회에서
-        # 위저드를 눌렀을 때 오류만 본다.
-        chosen = pick_contests(CONTEST_PAGE["items"], 3)
+    def test_목록에서는_거르지_않는다(self):
+        # 목록 응답에는 lat/lng 가 없다. 여기서 좌표로 거르면 **전부 걸러진다** —
+        # 처음에 그렇게 짜서 실제 서버에서는 표본을 하나도 못 만들었다 (#305 리뷰)
+        self.assertEqual([11, 12, 13, 14, 15], pick_candidates(CONTEST_PAGE["items"]))
 
-        self.assertEqual([11, 13, 14], [item["id"] for item in chosen])
+    def test_좌표는_상세로_판정한다(self):
+        self.assertTrue(has_location(CONTEST_DETAILS[11]))
+        self.assertFalse(has_location(CONTEST_DETAILS[12]))
+        self.assertFalse(has_location({}))
 
-    def test_걷기_스팟과_폴리라인_없는_것은_저장하지_않는다(self):
+    def test_걷기_장소와_폴리라인_없는_것은_저장하지_않는다(self):
         routes = pick_routes(NEAR_PAGE["items"], 3)
 
         self.assertEqual(["a", "b"], [route["routeId"] for route in routes])
@@ -135,7 +156,7 @@ class PickTest(unittest.TestCase):
         self.assertEqual(("2026-10-09", "2026-10-10"), (start, end))
 
     def test_그_대회에_있는_종목을_쓴다(self):
-        body = itinerary_request(CONTEST_PAGE["items"][0])
+        body = itinerary_request(CONTEST_DETAILS[11])
 
         self.assertEqual("HALF", body["event"])
         self.assertEqual(["TOUR", "FOOD"], body["themes"])
@@ -200,17 +221,65 @@ class SeedTest(unittest.TestCase):
         # 서울 반경 8km 안에 두루누비 코스가 사실상 없다. 조용히 넘기면 저장 코스
         # 화면이 왜 비었는지 아무도 모른다.
         opener = seeded_opener()
-        opener.routes[("GET", "/api/courses/near?lat=37.5663&lng=126.9779"
-                              "&targetKm=5&radiusKm=8")] = (200, {"items": []})
+        opener.routes[("GET", "/api/courses/near?" + NEAR_QUERY)] = (200, {"items": []})
 
         summary = seed(self.client(opener))
 
         self.assertEqual(1, len(summary["warnings"]))
         self.assertIn("ROUTE 가 0건", summary["warnings"][0])
 
+    def test_좌표_없는_대회는_상세를_보고_거른다(self):
+        # 12번은 목록에는 있지만 상세에 좌표가 없다. 찜은 되는데 그 대회에서 동선을
+        # 만들면 409 CONTEST_LOCATION_UNAVAILABLE 이라 표본에 섞이면 안 된다
+        opener = seeded_opener()
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([11, 13, 14], summary["contestIds"])
+
+    def test_상세를_불러_좌표를_확인한다(self):
+        # 목록만 보고 고르면 실제 서버에서 전부 걸러진다 (#305 리뷰)
+        opener = seeded_opener()
+
+        seed(self.client(opener))
+
+        detail_calls = [path for method, path, _, _ in opener.calls
+                        if method == "GET" and path.startswith("/api/contests/")]
+        self.assertEqual(["/api/contests/11", "/api/contests/12", "/api/contests/13",
+                          "/api/contests/14"], detail_calls)
+
+    def test_상세가_실패한_후보는_건너뛴다(self):
+        # 하나 때문에 전체가 멈추면, 채울 수 있는 표본도 못 채운다
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/contests/11")] = (500, {"code": "INTERNAL_ERROR"})
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([13, 14, 15], summary["contestIds"])
+
+    def test_한_장에서_못_채우면_다음_장을_본다(self):
+        opener = seeded_opener()
+        first = {"items": CONTEST_PAGE["items"][:2], "hasNext": True, "nextCursor": "c2"}
+        opener.routes[("GET", "/api/contests?size=20")] = (200, first)
+        opener.routes[("GET", "/api/contests?size=20&cursor=c2")] = (200, CONTEST_PAGE)
+
+        found = find_contests_with_location(self.client(opener), 3)
+
+        self.assertEqual([11, 13, 14], [item["id"] for item in found])
+
+    def test_찾은_대회가_모자라면_경고로_남긴다(self):
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/contests?size=20")] = (
+            200, {"items": CONTEST_PAGE["items"][:2], "hasNext": False})
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([11], summary["contestIds"])
+        self.assertTrue(any("찜 표본" in w for w in summary["warnings"]))
+
     def test_대회가_없으면_멈춘다(self):
         opener = seeded_opener()
-        opener.routes[("GET", "/api/contests?size=20")] = (200, {"items": []})
+        opener.routes[("GET", "/api/contests?size=20")] = (200, {"items": [], "hasNext": False})
 
         with self.assertRaises(SeedError):
             seed(self.client(opener))

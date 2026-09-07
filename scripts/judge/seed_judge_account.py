@@ -21,7 +21,7 @@
     export RUNNINGGU_JUDGE_EMAIL=...        # 로그에 안 남는다
     export RUNNINGGU_JUDGE_PASSWORD=...
     python seed_judge_account.py --out seed-summary.json
-    python seed_judge_account.py --dry-run  # 로그인과 고르기까지만, 쓰기 없음
+    python seed_judge_account.py --dry-run  # 표본 저장 안 함. 로그인·조회는 실제로 보낸다
 """
 
 from __future__ import annotations
@@ -43,11 +43,22 @@ TIMEOUT_SEC = 20
 FAVORITE_COUNT = 3
 SAVED_COURSE_COUNT = 3
 
-# 저장 코스를 찾을 출발지. 서울시청 — 수도권은 두루누비 코스가 사실상 없어서
-# 걷기 스팟이 기본 경험이다(AGENTS 6장). ROUTE 가 모자라면 그 사실이 그대로 보고된다.
-COURSE_ORIGIN = {"lat": "37.5663", "lng": "126.9779", "targetKm": "5", "radiusKm": "8"}
+# 저장 코스를 찾을 출발지. **부산 남파랑길 2코스 시작점**이다 🔒(#305 리뷰 · 2026-09-07).
+#
+# 처음에는 서울시청을 썼는데 수도권에는 두루누비 코스가 사실상 없다(AGENTS 6장 — 반경
+# 8km 안 0건). 저장 코스 화면이 비면 심사위원에게는 "안 만든 기능" 으로 보인다.
+#
+# 이 좌표는 선경님이 저장소 261개 코스와 실제 경로 빌더로 두 번 확인해 **적격 큐레이션
+# 5건**(남파랑길 2·3·4·5 · 해파랑길 1)이 나오는 자리다. 해운대는 2건이라 뺐다.
+#
+# **다만 5건이 곧 저장 3건은 아니다.** 실제 `/courses/near` 는 걷기 장소(PLACE)와 합쳐
+# 12개로 자르므로 ROUTE 가 몇 개 올지는 응답을 봐야 안다.
+COURSE_ORIGIN = {"lat": "35.114545", "lng": "129.040763", "targetKm": "5", "radiusKm": "8"}
 
 # 동선 생성 표본. 테마는 §4.8 의 "1개 이상" 을 채우는 최소 조합이다.
+# 좌표 있는 대회를 찾으려고 목록을 이어 볼 최대 장수. 앞쪽이 죄다 좌표가 없을 수 있다.
+MAX_LIST_PAGES = 3
+
 ITINERARY_THEMES = ["TOUR", "FOOD"]
 ITINERARY_EVENT_FALLBACK = "K10"
 
@@ -128,19 +139,26 @@ def error_code(payload: object) -> str:
 # ── 무엇을 채울지 고르는 부분 — 순수 함수라 서버 없이 테스트한다 ──────────────
 
 
-def pick_contests(items: list, count: int) -> list:
-    """찜할 대회를 고른다. 목록은 `(contestDate, id)` 오름차순으로 오므로 앞에서 자른다.
+def pick_candidates(items: list) -> list:
+    """찜 후보의 id. 목록은 `(contestDate, id)` 오름차순으로 오므로 순서를 그대로 쓴다.
 
-    **좌표가 없는 대회는 건너뛴다** — 동선 생성이 `409 CONTEST_LOCATION_UNAVAILABLE`
-    이라(§5-1), 찜은 되는데 거기서 동선을 못 만드는 대회가 표본에 섞인다.
+    **목록에는 좌표가 없다** — `ContestCardResponse` 에 `lat`·`lng` 가 없고 §3-1 응답에도
+    없다(#305 리뷰). 좌표는 상세(§3-4)에만 있으므로 여기서는 거르지 않고 후보만 낸다.
     """
-    usable = [item for item in items
-              if item.get("id") and item.get("lat") is not None and item.get("lng") is not None]
-    return usable[:count]
+    return [item["id"] for item in items if item.get("id")]
+
+
+def has_location(detail: dict) -> bool:
+    """동선을 만들 수 있는 대회인가. (§5-1)
+
+    좌표가 없으면 생성이 `409 CONTEST_LOCATION_UNAVAILABLE` 이다. 찜은 되는데 거기서
+    동선을 못 만드는 대회가 표본에 섞이면, 심사위원이 위저드를 눌렀을 때 오류만 본다.
+    """
+    return detail.get("lat") is not None and detail.get("lng") is not None
 
 
 def pick_routes(items: list, count: int) -> list:
-    """저장할 코스를 고른다. 걷기 스팟(`SPOT`)은 저장 대상이 아니다 — 코스가 아니다.
+    """저장할 코스를 고른다. 걷기 장소(`PLACE`)는 저장 대상이 아니다 — 코스가 아니다.
 
     `pathPolyline` 이 없는 항목도 뺀다. 저장 요청의 필수 값이고, 없는 것을 빈
     문자열로 채우면 서버가 `400` 을 준다.
@@ -239,11 +257,44 @@ def seed_itinerary(client: Client, contest: dict):
     return saved.get("id") if isinstance(saved, dict) else None
 
 
+def find_contests_with_location(client: Client, count: int, max_pages: int = MAX_LIST_PAGES) -> list:
+    """좌표가 있는 대회 [count] 개를 찾는다. **목록 → 상세** 두 걸음이다. (§3-1 · §3-4)
+
+    목록에 좌표가 없어서(#305 리뷰) 후보마다 상세를 한 번씩 더 부른다. 한 장에서 못
+    채우면 커서로 이어 본다 — 앞쪽 대회가 죄다 좌표가 없을 수 있다.
+
+    상세가 실패한 후보는 **건너뛰고 계속한다.** 하나 때문에 전체가 멈추면, 표본을 채울 수
+    있는데도 못 채운다.
+    """
+    found: list = []
+    seen: set = set()
+    cursor: str | None = None
+    for _ in range(max_pages):
+        path = "/api/contests?size=20" + ("&cursor=" + urllib.parse.quote(cursor) if cursor else "")
+        page = client.json("GET", path)
+        for contest_id in pick_candidates(list(page.get("items") or [])):
+            # 같은 대회가 두 장에 걸쳐 오면 한 번만 본다 — 조회 중 원천이 갱신되면 생긴다
+            if contest_id in seen:
+                continue
+            seen.add(contest_id)
+            try:
+                detail = client.json("GET", "/api/contests/" + str(contest_id))
+            except SeedError:
+                continue
+            if isinstance(detail, dict) and has_location(detail):
+                found.append(detail)
+                if len(found) == count:
+                    return found
+        cursor = page.get("nextCursor") if page.get("hasNext") else None
+        if not cursor:
+            break
+    return found
+
+
 def seed(client: Client, dry_run: bool = False) -> dict:
-    contests = client.json("GET", "/api/contests?size=20")
-    chosen = pick_contests(list(contests.get("items") or []), FAVORITE_COUNT)
+    chosen = find_contests_with_location(client, FAVORITE_COUNT)
     if not chosen:
-        raise SeedError("좌표가 있는 대회가 목록에 없다 — 서버 데이터부터 확인해야 한다")
+        raise SeedError("좌표가 있는 대회를 찾지 못했다 — 서버 데이터부터 확인해야 한다")
 
     query = urllib.parse.urlencode(COURSE_ORIGIN)
     near = client.json("GET", "/api/courses/near?" + query)
@@ -258,9 +309,12 @@ def seed(client: Client, dry_run: bool = False) -> dict:
         "itineraryId": None,
         "warnings": [],
     }
+    if len(chosen) < FAVORITE_COUNT:
+        summary["warnings"].append(
+            "좌표가 있는 대회를 " + str(len(chosen)) + "건만 찾았다 — 찜 표본이 그만큼만 찬다")
     if len(routes) < SAVED_COURSE_COUNT:
-        # 서울 반경 8km 안에 두루누비 코스가 사실상 없다(AGENTS 6장). 조용히 넘기면
-        # 저장 코스 화면이 왜 비었는지 아무도 모른다.
+        # 서버가 걷기 장소(PLACE)와 합쳐 12개로 자르므로 ROUTE 가 몇 개 올지는 응답을
+        # 봐야 안다. 조용히 넘기면 저장 코스 화면이 왜 비었는지 아무도 모른다.
         summary["warnings"].append(
             "저장할 ROUTE 가 " + str(len(routes)) + "건뿐이다 — "
             "출발지를 바꾸거나 코스 동기화를 확인한다")
@@ -301,7 +355,8 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default=os.environ.get("RUNNINGGU_API_BASE_URL"))
     parser.add_argument("--dry-run", action="store_true",
-                        help="로그인과 고르기까지만 하고 쓰지 않는다")
+                        help="표본을 저장하지 않는다. 로그인과 GET 조회는 실제로 보낸다 "
+                             "— 코스 조회는 서버에서 OSM 경로 생성을 유발할 수 있다")
     parser.add_argument("--out", help="요약 JSON 을 쓸 경로")
     args = parser.parse_args()
 
