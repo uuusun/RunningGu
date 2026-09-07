@@ -1,0 +1,61 @@
+{
+  "sourceFiles": {
+    "pc-current-tls.json": {
+      "at": "2026-09-06T21:51:03.052792+00:00",
+      "host": "apis.data.go.kr",
+      "httpRequests": 0,
+      "runtime": "OpenSSL 3.5.8 25 Aug 2026",
+      "addresses": [
+        "27.101.236.63"
+      ],
+      "dnsMs": 55.812,
+      "tcpMs": 44.023,
+      "tlsRecordsReceived": [
+        {
+          "bytes": 2740,
+          "firstRecordType": 22,
+          "elapsedMs": 36.224
+        },
+        {
+          "bytes": 522,
+          "firstRecordType": 252,
+          "elapsedMs": 37.913
+        }
+      ],
+      "tlsBytesSent": 1537,
+      "passed": true,
+      "tlsMs": 41.06,
+      "negotiated": "TLSv1.3",
+      "cipher": "TLS_AES_128_GCM_SHA256"
+    },
+    "pc-alpn-comparison.json": [
+      {
+        "at": "2026-09-06T21:51:54.876475+00:00",
+        "case": "same_as_previous",
+        "httpRequests": 0,
+        "tcpMs": 131.209,
+        "passed": true,
+        "tlsMs": 150.25,
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_128_GCM_SHA256",
+        "alpn": null
+      },
+      {
+        "at": "2026-09-06T21:51:55.182992+00:00",
+        "case": "alpn_http11",
+        "httpRequests": 0,
+        "tcpMs": 144.979,
+        "passed": true,
+        "tlsMs": 59.58,
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_128_GCM_SHA256",
+        "alpn": null
+      }
+    ]
+  },
+  "sourceSha256": {
+    "pc-current-tls.json": "61603f572d20a64896cb237198f2cd60d86aba0f9e14d57926b5f10966ab9c7b",
+    "pc-alpn-comparison.json": "6c1411073886ce9bdf01fafc43059d88e5ce2406a51e3582fb581f1f4bf2087c"
+  },
+  "scope": "PC TLS only, HTTP requests zero"
+}

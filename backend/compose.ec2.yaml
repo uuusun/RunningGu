@@ -32,18 +32,19 @@ services:
     command:
       - -Xms${GRAPHHOPPER_XMS:?GRAPHHOPPER_XMS를 설정해야 합니다}
       - -Xmx${GRAPHHOPPER_XMX:?GRAPHHOPPER_XMX를 설정해야 합니다}
-      # §9.2의 readiness 이후 반복 Full GC 0건을 Docker local 로그에서 판정한다.
+      # GC 시각·소요시간을 요청 성능·메모리와 함께 분석한다(앱 API 계획 §5.3).
       - -Xlog:gc*:stdout:time,uptime,level,tags
       - -jar
       - /opt/graphhopper/graphhopper-web.jar
       - server
       - /opt/graphhopper/graphhopper-server.yml
     restart: "no"
-    # 첫 8GiB baseline은 0(무제한)으로 측정한다. §9.3 통과 뒤 관측값으로 교체한다.
-    mem_reservation: ${GRAPHHOPPER_MEMORY_RESERVATION:-0}
-    mem_limit: ${GRAPHHOPPER_MEMORY_LIMIT:-0}
+    # 승인된 4GiB 값은 deploy/env/compose.env.example과 계약 §8.1을 따른다.
+    # 누락·빈 값을 무제한으로 대체하지 않는다.
+    mem_reservation: ${GRAPHHOPPER_MEMORY_RESERVATION:?GRAPHHOPPER_MEMORY_RESERVATION을 설정해야 합니다}
+    mem_limit: ${GRAPHHOPPER_MEMORY_LIMIT:?GRAPHHOPPER_MEMORY_LIMIT를 설정해야 합니다}
     # 양수 상한에서는 RAM+swap 합계를 RAM과 같게 해 GraphHopper만 swap을 금지한다(계약 §8.1).
-    # baseline의 0은 미설정 취급이며 swap 금지를 뜻하지 않는다.
-    memswap_limit: ${GRAPHHOPPER_MEMORY_LIMIT:-0}
+    # 과거 baseline 재현의 명시적 0은 무제한이며 현재 운영값이 아니다.
+    memswap_limit: ${GRAPHHOPPER_MEMORY_LIMIT:?GRAPHHOPPER_MEMORY_LIMIT를 설정해야 합니다}
     stop_grace_period: 30s
     logging: *bounded-logging

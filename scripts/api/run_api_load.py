@@ -394,9 +394,10 @@ class HttpClient:
             return Exchange(status, payload, duration_ms, len(raw))
         except LoadError:
             raise
-        except (urllib.error.URLError, TimeoutError, OSError):
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
             duration_ms = (time.perf_counter_ns() - started) / 1_000_000
-            raise LoadError("transport", duration_ms) from None
+            timed_out = isinstance(error, TimeoutError) or isinstance(getattr(error, "reason", None), TimeoutError)
+            raise LoadError("timeout" if timed_out else "transport", duration_ms) from None
 
 
 def object_list(payload: object, key: str, nonempty: bool = True) -> list[dict]:
@@ -486,7 +487,14 @@ def session_token(spec: RequestSpec, sessions: dict[str, AccountSession]) -> str
 def perform(spec: RequestSpec, client: HttpClient, fixture: dict, sessions: dict[str, AccountSession]) -> Exchange:
     account = sessions.get(spec.account_label) if spec.account_label else None
     exchange = client.exchange(spec, session_token(spec, sessions))
-    validate_exchange(spec, exchange, fixture, account)
+    try:
+        validate_exchange(spec, exchange, fixture, account)
+    except BaseException as error:
+        if hasattr(client, "validation_result"):
+            client.validation_result(False, error.code if isinstance(error, LoadError) else "internal_runner")
+        raise
+    if hasattr(client, "validation_result"):
+        client.validation_result(True, None)
     return exchange
 
 
@@ -1007,6 +1015,12 @@ def dry_run_summary(fixture: dict, fixture_hash: str) -> dict:
 
 
 def main() -> int:
+    # 실제 전체 부하 경로는 요청별 증거·finally를 보존하는 승인된 §5.3 실행기다.
+    import run_api_capacity
+    return run_api_capacity.main()
+
+
+def legacy_main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--execute", action="store_true")

@@ -1,5 +1,14 @@
 # 4GiB 축소 검증 — 2026-09-05
 
+> **후속 2026-09-06:** 별도 승인한 [4GiB 기본 운영 점검](staging-4g-closeout-20260906.md)을 완료했다.
+> 현재 4GiB를 유지한다. 아래 2026-09-05 전체 부하 중도 종료 결과는 소급 합격시키지 않는다.
+
+> **2026-09-05 최종 상태 — 13:00Z:** PR #298 머지 후 같은 2b 서버를 다시 4GiB로 전환했다.
+> 정상 재부팅·HTTPS·가드 preflight 이후 앱 API 시험을 실행했으나 GraphHopper Full GC 2회로
+> 반복 GC 금지 조건에 미달해 중단했다. 정지 시간은 32.152ms·36.316ms, 최저 가용 메모리는 27.383%다.
+> 가드 해제·backend 재기동·HTTPS·DB 점검까지 완료했다. 현재 4GiB staging은 정상 응답하지만,
+> 전체 부하·3회 반복·24시간 관찰은 미완료다. 다음 문단은 이전 시도의 이력이다.
+
 > 운영책임자가 8GiB 결과를 확인하고 4GiB 시험을 순서대로 진행하도록 승인했다.
 > 복구 기준 보존과 후보 상한의 장애 격리는 통과했다. 기존 EC2 유형 변경은 AWS Free Plan의
 > `FreeTierRestrictionError`로 거부되어 **4GiB 정상 부하 시험은 시작하지 못했다.**
@@ -373,3 +382,139 @@ swap 사용량 외에 실제 요청 성능과 메모리 압박의 지속 시간�
 - 자원 판정기 테스트 12개 2회 통과, 앱 부하 도구 테스트 49개 통과.
 - 현재 단계는 기준·판정기 검증과 서버·복구 경로 사전 대조다. 새 4GiB 전환·부하·24시간 관찰의
   성공 결과는 아직 없으며, 완료한 결과만 아래에 추가한다.
+
+
+## capacity-v2 머지 후 실행 — 2026-09-05
+
+- 운영책임자가 PR #298을 11:32:40Z에 머지했다. merge SHA는
+  `398d7dbb4fd13070adfe336a8c90d60ad03e8263`이다.
+- develop CI `33963612666` 성공과 정식 artifact `9968755968`
+  (`runninggu-backend-398d7dbb4fd13070adfe336a8c90d60ad03e8263`) 생성을 확인했다.
+- 비교 대상 서버의 backend·repository는 기존 정식 artifact의 `673a2f7`로 유지한다.
+  새 판정기만 merge SHA의 원문과 SHA-256을 대조해 별도 검증 경로에 설치했다.
+- 설치 SSM `41fa78db-2bfe-4609-aec5-cd0797e7c77b`: 11:35:29Z~11:35:30Z,
+  Success / exit 0. 판정기 SHA-256
+  `1ef5152c8ff13a5024428f089dfc77b3ba913f1a43d55357a27829fec9b6baeb`,
+  서버에서 판정기 테스트 12개를 두 번 실행해 통과했다.
+- 원격 준비 경로는 `/opt/runninggu-validation/capacity-v2-20260905/`이며 root 전용 0700이다.
+  기존 prepare/boot observer의 경로만 새 증거 경로로 바꾸고 원래 증거는 보존했다.
+
+### 전환 준비 첫 시도 — 서비스 정지 확인 실패·8GiB 설정 복구
+
+- SSM `697e8cce-54b3-462d-a2aa-2a9bb9b464ca`: 11:38:18Z~11:39:11Z,
+  Failed / exit 1. EC2는 여전히 2b의 m7i-flex.large이며 사양 변경은 하지 않았다.
+- backend 중지 후 full backup 1회(11:38:18Z~11:39:08Z)와 WAL 점검 1회 성공.
+  두 unit 모두 새 InvocationID, Result=success, ExecMainStatus=0을 확인했다.
+- 4GiB 후보 파일 적용과 PostgreSQL exit 0 정상 종료까지는 성공했으나,
+  마지막 backend·GraphHopper ActiveState가 모두 inactive인지 확인하는 단정문에서 실패했다.
+- 원래 환경파일·메모리 상한을 복원하고 PostgreSQL·GraphHopper·backend·backup/WAL timer를
+  시작했다. 준비 결과의 `original8gSettingsRestored=true`를 확인했다.
+  이 시도는 부하 시험이 아니며, 정상 종료 여부의 원인과 실제 복구 상태를 별도 진단한다.
+- 가드 활성화·계정 로그인·부하 요청·NIC/EC2 자원 수집은 아직 시작하지 않았다.
+
+### 전환 재시도와 첫 4GiB 기동 실패·복구
+
+- 준비 재시도 SSM `4cc9c63d-0c52-43d4-8ebd-027cee76963a`: 11:46:39Z~11:47:29Z, Success / exit 0.
+  full backup·WAL 점검 성공 후 후보 상한을 적용했다. 수동 중지된 backend의 MainPID=0,
+  ExecMainStatus=143, NRestarts=0을 정지 구간의 종료 기록으로 보존했다.
+- 같은 2b 인스턴스를 c7i-flex.large 4GiB로 변경했다. 기존 EIP·EBS·DB·673a2f7 JAR·graph artifact는 유지했다.
+- 첫 기동 검증 SSM `15e790ea-3b0e-4587-b3c3-13fb495931cb`: Failed / exit 1.
+  boot ID `efb4a106-bc87-4289-8ea2-0e97b1d56391`, GraphHopper는 준비됐으나 backend readiness 실패.
+  전환 준비에서 PostgreSQL을 명시적으로 docker stop 했으므로 unless-stopped 정책에 따라
+  재부팅 후에도 정지 상태였다. backend는 DB 대기 실패로 NRestarts=3·start limit에 도달했다.
+  이 실패를 성공으로 변경하지 않고 `cold-boot-attempt1.json`과 boot별 원문을 보존한다.
+- 복구 명령 전 AWS 콘솔 로그인 만료가 확인돼 사용자 재로그인 후 이어갔다.
+- 복구 SSM `a6f96a1d-ba9e-423b-ae68-84a25167b725`: 12:12:27Z~12:12:43Z, Success / exit 0.
+  PostgreSQL은 exited / exit 0 / OOMKilled=false, restart policy=unless-stopped였다.
+  기존 컨테이너 시작·pg_isready·backend reset-failed/start·readiness·pgBackRest check 통과.
+  backend·GraphHopper active / NRestarts=0, kernel OOM=0, 가드 비활성을 확인했다.
+- 정상 재부팅 요청 SSM `b94342b1-80bc-41c5-bd3a-6eaf79c12606`: 12:16:49Z~12:16:50Z,
+  Success / exit 0. PostgreSQL 실행 상태를 확인한 뒤 15초 후 OS 재부팅을 예약했다.
+  명시적인 컨테이너 stop을 반복하지 않았으며, 재부팅 후 자동 시작 결과는 아래에 별도 기록한다.
+- 가드 조정기의 시작 실패·사전 검증 실패 시 해제, 환경파일 보존과 중복키 거부를 검사한
+  로컬 모의 테스트 3개를 두 번 실행해 통과했다. 실제 서버 부하 결과를 대신하지 않는다.
+
+### 정상 재부팅·가드 검증과 앱 API 재시험 시작
+
+- 정상 재부팅 후 boot ID `2cbea9a5-fce4-411c-ba9e-6cc11870063b`에서 PostgreSQL이 자동 시작했다.
+  GraphHopper activation부터 두 서비스 readiness까지 18,989ms, backend·GraphHopper NRestarts=0,
+  kernel OOM=0이다. 후보 JVM/cgroup 상한·동일 artifact·pgBackRest check·가드 비활성을 확인했다.
+- SSM `9cebfa73-f562-464c-9a51-19404b4a050a`의 위 기동 검증 JSON은 passed=true이나,
+  이어 붙인 가드 조정기 설치 명령 문자열 오류로 전체 명령은 Failed / exit 1이었다.
+  조정기 파일을 쓰거나 가드를 켜기 전에 실패했다. 두 결과를 구분해 보존한다.
+- 설치 재시도 `7c53c675-1a6e-4341-b408-053478a18ff7`: 12:20:49Z, Success / exit 0.
+  서버 조정기 AST SHA-256 `577c1dc9be85a4bfc587d6b70c5443b4c4bfe638fab3795fe0ed1a25a4fb14f5`,
+  파일 SHA-256 `8a57cb8859dc5901129e022b38700acf2bffbbfd868eb9d95c9ceba22f16961b`.
+  임시 파일에서 활성/비활성 왕복 2회·다른 값 보존·중복키 거부를 확인했다.
+- 외부 PC HTTPS 스모크 7항목 통과. 최초 실패 결과와 복구 후 결과를 별도 파일에 보존했다.
+- 가드 활성화 SSM `5f9d8e24-ef78-42ec-9ffd-ff7261a324a2`: 12:21:59Z~12:22:11Z, Success / exit 0.
+  run `api4g-673a2f7-20260905T1107Z`, KTO operation별100·카카오 전체5000·endpoint별2000.
+  실제 KTO 3건 모두 HTTP_2XX, unsafe/non2xx/counter gap/over limit=0, 프로세스 동일성 확인.
+- EC2 자원 수집 SSM `a95e168e-e166-4585-b001-100c123607c8`: Success / exit 0.
+  12:24:14.338345Z부터 2,400초·5초 간격, capacity-v2. 초기 MemAvailable=55.429%.
+- 외부 PC NIC 수집을 먼저 시작했고, 두 계정 숨김 입력을 가진 기존 실행기에 12:25:20.610475Z
+  가드·수집 검증 gate를 전달했다. launcher 시작 기록은 12:25:21.146504Z다.
+  입력값은 메모리에만 보관하며 채팅·명령행·결과 파일에 넣지 않는다.
+- 수집 600초 WAL 점검 1회는 12:34:14.338659Z~12:34:14.637908Z 성공,
+  새 InvocationID `f0d466fea6b74b569e9ac88b2c384bf8` / Result=success / ExecMainStatus=0.
+  나머지 요청·자원·백업·WAL 및 종료 정리 결과는 시험 종료 후 판정한다.
+
+### 앱 API 재시험 중단·최종 판정
+
+기계 판독 요약은 [4GiB capacity-v2 실행 결과](api-load-ec2-4g-capacity-v2-20260905.json)다.
+원격 원문은 `/opt/runninggu-validation/api4g-673a2f7-20260905T1107Z/`에 보존한다.
+
+| 항목 | 실제 결과 |
+|---|---|
+| 판정 | 반복 Full GC 금지 조건 미달로 운영자가 중도 종료, 전체 합격 아님 |
+| 예정 요청 | 전체 2,100 / 본 시험 1,800; 전체 일정 미완주 |
+| 실제 전송·완료·본 시험 성공·dispatch·응답시간 | Ctrl+C 경로에서 실행기가 부분 통계를 저장하지 않아 확정 불가. 0 또는 성공으로 채우지 않음 |
+| 서버 접근 로그 | 전용 User-Agent의 1,365건: 200 1,311건 / 204 54건. 로그인·preflight·정리 등을 포함하므로 예정 부하 건수와 같지 않음 |
+| 자원 수집 | 예정 480개 중 289개 완전 표본, 최저 MemAvailable 27.383% |
+| swap | 최대 사용량 증가 60KiB, pswpin 증가 0, pswpout 증가 16, 활동 구간 3개·최장 연속 1개. 단독 실패 조건으로 사용하지 않음 |
+| OOM·비정상 재시작 | kernel/Docker OOM 0, 정상 관측 중 backend·GraphHopper·PostgreSQL 재시작 증가 0 |
+| 정상 부하 Full GC | GraphHopper 2회, 원래 backend InvocationID 구간 0회 |
+| 외부 호출 가드 | KTO 28 / 카카오 75, 모두 HTTP_2XX; unsafeEvents·non2xxResults·counterGaps·overLimit 0 |
+| 백업·WAL | full backup 1회, WAL 2회 성공. 예정한 세 번째 WAL은 중단으로 미실행 |
+| 외부 PC NIC | 312개 부분 표본, 송수신 최대 점유율 0.331% / 0.841%, 오류·폐기 counter 증가 0 |
+| 종료 복귀 | 가드 비활성·backend 재기동·readiness·HTTPS 7항목·pgBackRest check 통과 |
+| 후속 전체 3회·24시간 관찰 | 앱 API 시험 미달로 시작하지 않음 |
+
+#### Full GC 발생과 해석
+
+- `12:38:35.705Z`, GC(92): **G1 Compaction Pause 32.152ms**, heap `2040M → 1059M (2048M)`.
+- `12:42:59.626Z`, GC(114): **G1 Compaction Pause 36.316ms**, heap `2025M → 1059M (2048M)`.
+- 시작 줄과 완료 줄을 중복 집계하지 않았다. 두 번 모두 가드 활성화·readiness 이후 실제 부하 구간이다.
+- 같은 구간에서 `G1 Humongous Allocation`을 동반한 `Evacuation Failure` 로그 28개를 관측했다.
+  설정한 2GiB Java heap의 회수 압박을 보여 주지만 host 메모리 부족이나 OOM 발생을 뜻하지 않는다.
+  정지 시간 두 값만으로 4GiB 운영 불가·응답시간 기준 위반을 단정하지 않는다.
+- 승인된 `capacity-v2`에서도 반복 Full GC 금지 조건은 유지했으므로 이번 실행은 통과로 바꾸지 않는다.
+  다음 시험은 GC/heap 설정 검토와 중도 종료 시 부분 요청 통계 보존을 먼저 보완한 뒤 같은 입력·요청량으로 수행한다.
+  새 JVM 설정이나 새 합격 기준은 이번 결과에 소급 적용하지 않았다.
+
+#### 중단 시각·정리·집계 주의
+
+- GC 중간 진단 SSM `104cb183-b2a4-468e-8607-8da778963228`에서 완료 Full GC 2회를 확인했다.
+- 전용 부하 콘솔에 종료 신호를 보내 실행기가 `12:47:36.556156Z`에 `operator_interrupted`, exit 130으로 종료했다.
+  숨김 입력은 폐기했고 전용 입력 콘솔·NIC 수집 프로세스도 종료했다.
+- SSM `1ec0d321-fecb-4eaf-a0a6-3f6ad34252fe`: Success / exit 0.
+  `12:48:18.016521Z`에 중단 파일을 기록하고 가드 해제·backend 재기동을 수행했다.
+  `12:48:31.313894Z`에 실제 프로세스 환경의 guard=false / 빈 run ID와 readiness를 확인했다.
+- 자원 controller는 중단 파일을 확인해 수집을 SIGTERM으로 종료했다(exit -15). 예상보다 부족한 표본 수,
+  종료 후 달라진 backend InvocationID는 이 운영자 중단·재기동의 결과이며 정상 부하의 비정상 재시작으로 세지 않는다.
+- 원시 `metrics-completed.json`의 backend Full GC 4회는 가드 해제 후 재기동 구간까지 포함한 집계다.
+  별도 `normal-window-audit.json`에서 원래 `_SYSTEMD_INVOCATION_ID`와 readiness 이후로 제한해 **0회**를 확인했다.
+  원시 파일은 수정하지 않고 보정 근거를 함께 보존한다.
+- 중단 후 진단 `853bcdbe-9e9e-442e-aa60-322fee2d290f`, 정상 구간 감사
+  `d9978a74-296f-449d-866f-a612625c973f` 모두 Success / exit 0.
+  서비스·backup/WAL/certbot timer active, PostgreSQL running / non-OOM, pgBackRest check 성공이다.
+- Nginx의 개인정보 제외 형식은 응답시간을 저장하지 않는다. 위 1,365건은 기록된 HTTP 응답에 대한 증거이며,
+  완료되지 않은 전체 일정의 timeout·응답 내용·dispatch·지연 합격을 대신하지 않는다.
+- 현재 staging은 같은 `c7i-flex.large` 4GiB와 후보 상한으로 정상 복귀했다. 부하 종료 후 서비스 불안정·OOM이
+  관측되지 않아 이번 종료에서는 8GiB로 되돌리지 않았다. 검증된 8GiB 설정 사본과 복구 경로는 보존한다.
+  옛 2a 서버는 계속 정지 상태이며 이번 재시험에서 AWS 리소스를 새로 만들지 않았다.
+
+- 최종 정리 SSM `966fd0a6-9c5f-4b3d-95a1-b65a0e29820a`: `13:00:17.457323Z`, Success / exit 0.
+  이번 임시 boot observer를 비활성화했고, 자원 수집·가드 만료 timer는 inactive,
+  남은 부하·수집 프로세스 0개, 실제 가드 비활성과 운영 서비스·timer active를 확인했다.
+  이는 종료 정리의 통과이며 미완료 부하 시험의 합격을 뜻하지 않는다.

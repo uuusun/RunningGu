@@ -21,9 +21,10 @@ Restart=on-failure
 RestartSec=5
 TimeoutStartSec=125s
 TimeoutStopSec=30
-# 첫 8GiB baseline은 무제한으로 측정한다. §9.3 합격 뒤 둘을 관측값으로 함께 교체한다.
-MemoryHigh=infinity
-MemoryMax=infinity
+# 승인된 EC2 4GiB 운영값. heap 256m~512m와 함께 적용한다(계약 §8.1).
+# 기존 memory.conf 등 drop-in이 있으면 배포 후 실효 값도 확인한다.
+MemoryHigh=640M
+MemoryMax=768M
 
 NoNewPrivileges=true
 PrivateTmp=true

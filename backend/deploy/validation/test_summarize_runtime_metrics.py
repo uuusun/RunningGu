@@ -75,6 +75,21 @@ class RuntimeMetricsSummaryTest(unittest.TestCase):
         lines[8] = lines[8].replace("25.000", "19.999")
         self.assertFalse(summary_module.summarize(lines)["passed"])
 
+    def test_v3_memory_dip_is_observation_without_rewriting_v2(self) -> None:
+        lines = self.passing_lines()
+        lines[8] = lines[8].replace("25.000", "19.999").replace("pswpout=20", "pswpout=30")
+        result = summary_module.summarize(lines, "app-capacity-v3")
+        self.assertTrue(result["passed"])
+        self.assertEqual(1, result["memoryBelow20PercentSamples"])
+        self.assertEqual("requires_api_gc_swap_backup_review", result["capacityVerdict"])
+        self.assertFalse(summary_module.summarize(lines, "capacity-v2")["passed"])
+
+    def test_v3_does_not_hide_oom_or_missing_measurements(self) -> None:
+        lines = self.passing_lines()
+        lines[11] = lines[11].replace("oom_killed=false", "oom_killed=true")
+        self.assertFalse(summary_module.summarize(lines, "app-capacity-v3")["passed"])
+        self.assertFalse(summary_module.summarize(lines[:8], "app-capacity-v3")["passed"])
+
     def test_swap_diagnostics_must_be_present_nonnegative_and_numeric(self) -> None:
         for field in ("swap_used_kib=0", "pswpin=10", "pswpout=20"):
             for replacement in ("", field.split("=")[0] + "=invalid", field.split("=")[0] + "=-1"):

@@ -44,7 +44,7 @@ RUNNINGGU_REPOSITORY_ROOT="$test_root/repository" \
 
 grep -q '^schema_version=1$' "$test_root/output/runtime.log"
 grep -q '^git_commit=0123456789abcdef$' "$test_root/output/runtime.log"
-grep -Eq '^sample sequence=0 .*mem_available_percent=[0-9]+\.[0-9]{3} .*pswpin=[0-9]+ pswpout=[0-9]+$' \
+grep -Eq '^sample sequence=0 .*mem_available_percent=[0-9]+\.[0-9]{3} .*pswpin=[0-9]+ pswpout=[0-9]+ cpu_user=[0-9]+ .*cpu_idle=[0-9]+ .*cpu_steal=[0-9]+$' \
   "$test_root/output/runtime.log"
 grep -q '^systemd service=runninggu-backend.service ActiveState=active SubState=running NRestarts=0 MemoryCurrent=1048576 MemoryPeak=2097152$' \
   "$test_root/output/runtime.log"

@@ -1,0 +1,633 @@
+{
+  "scope": "basic_operation_closeout",
+  "runId": "ops4g-673a2f7-20260906T0550Z",
+  "baseline": {
+    "at": "2026-09-06T05:43:02.774498+00:00",
+    "since": "2026-09-05T13:00:00Z",
+    "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+    "instance": {
+      "instanceId": "i-07aa483968f4daddc",
+      "instanceType": "c7i-flex.large",
+      "availabilityZone": "ap-northeast-2b"
+    },
+    "backendCommit": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graphCurrent": "/opt/runninggu-data/graph/gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "memory": {
+      "MemTotal": 3903756,
+      "MemAvailable": 1108408,
+      "SwapTotal": 4194300,
+      "SwapFree": 4194248,
+      "availablePercent": 28.393
+    },
+    "services": {
+      "runninggu-backend.service": {
+        "MainPID": "37844",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Sat 2026-09-05 12:48:18 UTC",
+        "ExecMainExitTimestamp": "",
+        "ExecMainStatus": "0",
+        "MemoryCurrent": "423198720",
+        "MemoryHigh": "671088640",
+        "MemoryMax": "805306368",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "ActiveEnterTimestamp": "Sat 2026-09-05 12:48:18 UTC",
+        "InvocationID": "bf116d8448574ef8b30355acc9ee1f25"
+      },
+      "runninggu-graphhopper.service": {
+        "MainPID": "1492",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Sat 2026-09-05 12:17:41 UTC",
+        "ExecMainExitTimestamp": "",
+        "ExecMainStatus": "0",
+        "MemoryCurrent": "370470912",
+        "MemoryHigh": "infinity",
+        "MemoryMax": "infinity",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "ActiveEnterTimestamp": "Sat 2026-09-05 12:17:41 UTC",
+        "InvocationID": "09d01169c51f44749b0e353f1c2d8f7a"
+      },
+      "nginx.service": {
+        "MainPID": "686",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Sat 2026-09-05 12:17:34 UTC",
+        "ExecMainExitTimestamp": "",
+        "ExecMainStatus": "0",
+        "MemoryCurrent": "7716864",
+        "MemoryHigh": "infinity",
+        "MemoryMax": "infinity",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "ActiveEnterTimestamp": "Sat 2026-09-05 12:17:34 UTC",
+        "InvocationID": "3a29a44dba034b9b863a673d7609444c"
+      },
+      "runninggu-postgres-backup.service": {
+        "MainPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Sat 2026-09-05 18:20:52 UTC",
+        "ExecMainExitTimestamp": "Sat 2026-09-05 18:20:52 UTC",
+        "ExecMainStatus": "0",
+        "MemoryCurrent": "[not set]",
+        "MemoryHigh": "infinity",
+        "MemoryMax": "infinity",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "UnitFileState": "static",
+        "ActiveEnterTimestamp": "",
+        "InvocationID": "32c53b8dd73243b5bab68456b4671603"
+      },
+      "runninggu-postgres-wal-archive-check.service": {
+        "MainPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStartTimestamp": "Sun 2026-09-06 05:40:04 UTC",
+        "ExecMainExitTimestamp": "Sun 2026-09-06 05:40:05 UTC",
+        "ExecMainStatus": "0",
+        "MemoryCurrent": "[not set]",
+        "MemoryHigh": "infinity",
+        "MemoryMax": "infinity",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "UnitFileState": "static",
+        "ActiveEnterTimestamp": "",
+        "InvocationID": "38b6496304104130a0ffd13c436125d9"
+      }
+    },
+    "guard": {
+      "UPSTREAM_LOAD_GUARD_ENABLED": "false",
+      "UPSTREAM_LOAD_GUARD_RUN_ID": "",
+      "UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT": "0",
+      "UPSTREAM_LOAD_GUARD_KAKAO_TOTAL_LIMIT": "0",
+      "UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT": "0"
+    },
+    "backendHeap": [
+      "-Xms256m",
+      "-Xmx512m"
+    ],
+    "timers": {
+      "runninggu-postgres-backup.timer": {
+        "NextElapseUSecRealtime": "Sun 2026-09-06 18:20:00 UTC",
+        "LastTriggerUSec": "Sat 2026-09-05 18:20:04 UTC",
+        "ActiveState": "active",
+        "UnitFileState": "enabled"
+      },
+      "runninggu-postgres-wal-archive-check.timer": {
+        "NextElapseUSecRealtime": "Sun 2026-09-06 05:50:00 UTC",
+        "LastTriggerUSec": "Sun 2026-09-06 05:40:04 UTC",
+        "ActiveState": "active",
+        "UnitFileState": "enabled"
+      },
+      "certbot.timer": {
+        "NextElapseUSecRealtime": "Sun 2026-09-06 12:39:53 UTC",
+        "LastTriggerUSec": "Sun 2026-09-06 03:18:16 UTC",
+        "ActiveState": "active",
+        "UnitFileState": "enabled"
+      }
+    },
+    "containers": {
+      "postgres": {
+        "id": "2fb0bb24fec2b56726dac4248b7c17ff2c7f0047166aa9de74339accac24d6fd",
+        "image": "sha256:547c41760b4112de392c4a290292a760252b0a07360b22ce75c31484bc2a322a",
+        "status": "running",
+        "oomKilled": false,
+        "startedAt": "2026-09-05T12:17:36.355930733Z",
+        "restartCount": 0,
+        "memoryLimit": 0,
+        "memorySwapLimit": 0,
+        "memoryReservation": 0
+      },
+      "graphhopper": {
+        "id": "145ccb141686984a2e1dedb3da67d8afc8eadcb72262c5408a181e3bc3192caf",
+        "image": "sha256:16b3618f3e69a094990e6c9360ee92972beec643ca26bc5d9b61404172910753",
+        "status": "running",
+        "oomKilled": false,
+        "startedAt": "2026-09-05T12:17:42.010825586Z",
+        "restartCount": 0,
+        "memoryLimit": 2684354560,
+        "memorySwapLimit": 2684354560,
+        "memoryReservation": 2147483648
+      }
+    },
+    "graphHeap": [
+      "-Xms512m",
+      "-Xmx2g"
+    ],
+    "graphGc": {
+      "completedEvents": 0,
+      "events": [],
+      "evacuationFailureLines": 0
+    },
+    "history": {
+      "runninggu-backend.service": {
+        "firstLogAt": "2026-09-05T13:48:30.407496+00:00",
+        "lastLogAt": "2026-09-06T04:48:30.520675+00:00",
+        "logRows": 50,
+        "eventCount": 0,
+        "events": []
+      },
+      "runninggu-graphhopper.service": {
+        "firstLogAt": null,
+        "lastLogAt": null,
+        "logRows": 0,
+        "eventCount": 0,
+        "events": []
+      },
+      "docker.service": {
+        "firstLogAt": null,
+        "lastLogAt": null,
+        "logRows": 0,
+        "eventCount": 0,
+        "events": []
+      },
+      "runninggu-postgres-backup.service": {
+        "firstLogAt": "2026-09-05T18:20:04.748134+00:00",
+        "lastLogAt": "2026-09-05T18:20:52.956926+00:00",
+        "logRows": 24,
+        "eventCount": 1,
+        "events": [
+          {
+            "at": "2026-09-05T18:20:52.956926+00:00",
+            "kind": "completed",
+            "invocationId": null
+          }
+        ]
+      },
+      "runninggu-postgres-wal-archive-check.service": {
+        "firstLogAt": "2026-09-05T13:00:04.747107+00:00",
+        "lastLogAt": "2026-09-06T05:40:05.009170+00:00",
+        "logRows": 404,
+        "eventCount": 101,
+        "events": [
+          {
+            "at": "2026-09-06T03:20:05.028513+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T03:30:05.007157+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T03:40:05.008487+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T03:50:05.011350+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:00:05.005775+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:10:05.006702+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:20:05.005951+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:30:05.002771+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:40:05.009718+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T04:50:05.006748+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T05:00:05.008121+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T05:10:05.009444+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T05:20:05.005421+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T05:30:05.007513+00:00",
+            "kind": "completed",
+            "invocationId": null
+          },
+          {
+            "at": "2026-09-06T05:40:05.009170+00:00",
+            "kind": "completed",
+            "invocationId": null
+          }
+        ]
+      }
+    },
+    "backendGc": {
+      "completedEvents": 0,
+      "events": [],
+      "evacuationFailureLines": 0
+    },
+    "kernelOomIndicatorLines": 0,
+    "backupInfo": {
+      "status": {
+        "code": 0,
+        "lock": {
+          "backup": {
+            "held": false
+          }
+        },
+        "message": "ok"
+      },
+      "backupCount": 20,
+      "latest": [
+        {
+          "label": "20260905-114640F",
+          "type": "full",
+          "timestamp": {
+            "start": 1788608800,
+            "stop": 1788608845
+          },
+          "error": false
+        },
+        {
+          "label": "20260905-124054F",
+          "type": "full",
+          "timestamp": {
+            "start": 1788612054,
+            "stop": 1788612102
+          },
+          "error": false
+        },
+        {
+          "label": "20260905-182005F",
+          "type": "full",
+          "timestamp": {
+            "start": 1788632405,
+            "stop": 1788632450
+          },
+          "error": false
+        }
+      ]
+    }
+  },
+  "resources": {
+    "startedAt": "2026-09-06T06:02:51.847361+00:00",
+    "finishedAt": "2026-09-06T06:17:51.073490+00:00",
+    "collectorExitCode": 0,
+    "sampleCount": 180,
+    "expectedSampleCount": 180,
+    "sequenceComplete": true,
+    "completeSampleEnds": true,
+    "hasEndMarker": true,
+    "maxSampleGapSeconds": 5,
+    "minMemAvailablePercent": 27.628,
+    "minMemAvailableKiB": 1078540,
+    "firstMemAvailablePercent": 28.977,
+    "lastMemAvailablePercent": 28.103,
+    "swapFirstKiB": 52,
+    "swapLastKiB": 52,
+    "swapPeakKiB": 52,
+    "swapInPages": 0,
+    "swapOutPages": 0,
+    "swapActiveIntervals": [],
+    "counterDecreases": [],
+    "services": {
+      "runninggu-backend.service": {
+        "rows": 180,
+        "maxNRestarts": 0,
+        "nonActiveSamples": []
+      },
+      "runninggu-graphhopper.service": {
+        "rows": 180,
+        "maxNRestarts": 0,
+        "nonActiveSamples": []
+      }
+    },
+    "containers": {
+      "graphhopper": {
+        "rows": 180,
+        "notRunning": 0,
+        "oomKilled": 0,
+        "maxRestartCount": 0,
+        "maxCpuPercent": 34.93
+      },
+      "postgres": {
+        "rows": 180,
+        "notRunning": 0,
+        "oomKilled": 0,
+        "maxRestartCount": 0,
+        "maxCpuPercent": 24.94
+      }
+    }
+  },
+  "runtimeEvents": {
+    "backendGuardInvocationFullGc": [],
+    "backendCleanupInvocationFullGc": [
+      {
+        "pauseMs": 23.694,
+        "heapMiB": [
+          27,
+          10,
+          247
+        ]
+      },
+      {
+        "pauseMs": 51.256,
+        "heapMiB": [
+          74,
+          18,
+          247
+        ]
+      },
+      {
+        "pauseMs": 74.043,
+        "heapMiB": [
+          39,
+          25,
+          247
+        ]
+      },
+      {
+        "pauseMs": 105.739,
+        "heapMiB": [
+          106,
+          45,
+          247
+        ]
+      }
+    ],
+    "graphhopperFullGc": [],
+    "jvmOutOfMemoryLines": 0,
+    "kernelOomIndicatorLines": 0,
+    "kernelAllocationFailureLines": 0
+  },
+  "guardActivation": {
+    "runId": "ops4g-673a2f7-20260906T0550Z",
+    "startedAt": "2026-09-06T06:02:38.533410+00:00",
+    "readyAt": "2026-09-06T06:02:51.381927+00:00",
+    "invocationId": "9c71a6835ff342b5a1954330b3eaf7e5",
+    "nRestarts": "0"
+  },
+  "guardDisabled": {
+    "runId": "ops4g-673a2f7-20260906T0550Z",
+    "finishedAt": "2026-09-06T06:05:58.744441+00:00",
+    "guardDisabled": true,
+    "readiness": true,
+    "backendNRestarts": "0",
+    "guardSummary": {
+      "runId": "ops4g-673a2f7-20260906T0550Z",
+      "guardLines": 23,
+      "malformedLines": 0,
+      "unsafeEvents": 0,
+      "non2xxResults": 0,
+      "counterGaps": 0,
+      "overLimit": 0,
+      "requiredEndpoint": "KTO_SEARCH_FESTIVAL",
+      "requiredEndpointSeen": true,
+      "endpoints": [
+        {
+          "endpoint": "KAKAO_CATEGORY",
+          "attempts": 1,
+          "finalCount": 1,
+          "limit": 2000
+        },
+        {
+          "endpoint": "KAKAO_KEYWORD",
+          "attempts": 14,
+          "finalCount": 14,
+          "limit": 2000
+        },
+        {
+          "endpoint": "KTO_SEARCH_FESTIVAL",
+          "attempts": 2,
+          "finalCount": 2,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_KOR_LOCATION",
+          "attempts": 2,
+          "finalCount": 2,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_WELLNESS_LOCATION",
+          "attempts": 2,
+          "finalCount": 2,
+          "limit": 100
+        },
+        {
+          "endpoint": "KTO_DURUNUBI_COURSE",
+          "attempts": 2,
+          "finalCount": 2,
+          "limit": 100
+        }
+      ],
+      "providers": [
+        {
+          "provider": "KAKAO",
+          "attempts": 15,
+          "finalCount": 15,
+          "limit": "5000"
+        },
+        {
+          "provider": "KTO",
+          "attempts": 8,
+          "finalCount": 8,
+          "limit": "NONE"
+        }
+      ],
+      "passed": true,
+      "invocationUnchanged": true,
+      "nRestartsUnchanged": true
+    }
+  },
+  "maintenance": {
+    "runId": "ops4g-673a2f7-20260906T0550Z",
+    "startedAt": "2026-09-06T06:05:58.844646+00:00",
+    "finishedAt": "2026-09-06T06:06:00.103424+00:00",
+    "pgBackRestCheckExitCode": 0,
+    "wal": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "InvocationID": "612e7462fcf24e5a85b471839b52bd0b",
+      "newInvocation": true
+    },
+    "latestBackup": {
+      "label": "20260905-182005F",
+      "type": "full",
+      "timestamp": {
+        "start": 1788632405,
+        "stop": 1788632450
+      },
+      "error": false
+    },
+    "repositoryStatus": {
+      "code": 0,
+      "lock": {
+        "backup": {
+          "held": false
+        }
+      },
+      "message": "ok"
+    },
+    "passed": true
+  },
+  "finalState": {
+    "at": "2026-09-06T06:17:55.147129+00:00",
+    "bootId": "2cbea9a5-fce4-411c-ba9e-6cc11870063b",
+    "guardDisabled": true,
+    "backendCommit": "673a2f796052f4553113d5cd25608fb3821222ac",
+    "graphCurrent": "/opt/runninggu-data/graph/gh11-korea-20260901-2ff6731b181a-2b8515dd29fc",
+    "services": {
+      "runninggu-backend.service": {
+        "NRestarts": "0",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "cfe2a95ecfcc48689e75ff74f830ea01"
+      },
+      "runninggu-graphhopper.service": {
+        "NRestarts": "0",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "09d01169c51f44749b0e353f1c2d8f7a"
+      },
+      "nginx.service": {
+        "NRestarts": "0",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "3a29a44dba034b9b863a673d7609444c"
+      },
+      "runninggu-postgres-backup.timer": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "InvocationID": "c37f4409e3424e58b3c3d9c5648fddec"
+      },
+      "runninggu-postgres-wal-archive-check.timer": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "InvocationID": "856886cb44634da28eac8f8b361abf47"
+      },
+      "certbot.timer": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "InvocationID": "3bb3883af70149fb964a04b1bd31e41c"
+      },
+      "runninggu-load-guard-expiry.timer": {
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "InvocationID": ""
+      },
+      "runninggu-closeout-metrics.service": {
+        "NRestarts": "0",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "InvocationID": ""
+      }
+    },
+    "readiness": true
+  },
+  "rawMetricsSha256": "2c64e5638d7aa25a25e25989a836468d7794ae4d4da30ea72304e7dc3521478b",
+  "controllerSha256": "d73fd64939c6fcd20d2504c20e67c587a1f3155d372871a1d9a5a3cce01e9d3c",
+  "restartGcDetail": {
+    "ssmCommandId": "1c23e0b4-1007-4151-9b00-a2d2c00d29ee",
+    "scope": "planned_backend_restart_gc",
+    "cause": "Metadata GC Threshold",
+    "invocationId": "cfe2a95ecfcc48689e75ff74f830ea01",
+    "events": [
+      {
+        "at": "2026-09-06T06:05:49.047989+00:00",
+        "pauseMs": 23.694
+      },
+      {
+        "at": "2026-09-06T06:05:50.924937+00:00",
+        "pauseMs": 51.256
+      },
+      {
+        "at": "2026-09-06T06:05:53.090992+00:00",
+        "pauseMs": 74.043
+      },
+      {
+        "at": "2026-09-06T06:05:58.668124+00:00",
+        "pauseMs": 105.739
+      }
+    ],
+    "guardDisabledReadinessAt": "2026-09-06T06:05:58.744441+00:00",
+    "allBeforeReadiness": true
+  },
+  "ssmCommands": {
+    "baseline": "7714c404-a930-4ec7-8e96-f49422258594",
+    "activateAndCollect": "a23986a0-6eab-46df-a261-5dc74f8bdb67",
+    "guardOffAndMaintenance": "42727340-10aa-4ed9-a54f-f5d6f0ea34e9",
+    "resourceAndFinalState": "749326b8-1cd6-470e-a1ee-c42ab814450e"
+  }
+}
