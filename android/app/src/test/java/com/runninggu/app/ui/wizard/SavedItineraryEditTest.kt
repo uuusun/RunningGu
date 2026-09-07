@@ -230,9 +230,18 @@ class SavedItineraryEditTest {
                         blocks = listOf(userBlock("11", "하나"), userBlock("12", "둘")),
                         serverId = 7L,
                     ),
+                    ItineraryDay(
+                        date = LocalDate.parse("2026-09-05"),
+                        off = 0,
+                        label = "D-day",
+                        dateLabel = "09.05",
+                        note = "",
+                        blocks = listOf(userBlock("21", "둘째날")),
+                        serverId = 8L,
+                    ),
                 ),
                 recovery = null,
-                recoveryFlags = listOf(false),
+                recoveryFlags = listOf(false, false),
             ),
             region = "세종",
             needsRegeneration = false,
@@ -247,5 +256,39 @@ class SavedItineraryEditTest {
                 active = true,
             ),
         )
+    }
+
+    // ── 날짜 전환 경합 (#311 리뷰 · 민지님 · 선경님) ──────────────
+    //
+    // `dayId` 는 시작할 때 잡는데 결과를 어느 날에 쓸지는 응답 뒤에 정해졌다.
+    // 왕복 중 날짜 탭을 누르면 둘이 갈렸다.
+
+    @Test
+    fun `왕복 중 날짜를 바꿔도 순서 응답은 요청한 날에 쓴다`() = runTest(dispatcher) {
+        val repo = FakeRepo(reordered = listOf(userBlock("12", "둘"), userBlock("11", "하나")))
+        val vm = restored(repo)
+        advanceUntilIdle()
+
+        vm.onMoveBlock(from = 0, to = 1)   // 1일차에서 시작
+        vm.onDaySelect(1)                  // 응답 전에 2일차로
+        advanceUntilIdle()
+
+        // 2일차는 그대로여야 한다 — 1일차 응답이 덮으면 안 된다
+        assertEquals(listOf("21"), vm.uiState.value.days[1].blocks.map { it.id })
+        assertEquals(listOf("12", "11"), vm.uiState.value.days[0].blocks.map { it.id })
+    }
+
+    @Test
+    fun `왕복 중 날짜를 바꿔도 삭제는 요청한 날에서 뺀다`() = runTest(dispatcher) {
+        val vm = restored(FakeRepo())
+        advanceUntilIdle()
+
+        vm.onRemoveBlock("11")   // 1일차에서 시작
+        vm.onDaySelect(1)        // 응답 전에 2일차로
+        advanceUntilIdle()
+
+        // 서버에서 지워졌으니 1일차에서도 빠져야 한다
+        assertEquals(listOf("12"), vm.uiState.value.days[0].blocks.map { it.id })
+        assertEquals(listOf("21"), vm.uiState.value.days[1].blocks.map { it.id })
     }
 }

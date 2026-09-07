@@ -2,6 +2,7 @@ package com.runninggu.app.ui.wizard
 
 import com.runninggu.app.data.repository.BlockPatch
 import com.runninggu.app.data.repository.NewBlock
+import com.runninggu.app.data.repository.normalized
 import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.ui.runCatchingUnlessCancelled
 import com.runninggu.app.ui.userMessageOrDefault
@@ -406,10 +407,10 @@ class ResultViewModel(
      */
     fun onRemoveBlock(blockId: String) {
         if (_uiState.value.isSavedEditing) {
-            savedEdit(blockId) { itineraryId, dayId ->
+            savedEdit(blockId) { itineraryId, dayId, dayIndex ->
                 repository.deleteBlock(itineraryId, dayId, blockId.toLong())
-                // 204 라 돌려줄 것이 없다 — 지운 것만 목록에서 뺀다
-                ItineraryEdits.removeBlock(daysNow(), activeIndexNow(), blockId)
+                // 204 라 돌려줄 블록이 없다 — 지운 것만 **요청한 그 일자**에서 뺀다
+                ItineraryEdits.removeBlock(daysNow(), dayIndex, blockId)
             }
             return
         }
@@ -428,15 +429,16 @@ class ResultViewModel(
         if (_uiState.value.isSavedEditing) {
             // 서버에 보낼 순서는 **옮긴 뒤**의 것이다. 로컬 연산으로 결과를 만들어 그
             // 순서를 보내고, 응답(그 일자 전체)으로 갈아 끼운다.
-            val moved = ItineraryEdits.moveBlock(daysNow(), activeIndexNow(), from, to)
-            val userIds = moved.getOrNull(activeIndexNow())?.blocks
+            val at = _uiState.value.activeDayIndex
+            val moved = ItineraryEdits.moveBlock(daysNow(), at, from, to)
+            val userIds = moved.getOrNull(at)?.blocks
                 ?.filter { !it.systemManaged }
                 ?.mapNotNull { it.id.toLongOrNull() }
                 .orEmpty()
-            savedEdit(null) { itineraryId, dayId ->
+            savedEdit(null) { itineraryId, dayId, dayIndex ->
                 val blocks = repository.reorderBlocks(itineraryId, dayId, userIds)
                 // **앱이 다시 정렬하지 않는다** — 서버가 RACE 를 제자리에 끼워 준다(§5-10)
-                replaceActiveDayBlocks(blocks)
+                replaceDayBlocks(dayIndex, blocks)
             }
             return
         }
@@ -453,13 +455,29 @@ class ResultViewModel(
 
     private fun daysNow(): List<ItineraryDay> = _uiState.value.result?.days.orEmpty()
 
-    private fun activeIndexNow(): Int = _uiState.value.activeDayIndex
-
-    /** 응답으로 활성 일자의 블록을 통째 교체한다. */
-    private fun replaceActiveDayBlocks(blocks: List<ItineraryBlock>): List<ItineraryDay> =
+    /**
+     * 응답을 **요청한 그 일자**에 쓴다. (#311 리뷰 · 민지님 · 선경님)
+     *
+     * 처음에는 완료 시점의 `activeDayIndex` 를 다시 읽었다. `dayId` 는 시작할 때 잡아
+     * 두는데 **결과를 어느 날에 쓸지는 응답이 온 뒤에 정해져서**, 왕복 중에 날짜 탭을
+     * 누르면 둘이 갈렸다.
+     *
+     * ```
+     * 1일차 [순서 변경] → 응답 전 2일차 탭 → 1일차 응답이 2일차를 통째로 덮는다
+     * 1일차 [삭제]      → 응답 전 2일차 탭 → 서버에선 지워졌는데 화면엔 남는다
+     * ```
+     *
+     * **날짜 탭을 잠그는 쪽으로 가지 않았다.** 왕복이 도는 동안 다른 날을 못 보게 할
+     * 이유가 없다 — 잘못된 것은 "보는 날" 이 아니라 "쓰는 날" 이었다.
+     */
+    private fun replaceDayBlocks(dayIndex: Int, blocks: List<ItineraryBlock>): List<ItineraryDay> =
         daysNow().mapIndexed { index, day ->
-            if (index == activeIndexNow()) day.copy(blocks = blocks) else day
+            if (index == dayIndex) day.copy(blocks = blocks) else day
         }
+
+    /** 요청한 일자의 지금 블록들. 다른 날이 바뀌어 있어도 이 날 값은 그대로다. */
+    private fun blocksOf(dayIndex: Int): List<ItineraryBlock> =
+        daysNow().getOrNull(dayIndex)?.blocks.orEmpty()
 
     /**
      * 저장 후 편집 한 번. 서버 id 가 없으면 아무것도 안 한다.
@@ -468,19 +486,22 @@ class ResultViewModel(
      */
     private fun savedEdit(
         blockId: String?,
-        block: suspend (itineraryId: Long, dayId: Long) -> List<ItineraryDay>,
+        block: suspend (itineraryId: Long, dayId: Long, dayIndex: Int) -> List<ItineraryDay>,
     ) {
         val state = _uiState.value
         val itineraryId = state.restoredItineraryId ?: return
         // **일자 id 가 없으면 부를 수 없다.** 복원 응답에는 반드시 있다(§5-5) — 없으면
         // 계약이 깨진 것이라 조용히 로컬만 고치지 않는다
         val dayId = state.activeDay?.serverId ?: return editFailed(SAVED_EDIT_NO_SERVER_ID)
+        // **시작 시점의 일자를 고정한다** (#311 리뷰). 응답을 쓸 때 다시 읽으면 그 사이
+        // 날짜 탭을 누른 것이 반영돼 엉뚱한 날에 적용된다
+        val dayIndex = state.activeDayIndex
         if (blockId != null && blockId.toLongOrNull() == null) return editFailed(SAVED_EDIT_NO_SERVER_ID)
         if (state.editInFlight) return
 
         _uiState.update { it.copy(editInFlight = true, editError = null) }
         viewModelScope.launch {
-            runCatchingUnlessCancelled { block(itineraryId, dayId) }
+            runCatchingUnlessCancelled { block(itineraryId, dayId, dayIndex) }
                 .onSuccess { days ->
                     _uiState.update { s ->
                         val result = s.result ?: return@update s.copy(editInFlight = false)
@@ -568,7 +589,7 @@ class ResultViewModel(
         val replaceId = sheet.replaceBlockId
 
         if (_uiState.value.isSavedEditing) {
-            savedEdit(replaceId) { itineraryId, dayId ->
+            savedEdit(replaceId) { itineraryId, dayId, dayIndex ->
                 if (replaceId != null) {
                     // **바꾸는 필드만 보낸다**(§5-8). 안 바꿀 값을 현재 값으로 채워 보내면
                     // 그 사이 서버에서 바뀐 값을 덮어쓴다 — `BlockPatch` 의 null 은
@@ -578,33 +599,40 @@ class ResultViewModel(
                         BlockPatch(title = item.name, category = catKey, place = place, description = item.description),
                     )
                     // 갱신된 블록 전체가 오므로 그것으로 갈아 끼운다
-                    replaceActiveDayBlocks(
-                        daysNow().getOrNull(activeIndexNow())?.blocks.orEmpty()
-                            .map { if (it.id == replaceId) updated else it },
+                    replaceDayBlocks(
+                        dayIndex,
+                        blocksOf(dayIndex).map { if (it.id == replaceId) updated else it },
                     )
                 } else {
-                    val added = repository.addBlock(
-                        itineraryId, dayId,
-                        NewBlock(title = item.name, category = catKey, place = place, description = item.description),
-                    )
-                    // **추가는 `{blockId, orderNo}` 만 온다**(§5-7). 앱이 보내기 전에 서버와
-                    // 같게 다듬으므로(#301 · `toDto`) 보낸 값 + 받은 id 로 행을 만들어도
-                    // 저장값과 갈리지 않는다 🔒확정(2026-09-06 · 선경 결정)
+                    // **정규화한 것 하나를 요청과 화면 행에 같이 쓴다** (#311 리뷰 · 선경님).
+                    // 처음에는 원본 `item` 으로 행을 만들었는데, 후보 이름이 `"  새 장소  "`
+                    // 면 서버는 `"새 장소"` 로 저장하고 화면만 공백을 달고 있게 된다 —
+                    // #301 이 DTO 안에서 다듬어도 `item` 자체는 안 바뀐다.
+                    val sending = NewBlock(
+                        title = item.name,
+                        category = catKey,
+                        place = place,
+                        description = item.description,
+                    ).normalized()
+                    val added = repository.addBlock(itineraryId, dayId, sending)
+                    // **추가는 `{blockId, orderNo}` 만 온다**(§5-7). 보낸 값이 이미 서버와
+                    // 같게 다듬어져 있으므로 받은 id 만 붙이면 저장값과 갈리지 않는다
+                    // 🔒확정(2026-09-06 · 선경 결정)
                     val row = ItineraryBlock(
                         id = added.blockId.toString(),
-                        time = ADDED_BLOCK_TIME,
-                        title = item.name,
-                        catKey = catKey,
-                        place = place,
-                        desc = item.description,
+                        time = sending.startTime,
+                        title = sending.title,
+                        catKey = sending.category,
+                        place = sending.place,
+                        desc = sending.description,
                         blockType = BlockType.USER,
                     )
-                    replaceActiveDayBlocks(
-                        daysNow().getOrNull(activeIndexNow())?.blocks.orEmpty() + row,
-                    )
+                    replaceDayBlocks(dayIndex, blocksOf(dayIndex) + row)
                 }
             }
-            onSheetDismiss()
+            // **요청이 실제로 시작됐을 때만 닫는다** (#311 리뷰). 왕복 중이면
+            // `savedEdit` 이 그냥 돌아오는데 시트가 닫히면, 고른 장소가 조용히 사라진다
+            if (_uiState.value.editInFlight) onSheetDismiss()
             return
         }
 

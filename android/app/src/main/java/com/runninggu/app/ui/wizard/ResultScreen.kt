@@ -490,17 +490,31 @@ private fun Content(
                                 SavedEditError(it)
                             }
 
+                            // **왕복 중이라는 것을 보여준다** (#311 리뷰). 안 보여주면
+                            // 누른 뒤 아무 일도 안 나는 것처럼 보여 또 누르는데, 그때
+                            // 두 번째 입력은 `savedEdit` 가드에 막혀 조용히 사라진다.
+                            if (state.editInFlight) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "고치는 중이에요…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
                             Spacer(Modifier.height(10.dp))
+                            // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
+                            // 반응하면 "됐다" 로 읽힌다
                             EditList(
                                 day = day,
                                 openedId = openedBlockId,
                                 onOpenedChange = { openedBlockId = it },
-                                onRemove = onRemoveBlock,
-                                onMove = onMoveBlock,
-                                onReplace = onReplaceBlock,
+                                onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
+                                onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
+                                onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
                             )
                             Spacer(Modifier.height(10.dp))
-                            AddPlaceButton(onClick = onAddPlace)
+                            AddPlaceButton(onClick = onAddPlace, enabled = !state.editInFlight)
                         }
                     }
                 } else {
@@ -1064,8 +1078,8 @@ private fun DragGrip(
 
 /** 편집 목록 하단의 [장소 추가]. 후보 시트를 추가 모드로 연다. (SPEC §4.10) */
 @Composable
-private fun AddPlaceButton(onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+private fun AddPlaceButton(onClick: () -> Unit, enabled: Boolean = true) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Text("장소 추가")
@@ -1437,9 +1451,14 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 /**
  * 저장 후 편집 실패 한 줄. (§5-7 ~ §5-10 · #213)
  *
- * **[EditNotice] 바로 아래, 목록 위에 둔다.** 실패한 연산이 어느 행이었는지는 서버
- * 응답으로 알 수 없어서(삭제는 204 다) 행에 붙이지 못한다. 목록 전체에 대한 한 줄이
- * 그래서 맞다.
+ * **[EditNotice] 바로 아래, 목록 위에 둔다.**
+ *
+ * 처음에는 *"삭제가 204 라 어느 행이 실패했는지 알 수 없다"* 고 적었는데 **틀렸다**
+ * (#311 리뷰 · 선경님). 응답에 없을 뿐 **요청의 `blockId` 는 앱이 들고 있다.**
+ *
+ * 그래도 행이 아니라 목록 위에 두는 이유는 다르다 — **순서 변경에는 대상 행이 없고**,
+ * 실패하면 목록 전체가 요청 전 상태로 남는다. 네 연산이 같은 자리에 말하는 편이
+ * 사용자가 찾기 쉽다.
  */
 @Composable
 private fun SavedEditError(message: String) {
