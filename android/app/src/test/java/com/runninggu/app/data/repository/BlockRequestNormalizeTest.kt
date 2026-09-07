@@ -1,10 +1,14 @@
 package com.runninggu.app.data.repository
 
+import com.runninggu.app.data.remote.ApiJson
+import com.runninggu.app.data.remote.dto.BlockPatchRequestDto
 import com.runninggu.app.data.remote.dto.DEFAULT_BLOCK_START_TIME
 import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.Poi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -24,6 +28,10 @@ import org.junit.Test
  * 실제로 되돌려 돌려 보고 적는다.
  *
  * ```
+ * BlockPatch.toDto 에 blank → null 을 넣는다   ← #301 리뷰가 잡은 회귀
+ *   → 수정에서_공백을_null_로_바꾸지_않는다
+ *     장소를_지우는_요청이_실제로_와이어에_실린다
+ *
  * NewBlock.toDto 에서 normalized() 를 뺀다
  *   → 추가는_앞뒤_공백을_지우고_보낸다                     FAILED
  *     공백만_있는_장소와_설명은_null_로_나간다             FAILED
@@ -95,17 +103,45 @@ class BlockRequestNormalizeTest {
     }
 
     @Test
-    fun `수정도_같은_정규화를_거친다`() {
+    fun `수정도_앞뒤_공백을_지운다`() {
         val dto = BlockPatch(
             title = " 국밥 ",
-            place = poi(" 소문난 국밥 ", "   "),
+            place = poi(" 소문난 국밥 ", " 서울 중구 1 "),
             description = " 저녁 ",
         ).toDto()
 
         assertEquals("국밥", dto.title)
         assertEquals("소문난 국밥", dto.placeName)
-        assertNull("공백만 있는 주소는 서버가 null 로 저장한다", dto.address)
+        assertEquals("서울 중구 1", dto.address)
         assertEquals("저녁", dto.description)
+    }
+
+    @Test
+    fun `수정에서_공백을_null_로_바꾸지_않는다`() {
+        // #301 리뷰. 추가와 같은 정규화를 넣었더니 **장소를 지우는 길이 막혔다.**
+        //
+        //   빈 문자열 ""   → 서버가 blank → null 로 저장   = 지운다
+        //   Kotlin null    → 와이어에서 키가 빠짐            = 안 건드린다
+        //
+        // 앱은 explicitNulls=false 라 "placeName": null 을 못 보낸다. 빈 문자열이
+        // 유일한 지우기 수단인데 그것마저 null 로 줄이면 비울 방법이 사라진다.
+        val dto = BlockPatch(place = poi("   ", "　")).toDto()
+
+        assertEquals("빈 문자열이 지우기 신호다", "", dto.placeName)
+        assertEquals("", dto.address)
+    }
+
+    @Test
+    fun `장소를_지우는_요청이_실제로_와이어에_실린다`() {
+        // DTO 필드만 봐서는 못 잡는다 — 키가 빠지는지 ""로 실리는지가 문제다.
+        val body = ApiJson.encodeToString(
+            BlockPatchRequestDto.serializer(),
+            BlockPatch(place = poi("", "")).toDto(),
+        )
+
+        assertTrue("placeName 키가 없으면 서버는 기존 장소를 유지한다", body.contains(""""placeName":""""))
+        assertTrue(body.contains(""""address":""""))
+        assertFalse("안 보낸 것은 없어야 한다", body.contains("title"))
     }
 
     /**

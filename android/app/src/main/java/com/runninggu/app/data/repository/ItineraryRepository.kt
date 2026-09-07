@@ -160,6 +160,9 @@ fun NewBlock.normalized(): NewBlock = copy(
  * [NewBlock.normalized] 와 달리 **`startTime` 에 기본값을 채우지 않는다.** 수정에서 시각을
  * 비워 보내면 서버가 `400` 이다 — 기본값 13:00 은 추가(§5-7)에만 있는 규칙이라, 여기서
  * 채우면 사용자가 안 정한 시각이 말없이 들어간다.
+ *
+ * **공백을 `null` 로 줄이지도 않는다.** 여기서 빈 문자열은 "지워라" 라서, `null` 로 바꾸면
+ * 와이어에서 키가 빠져 "안 건드린다" 가 된다([BlockPatch.toDto]).
  */
 fun BlockPatch.normalized(): BlockPatch = copy(
     startTime = startTime?.let { BlockText.required(it, "startTime") },
@@ -367,6 +370,22 @@ internal fun NewBlock.toDto(): BlockCreateRequestDto {
  *
  * **`null` 은 "안 건드린다" 이지 "비운다" 가 아니다.** 서버가 보낸 필드만 반영하므로,
  * 안 바꿀 값을 현재 값으로 채워 보내면 그 사이 서버에서 바뀐 값을 덮어쓴다.
+ *
+ * ## 여기서는 공백을 `null` 로 바꾸지 않는다 — 추가(§5-7)와 다른 자리다 (#301 리뷰)
+ *
+ * 처음에 추가와 같은 정규화를 넣었다가 **장소를 지우는 길을 막았다.**
+ *
+ * ```
+ * 빈 문자열 ""   → 서버가 blank → null 로 저장   = 지운다
+ * Kotlin null    → explicitNulls=false 라 키가 빠짐 = 안 건드린다
+ * ```
+ *
+ * 공백을 `null` 로 바꾸면 **"지워라" 가 "그대로 둬라" 로 조용히 바뀐다.** 앱이 서버에
+ * `"placeName": null` 을 못 보내므로(와이어에서 빠진다) 빈 문자열이 유일한 지우기
+ * 수단인데, 그것마저 없애면 장소를 비울 방법이 사라진다.
+ *
+ * 그래서 여기서는 **앞뒤 공백만 지운다.** 추가(§5-7)는 지울 값이 애초에 없어서 `null`
+ * 로 보내든 `""` 로 보내든 결과가 같다 — 그쪽만 `null` 로 줄인다.
  */
 internal fun BlockPatch.toDto(): BlockPatchRequestDto {
     val patch = normalized()
@@ -374,8 +393,10 @@ internal fun BlockPatch.toDto(): BlockPatchRequestDto {
         startTime = patch.startTime,
         title = patch.title,
         category = patch.category?.name,
-        placeName = BlockText.nullable(patch.place?.name),
-        address = BlockText.nullable(patch.place?.addr),
+        // normalized() 가 이미 앞뒤 공백을 지웠다. 여기서 blank → null 을 더 하면
+        // 장소를 지우는 요청이 "안 건드린다" 로 바뀐다 (#301 리뷰).
+        placeName = patch.place?.name,
+        address = patch.place?.addr,
         lat = patch.place?.lat,
         lng = patch.place?.lng,
         description = patch.description,
