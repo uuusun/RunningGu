@@ -259,7 +259,10 @@ private fun ResultContent(
         },
         bottomBar = {
             // 복원 화면에는 저장 바가 없다 — 누를 수 있으면 A 경로로 통째 저장된다 (#213)
-            if (state.phase == ResultUiState.Phase.CONTENT && state.editingEnabled) {
+            // **복원 화면에는 저장 CTA 가 없다.** 이미 저장된 것이고, 통째 저장은
+            // RACE 블록을 재구성해서 쓰면 안 된다(§5-2). 편집은 §5-7~5-10 으로 이미
+            // 서버에 갔다 — 누를 것이 없다.
+            if (state.phase == ResultUiState.Phase.CONTENT && !state.isSavedEditing) {
                 SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
             }
         },
@@ -290,7 +293,6 @@ private fun ResultContent(
                     onCardClick = viewModel::onCardClick,
                     onCardCentered = viewModel::onCardCentered,
                     onOpenCourses = { onOpenCourses(state.courseStay, state.courseTargetKm) },
-                    editingEnabled = state.editingEnabled,
                     onToggleEdit = viewModel::onToggleEdit,
                     onRemoveBlock = viewModel::onRemoveBlock,
                     onMoveBlock = viewModel::onMoveBlock,
@@ -317,7 +319,6 @@ private fun ResultContent(
 private fun Content(
     state: ResultUiState,
     /** 화면 전체가 편집을 여는가. 복원(S7-R)은 P0 에서 false 다 (#213). */
-    editingEnabled: Boolean,
     onDaySelect: (Int) -> Unit,
     onPinClick: (String) -> Unit,
     onCardClick: (String) -> Unit,
@@ -464,8 +465,10 @@ private fun Content(
                         DayHeader(
                             label = day.label,
                             isEditing = state.isEditing,
-                            // 복원 화면에는 [편집] 이 없다 — 눌러 봐야 저장할 길이 없다 (#213)
-                            onToggleEdit = if (editingEnabled) onToggleEdit else null,
+                            // **복원 화면도 이제 [편집] 이 열린다** (#213). #292 로 블록
+                            // API 가 서고 #301 로 정규화가 정해져서, 연산이 §5-7~5-10 으로
+                            // 서버에 간다 — 저장 CTA 없이 그 자리에서 반영된다.
+                            onToggleEdit = onToggleEdit,
                         )
                         Spacer(Modifier.height(10.dp))
                     }
@@ -478,6 +481,15 @@ private fun Content(
                     item(key = "editList") {
                         Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                             EditNotice()
+
+                            // **실패는 목록 위에 남긴다** (#213). 스낵바는 사라지는데
+                            // 고치려던 것은 화면에 그대로 있다 — 무엇이 안 됐는지 계속
+                            // 보여야 다시 누를지 판단한다.
+                            state.editError?.let {
+                                Spacer(Modifier.height(8.dp))
+                                SavedEditError(it)
+                            }
+
                             Spacer(Modifier.height(10.dp))
                             EditList(
                                 day = day,
@@ -1421,3 +1433,27 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         dismissButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
     )
 }
+
+/**
+ * 저장 후 편집 실패 한 줄. (§5-7 ~ §5-10 · #213)
+ *
+ * **[EditNotice] 바로 아래, 목록 위에 둔다.** 실패한 연산이 어느 행이었는지는 서버
+ * 응답으로 알 수 없어서(삭제는 204 다) 행에 붙이지 못한다. 목록 전체에 대한 한 줄이
+ * 그래서 맞다.
+ */
+@Composable
+private fun SavedEditError(message: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+

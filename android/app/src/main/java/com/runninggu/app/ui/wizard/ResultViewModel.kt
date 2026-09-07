@@ -1,5 +1,8 @@
 package com.runninggu.app.ui.wizard
 
+import com.runninggu.app.data.repository.BlockPatch
+import com.runninggu.app.data.repository.NewBlock
+import com.runninggu.app.ui.OFFLINE
 import com.runninggu.app.ui.runCatchingUnlessCancelled
 import com.runninggu.app.ui.userMessageOrDefault
 import androidx.lifecycle.ViewModel
@@ -395,18 +398,103 @@ class ResultViewModel(
         _uiState.update { it.copy(isEditing = !it.isEditing) }
     }
 
-    /** 블록 삭제. 대회 블록이면 [ItineraryEdits] 가 거부해 목록이 그대로 온다. */
+    /**
+     * 블록 삭제. 대회 블록이면 [ItineraryEdits] 가 거부해 목록이 그대로 온다.
+     *
+     * **저장 후에는 서버로 간다**(§5-9). 로컬만 지우면 화면에서는 사라졌는데 서버에는
+     * 남아, 다시 열면 되살아난다.
+     */
     fun onRemoveBlock(blockId: String) {
+        if (_uiState.value.isSavedEditing) {
+            savedEdit(blockId) { itineraryId, dayId ->
+                repository.deleteBlock(itineraryId, dayId, blockId.toLong())
+                // 204 라 돌려줄 것이 없다 — 지운 것만 목록에서 뺀다
+                ItineraryEdits.removeBlock(daysNow(), activeIndexNow(), blockId)
+            }
+            return
+        }
         editActiveDay { days, dayIndex ->
             ItineraryEdits.removeBlock(days, dayIndex, blockId)
         }
     }
 
-    /** 한 칸 위/아래로. 같은 일자 안에서만 움직인다. (SPEC §5.7) */
+    /**
+     * 한 칸 위/아래로. 같은 일자 안에서만 움직인다. (SPEC §5.7)
+     *
+     * **저장 후에는 그 일자의 USER 블록 전체를 보낸다**(§5-10). 일부만 보내거나 RACE 를
+     * 섞으면 `BLOCK_SET_MISMATCH` 다 — 부분 갱신이 아니라 전체 교체 계약이다.
+     */
     fun onMoveBlock(from: Int, to: Int) {
+        if (_uiState.value.isSavedEditing) {
+            // 서버에 보낼 순서는 **옮긴 뒤**의 것이다. 로컬 연산으로 결과를 만들어 그
+            // 순서를 보내고, 응답(그 일자 전체)으로 갈아 끼운다.
+            val moved = ItineraryEdits.moveBlock(daysNow(), activeIndexNow(), from, to)
+            val userIds = moved.getOrNull(activeIndexNow())?.blocks
+                ?.filter { !it.systemManaged }
+                ?.mapNotNull { it.id.toLongOrNull() }
+                .orEmpty()
+            savedEdit(null) { itineraryId, dayId ->
+                val blocks = repository.reorderBlocks(itineraryId, dayId, userIds)
+                // **앱이 다시 정렬하지 않는다** — 서버가 RACE 를 제자리에 끼워 준다(§5-10)
+                replaceActiveDayBlocks(blocks)
+            }
+            return
+        }
         editActiveDay { days, dayIndex ->
             ItineraryEdits.moveBlock(days, dayIndex, from, to)
         }
+    }
+
+    // ── 저장 후 편집 (§5-7 ~ §5-10 · #213) ─────────────────────
+    //
+    // 저장 전 편집과 결정적으로 다른 것은 **왕복이 실패할 수 있다**는 것이다. 그래서
+    // 낙관적으로 먼저 그리지 않는다 — 되돌리면 사용자가 "됐다가 안 됐다" 를 본다.
+    // 계약도 그 방향이다: 수정·순서는 서버가 **결과를 통째로** 돌려준다.
+
+    private fun daysNow(): List<ItineraryDay> = _uiState.value.result?.days.orEmpty()
+
+    private fun activeIndexNow(): Int = _uiState.value.activeDayIndex
+
+    /** 응답으로 활성 일자의 블록을 통째 교체한다. */
+    private fun replaceActiveDayBlocks(blocks: List<ItineraryBlock>): List<ItineraryDay> =
+        daysNow().mapIndexed { index, day ->
+            if (index == activeIndexNow()) day.copy(blocks = blocks) else day
+        }
+
+    /**
+     * 저장 후 편집 한 번. 서버 id 가 없으면 아무것도 안 한다.
+     *
+     * @param blockId 서버 id 로 바꿀 수 있어야 하는 블록. 순서 변경처럼 대상이 없으면 null
+     */
+    private fun savedEdit(
+        blockId: String?,
+        block: suspend (itineraryId: Long, dayId: Long) -> List<ItineraryDay>,
+    ) {
+        val state = _uiState.value
+        val itineraryId = state.restoredItineraryId ?: return
+        // **일자 id 가 없으면 부를 수 없다.** 복원 응답에는 반드시 있다(§5-5) — 없으면
+        // 계약이 깨진 것이라 조용히 로컬만 고치지 않는다
+        val dayId = state.activeDay?.serverId ?: return editFailed(SAVED_EDIT_NO_SERVER_ID)
+        if (blockId != null && blockId.toLongOrNull() == null) return editFailed(SAVED_EDIT_NO_SERVER_ID)
+        if (state.editInFlight) return
+
+        _uiState.update { it.copy(editInFlight = true, editError = null) }
+        viewModelScope.launch {
+            runCatchingUnlessCancelled { block(itineraryId, dayId) }
+                .onSuccess { days ->
+                    _uiState.update { s ->
+                        val result = s.result ?: return@update s.copy(editInFlight = false)
+                        s.copy(result = result.copy(days = days), editInFlight = false, editError = null)
+                    }
+                }
+                .onFailure { cause ->
+                    _uiState.update { it.copy(editInFlight = false, editError = savedEditMessage(cause)) }
+                }
+        }
+    }
+
+    private fun editFailed(message: String) {
+        _uiState.update { it.copy(editInFlight = false, editError = message) }
     }
 
     private inline fun editActiveDay(
@@ -477,10 +565,52 @@ class ResultViewModel(
             addr = item.address,
         )
         val catKey = BlockCategory.of(sheet.category)
+        val replaceId = sheet.replaceBlockId
+
+        if (_uiState.value.isSavedEditing) {
+            savedEdit(replaceId) { itineraryId, dayId ->
+                if (replaceId != null) {
+                    // **바꾸는 필드만 보낸다**(§5-8). 안 바꿀 값을 현재 값으로 채워 보내면
+                    // 그 사이 서버에서 바뀐 값을 덮어쓴다 — `BlockPatch` 의 null 은
+                    // "안 건드린다" 다(#301)
+                    val updated = repository.updateBlock(
+                        itineraryId, dayId, replaceId.toLong(),
+                        BlockPatch(title = item.name, category = catKey, place = place, description = item.description),
+                    )
+                    // 갱신된 블록 전체가 오므로 그것으로 갈아 끼운다
+                    replaceActiveDayBlocks(
+                        daysNow().getOrNull(activeIndexNow())?.blocks.orEmpty()
+                            .map { if (it.id == replaceId) updated else it },
+                    )
+                } else {
+                    val added = repository.addBlock(
+                        itineraryId, dayId,
+                        NewBlock(title = item.name, category = catKey, place = place, description = item.description),
+                    )
+                    // **추가는 `{blockId, orderNo}` 만 온다**(§5-7). 앱이 보내기 전에 서버와
+                    // 같게 다듬으므로(#301 · `toDto`) 보낸 값 + 받은 id 로 행을 만들어도
+                    // 저장값과 갈리지 않는다 🔒확정(2026-09-06 · 선경 결정)
+                    val row = ItineraryBlock(
+                        id = added.blockId.toString(),
+                        time = ADDED_BLOCK_TIME,
+                        title = item.name,
+                        catKey = catKey,
+                        place = place,
+                        desc = item.description,
+                        blockType = BlockType.USER,
+                    )
+                    replaceActiveDayBlocks(
+                        daysNow().getOrNull(activeIndexNow())?.blocks.orEmpty() + row,
+                    )
+                }
+            }
+            onSheetDismiss()
+            return
+        }
+
         editActiveDay { days, dayIndex ->
-            val blockId = sheet.replaceBlockId
-            if (blockId != null) {
-                ItineraryEdits.replacePlace(days, dayIndex, blockId, place, catKey)
+            if (replaceId != null) {
+                ItineraryEdits.replacePlace(days, dayIndex, replaceId, place, catKey)
             } else {
                 ItineraryEdits.addBlock(
                     days, dayIndex,
@@ -627,4 +757,33 @@ private fun WizardUiState.toRequestOrNull(demoContestId: Long?): GenerateItinera
         hotel = stay?.let { HotelInput(it.name, it.lat, it.lng) },
     )
 }
+
+/**
+ * 저장 후 편집 실패 문구. (§5-7 ~ §5-10 · #213)
+ *
+ * **서버가 준 `code` 로 가른다.** 같은 "실패" 라도 사용자가 할 일이 다르다 — 대회 블록을
+ * 고치려 한 것은 다시 눌러도 안 되고, 네트워크는 다시 누르면 된다.
+ */
+internal fun savedEditMessage(cause: Throwable): String = when {
+    cause is ApiException.Network -> OFFLINE
+    cause is ApiException.Http && cause.code == ApiErrorCode.SYSTEM_BLOCK_IMMUTABLE ->
+        "대회 일정은 고칠 수 없어요."
+    // 그 일자의 USER 블록 전체를 보내야 하는데 집합이 어긋났다(§5-10). 화면과 서버가
+    // 다른 목록을 보고 있다는 뜻이라 다시 여는 것이 맞다.
+    cause is ApiException.Http && cause.code == ApiErrorCode.BLOCK_SET_MISMATCH ->
+        "동선이 그 사이 바뀌었어요. 다시 열어 주세요."
+    cause is ApiException.Http -> cause.userMessage ?: SAVED_EDIT_FAILED
+    else -> SAVED_EDIT_FAILED
+}
+
+/** 서버가 문구를 안 준 실패. */
+internal const val SAVED_EDIT_FAILED = "고치지 못했어요. 잠시 후 다시 시도해 주세요."
+
+/**
+ * 서버 id 가 없어 부를 수 없다. (§5-5)
+ *
+ * 복원 응답에는 일자·블록 id 가 반드시 온다. 없으면 계약이 깨진 것이라 **조용히 로컬만
+ * 고치지 않는다** — 화면에서는 고쳐졌는데 서버에는 안 간 상태가 제일 나쁘다.
+ */
+internal const val SAVED_EDIT_NO_SERVER_ID = "이 동선은 지금 고칠 수 없어요. 다시 열어 주세요."
 
