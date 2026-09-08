@@ -487,9 +487,9 @@ class ResultViewModel(
     private fun savedEdit(
         blockId: String?,
         block: suspend (itineraryId: Long, dayId: Long, dayIndex: Int) -> List<ItineraryDay>,
-    ) {
+    ): Boolean {
         val state = _uiState.value
-        val itineraryId = state.restoredItineraryId ?: return
+        val itineraryId = state.restoredItineraryId ?: return false
         // **일자 id 가 없으면 부를 수 없다.** 복원 응답에는 반드시 있다(§5-5) — 없으면
         // 계약이 깨진 것이라 조용히 로컬만 고치지 않는다
         val dayId = state.activeDay?.serverId ?: return editFailed(SAVED_EDIT_NO_SERVER_ID)
@@ -497,7 +497,9 @@ class ResultViewModel(
         // 날짜 탭을 누른 것이 반영돼 엉뚱한 날에 적용된다
         val dayIndex = state.activeDayIndex
         if (blockId != null && blockId.toLongOrNull() == null) return editFailed(SAVED_EDIT_NO_SERVER_ID)
-        if (state.editInFlight) return
+        // **이미 하나가 돌고 있으면 이번 것은 안 받는다.** 받았는지를 돌려주는 이유는
+        // 호출부가 그에 따라 시트를 닫을지 정해야 하기 때문이다 (#311 리뷰 · 선경님)
+        if (state.editInFlight) return false
 
         _uiState.update { it.copy(editInFlight = true, editError = null) }
         viewModelScope.launch {
@@ -512,10 +514,13 @@ class ResultViewModel(
                     _uiState.update { it.copy(editInFlight = false, editError = savedEditMessage(cause)) }
                 }
         }
+        return true
     }
 
-    private fun editFailed(message: String) {
+    /** 시작도 못 했다. `false` 를 돌려 호출부가 시트를 열어 두게 한다. */
+    private fun editFailed(message: String): Boolean {
         _uiState.update { it.copy(editInFlight = false, editError = message) }
+        return false
     }
 
     private inline fun editActiveDay(
@@ -589,7 +594,7 @@ class ResultViewModel(
         val replaceId = sheet.replaceBlockId
 
         if (_uiState.value.isSavedEditing) {
-            savedEdit(replaceId) { itineraryId, dayId, dayIndex ->
+            val accepted = savedEdit(replaceId) { itineraryId, dayId, dayIndex ->
                 if (replaceId != null) {
                     // **바꾸는 필드만 보낸다**(§5-8). 안 바꿀 값을 현재 값으로 채워 보내면
                     // 그 사이 서버에서 바뀐 값을 덮어쓴다 — `BlockPatch` 의 null 은
@@ -630,9 +635,10 @@ class ResultViewModel(
                     replaceDayBlocks(dayIndex, blocksOf(dayIndex) + row)
                 }
             }
-            // **요청이 실제로 시작됐을 때만 닫는다** (#311 리뷰). 왕복 중이면
-            // `savedEdit` 이 그냥 돌아오는데 시트가 닫히면, 고른 장소가 조용히 사라진다
-            if (_uiState.value.editInFlight) onSheetDismiss()
+            // **이번 호출이 수락됐을 때만 닫는다** (#311 리뷰 · 선경님). 전역
+            // `editInFlight` 를 보면 **다른 요청이 돌고 있을 때도 true** 라, 추가 API 는
+            // 안 불렸는데 시트가 닫힌다 — 고른 장소가 조용히 사라진다.
+            if (accepted) onSheetDismiss()
             return
         }
 

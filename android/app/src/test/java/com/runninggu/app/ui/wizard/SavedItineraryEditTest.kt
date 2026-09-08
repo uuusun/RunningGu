@@ -4,6 +4,7 @@ import com.runninggu.app.data.model.ContestSnapshot
 import com.runninggu.app.data.model.HotelSnapshot
 import com.runninggu.app.data.model.ItineraryRequestSnapshot
 import com.runninggu.app.data.model.ItineraryResult
+import com.runninggu.app.data.model.PoiItem
 import com.runninggu.app.data.model.SavedItineraryDetail
 import com.runninggu.app.data.remote.ApiErrorCode
 import com.runninggu.app.data.remote.ApiException
@@ -205,6 +206,14 @@ class SavedItineraryEditTest {
             desc = "",
         )
 
+        private fun candidate() = PoiItem(
+            name = "새 장소",
+            address = "서울 어딘가",
+            description = "설명",
+            lat = 37.5,
+            lng = 127.0,
+        )
+
         private fun httpError(code: ApiErrorCode) =
             ApiException.Http(409, code, null)
 
@@ -291,4 +300,40 @@ class SavedItineraryEditTest {
         assertEquals(listOf("12"), vm.uiState.value.days[0].blocks.map { it.id })
         assertEquals(listOf("21"), vm.uiState.value.days[1].blocks.map { it.id })
     }
+
+    // ── [완료] · 시트 유지 (#311 리뷰 · 선경님) ──────────────────
+
+    // [완료] 는 요청 중에도 눌린다. 안내가 편집 모드 안에만 있으면 완료 화면에서
+    // 실패가 안 보인다 — 서버엔 안 갔는데 사용자는 됐다고 믿는다.
+    @Test
+    fun `완료를 눌러도 실패는 상태에 남는다`() = runTest(dispatcher) {
+        val vm = restored(FakeRepo(failure = ApiException.Network(IOException("끊김"))))
+        advanceUntilIdle()
+
+        vm.onToggleEdit()          // 편집 진입
+        vm.onRemoveBlock("11")
+        vm.onToggleEdit()          // 응답 전에 [완료]
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.isEditing)
+        assertEquals(OFFLINE, vm.uiState.value.editError)
+    }
+
+    // 전역 editInFlight 로 시트를 닫으면 **다른 요청이 도는 중에도** 닫힌다.
+    // 추가 API 는 안 불렸는데 고른 장소가 사라진다.
+    @Test
+    fun `왕복 중이면 후보를 골라도 시트가 안 닫힌다`() = runTest(dispatcher) {
+        val repo = FakeRepo()
+        val vm = restored(repo)
+        advanceUntilIdle()
+
+        vm.onRemoveBlock("11")     // 하나 보내 놓고
+        vm.onAddPlace()            // 시트를 연다
+        vm.onCandidateSelect(candidate())
+        // 아직 advanceUntilIdle 안 함 — 삭제가 도는 중이다
+
+        assertTrue("추가가 거부됐는데 시트가 닫혔다", vm.uiState.value.sheet != null)
+        assertNull("추가 API 가 불렸다", repo.added)
+    }
 }
+

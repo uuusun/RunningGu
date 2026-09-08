@@ -474,6 +474,23 @@ private fun Content(
                     }
                 }
 
+                // **편집 모드 밖에 둔다** (#311 리뷰 · 선경님). [완료] 는 요청 중에도
+                // 눌리는데, 안내가 `isEditing` 안에 있으면 **완료 화면에서 실패가
+                // 안 보인다** — 서버에는 안 갔는데 사용자는 됐다고 믿는다.
+                if (state.editInFlight || state.editError != null) {
+                    item(key = "savedEditStatus") {
+                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                            Spacer(Modifier.height(8.dp))
+                            state.editError?.let { SavedEditError(it) }
+                                ?: Text(
+                                    text = "고치는 중이에요…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                        }
+                    }
+                }
+
                 if (state.isEditing) {
                     // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
                     // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
@@ -485,23 +502,6 @@ private fun Content(
                             // **실패는 목록 위에 남긴다** (#213). 스낵바는 사라지는데
                             // 고치려던 것은 화면에 그대로 있다 — 무엇이 안 됐는지 계속
                             // 보여야 다시 누를지 판단한다.
-                            state.editError?.let {
-                                Spacer(Modifier.height(8.dp))
-                                SavedEditError(it)
-                            }
-
-                            // **왕복 중이라는 것을 보여준다** (#311 리뷰). 안 보여주면
-                            // 누른 뒤 아무 일도 안 나는 것처럼 보여 또 누르는데, 그때
-                            // 두 번째 입력은 `savedEdit` 가드에 막혀 조용히 사라진다.
-                            if (state.editInFlight) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text = "고치는 중이에요…",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-
                             Spacer(Modifier.height(10.dp))
                             // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
                             // 반응하면 "됐다" 로 읽힌다
