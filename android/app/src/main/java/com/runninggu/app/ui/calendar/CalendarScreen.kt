@@ -237,7 +237,13 @@ private fun RaceList(
         // 대회는 접수 마감이 걸려 있어서, 낡은 목록을 최신인 것처럼 보여주면
         // 이미 끝난 접수를 보고 신청하러 간다.
         uiState.cachedAt?.let {
-            item { CachedNotice(cachedAt = it, modifier = Modifier.padding(horizontal = 16.dp)) }
+            // **여백을 따로 안 준다.** 이 `LazyColumn` 은 `contentPadding` 으로 좌우
+            // `ScreenPadding` 을 이미 갖고 있어서, 여기서 또 주면 아래 `ListHeader`·
+            // 대회 카드보다 안쪽으로 들어간다(#314 리뷰 · 민지님).
+            //
+            // 홈은 반대로 `LazyColumn` 에 좌우 여백이 없어 항목마다 직접 준다 —
+            // 그쪽 관용구를 그대로 옮겨 와서 났던 일이다.
+            item { CachedNotice(cachedAt = it) }
         }
 
         item { ListHeader(uiState = uiState) }
