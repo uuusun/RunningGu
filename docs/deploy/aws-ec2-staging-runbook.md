@@ -69,7 +69,8 @@ GraphHopper 11, Nginx를 배포하는 순서다. 새 `/health` API나 Actuator�
 | 메모리 | 현재 GH heap 512MiB~2GiB·container 상한 2.5GiB, backend heap 256~512MiB·MemoryHigh 640MiB/Max 768MiB. host swap 4GiB |
 | 외부 포트 | Nginx 80·443만 허용. 5432·8080·8989는 loopback |
 | 접속 | SSM Session Manager. SSH 22는 열지 않음 |
-| 운영책임자 | 유선경 — AWS·결제·도메인·Google Play·인프라 |
+| 운영책임자 | 유선경 — AWS·결제·도메인·인프라, **원스토어 콘솔·판매자 정보·IARC**, **릴리스 keystore 보관과 실제 서명** |
+| 출시 실무 분담 | 김민지 — 서명 대상 소스 커밋 고정·검증 항목 준비 · 이건모 — 기기 검증·카카오 콘솔(키 해시 등록) · 유선경 — 서명 APK 생성·스토어 제출 |
 | 운영 연락처 | `runninggu.play@gmail.com` — Certbot·예산 알림 |
 | 월 예산 | 총 100,000원, 실제 비용 80,000원·예상 비용 100,000원 도달 알림 |
 | 백업 | pgBackRest 일일 전체 백업 + 연속 WAL, 서울 리전 암호화 S3, 7일 보존, 운영책임자만 접근 |

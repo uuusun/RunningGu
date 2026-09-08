@@ -70,26 +70,40 @@ data class ResultUiState(
      * 정한다.
      */
     val needsRegeneration: Boolean = false,
+    /**
+     * 저장 후 편집이 서버에 다녀오는 중이다. (§5-7 ~ §5-10 · #213)
+     *
+     * **저장 전 편집에는 없는 상태다.** 그쪽은 로컬 연산이라 즉시 끝나고 실패가 없다.
+     * 저장 후에는 연산마다 왕복이 있어서, 그동안 같은 행을 또 누르면 두 요청이 엇갈린다.
+     */
+    val editInFlight: Boolean = false,
+    /**
+     * 저장 후 편집이 실패한 이유. 성공하거나 다른 편집을 시작하면 지운다.
+     *
+     * **스낵바가 아니라 목록 위 한 줄이다.** 스낵바는 사라지는데, 편집은 실패한 채로
+     * 화면에 남아 있다 — 무엇이 안 된 것인지 계속 보여야 한다.
+     */
+    val editError: String? = null,
 ) {
     /**
-     * 이 화면이 편집·저장을 여는가. **복원(S7-R)은 P0 에서 닫는다.** (이슈 #213)
+     * 저장 후 편집인가. **연산이 로컬이 아니라 서버로 간다.** (§5-7 ~ §5-10 · #213)
      *
-     * 저장된 동선을 고치는 것을 `POST /api/itineraries` 로 통째 저장하면 안 된다 —
-     * 서버가 저장할 때마다 **현재 canonical 대회로 RACE 블록을 재구성**하기 때문이다(§5-2).
-     * USER 장소 하나만 고쳐도 저장 snapshot 의 대회 정보가 말없이 바뀌고, 대회 날짜가
-     * 여행 기간 밖으로 옮겨졌으면 편집 저장 자체가 `INVALID_TRAVEL_PERIOD` 로 실패한다.
+     * 두 경로가 화면은 같고 하는 일이 다르다.
      *
-     * 저장 후 편집은 §5-7~5-10 블록 API 로 가야 한다 — 저장 snapshot 의 RACE 를 지키면서
-     * USER 블록만 고치려고 둔 계약이다. 그건 연산 4개마다 낙관적 갱신·롤백 규칙을 정해야
-     * 하는 별도 작업이라 이 PR 에 담지 않았다.
+     * ```
+     * 생성 경로   로컬 ItineraryEdits 로 고치고 [저장] 에서 통째로 POST
+     * 복원 경로   연산마다 서버 왕복. 저장 버튼이 없다 — 이미 저장된 것이다
+     * ```
      *
-     * **화면에 리터럴로 두지 않고 상태에 둔 이유가 테스트다.** Composable 안의 `false` 는
-     * 단위 테스트가 못 본다 — 여기 있으면 규칙이 깨졌을 때 테스트가 잡는다.
+     * **`POST /api/itineraries` 로 통째 저장하면 안 된다** — 서버가 저장할 때마다 현재
+     * canonical 대회로 RACE 블록을 재구성하기 때문이다(§5-2). USER 장소 하나만 고쳐도
+     * 저장 snapshot 의 대회 정보가 말없이 바뀌고, 대회 날짜가 여행 기간 밖으로 옮겨졌으면
+     * 편집 저장 자체가 `INVALID_TRAVEL_PERIOD` 로 실패한다. 그래서 §5-7~5-10 이 있다.
      *
-     * 블록마다 따로 있는 `ItineraryEdits.canEdit`(대회 블록은 못 고친다)와 다른 층이다.
-     * 이건 **화면 전체**가 편집을 여는가다.
+     * **화면에 리터럴로 두지 않고 상태에 둔 이유가 테스트다.** Composable 안의 조건은
+     * 단위 테스트가 못 본다.
      */
-    val editingEnabled: Boolean get() = restoredItineraryId == null
+    val isSavedEditing: Boolean get() = restoredItineraryId != null
 
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 

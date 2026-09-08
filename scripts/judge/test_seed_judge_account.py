@@ -1,0 +1,461 @@
+#!/usr/bin/env python3
+"""`seed_judge_account.py` 단위 테스트. 네트워크를 타지 않는다.
+
+가짜 서버를 세워 요청 순서와 본문을 본다. 고르는 규칙(순수 함수)과 자격 증명이
+새지 않는지가 핵심이다.
+"""
+
+from __future__ import annotations
+
+import collections
+import json
+import unittest
+
+from seed_judge_account import (
+    Client,
+    SeedError,
+    check_ids,
+    course_payload,
+    fetch_all_rows,
+    find_contests_with_location,
+    has_location,
+    itinerary_request,
+    mask_email,
+    pick_candidates,
+    pick_routes,
+    row_ids,
+    rows,
+    seed,
+    travel_period,
+    verify,
+    verify_warnings,
+)
+
+
+class FakeResponse:
+    def __init__(self, status: int, payload):
+        self.code = status
+        self._body = b"" if payload is None else json.dumps(payload).encode("utf-8")
+
+    def read(self, _limit=None):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+
+class FakeOpener:
+    """경로별 응답을 돌려주고 받은 요청을 전부 기록한다."""
+
+    def __init__(self, routes: dict):
+        self.routes = routes
+        self.calls = []
+        self.seen: dict = collections.defaultdict(int)
+
+    def open(self, request, timeout=None):
+        path = request.full_url.split("://", 1)[-1].split("/", 1)[-1]
+        path = "/" + path
+        body = None
+        if request.data:
+            body = json.loads(request.data.decode("utf-8"))
+        self.calls.append((request.get_method(), path, body,
+                           dict(request.header_items())))
+        key = (request.get_method(), path)
+        if key not in self.routes:
+            return FakeResponse(404, {"code": "NOT_FOUND", "status": 404})
+        entry = self.routes[key]
+        if isinstance(entry, list):
+            # 같은 경로를 여러 번 부르는 경우(코스 저장 2건). 마지막 것은 계속 나온다
+            index = min(self.seen[key], len(entry) - 1)
+            self.seen[key] += 1
+            entry = entry[index]
+        status, payload = entry
+        return FakeResponse(status, payload)
+
+
+# 실제 `GET /api/contests` 응답 모양. **좌표가 없다** — `ContestCardResponse` 에 `lat`·`lng`
+# 가 없고 §3-1 응답 예시에도 없다. 처음에 여기에 좌표를 넣어 두는 바람에 테스트가 헛돌았다
+# (#305 리뷰).
+CONTEST_PAGE = {
+    "items": [
+        {"id": 11, "name": "대회11", "contestDate": "2026-10-10", "events": ["HALF", "K10"]},
+        {"id": 12, "name": "대회12", "contestDate": "2026-10-11", "events": []},
+        {"id": 13, "name": "대회13", "contestDate": "2026-10-12", "events": ["FULL"]},
+        {"id": 14, "name": "대회14", "contestDate": "2026-10-13", "events": ["K5"]},
+        {"id": 15, "name": "대회15", "contestDate": "2026-10-14", "events": ["K10"]},
+    ],
+    "hasNext": False,
+}
+
+# 실제 `GET /api/contests/{id}` 응답 모양. **여기에만 좌표가 있다.** (§3-4)
+# 12번은 좌표가 없어서 동선 생성이 409 다 — 표본에 섞이면 안 된다.
+CONTEST_DETAILS = {
+    11: {"id": 11, "contestDate": "2026-10-10", "events": ["HALF", "K10"], "lat": 37.5, "lng": 127.0},
+    12: {"id": 12, "contestDate": "2026-10-11", "events": [], "lat": None, "lng": None},
+    13: {"id": 13, "contestDate": "2026-10-12", "events": ["FULL"], "lat": 35.1, "lng": 129.0},
+    14: {"id": 14, "contestDate": "2026-10-13", "events": ["K5"], "lat": 36.3, "lng": 127.4},
+    15: {"id": 15, "contestDate": "2026-10-14", "events": ["K10"], "lat": 37.4, "lng": 126.7},
+}
+
+NEAR_PAGE = {
+    "items": [
+        {"kind": "ROUTE", "routeId": "b", "name": "한강 코스", "distanceM": 900,
+         "lat": 37.51, "lng": 126.99, "routeKm": 5.1, "durationMin": 40,
+         "gainM": 12, "elevationProfileM": [1, 2], "pathPolyline": "aaa",
+         "dataSource": "API_GPX", "difficulty": "EASY", "sido": "서울",
+         "sourceCourseId": "DN-2"},
+        {"kind": "PLACE", "name": "걷기 장소", "distanceM": 100, "lat": 37.5,
+         "lng": 126.98},
+        {"kind": "ROUTE", "routeId": "a", "name": "남산 코스", "distanceM": 400,
+         "lat": 37.55, "lng": 126.98, "routeKm": 4.2, "durationMin": 35,
+         "gainM": 80, "elevationProfileM": [3], "pathPolyline": "bbb",
+         "dataSource": "GPX_ONLY", "difficulty": "NORMAL", "sido": "서울",
+         "sourceCourseId": "DN-1"},
+        {"kind": "ROUTE", "routeId": "c", "name": "폴리라인 없음", "distanceM": 200,
+         "lat": 37.52, "lng": 126.97, "pathPolyline": None},
+        {"kind": "ROUTE", "routeId": "d", "name": "이기대 코스", "distanceM": 600,
+         "lat": 35.13, "lng": 129.11, "routeKm": 6.0, "durationMin": 55,
+         "gainM": 140, "elevationProfileM": [5, 9], "pathPolyline": "ccc",
+         "dataSource": "API_GPX", "difficulty": "NORMAL", "sido": "부산",
+         "sourceCourseId": "DN-3"},
+    ],
+}
+
+
+NEAR_QUERY = "lat=35.114545&lng=129.040763&targetKm=5&radiusKm=8"
+
+
+def personal_page(ids: list, has_next: bool = False, number: int = 0) -> dict:
+    """개인 목록 응답 모양. **행은 객체이고 `id` 를 갖는다** (§5-4 · §7-A).
+
+    전에는 `{"items": [1, 2, 3]}` 처럼 스칼라를 넣어 뒀는데, 그러면 개수만 세는
+    구현이 통과한다 — 목록 fixture 에 좌표를 넣어 두는 바람에 헛돌았던 것과 같은
+    실수다(#305 리뷰).
+    """
+    return {
+        "content": [{"id": value, "name": "행" + str(value)} for value in ids],
+        "page": {"number": number, "size": 20, "totalElements": len(ids),
+                 "hasNext": has_next},
+    }
+
+
+FAVORITE_LIST = "/api/me/favorites?page=0&size=20"
+COURSE_LIST = "/api/me/courses?page=0&size=20"
+ITINERARY_LIST = "/api/itineraries?page=0&size=20"
+
+
+def seeded_opener() -> FakeOpener:
+    routes = {
+        ("POST", "/api/auth/login"): (200, {"accessToken": "T0KEN"}),
+        ("GET", "/api/contests?size=20"): (200, CONTEST_PAGE),
+        ("GET", "/api/courses/near?" + NEAR_QUERY): (200, NEAR_PAGE),
+        ("PUT", "/api/me/favorites/11"): (204, None),
+        ("PUT", "/api/me/favorites/13"): (204, None),
+        ("PUT", "/api/me/favorites/14"): (204, None),
+        ("PUT", "/api/me/favorites/15"): (204, None),
+        # 코스 두 건은 서로 다른 행이므로 서버도 다른 id 를 준다. 같은 id 가 두 번
+        # 오는 것은 정상이 아니라 **중복**이고, 아래 회귀 테스트에서 따로 본다
+        ("POST", "/api/me/courses"): [(201, {"id": 77}), (201, {"id": 78}),
+                                      (201, {"id": 79})],
+        ("POST", "/api/itineraries/generate"): (200, {"contestId": 11, "days": []}),
+        ("POST", "/api/itineraries"): (201, {"id": 42}),
+        ("GET", FAVORITE_LIST): (200, personal_page([11, 13, 14])),
+        ("GET", COURSE_LIST): (200, personal_page([77, 78, 79])),
+        ("GET", ITINERARY_LIST): (200, personal_page([42])),
+    }
+    for contest_id, detail in CONTEST_DETAILS.items():
+        routes[("GET", "/api/contests/" + str(contest_id))] = (200, detail)
+    return FakeOpener(routes)
+
+
+
+class PickTest(unittest.TestCase):
+
+    def test_목록에서는_거르지_않는다(self):
+        # 목록 응답에는 lat/lng 가 없다. 여기서 좌표로 거르면 **전부 걸러진다** —
+        # 처음에 그렇게 짜서 실제 서버에서는 표본을 하나도 못 만들었다 (#305 리뷰)
+        self.assertEqual([11, 12, 13, 14, 15], pick_candidates(CONTEST_PAGE["items"]))
+
+    def test_좌표는_상세로_판정한다(self):
+        self.assertTrue(has_location(CONTEST_DETAILS[11]))
+        self.assertFalse(has_location(CONTEST_DETAILS[12]))
+        self.assertFalse(has_location({}))
+
+    def test_걷기_장소와_폴리라인_없는_것은_저장하지_않는다(self):
+        routes = pick_routes(NEAR_PAGE["items"], 3)
+
+        self.assertEqual(["a", "d", "b"], [route["routeId"] for route in routes])
+
+    def test_대회일을_반드시_포함한다(self):
+        # §5-1 위반이면 400 INVALID_TRAVEL_PERIOD 다.
+        start, end = travel_period("2026-10-10")
+
+        self.assertEqual(("2026-10-09", "2026-10-10"), (start, end))
+
+    def test_그_대회에_있는_종목을_쓴다(self):
+        body = itinerary_request(CONTEST_DETAILS[11])
+
+        self.assertEqual("HALF", body["event"])
+        self.assertEqual(["TOUR", "FOOD"], body["themes"])
+
+    def test_종목이_없으면_기본값으로_간다(self):
+        body = itinerary_request({"id": 9, "contestDate": "2026-10-10", "events": []})
+
+        self.assertEqual("K10", body["event"])
+
+    def test_저장_코스는_받은_값을_그대로_옮긴다(self):
+        payload = course_payload(NEAR_PAGE["items"][0])
+
+        self.assertEqual("한강 코스", payload["courseName"])
+        self.assertEqual("aaa", payload["pathPolyline"])
+        self.assertEqual(5.1, payload["distanceKm"])
+        self.assertEqual([1, 2], payload["elevationProfileM"])
+
+    def test_목록_행은_content_와_items_둘_다_읽는다(self):
+        self.assertEqual([1], rows({"content": [1]}))
+        self.assertEqual([2], rows({"items": [2]}))
+        self.assertEqual([], rows(None))
+
+
+class SeedTest(unittest.TestCase):
+
+    def client(self, opener) -> Client:
+        client = Client("https://example.test", opener=opener)
+        client.token = "T0KEN"
+        return client
+
+    def test_찜_저장코스_동선을_모두_채운다(self):
+        opener = seeded_opener()
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([11, 13, 14], summary["favorites"])
+        self.assertEqual([77, 78, 79], summary["savedCourseIds"])
+        self.assertEqual(42, summary["itineraryId"])
+
+    def test_생성_응답을_그대로_저장한다(self):
+        # §5-2 는 "요청 = 5-1 응답 구조" 다. 다시 조립하면 서버가 필드를 늘렸을 때
+        # 한쪽만 따라간다.
+        opener = seeded_opener()
+
+        seed(self.client(opener))
+
+        saves = [body for method, path, body, _ in opener.calls
+                 if (method, path) == ("POST", "/api/itineraries")]
+        self.assertEqual([{"contestId": 11, "days": []}], saves)
+
+    def test_dry_run_은_아무것도_쓰지_않는다(self):
+        opener = seeded_opener()
+
+        summary = seed(self.client(opener), dry_run=True)
+
+        writes = [(method, path) for method, path, _, _ in opener.calls
+                  if method in {"POST", "PUT", "DELETE", "PATCH"}]
+        self.assertEqual([], writes)
+        self.assertEqual([], summary["favorites"])
+
+    def test_저장할_코스가_모자라면_경고로_남긴다(self):
+        # 서울 반경 8km 안에 두루누비 코스가 사실상 없다. 조용히 넘기면 저장 코스
+        # 화면이 왜 비었는지 아무도 모른다.
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/courses/near?" + NEAR_QUERY)] = (200, {"items": []})
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual(1, len(summary["warnings"]))
+        self.assertIn("ROUTE 가 0건", summary["warnings"][0])
+
+    def test_좌표_없는_대회는_상세를_보고_거른다(self):
+        # 12번은 목록에는 있지만 상세에 좌표가 없다. 찜은 되는데 그 대회에서 동선을
+        # 만들면 409 CONTEST_LOCATION_UNAVAILABLE 이라 표본에 섞이면 안 된다
+        opener = seeded_opener()
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([11, 13, 14], summary["contestIds"])
+
+    def test_상세를_불러_좌표를_확인한다(self):
+        # 목록만 보고 고르면 실제 서버에서 전부 걸러진다 (#305 리뷰)
+        opener = seeded_opener()
+
+        seed(self.client(opener))
+
+        detail_calls = [path for method, path, _, _ in opener.calls
+                        if method == "GET" and path.startswith("/api/contests/")]
+        self.assertEqual(["/api/contests/11", "/api/contests/12", "/api/contests/13",
+                          "/api/contests/14"], detail_calls)
+
+    def test_상세가_실패한_후보는_건너뛴다(self):
+        # 하나 때문에 전체가 멈추면, 채울 수 있는 표본도 못 채운다
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/contests/11")] = (500, {"code": "INTERNAL_ERROR"})
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([13, 14, 15], summary["contestIds"])
+
+    def test_한_장에서_못_채우면_다음_장을_본다(self):
+        opener = seeded_opener()
+        first = {"items": CONTEST_PAGE["items"][:2], "hasNext": True, "nextCursor": "c2"}
+        opener.routes[("GET", "/api/contests?size=20")] = (200, first)
+        opener.routes[("GET", "/api/contests?size=20&cursor=c2")] = (200, CONTEST_PAGE)
+
+        found = find_contests_with_location(self.client(opener), 3)
+
+        self.assertEqual([11, 13, 14], [item["id"] for item in found])
+
+    def test_찾은_대회가_모자라면_경고로_남긴다(self):
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/contests?size=20")] = (
+            200, {"items": CONTEST_PAGE["items"][:2], "hasNext": False})
+
+        summary = seed(self.client(opener))
+
+        self.assertEqual([11], summary["contestIds"])
+        self.assertTrue(any("찜 표본" in w for w in summary["warnings"]))
+
+    def test_대회가_없으면_멈춘다(self):
+        opener = seeded_opener()
+        opener.routes[("GET", "/api/contests?size=20")] = (200, {"items": [], "hasNext": False})
+
+        with self.assertRaises(SeedError):
+            seed(self.client(opener))
+
+    def test_토큰을_모든_요청에_싣는다(self):
+        opener = seeded_opener()
+
+        seed(self.client(opener))
+
+        for _method, path, _body, headers in opener.calls:
+            self.assertEqual("Bearer T0KEN", headers.get("Authorization"), path)
+
+
+class VerifyTest(unittest.TestCase):
+    """되읽기. **개수가 아니라 이번에 저장한 id 를 대조한다** (#305 리뷰)."""
+
+    def client(self, opener) -> Client:
+        client = Client("https://example.test", opener=opener)
+        client.token = "T0KEN"
+        return client
+
+    def seeded(self, opener) -> tuple:
+        client = self.client(opener)
+        summary = seed(client)
+        return client, summary
+
+    def test_저장한_id_가_목록에_있으면_통과한다(self):
+        opener = seeded_opener()
+        client, summary = self.seeded(opener)
+
+        checked = verify(client, summary)
+
+        self.assertTrue(checked["ok"])
+        self.assertEqual([], checked["favorites"]["missing"])
+        self.assertEqual([], checked["savedCourses"]["duplicated"])
+        self.assertEqual(3, checked["favorites"]["confirmed"])
+        self.assertEqual(3, checked["savedCourses"]["confirmed"])
+        self.assertEqual(1, checked["itineraries"]["confirmed"])
+
+    def test_같은_개수여도_다른_id_면_누락이다(self):
+        # 전에는 개수만 셌다. 무관한 id 가 세 개 와도 favoriteCount=3 으로 통과했다
+        opener = seeded_opener()
+        client, summary = self.seeded(opener)
+        opener.routes[("GET", FAVORITE_LIST)] = (200, personal_page([99, 98, 97]))
+
+        checked = verify(client, summary)
+
+        self.assertFalse(checked["ok"])
+        self.assertEqual([11, 13, 14], checked["favorites"]["missing"])
+        self.assertEqual(0, checked["favorites"]["confirmed"])
+        self.assertEqual(3, checked["favorites"]["listed"])
+
+    def test_같은_id_를_두_번_저장하면_중복이다(self):
+        # 서버가 두 번 다 77 을 주면 표본은 1건인데 savedCourseIds 는 2건으로 보인다
+        opener = seeded_opener()
+        opener.routes[("POST", "/api/me/courses")] = (201, {"id": 77})
+        opener.routes[("GET", COURSE_LIST)] = (200, personal_page([77]))
+        client, summary = self.seeded(opener)
+
+        checked = verify(client, summary)
+
+        self.assertEqual([77, 77, 77], summary["savedCourseIds"])
+        self.assertFalse(checked["ok"])
+        self.assertEqual([77], checked["savedCourses"]["duplicated"])
+        self.assertEqual(3, checked["savedCourses"]["saved"])
+        self.assertEqual(1, checked["savedCourses"]["confirmed"])
+        self.assertEqual(2, checked["savedCourses"]["shortfall"])
+
+    def test_첫_장에_없어도_뒷장까지_보고_판정한다(self):
+        # 계정에 표본이 쌓이면 이번에 저장한 것이 뒤로 밀린다. 첫 장만 보면
+        # 있는 것을 "없다" 고 말한다
+        opener = seeded_opener()
+        client, summary = self.seeded(opener)
+        opener.routes[("GET", FAVORITE_LIST)] = (
+            200, personal_page([51, 52, 53], has_next=True))
+        opener.routes[("GET", "/api/me/favorites?page=1&size=20")] = (
+            200, personal_page([11, 13, 14], number=1))
+
+        checked = verify(client, summary)
+
+        self.assertTrue(checked["ok"])
+        self.assertEqual([], checked["favorites"]["missing"])
+        self.assertEqual(6, checked["favorites"]["listed"])
+
+    def test_뒷장이_없으면_더_부르지_않는다(self):
+        opener = seeded_opener()
+        client = self.client(opener)
+
+        fetch_all_rows(client, "/api/me/favorites")
+
+        listings = [path for method, path, _, _ in opener.calls
+                    if method == "GET" and path.startswith("/api/me/favorites")]
+        self.assertEqual([FAVORITE_LIST], listings)
+
+    def test_id_없는_행은_세지_않는다(self):
+        # 응답 모양이 바뀌면 조용히 통과하는 것보다 누락으로 터지는 편이 낫다
+        self.assertEqual({7}, row_ids([{"id": 7}, {"name": "id 없음"}, 3, None]))
+
+    def test_부족과_누락과_중복을_문장으로_나눈다(self):
+        checked = {
+            "favorites": check_ids([11, 13], {11, 13}, 3),
+            "savedCourses": check_ids([77, 77], {77}, 3),
+            "itineraries": check_ids([42], set(), 1),
+        }
+
+        messages = verify_warnings(checked)
+
+        # 중복은 부족을 함께 낳는다 — 둘 다 적어야 "왜 모자란지" 가 남는다
+        self.assertEqual(4, len(messages))
+        self.assertIn("찜 표본이 2건뿐이다", messages[0])
+        self.assertIn("두 번 저장했다", messages[1])
+        self.assertIn("저장 코스 표본이 1건뿐이다", messages[2])
+        self.assertIn("목록에 없다", messages[3])
+
+
+class SecretTest(unittest.TestCase):
+
+    def test_이메일을_가린다(self):
+        # 요약 JSON 은 이슈나 PR 에 붙는다. 주소가 그대로 남으면 안 된다(AGENTS 8장).
+        self.assertEqual("ru***@example.com", mask_email("runninggu.judge@example.com"))
+        self.assertEqual("a***@b.com", mask_email("a@b.com"))
+        self.assertEqual("***", mask_email("도메인없음"))
+
+    def test_실패_메시지에_본문을_담지_않는다(self):
+        opener = FakeOpener({
+            ("POST", "/api/me/courses"): (400, {"code": "VALIDATION_FAILED",
+                                                "detail": "비밀이 섞인 본문"}),
+        })
+        client = Client("https://example.test", opener=opener)
+
+        with self.assertRaises(SeedError) as caught:
+            client.json("POST", "/api/me/courses", {"a": 1})
+
+        self.assertIn("VALIDATION_FAILED", str(caught.exception))
+        self.assertNotIn("비밀이 섞인 본문", str(caught.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()
