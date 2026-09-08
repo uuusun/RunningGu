@@ -477,6 +477,14 @@ private fun Content(
                 // **편집 모드 밖에 둔다** (#311 리뷰 · 선경님). [완료] 는 요청 중에도
                 // 눌리는데, 안내가 `isEditing` 안에 있으면 **완료 화면에서 실패가
                 // 안 보인다** — 서버에는 안 갔는데 사용자는 됐다고 믿는다.
+                //
+                // **실패는 목록 위에 남긴다** (#213). 스낵바는 사라지는데 고치려던
+                // 것은 화면에 그대로 있다 — 무엇이 안 됐는지 계속 보여야 다시 누를지
+                // 판단한다.
+                //
+                // **이 배치는 테스트가 안 지킨다.** `if (state.isEditing)` 안으로
+                // 도로 넣어도 단위 테스트 11개가 다 통과한다 — 상태는 그대로고
+                // 그리는 자리만 바뀌기 때문이다(#311 리뷰 · 민지님 · 이슈 #315).
                 if (state.editInFlight || state.editError != null) {
                     item(key = "savedEditStatus") {
                         Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
@@ -499,9 +507,6 @@ private fun Content(
                         Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                             EditNotice()
 
-                            // **실패는 목록 위에 남긴다** (#213). 스낵바는 사라지는데
-                            // 고치려던 것은 화면에 그대로 있다 — 무엇이 안 됐는지 계속
-                            // 보여야 다시 누를지 판단한다.
                             Spacer(Modifier.height(10.dp))
                             // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
                             // 반응하면 "됐다" 로 읽힌다
