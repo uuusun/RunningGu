@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.runninggu.app.ui.common.OFFLINE_FAVORITE_BLOCKED
 
 /**
  * S3 대회 상세 ViewModel. (SPEC §4.6 · AP-11 · AP-14)
@@ -145,6 +146,13 @@ class RaceDetailViewModel(
     fun onFavoriteToggle() {
         val id = raceId ?: return
         viewModelScope.launch {
+            // **캐시 화면에서는 서버로 보내지 않는다.** (매핑표 공통 오프라인 읽기 · #307)
+            // 화면이 버튼을 잠그지만 여기서도 막는다 — 잠금은 그리는 쪽 사정이라
+            // 다음에 누가 `enabled` 를 떼면 요청이 조용히 나간다.
+            if (!_uiState.value.canFavorite) {
+                _message.value = OFFLINE_FAVORITE_BLOCKED
+                return@launch
+            }
             when (val result = FavoriteStore.toggle(id)) {
                 FavoriteToggleResult.LoginRequired -> _loginRequired.value = true
                 is FavoriteToggleResult.Done ->

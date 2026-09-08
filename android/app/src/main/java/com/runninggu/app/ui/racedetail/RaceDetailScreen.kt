@@ -146,7 +146,11 @@ fun RaceDetailScreen(
                     ) {
                         Icon(Icons.Filled.Share, contentDescription = "공유")
                     }
-                    IconButton(onClick = viewModel::onFavoriteToggle) {
+                    // 캐시로 그린 화면에서는 잠근다 — 위 공유 버튼과 같은 기준이다(#307).
+                    IconButton(
+                        onClick = viewModel::onFavoriteToggle,
+                        enabled = state.canFavorite,
+                    ) {
                         Icon(
                             imageVector = if (state.isFavorite) {
                                 Icons.Filled.Favorite

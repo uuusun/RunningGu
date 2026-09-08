@@ -1,6 +1,7 @@
 package com.runninggu.app.ui.calendar
 
 import com.runninggu.app.ui.common.DataOrigin
+import com.runninggu.app.ui.common.OFFLINE_FAVORITE_BLOCKED
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -305,6 +306,13 @@ class CalendarViewModel(
     /** 하트 토글. 카드 이동과 독립이며 스낵바를 띄운다. (SPEC §4.5 · 결정-16 · AP-21) */
     fun onFavoriteToggle(raceId: String) {
         viewModelScope.launch {
+            // **캐시 화면에서는 서버로 보내지 않는다.** (매핑표 공통 오프라인 읽기 · #307)
+            // 화면이 버튼을 잠그지만 여기서도 막는다 — 잠금은 그리는 쪽 사정이라
+            // 다음에 누가 `enabled` 를 떼면 요청이 조용히 나간다.
+            if (!_uiState.value.canFavorite) {
+                _message.value = OFFLINE_FAVORITE_BLOCKED
+                return@launch
+            }
             // 상태 갱신은 보관소 구독(init)이 받아서 반영한다 — 낙관적 갱신이라 즉시 온다.
             when (val result = FavoriteStore.toggle(raceId)) {
                 FavoriteToggleResult.LoginRequired -> _loginRequired.value = true

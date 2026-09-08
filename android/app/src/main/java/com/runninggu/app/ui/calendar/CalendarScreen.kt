@@ -262,6 +262,7 @@ private fun RaceList(
                         race.registrationStatus() == RegistrationStatus.OPEN,
                     onClick = { onRaceClick(race.id) },
                     onFavoriteToggle = { onFavoriteToggle(race.id) },
+                    favoriteEnabled = uiState.canFavorite,
                 )
             }
         }

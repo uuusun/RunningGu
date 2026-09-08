@@ -32,6 +32,19 @@ data class RaceDetailUiState(
     /** 캐시로 되살린 화면인가. 화면은 이때만 "언제 것" 인지를 함께 그린다. */
     val cachedAt: java.time.Instant?
         get() = (origin as? DataOrigin.LocalCache)?.cachedAt
+
+    /**
+     * 찜을 바꿀 수 있는가. **캐시로 그린 화면에서는 잠근다.** (매핑표 공통 오프라인 읽기 · #307)
+     *
+     * 읽기는 캐시로 되지만 **쓰기는 서버가 받아야 한다.** 잠그지 않으면 하트가 먼저
+     * 바뀌고(낙관적 갱신) 요청이 실패해 되돌아온다 — 눌린 것도 아니고 안 눌린 것도
+     * 아닌 상태가 잠깐 보인다. 안내만 "오프라인" 으로 바꾸고 조작을 열어 두면
+     * **화면은 읽기 전용이라 말하면서 쓰기를 받는 셈**이다(#314 리뷰 · 선경님).
+     *
+     * 온라인 재조회가 성공하면 [origin] 이 [DataOrigin.Server] 로 돌아오므로 다시 열린다.
+     */
+    val canFavorite: Boolean
+        get() = origin is DataOrigin.Server
     /**
      * [NOT_FOUND]는 `404 CONTEST_NOT_FOUND`(API 명세 §3-4) 전용이다.
      * 재시도해도 소용없으므로 [ERROR]와 달리 [다시 시도]를 주지 않는다.

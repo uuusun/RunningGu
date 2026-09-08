@@ -50,3 +50,13 @@ fun CachedNotice(cachedAt: Instant, modifier: Modifier = Modifier) {
         modifier = modifier.padding(top = 2.dp, bottom = 6.dp),
     )
 }
+
+/**
+ * 캐시로 그린 화면에서 찜을 누른 경우. (매핑표 공통 오프라인 읽기 · #307 · #314 리뷰)
+ *
+ * **두 화면이 같은 문구를 쓴다.** 캘린더에서는 되고 상세에서는 안 되는 것처럼 읽히면
+ * 안 된다 — 같은 찜이고 같은 이유로 막힌다. [CachedNotice] 와 한 자리에 두는 것은
+ * 둘 다 "이 화면은 캐시다" 라는 한 가지 사실에서 나오기 때문이다.
+ */
+internal const val OFFLINE_FAVORITE_BLOCKED =
+    "오프라인이라 찜을 바꿀 수 없어요. 연결되면 다시 시도해 주세요."

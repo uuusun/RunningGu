@@ -1,6 +1,14 @@
 package com.runninggu.app.ui.calendar
 
 import com.runninggu.app.ui.common.DataOrigin
+import com.runninggu.app.ui.common.OFFLINE_FAVORITE_BLOCKED
+import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.data.repository.FavoritePage
+import com.runninggu.app.data.repository.FavoriteRepository
+import java.time.Instant
 import com.runninggu.app.data.repository.ContestDetailResult
 import androidx.lifecycle.viewModelScope
 import com.runninggu.app.data.model.Contest
@@ -53,6 +61,7 @@ class CalendarViewModelTest {
 
     @After
     fun tearDown() {
+        SessionStore.signOut()
         viewModels.forEach { it.viewModelScope.cancel() }
         viewModels.clear()
         Dispatchers.resetMain()
@@ -65,6 +74,82 @@ class CalendarViewModelTest {
      * 사라진 Main 으로 재개되면서 **엉뚱한 테스트를 깨뜨린다**(`FavoriteStoreTest` 가 그랬다).
      */
     private fun newViewModel() = CalendarViewModel(repository).also { viewModels += it }
+
+    /**
+     * 찜은 **로그인해야 서버로 나간다**([FavoriteStore.toggle] 첫 줄). 로그인 없이 두면
+     * `LoginRequired` 로 빠져서 **캐시 잠금이 아니라 로그인 때문에** 저장소가 안 불린다 —
+     * 그러면 이 테스트가 통과해도 아무것도 증명하지 못한다.
+     */
+    private fun signIn() {
+        SessionStore.signIn(
+            SessionProfile(
+                nickname = "테스터",
+                email = "tester@example.com",
+                loginProvider = LoginProvider.EMAIL,
+            ),
+        )
+    }
+
+    /**
+     * **캐시로 그린 목록에서는 찜 요청이 서버로 안 나간다.** (매핑표 공통 오프라인 읽기 · #307)
+     *
+     * 화면이 하트를 잠그지만 **여기서 보는 것은 "저장소가 안 불린다"** 이지 "버튼이 회색이다"
+     * 가 아니다. 잠금은 그리는 쪽 사정이라 다음에 누가 `enabled` 를 떼면 요청이 조용히
+     * 나간다(#314 리뷰 · 선경님).
+     */
+    @Test
+    fun `캐시로 그린 목록에서는 찜 요청이 서버로 안 나간다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        repository.cachedAt = Instant.parse("2026-09-03T07:55:00Z")
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        assertFalse("캐시 목록인데 찜이 열려 있다", viewModel.uiState.value.canFavorite)
+
+        viewModel.onFavoriteToggle("1")
+        advanceUntilIdle()
+
+        assertEquals("캐시인데 서버로 나갔다", 0, favorites.writes)
+        assertEquals(OFFLINE_FAVORITE_BLOCKED, viewModel.message.value)
+    }
+
+    @Test
+    fun `서버에서 받은 목록에서는 찜이 그대로 나간다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        repository.cachedAt = null
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.canFavorite)
+
+        viewModel.onFavoriteToggle("1")
+        advanceUntilIdle()
+
+        assertEquals("서버 목록인데 안 나갔다", 1, favorites.writes)
+    }
+
+    /** 캐시로 그린 뒤 재조회가 성공하면 잠긴 채 남지 않는다. */
+    @Test
+    fun `온라인으로 다시 받으면 찜이 열린다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        repository.cachedAt = Instant.parse("2026-09-03T07:55:00Z")
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.canFavorite)
+
+        repository.cachedAt = null
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertTrue("재조회가 성공했는데 잠긴 채다", viewModel.uiState.value.canFavorite)
+        viewModel.onFavoriteToggle("1")
+        advanceUntilIdle()
+        assertEquals(1, favorites.writes)
+    }
 
     @Test
     fun `홈에서 넘어온 검색어가 첫 서버 조회에 들어간다`() = runTest(dispatcher) {
@@ -424,4 +509,22 @@ private class RecordingContestRepository : ContestRepository {
         active = true,
         sources = listOf("MARATHON_GO"),
     )
+}
+
+/** 쓰기가 몇 번 나갔는지만 센다. (#307 오프라인 쓰기 잠금) */
+private class CountingFavoriteRepository : FavoriteRepository {
+    var writes = 0
+        private set
+
+    override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(emptySet())
+    override suspend fun list(page: Int, size: Int): FavoritePage =
+        FavoritePage(contests = emptyList(), hasNext = false, totalElements = 0)
+    override suspend fun add(contestId: String): Result<Unit> {
+        writes++
+        return Result.success(Unit)
+    }
+    override suspend fun remove(contestId: String): Result<Unit> {
+        writes++
+        return Result.success(Unit)
+    }
 }
