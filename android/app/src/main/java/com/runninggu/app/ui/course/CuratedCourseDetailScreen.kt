@@ -133,15 +133,16 @@ private fun Content(detail: CuratedCourseDetail) {
                 detail.difficulty?.let { Stat("난이도", it.label) }
             }
 
-            if (detail.elevationProfileM.isNotEmpty()) {
+            // 그릴 값이 나올 때만 그린다 — `isNotEmpty()` 는 점이 하나여도 통과하는데
+            // `elevationUnitProfile` 은 그때 `null` 이라 사인파가 그려졌다 (#316)
+            elevationUnitProfile(detail.elevationProfileM)?.let { profile ->
                 Spacer(Modifier.height(20.dp))
                 Text("고도", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 ElevationLine(
                     seed = detail.courseId.hashCode(),
                     closed = false,
-                    // 미터 원값을 그대로 넘기면 안 된다 — `ElevationLine` 은 0..1 을 받는다 (#268)
-                    profile = elevationUnitProfile(detail.elevationProfileM),
+                    profile = profile,
                     modifier = Modifier.fillMaxWidth().height(72.dp),
                 )
             }
