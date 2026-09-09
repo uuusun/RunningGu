@@ -822,8 +822,19 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 |---|---|---|
 | POST | `/me/courses` | 코스 저장(스냅샷) — body `{sourceCourseId?, dataSource, courseName, region?, distanceKm, durationMin, difficulty?, gainM, elevationProfileM, entryLat, entryLng, pathPolyline}`. 신규 `201 {id, created:true}`, 중복 `200 {id, created:false}` — `created`는 **항상 온다** |
 | GET | `/me/courses` | 목록(Pageable) — **`pathPolyline` 제외 프로젝션** 🔧(목록이 LOB를 안 읽도록) |
-| GET | `/me/courses/{id}` | 상세 — `pathPolyline`, `attributions[]` 포함 (코스 상세 **점선** 렌더링 🔒) |
+| GET | `/me/courses/{id}` | 상세 — `pathPolyline`, `attributions[]` 포함 (코스 상세 경로선 렌더링) |
 | DELETE | `/me/courses/{id}` | `204` |
+
+**경로선은 실선이다** — 종전에 이 표와 부록 A 에 "코스 상세 점선 렌더링 🔒" 이라고 적혀
+있었으나 **근거가 없어 뺐다**(#322). 그 문구는 명세와 목업이 함께 들어온 최초 커밋(`ab7e5d6`)
+부터 있었는데, 목업의 경로선(`.drawline`)은 실선이다. `stroke-dasharray` 가 붙어 있지만
+값이 선 전체 길이(`--len: 420`·`600`)이고 `stroke-dashoffset` 을 `0` 으로 옮기는 **선 그리기
+애니메이션**이라 끊기는 자리가 없다. 목업에서 `dashed` 가 진짜 점선으로 쓰인 두 곳(빈 상태
+박스·[장소 추가] 버튼)은 경로선이 아니다. 속성 이름만 보고 옮겨 적힌 것으로 판단했다.
+
+저장 코스만 점선으로 만들면 같은 지도에서 **코스 종류에 따라 선 모양이 달라지는데**, 사용자가
+그 차이를 "저장한 것" 으로 읽을 근거가 목업에도 SPEC 에도 없다. 경로선은 `RunningGuMap.drawLine()`
+하나를 저장 코스·큐레이션 코스(S8)·동선(S7)이 함께 쓴다.
 
 `difficulty`는 **선택**이다 🔧. `/courses/near`의 `difficulty`는 생성된 왕복 구간 기준이라 고도 정보가 없으면 값이 없고(§6-1 표시용), 저장 코스 목록·상세 응답에서도 `null`을 허용한다. 요청만 필수로 두면 난이도를 못 낸 경로는 저장 자체가 막힌다.
 
@@ -913,7 +924,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | 9 마이 즐겨찾기 | 목록 / 해제 | 7-C GET / 7-C DELETE |
 | 9 마이 프로필 | 조회 / 닉네임·마케팅 수정 / 비밀번호 변경 | 2-GET / 2-PATCH·`/agreements` / 2-PUT `/password` |
 | 9 마이 계정 | 가입 로그인 방식 표시 / 로그아웃 / 탈퇴 재인증·탈퇴 | 2-GET `/me` / 1-10 / 2-2 POST·DELETE |
-| 10 코스 상세 | 저장 코스 경로 점선 | 7-A GET {id} |
+| 10 코스 상세 | 저장 코스 경로 | 7-A GET {id} |
 | 공통 | 앱 시작 세션 확인 / 재발급 / 로그아웃 | 2-GET / 1-9 / 1-10 |
 
 > 정리본의 모든 "액션" 항목이 매핑됨 — 누락 없음 확인(2026-07-30).
