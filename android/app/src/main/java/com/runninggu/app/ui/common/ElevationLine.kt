@@ -114,7 +114,8 @@ private fun fract(v: Float): Float = v - floor(v)
  * 다음 사람이 찾는다.
  */
 fun elevationUnitProfile(profileM: List<Int>): List<Float>? {
-    // 두 점 미만이면 선이 아니다 — 그릴 것이 없으니 seed 로 만든 장식 곡선에 맡긴다
+    // 두 점 미만이면 선이 아니다. **부르는 쪽은 `null` 을 「고도를 그리지 않는다」 로
+    // 읽어야 한다** — `ElevationLine` 에 그대로 넘기면 seed 사인파가 그려진다(#316).
     if (profileM.size < 2) return null
     val min = profileM.min()
     val max = profileM.max()

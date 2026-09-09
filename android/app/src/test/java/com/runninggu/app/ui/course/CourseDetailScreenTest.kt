@@ -41,7 +41,7 @@ class CourseDetailScreenTest {
     }
 
     @Test
-    fun `점이 모자라면 null 을 주고 시드 프로파일에 맡긴다`() {
+    fun `점이 모자라면 null 을 준다 — 부르는 쪽이 고도를 아예 안 그린다`() {
         assertNull(elevationUnitProfile(emptyList()))
         assertNull(elevationUnitProfile(listOf(42)))
     }

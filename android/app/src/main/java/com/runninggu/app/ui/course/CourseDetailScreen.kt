@@ -155,22 +155,33 @@ private fun Content(detail: SavedCourseDetail) {
             Spacer(Modifier.height(16.dp))
             StatRow(course)
 
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "고도",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(8.dp))
-            ElevationLine(
-                seed = course.id.toInt(),
-                closed = false,
-                // 미터 원값을 그대로 넘기면 안 된다 — `ElevationLine` 은 0..1 을 받는다.
-                profile = elevationUnitProfile(detail.elevationProfileM),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-            )
+            // **그릴 값이 나올 때만 그린다** (#316). `null` 이면 제목까지 통째로 감춘다.
+            //
+            // `ElevationLine` 은 `profile` 이 `null` 이면 `seed` 로 사인파를 그린다 —
+            // 대회 카드가 쓰는 장식용 곡선이라, 「고도」 아래에 나오면 **그 코스와 무관한
+            // 능선**을 사용자가 실제 고도로 읽는다.
+            //
+            // **`isNotEmpty()` 로 거르지 않는 이유**가 있다. `elevationUnitProfile` 은
+            // 점이 **둘** 미만이면 `null` 인데 `isNotEmpty()` 는 하나여도 통과한다 —
+            // 조건이 두 군데로 갈라지면 그 한 칸이 새는 자리가 된다. 결과로 판단하면
+            // 조건이 한 곳뿐이라 갈라질 수 없다.
+            elevationUnitProfile(detail.elevationProfileM)?.let { profile ->
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = "고도",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                ElevationLine(
+                    seed = course.id.toInt(),
+                    closed = false,
+                    profile = profile,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                )
+            }
         }
 
         // 출처는 목록 하단과 같은 규칙이다 — 순서·문구를 바꾸지 않는다 (결정-44).

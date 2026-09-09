@@ -428,15 +428,15 @@ private fun NearbyRow(
                 )
 
                 if (item is NearbyItem.Route) {
-                    if (item.elevationProfileM.isNotEmpty()) {
+                    // 그릴 값이 나올 때만 그린다 — `isNotEmpty()` 는 점이 하나여도
+                    // 통과하는데 `elevationUnitProfile` 은 그때 `null` 이라 코스와
+                    // 무관한 사인파가 그려졌다 (#316)
+                    elevationUnitProfile(item.elevationProfileM)?.let { profile ->
                         Spacer(Modifier.height(6.dp))
                         ElevationLine(
                             seed = item.routeId.hashCode(),
                             closed = false,
-                            // **미터 원값을 그대로 넘기면 안 된다** — `ElevationLine` 은
-                            // 0..1 을 받는다. 원값을 주면 `1f - v` 가 음수가 되어 캔버스
-                            // 밖에 그려지고 빈 박스만 남는다(#268)
-                            profile = elevationUnitProfile(item.elevationProfileM),
+                            profile = profile,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(28.dp),
