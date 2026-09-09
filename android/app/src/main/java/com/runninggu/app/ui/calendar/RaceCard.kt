@@ -69,6 +69,8 @@ fun RaceCard(
     isFavorite: Boolean,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    /** 캐시로 그린 목록이면 false — 쓰기는 서버가 받아야 한다(#307). */
+    favoriteEnabled: Boolean = true,
     modifier: Modifier = Modifier,
     featured: Boolean = false,
 ) {
@@ -122,6 +124,7 @@ fun RaceCard(
                     )
                     IconButton(
                         onClick = onFavoriteToggle,
+                        enabled = favoriteEnabled,
                         modifier = Modifier.size(28.dp),
                     ) {
                         Icon(

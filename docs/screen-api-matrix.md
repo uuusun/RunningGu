@@ -229,7 +229,7 @@ Compose 화면
 | 날짜 선택·해제 | 목록 재조회 | date/null | 대회 목록 | day/month empty 문구 구분 |
 | 필터 draft | 로컬 | events/openOnly/regions | 없음 | 취소 시 폐기, 완료 시 두 API 재조회 |
 | 다음 페이지 | 같은 목록 API | opaque cursor | 추가 items | 실패 시 기존 items 유지 + 재시도 |
-| 찜 | PUT/DELETE `/api/me/favorites/{contestId}` | contestId | 204 | 게스트 로그인 모달, 실패 시 원복 |
+| 찜 | PUT/DELETE `/api/me/favorites/{contestId}` | contestId | 204 | 게스트 로그인 모달, 실패 시 원복. **캐시로 그린 목록(`cachedAt != null`)에서는 하트를 잠근다** — 버튼 비활성 + ViewModel 이 요청을 안 보내고 "오프라인이라 찜을 바꿀 수 없어요" 를 띄운다. 온라인 재조회가 성공하면 다시 열린다 (공통 오프라인 읽기 · #307) |
 | 카드 선택 | S3 이동 | contestId | 없음 | 없음 |
 
 ### S3 대회 상세
@@ -237,7 +237,7 @@ Compose 화면
 | UI/행동 | API/로컬 | 응답에서 쓰는 값 | 원천·저장 | 상태 |
 |---|---|---|---|---|
 | 상세 본문 | `GET /api/contests/{contestId}` | 카드 필드, nullable imageUrl, organizer, officialUrl, nullable lat/lng, dDay, favorite, active | SERVER_DB/Room | 비활성도 404가 아닌 Content: 흐림+"정보 제공 종료". 이미지 null은 placeholder |
-| 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복 |
+| 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복. **캐시로 그린 화면에서는 앱바 하트를 잠근다** — S2 와 같은 기준·같은 문구 (공통 오프라인 읽기 · #307) |
 | 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | active일 때만 호출. 본문과 독립 Loading/Empty/502/504. `409 CONTEST_LOCATION_UNAVAILABLE` = **재시도 버튼 없는 별도 오류**("인근 축제를 확인할 수 없어요") — 좌표는 재시도로 생기지 않는다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null이면 버튼 숨김 |
 | 공유 | Android 공유 시트(`ACTION_SEND`) | `EXTRA_TEXT`=대회명·`MM.dd 요일 HH:mm`·장소·열리는 공식 주소, `EXTRA_SUBJECT`=대회명 | 저장 없음 | **P0**(#279). `createChooser` 로 매번 고르게 한다. `state.race == null` 이면 비활성. 링크는 `openableWebUrl` 을 통과한 것만 — 화면 [공식 페이지 ↗] 와 같은 기준. 카톡 전용 카드(썸네일·버튼)는 P1/AP-17 |
