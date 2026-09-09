@@ -99,7 +99,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `본문과 축제를 이어서 받는다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(FakeContestRepository(festivals = listOf(festival())))
+        val viewModel = newViewModel(FakeContestRepository(festivals = listOf(festival())))
 
         viewModel.start("7")
         advanceUntilIdle()
@@ -113,7 +113,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `404 는 재시도 없는 상태다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(
+        val viewModel = newViewModel(
             FakeContestRepository(detailFailure = http(ApiErrorCode.NOT_FOUND)),
         )
 
@@ -125,7 +125,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `네트워크 오류는 재시도 있는 상태다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(
+        val viewModel = newViewModel(
             FakeContestRepository(detailFailure = ApiException.Network(java.io.IOException("끊김"))),
         )
 
@@ -138,7 +138,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `축제 409 는 재시도를 주지 않는 별도 상태다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(
+        val viewModel = newViewModel(
             FakeContestRepository(festivalFailure = http(ApiErrorCode.CONTEST_LOCATION_UNAVAILABLE)),
         )
 
@@ -153,7 +153,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `축제가 죽어도 본문은 남는다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(
+        val viewModel = newViewModel(
             FakeContestRepository(festivalFailure = ApiException.Network(java.io.IOException("끊김"))),
         )
 
@@ -170,7 +170,7 @@ class RaceDetailViewModelTest {
         val repository = FakeContestRepository()
 
         // 번들 항목의 id 다. 숫자로 바꿔 보내면 엉뚱한 대회를 묻게 된다.
-        val viewModel = RaceDetailViewModel(repository)
+        val viewModel = newViewModel(repository)
         viewModel.start("roadrun-41543")
         advanceUntilIdle()
 
@@ -183,7 +183,7 @@ class RaceDetailViewModelTest {
         // 원천이 사라진 대회의 주변 축제를 보여주면 아직 열리는 대회처럼 읽힌다 (결정-46).
         val repository = FakeContestRepository(active = false)
 
-        val viewModel = RaceDetailViewModel(repository)
+        val viewModel = newViewModel(repository)
         viewModel.start("7")
         advanceUntilIdle()
 
@@ -210,7 +210,7 @@ class RaceDetailViewModelTest {
     fun `캐시로 되살린 상세는 언제 것인지를 화면까지 들고 온다`() = runTest(dispatcher) {
         // 대회 상세는 접수 마감이 걸려 있다. 캐시된 값을 지금 값처럼 그리면 이미 끝난
         // 접수를 열려 있다고 보여주게 된다 (#307)
-        val viewModel = RaceDetailViewModel(FakeContestRepository(detailCachedAt = CACHED_AT))
+        val viewModel = newViewModel(FakeContestRepository(detailCachedAt = CACHED_AT))
 
         viewModel.start("7")
         advanceUntilIdle()
@@ -221,7 +221,7 @@ class RaceDetailViewModelTest {
 
     @Test
     fun `서버에서 막 받은 상세에는 출처 표시가 없다`() = runTest(dispatcher) {
-        val viewModel = RaceDetailViewModel(FakeContestRepository())
+        val viewModel = newViewModel(FakeContestRepository())
 
         viewModel.start("7")
         advanceUntilIdle()
@@ -299,6 +299,11 @@ class RaceDetailViewModelTest {
         assertEquals(1, favorites.writes)
     }
 
+    /**
+     * **이 클래스의 ViewModel 은 전부 이걸로 만든다.** 하나라도 직접 생성하면 그 인스턴스의
+     * `FavoriteStore.favoriteIds` 수집이 [tearDown] 을 그냥 통과해, 뒤따르는
+     * `resetForTest`·`resetMain` 과 겹치면서 **다음 클래스로 누수가 넘어간다**(#320 리뷰 · 선경님).
+     */
     private fun newViewModel(repository: FakeContestRepository) =
         RaceDetailViewModel(repository).also { viewModels += it }
 }
