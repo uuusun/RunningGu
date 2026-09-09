@@ -1,6 +1,15 @@
 package com.runninggu.app.ui.racedetail
 
 import com.runninggu.app.ui.common.DataOrigin
+import com.runninggu.app.ui.common.OFFLINE_FAVORITE_BLOCKED
+import com.runninggu.app.ui.favorite.FavoriteStore
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
+import com.runninggu.app.data.local.SessionStore
+import com.runninggu.app.data.repository.FavoritePage
+import com.runninggu.app.data.repository.FavoriteRepository
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import com.runninggu.app.data.repository.ContestDetailResult
 import com.runninggu.app.data.model.Contest
 import com.runninggu.app.data.model.NearbyFestival
@@ -21,7 +30,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
@@ -46,8 +57,45 @@ class RaceDetailViewModelTest {
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
 
+    /**
+     * ViewModel 은 만들면 **끝나지 않는 구독**을 하나 연다 — `FavoriteStore.favoriteIds` 다.
+     * 끊지 않으면 `resetMain()` 뒤에도 살아남아 나중에 다른 테스트가 찜을 바꿀 때
+     * 사라진 Main 으로 재개되면서 엉뚱한 테스트를 깨뜨린다(`CalendarViewModelTest` 와 같다).
+     */
+    private val viewModels = mutableListOf<RaceDetailViewModel>()
+
+    /**
+     * **뒷정리가 이 파일만의 일이 아니다.** [FavoriteStore] 는 싱글턴이라 여기서 갈아 끼운
+     * 스텁과 세션이 다음 테스트 클래스로 넘어간다. 실제로 정리를 빼고 돌렸더니 이 파일은
+     * 다 통과하는데 `FavoriteStoreTest` 와 `FavoriteRacesStateTest` 가 대신 깨졌다 —
+     * 죽은 `Dispatchers.Main` 으로 재개되는 `DispatchException` 과 꺼진 하트다.
+     *
+     * 순서가 있다. **구독을 먼저 끊고**(끊기 전에 `resetMain()` 하면 그 구독이 죽은 Main 을
+     * 잡는다), 세션을 내리고, 저장소를 빈 것으로 되돌린 뒤 마지막에 Main 을 푼다.
+     */
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        viewModels.forEach { it.viewModelScope.cancel() }
+        viewModels.clear()
+        SessionStore.signOut()
+        FavoriteStore.resetForTest(CountingFavoriteRepository())
+        Dispatchers.resetMain()
+    }
+
+    /**
+     * 찜은 **로그인해야 서버로 나간다**([FavoriteStore.toggle] 첫 줄). 로그인 없이 두면
+     * `LoginRequired` 로 빠져서 **캐시 잠금이 아니라 로그인 때문에** 저장소가 안 불린다 —
+     * 그러면 통과해도 아무것도 증명하지 못한다.
+     */
+    private fun signIn() {
+        SessionStore.signIn(
+            SessionProfile(
+                nickname = "테스터",
+                email = "tester@example.com",
+                loginProvider = LoginProvider.EMAIL,
+            ),
+        )
+    }
 
     @Test
     fun `본문과 축제를 이어서 받는다`() = runTest(dispatcher) {
@@ -181,6 +229,78 @@ class RaceDetailViewModelTest {
         assertEquals(DataOrigin.Server, viewModel.uiState.value.origin)
         assertNull(viewModel.uiState.value.cachedAt)
     }
+
+    /**
+     * **캐시로 그린 상세에서는 찜 요청이 서버로 안 나간다.** (매핑표 공통 오프라인 읽기 · #307)
+     *
+     * 앱바 하트를 `enabled = false` 로 잠그지만 **여기서 보는 것은 "저장소가 안 불린다"** 이지
+     * "버튼이 회색이다" 가 아니다. 잠금은 그리는 쪽 사정이라 다음에 누가 `enabled` 를 떼면
+     * 요청이 조용히 나간다(#314 리뷰).
+     *
+     * 캘린더는 [CalendarViewModelTest] 가 같은 것을 지킨다. **두 화면의 로직이 같아서 더
+     * 필요하다** — 한쪽만 지키면 상세를 건드렸을 때 캘린더만 빨간불이 나고 상세는 조용히
+     * 통과한다(#314 리뷰 후속).
+     */
+    @Test
+    fun `캐시로 그린 상세에서는 찜 요청이 서버로 안 나간다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        val viewModel = newViewModel(FakeContestRepository(detailCachedAt = CACHED_AT))
+
+        viewModel.start("7")
+        advanceUntilIdle()
+        assertFalse("캐시 상세인데 찜이 열려 있다", viewModel.uiState.value.canFavorite)
+
+        viewModel.onFavoriteToggle()
+        advanceUntilIdle()
+
+        assertEquals("캐시인데 서버로 나갔다", 0, favorites.writes)
+        assertEquals(OFFLINE_FAVORITE_BLOCKED, viewModel.message.value)
+    }
+
+    @Test
+    fun `서버에서 받은 상세에서는 찜이 그대로 나간다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        val viewModel = newViewModel(FakeContestRepository())
+
+        viewModel.start("7")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.canFavorite)
+
+        viewModel.onFavoriteToggle()
+        advanceUntilIdle()
+
+        assertEquals("서버 상세인데 안 나갔다", 1, favorites.writes)
+    }
+
+    /** 캐시로 그린 뒤 재조회가 성공하면 잠긴 채 남지 않는다. (#307) */
+    @Test
+    fun `온라인으로 다시 받으면 상세 찜이 열린다`() = runTest(dispatcher) {
+        val favorites = CountingFavoriteRepository()
+        FavoriteStore.resetForTest(favorites)
+        signIn()
+        val repository = FakeContestRepository(detailCachedAt = CACHED_AT)
+        val viewModel = newViewModel(repository)
+
+        viewModel.start("7")
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.canFavorite)
+
+        repository.detailCachedAt = null
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertTrue("재조회가 성공했는데 잠긴 채다", viewModel.uiState.value.canFavorite)
+        viewModel.onFavoriteToggle()
+        advanceUntilIdle()
+        assertEquals(1, favorites.writes)
+    }
+
+    private fun newViewModel(repository: FakeContestRepository) =
+        RaceDetailViewModel(repository).also { viewModels += it }
 }
 
 /** 고정 시각. 되살린 상세가 이 값을 화면까지 들고 오는지 본다 (#307). */
@@ -191,8 +311,13 @@ private class FakeContestRepository(
     private val detailFailure: ApiException? = null,
     private val festivalFailure: ApiException? = null,
     private val active: Boolean = true,
-    /** 캐시로 되살린 상세면 저장 시각. null 이면 서버에서 막 받은 것이다 (#307). */
-    private val detailCachedAt: java.time.Instant? = null,
+    /**
+     * 캐시로 되살린 상세면 저장 시각. null 이면 서버에서 막 받은 것이다 (#307).
+     *
+     * `var` 인 이유 — 캐시로 그린 뒤 **온라인 재조회가 성공하는** 경우를 한 인스턴스로
+     * 이어서 봐야 한다. 새 저장소로 갈아 끼우면 재조회가 아니라 다른 화면이 된다.
+     */
+    var detailCachedAt: java.time.Instant? = null,
 ) : ContestRepository {
 
     var lastDetailId: Long? = null
@@ -247,4 +372,22 @@ private class FakeContestRepository(
         active = active,
         sources = listOf("MARATHON_GO"),
     )
+}
+
+/** 쓰기가 몇 번 나갔는지만 센다. (#307 오프라인 쓰기 잠금) */
+private class CountingFavoriteRepository : FavoriteRepository {
+    var writes = 0
+        private set
+
+    override suspend fun loadFavoriteIds(): Result<Set<String>> = Result.success(emptySet())
+    override suspend fun list(page: Int, size: Int): FavoritePage =
+        FavoritePage(contests = emptyList(), hasNext = false, totalElements = 0)
+    override suspend fun add(contestId: String): Result<Unit> {
+        writes++
+        return Result.success(Unit)
+    }
+    override suspend fun remove(contestId: String): Result<Unit> {
+        writes++
+        return Result.success(Unit)
+    }
 }
