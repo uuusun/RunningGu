@@ -12,6 +12,9 @@ import unittest
 
 BACKEND = Path(__file__).resolve().parents[2]
 COMPOSE_ENV = BACKEND / "deploy/env/compose.env.example"
+PRODUCTION_COMPOSE_ENV = BACKEND / "deploy/env/compose.production.env.example"
+APPLICATION_ENV = BACKEND / "deploy/env/application.env.example"
+PRODUCTION_APPLICATION_ENV = BACKEND / "deploy/env/application.production.env.example"
 MEMORY_KEYS = (
     "GRAPHHOPPER_XMS", "GRAPHHOPPER_XMX",
     "GRAPHHOPPER_MEMORY_RESERVATION", "GRAPHHOPPER_MEMORY_LIMIT",
@@ -39,13 +42,13 @@ def compose_result(overrides=None, env_file=COMPOSE_ENV):
     )
 
 
-def compose_model(reservation=None, limit=None):
+def compose_model(reservation=None, limit=None, env_file=COMPOSE_ENV):
     overrides = {}
     if reservation is not None:
         overrides["GRAPHHOPPER_MEMORY_RESERVATION"] = reservation
     if limit is not None:
         overrides["GRAPHHOPPER_MEMORY_LIMIT"] = limit
-    result = compose_result(overrides)
+    result = compose_result(overrides, env_file=env_file)
     if result.returncode:
         # 보간된 환경 값과 전체 Compose 모델은 로그에 출력하지 않는다.
         raise AssertionError(f"Compose 모델 생성 실패: exit={result.returncode}")
@@ -60,12 +63,17 @@ def assert_memory_policy(model, reservation, limit):
     assert model["restart"] == "no", "Docker 자동 재시작 금지"
 
 
-def backend_profile():
+def read_env(path):
     env = {}
-    for line in (BACKEND / "deploy/env/application.env.example").read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line and not line.startswith("#"):
             key, value = line.split("=", 1)
             env[key] = value
+    return env
+
+
+def backend_profile(env_file=APPLICATION_ENV):
+    env = read_env(env_file)
     unit = configparser.ConfigParser(interpolation=None)
     unit.optionxform = str
     unit.read(BACKEND / "deploy/systemd/runninggu-backend.service", encoding="utf-8")
@@ -86,6 +94,34 @@ def assert_4g_profile(model, env, service):
 class ComposeMemoryPolicyTest(unittest.TestCase):
     def test_repository_examples_render_approved_4g_profile(self):
         assert_4g_profile(compose_model(), *backend_profile())
+
+    def test_production_examples_render_approved_4g_profile(self):
+        assert_4g_profile(
+            compose_model(env_file=PRODUCTION_COMPOSE_ENV),
+            *backend_profile(PRODUCTION_APPLICATION_ENV),
+        )
+
+    def test_backup_paths_are_explicit_and_separated_by_environment(self):
+        staging_env = read_env(COMPOSE_ENV)
+        production_env = read_env(PRODUCTION_COMPOSE_ENV)
+        self.assertEqual(staging_env["PGBACKREST_REPO1_PATH"], "/runninggu/staging")
+        self.assertEqual(production_env["PGBACKREST_REPO1_PATH"], "/runninggu/production")
+        self.assertNotEqual(staging_env["PGBACKREST_REPO1_PATH"], production_env["PGBACKREST_REPO1_PATH"])
+
+        production = compose_result(env_file=PRODUCTION_COMPOSE_ENV)
+        self.assertEqual(production.returncode, 0, f"운영 Compose 모델 생성 실패: exit={production.returncode}")
+        postgres = json.loads(production.stdout)["services"]["postgres"]
+        self.assertEqual(postgres["environment"]["PGBACKREST_REPO1_PATH"], "/runninggu/production")
+
+    def test_production_application_profile_uses_public_url_and_mail(self):
+        env = read_env(PRODUCTION_APPLICATION_ENV)
+        self.assertEqual(env["RUNNINGGU_DEPLOYMENT_ENVIRONMENT"], "production")
+        self.assertEqual(env["PASSWORD_RESET_URL"], "https://api.runninggu.store/reset-password")
+        self.assertEqual(env["SMTP_HOST"], "smtp.resend.com")
+        self.assertEqual(env["SMTP_USERNAME"], "resend")
+        self.assertEqual(env["SMTP_FROM_ADDRESS"], "no-reply@runninggu.store")
+        self.assertEqual(env["MAIL_ENABLED"], "true")
+        self.assertEqual(env["UPSTREAM_LOAD_GUARD_ENABLED"], "false")
 
     def test_empty_memory_values_fail_before_deployment(self):
         for key in MEMORY_KEYS:

@@ -42,9 +42,9 @@ Windows PowerShell:
 ```
 
 출력의 `<work-dir>/artifacts/<artifact-id>/` 아래 세 파일만 비공개 S3의 계약 key에 업로드한다.
-`graph-release.example.json`을 복사해 실제 manifest hash와 build input hash를 채운
-`backend/graphhopper/graph-release.json`은 별도 리뷰를 받아야 하며, 비어 있는 예시를 배포하지
-않는다. 운영 PBF import에는 builder host가 8GiB보다 큰 메모리를 사용할 수 있지만 그 메모리는
+`graph-release.example.json`을 복사해 실제 manifest hash와 build input hash를 채운다. 스테이징은
+`backend/graphhopper/graph-release.json`, 운영은 `backend/graphhopper/graph-release.production.json`을
+별도 리뷰받으며, 비어 있는 예시를 배포하지 않는다. 운영 PBF import에는 builder host가 8GiB보다 큰 메모리를 사용할 수 있지만 그 메모리는
 EC2 server 상시 사양과 무관하다.
 
 ## 준비물

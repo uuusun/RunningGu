@@ -75,21 +75,22 @@ public class AuthDataCleanupScheduler {
         } catch (RuntimeException exception) {
             int consecutiveFailures = state.recordFailure();
             Duration sinceLastSuccess = state.sinceLastSuccess(cutoff);
+            // DB 예외 원문에는 이메일·토큰 해시 등 행 값이 포함될 수 있다. (SPEC §6.5, §9.4)
             if (consecutiveFailures >= 2
                     || (sinceLastSuccess != null && sinceLastSuccess.compareTo(URGENT_AFTER) >= 0)) {
                 log.error(
-                        "인증 데이터 정리 긴급 경고 table={} consecutiveFailures={} lastSuccessAt={}",
+                        "인증 데이터 정리 긴급 경고 table={} consecutiveFailures={} lastSuccessAt={} exceptionType={}",
                         table,
                         consecutiveFailures,
                         state.lastSuccessAt(),
-                        exception);
+                        exception.getClass().getName());
             } else {
                 log.warn(
-                        "인증 데이터 정리 실패 table={} consecutiveFailures={} lastSuccessAt={}",
+                        "인증 데이터 정리 실패 table={} consecutiveFailures={} lastSuccessAt={} exceptionType={}",
                         table,
                         consecutiveFailures,
                         state.lastSuccessAt(),
-                        exception);
+                        exception.getClass().getName());
             }
         }
     }

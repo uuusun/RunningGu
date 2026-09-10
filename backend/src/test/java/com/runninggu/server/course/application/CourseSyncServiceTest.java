@@ -26,7 +26,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class CourseSyncServiceTest {
 
     private static final Instant COMPLETED_AT = Instant.parse("2026-08-22T03:00:00Z");
@@ -76,6 +80,30 @@ class CourseSyncServiceTest {
 
         assertThat(result.success()).isFalse();
         assertThat(catalog.snapshot()).isSameAs(before);
+    }
+
+    @Test
+    void 내부_예외의_좌표와_토큰을_로그에_남기지_않는다(CapturedOutput output) {
+        String privateLatitude = "37.5665002";
+        String privateLongitude = "126.9780002";
+        String privateToken = "course-log-private-token";
+        CourseCatalog catalog = catalog();
+        CourseCatalogSnapshot before = catalog.snapshot();
+        CourseSyncService service = service(catalog, () -> {
+            throw new IllegalStateException(
+                    "lat=" + privateLatitude + " lng=" + privateLongitude,
+                    new IllegalArgumentException("token=" + privateToken));
+        });
+
+        CourseSyncResult result = service.synchronize();
+
+        assertThat(result.success()).isFalse();
+        assertThat(catalog.snapshot()).isSameAs(before);
+        assertThat(output.getAll())
+                .doesNotContain(privateLatitude)
+                .doesNotContain(privateLongitude)
+                .doesNotContain(privateToken)
+                .contains("exceptionType=java.lang.IllegalStateException");
     }
 
     @Test

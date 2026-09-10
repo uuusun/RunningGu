@@ -19,7 +19,12 @@ spring:
     enabled: true
   jackson:
     time-zone: UTC
+  http:
+    # framework 진단에 요청 헤더·파라미터 원문을 포함하지 않는다. (SPEC §9.4)
+    log-request-details: false
   mvc:
+    # 처리된 MVC 예외의 원문을 framework가 다시 기록하지 않는다. (SPEC §9.4)
+    log-resolved-exception: false
     problemdetails:
       enabled: true
   cache:
@@ -43,6 +48,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
+  tomcat:
+    # 접속 기록은 요청 원문을 제외하는 nginx runninggu_minimal 한 곳에서만 만든다. (SPEC §9.4)
+    accesslog:
+      enabled: false
   error:
     include-message: never
     include-binding-errors: never
@@ -56,8 +65,14 @@ springdoc:
     path: /swagger-ui.html
 
 logging:
+  # framework가 Throwable을 기록해도 message/cause/stack 원문을 출력하지 않는다. (SPEC §9.4)
+  exception-conversion-word: "%nopex"
   pattern:
     level: "%5p [traceId=%X{traceId:-}]"
+  level:
+    # PostgreSQL 제약 오류 Detail에는 provider_subject(이메일)가 포함될 수 있다.
+    # GlobalExceptionHandler의 안전한 code/traceId 로그를 진단 기준으로 사용한다. (SPEC §9.4)
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
 
 runninggu:
   upstream-load-guard:

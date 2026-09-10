@@ -744,6 +744,9 @@ ACME webroot와 HTTP bootstrap 설정을 설치한다. Ubuntu 기본 site는 sym
 ```bash
 sudo install -d -m 0755 /var/www/certbot
 sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/nginx/runninggu-log-privacy.conf \
+  /etc/nginx/conf.d/00-runninggu-log-privacy.conf
+sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/nginx/staging-api.bootstrap.conf \
   /etc/nginx/sites-available/runninggu-staging-bootstrap
 sudo ln -sfn \
@@ -780,6 +783,9 @@ sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/nginx/runninggu-ssl-params.conf \
   /etc/nginx/snippets/runninggu-ssl-params.conf
 sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/nginx/runninggu-log-privacy.conf \
+  /etc/nginx/conf.d/00-runninggu-log-privacy.conf
+sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/nginx/staging-api.conf \
   /etc/nginx/sites-available/runninggu-staging
 sudo install -m 0644 \
@@ -814,20 +820,38 @@ test "$(sudo systemctl show logrotate.service --property=ExecMainStatus --value)
 ```
 
 Nginx는 외부 `Forwarded`와 `X-Forwarded-*`를 제거·재작성하며 `X-Forwarded-Prefix`를 빈 값으로
-지운다. HTTP와 HTTPS의 앱 host 접속 로그는 모두 쿼리 문자열을 제외한
-`/var/log/nginx/runninggu-staging.access.log`에 남고, 오류 로그는
-`/var/log/nginx/runninggu-staging.error.log`에 남는다. 두 파일을 포함한
-`/var/log/nginx/*.log`는 매일 회전하고 회전본 14개와 14일 `maxage`를 적용하며 압축한다.
-Spring Boot는 loopback만 listen하므로 Nginx를 우회할 수 없다.
+지운다. HTTP·HTTPS 앱 host와 알 수 없는 Host의 접속 로그는 `runninggu_minimal` 형식으로
+IP·시각·allowlist 방식·상태·응답 크기·처리시간만 기록한다. URI·query·Host·User-Agent는
+기록하지 않는다. 앱 host는 `/var/log/nginx/runninggu-staging.access.log`, 기본 거부 server는
+`/var/log/nginx/runninggu-rejected.access.log`를 사용한다. 두 파일은 매일 회전하고 회전본 14개와
+14일 `maxage`를 적용하며 압축한다. Spring Boot는 loopback만 listen하므로 Nginx를 우회할 수 없다.
 
-`runninggu_noqs`의 `$uri`는 **정규화·rewrite 후의 경로**다. 클라이언트가 보낸 원래
-경로와 다를 수 있으므로 장애 분석에서 구분한다. 이 형식은 `access_log`에만 적용되며
-`error_log`의 요청 문맥에는 원래 요청 주소와 질의 문자열이 남을 수 있다.
-알 수 없는 Host의 전역 접속 로그도 앱 host의 질의 문자열 제외 보장 대상이 아니다.
-두 경로의 개인정보 노출 방지는 공개 전 별도 조치·검증 항목이다. 오류 로그 수준을
-바꾸거나 접속 로그 보관을 14일로 정한 것만으로 노출 방지가 완료됐다고 판정하지 않는다.
-근거: [nginx 로그 설정](https://nginx.org/en/docs/http/ngx_http_log_module.html),
-[오류 로그 안내](https://docs.nginx.com/nginx/admin-guide/monitoring/logging/).
+OSS nginx의 요청 처리 `error_log`는 request 원문을 필드별로 제외할 수 없으므로 앱 host와
+기본 거부 server에서 `/dev/null`로 보낸다. 4xx·5xx와 upstream 상태·시간은 최소 접속 로그로,
+애플리케이션 오류는 개인정보 원문 없는 `code`·예외 클래스·`traceId`로 확인한다. nginx의
+기동·설정 검사·reload 실패는 systemd journal에서 확인한다. 상세 기준은
+[서버 로그 개인정보 보호 정책](server-log-privacy-policy.md)을 따른다.
+
+### 13.1 로그 개인정보 표식 검사
+
+설정 적용 직후 백엔드가 active인 상태에서 실행한다. 이 검사는 고유한 가짜 이메일·좌표·토큰을
+정상·검증 실패·로그인 실패·알 수 없는 Host·과대 헤더 요청에 넣는다. 로그 원문이나 표식은
+출력하지 않고 HTTP 상태, 조회 행 수, 표식 검출 건수만 JSON으로 출력한다.
+
+```bash
+cd /opt/runninggu/repository
+sudo python3 backend/deploy/validation/check-server-log-privacy.py \
+  --host staging-api.runninggu.store
+```
+
+`statusChecksPassed=true`, 두 `accessLogGrowth=true`,
+`legacyRequestErrorLogUnchanged=true`, `forbiddenMatches=0`,
+`historicalPatternMatches`의 `email`·`coordinate`·`secret`이 모두 0,
+`passed=true`를 확인한다.
+0건만 보고 합격시키지 않는다. 예정한 상태와 접속 로그 증가가 함께 확인돼야 시험 요청이
+실제로 각 경로를 지났다고 판단한다. 과거 패턴이 발견되면 로그 원문을 출력하지 말고
+저장소·검사 기간·건수만 기록하며, 정확한 삭제 범위 또는 보존기간 종료를 정하기 전에는
+공개 조건을 통과시키지 않는다. 운영 배포에서도 운영 host로 같은 검사를 다시 실행한다.
 
 ## 14. 인증서 자동 갱신
 
@@ -1019,7 +1043,8 @@ curl --fail --silent --show-error \
 - HTTP가 HTTPS로 redirect되는가
 - Swagger와 `/v3/api-docs`가 비활성인가
 - 외부에서 5432·8080·8989에 연결할 수 없는가
-- Nginx access log가 쿼리스트링을 제외한 `runninggu_noqs` 포맷을 사용하는가
+- Nginx access log가 URI·query·Host·User-Agent를 제외한 `runninggu_minimal` 형식을 사용하는가
+- §13.1 표식 검사에서 요청 실행·두 접속 로그 증가·금지 표식 0건을 함께 확인했는가
 - GraphHopper가 같은 graph artifact ID를 재사용하고 PBF·SRTM download·import를 시작하지 않는가
 - GraphHopper runtime stdout은 Docker `local`에만 있고 주 service journal에 중복되지 않는가
 - container runtime stderr가 주 service journal로 릴레이되지 않고, failure-only wrapper가

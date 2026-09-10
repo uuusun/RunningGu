@@ -302,11 +302,12 @@ GraphHopper 11은 같은 입력으로 import해도 `properties`와 `properties.t
 ### 4.2 release descriptor
 
 EC2 검증기가 S3 manifest의 자기 일관성만 확인해서는 승인되지 않은 artifact도 통과할 수 있다.
-exact commit에는 비밀값이 아닌 다음 descriptor를 둔다.
+환경별 exact commit에는 비밀값이 아닌 다음 descriptor를 둔다.
 
-```text
-backend/graphhopper/graph-release.json
-```
+| 환경 | descriptor |
+|---|---|
+| staging | `backend/graphhopper/graph-release.json` |
+| production | `backend/graphhopper/graph-release.production.json` |
 
 ```json
 {
@@ -318,7 +319,8 @@ backend/graphhopper/graph-release.json
 }
 ```
 
-install·verify 스크립트는 checkout의 descriptor, S3 manifest SHA-256, manifest 내부 artifact ID와
+install·verify 스크립트는 `GRAPHHOPPER_ENVIRONMENT`와 일치하는 checkout의 descriptor,
+S3 manifest SHA-256, manifest 내부 artifact ID와
 build input hash가 모두 일치할 때만 활성화를 허용한다. graph artifact를 독립 갱신해도 descriptor
 변경은 PR로 리뷰하고 exact commit을 배포한다.
 
