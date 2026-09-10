@@ -146,6 +146,7 @@ sudo apt-get update
 sudo apt-get install -y \
   openjdk-21-jre-headless \
   nginx \
+  logrotate \
   certbot \
   awscli \
   git \
@@ -166,6 +167,7 @@ java -version
 sudo docker version
 sudo docker compose version
 nginx -v
+logrotate --version
 certbot --version
 aws --version
 ```
@@ -226,8 +228,8 @@ sudo install -m 0644 \
 sudo systemctl restart systemd-journald
 ```
 
-현재 정책은 디스크 용량만 제한한다. 정확한 로그 보존 일수는 운영·개인정보 정책을 확정한 뒤
-별도로 추가한다. GraphHopper runtime의 기준 저장소는 Compose의 크기 제한된 Docker `local`
+journal은 디스크 용량으로 제한한다. nginx 접속·오류 파일은 §13의 별도 logrotate 정책으로
+매일 회전하고 14일 보관한다. GraphHopper runtime의 기준 저장소는 Compose의 크기 제한된 Docker `local`
 driver다. 주 service의 stdout은 버리고 stderr는 container 생성 전 Compose 오류와 `ExecStartPre`
 실패 이유를 위해 journal에 둔다. journal에는 그 밖에 Spring Boot·Importer·백업·WAL 감시와
 GraphHopper 검증·알림 같은 control-plane 기록을 보존한다.
@@ -768,7 +770,10 @@ sudo certbot certonly \
 
 ## 13. 최종 HTTPS·기본 거부 설정
 
-TLS parameter, named site, 알 수 없는 Host 기본 거부를 설치한다.
+TLS parameter, named site, 알 수 없는 Host 기본 거부와 nginx 로그 14일 보관 정책을 설치한다.
+logrotate 설정은 Ubuntu 패키지의 `/etc/logrotate.d/nginx`를 저장소 파일로 교체한다. 같은 로그
+경로를 가리키는 별도 설정 파일을 추가하면 중복 정의가 되므로 만들지 않는다. 최초 교체 전
+패키지 기본값은 include 대상이 아닌 `/etc/runninggu/backups`에 한 번만 보관한다.
 
 ```bash
 sudo install -m 0644 \
@@ -780,6 +785,15 @@ sudo install -m 0644 \
 sudo install -m 0644 \
   /opt/runninggu/repository/backend/deploy/nginx/default-reject.conf \
   /etc/nginx/sites-available/00-runninggu-default-reject
+sudo install -d -o root -g root -m 0700 /etc/runninggu/backups
+if ! test -e /etc/runninggu/backups/nginx.logrotate.before-runninggu; then
+  sudo install -m 0600 \
+    /etc/logrotate.d/nginx \
+    /etc/runninggu/backups/nginx.logrotate.before-runninggu
+fi
+sudo install -m 0644 \
+  /opt/runninggu/repository/backend/deploy/logrotate/nginx \
+  /etc/logrotate.d/nginx
 
 sudo ln -sfn \
   /etc/nginx/sites-available/runninggu-staging \
@@ -791,10 +805,29 @@ sudo unlink /etc/nginx/sites-enabled/runninggu-staging-bootstrap
 
 sudo nginx -t
 sudo systemctl reload nginx
+sudo logrotate --debug /etc/logrotate.conf
+sudo systemctl enable --now logrotate.timer
+sudo systemctl start logrotate.service
+sudo systemctl is-active --quiet logrotate.timer
+test "$(sudo systemctl show logrotate.service --property=Result --value)" = success
+test "$(sudo systemctl show logrotate.service --property=ExecMainStatus --value)" = 0
 ```
 
 Nginx는 외부 `Forwarded`와 `X-Forwarded-*`를 제거·재작성하며 `X-Forwarded-Prefix`를 빈 값으로
-지운다. Spring Boot는 loopback만 listen하므로 Nginx를 우회할 수 없다.
+지운다. HTTP와 HTTPS의 앱 host 접속 로그는 모두 쿼리 문자열을 제외한
+`/var/log/nginx/runninggu-staging.access.log`에 남고, 오류 로그는
+`/var/log/nginx/runninggu-staging.error.log`에 남는다. 두 파일을 포함한
+`/var/log/nginx/*.log`는 매일 회전하고 회전본 14개와 14일 `maxage`를 적용하며 압축한다.
+Spring Boot는 loopback만 listen하므로 Nginx를 우회할 수 없다.
+
+`runninggu_noqs`의 `$uri`는 **정규화·rewrite 후의 경로**다. 클라이언트가 보낸 원래
+경로와 다를 수 있으므로 장애 분석에서 구분한다. 이 형식은 `access_log`에만 적용되며
+`error_log`의 요청 문맥에는 원래 요청 주소와 질의 문자열이 남을 수 있다.
+알 수 없는 Host의 전역 접속 로그도 앱 host의 질의 문자열 제외 보장 대상이 아니다.
+두 경로의 개인정보 노출 방지는 공개 전 별도 조치·검증 항목이다. 오류 로그 수준을
+바꾸거나 접속 로그 보관을 14일로 정한 것만으로 노출 방지가 완료됐다고 판정하지 않는다.
+근거: [nginx 로그 설정](https://nginx.org/en/docs/http/ngx_http_log_module.html),
+[오류 로그 안내](https://docs.nginx.com/nginx/admin-guide/monitoring/logging/).
 
 ## 14. 인증서 자동 갱신
 

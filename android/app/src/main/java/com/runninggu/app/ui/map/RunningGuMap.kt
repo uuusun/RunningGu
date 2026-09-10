@@ -231,6 +231,17 @@ private class ScenePainter {
         pinLine = drawLine(layer, scene.pinPath)
     }
 
+    /**
+     * 경로선을 그린다. **모든 화면이 이 하나를 같이 쓴다** — 저장 코스·큐레이션 코스(S8)·
+     * 동선(S7).
+     *
+     * **실선이 맞다.** API 명세에 "코스 상세 점선 렌더링 🔒" 이 적혀 있었지만 근거가 없어
+     * 뺐다(#322 · 명세 §7-A). 목업의 경로선에 붙은 `stroke-dasharray` 는 점선이 아니라
+     * **선 그리기 애니메이션**이었다 — 속성 이름만 보고 옮겨 적힌 것이다.
+     *
+     * 저장 코스만 점선으로 만들면 같은 지도에서 코스 종류에 따라 선 모양이 달라지는데,
+     * 사용자가 그 차이를 읽을 근거가 목업에도 SPEC 에도 없다.
+     */
     private fun drawLine(layer: RouteLineLayer, points: List<LatLng>): RouteLine? {
         if (points.size < MIN_ROUTE_POINTS) return null
 
