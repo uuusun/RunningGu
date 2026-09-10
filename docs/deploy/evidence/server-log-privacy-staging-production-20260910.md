@@ -4,13 +4,13 @@
 
 | 환경 | EC2 | 검사 시점 상태 | 이번 판정 |
 |---|---|---|---|
-| staging | `i-07aa483968f4daddc` | nginx·인증서·백엔드 active | 새 요청 비노출 확인, 과거 로그 때문에 공개 차단 유지 |
+| staging | `i-07aa483968f4daddc` | nginx·인증서·백엔드 active | 과거 로그 정리 후 전체 표식 검사 통과 |
 | production | `i-0c9f040b65d41d6c1` | HTTP bootstrap만 active, 인증서·백엔드 없음 | bootstrap 비노출 확인, TLS·백엔드 검사는 미완료 |
 
 검사는 로그 원문과 시험 표식을 출력하지 않고 상태, 조회 행 수와 검출 건수만 남겼다.
-nginx 설정은 `fix/log-privacy` 작업 트리의 설정을 설치했다. staging 백엔드 JAR은 아직 이
-브랜치 산출물로 교체하지 않았고, 커밋 기반 산출물이 배포될 때까지 systemd 방어 설정을
-추가했다.
+백엔드·staging 설정 기준은 `90a4ad0`, production 설정 기준은 `607c944`이며 두 커밋은
+`origin/fix/log-privacy`에 올라가 있다. staging 백엔드 JAR은 아직 이 브랜치 산출물로
+교체하지 않았고, 커밋 기반 산출물이 배포될 때까지 systemd 방어 설정을 추가했다.
 
 ## 공통 서버 상태
 
@@ -33,7 +33,7 @@ SSM 명령 `e82dc3c6-be0b-4d02-b4e4-ad53cfbf7864`에서 두 서버 모두
   재시작 뒤 backend active와 loopback 인증 조회 200을 확인했다. 저장소 코드가 배포되면
   이 임시 logger 차단은 안전한 `code`·예외 클래스·`traceId` 로그로 대체한다.
 
-### 실제 요청 검사
+### 실제 요청 검사와 과거 로그 정리
 
 SSM `5a17a7a8-8f58-4e27-93ce-368f89321b97` 결과는 다음과 같다.
 
@@ -50,7 +50,23 @@ SSM `5a17a7a8-8f58-4e27-93ce-368f89321b97` 결과는 다음과 같다.
 파일이 아닌 archive 7개에 각각 1건씩 있었고, 현재 활성 journal은 0건이었다. nginx
 journal은 최근 14일 78행에서 0건이었다.
 
-과거 파일 정리가 끝나기 전에는 약관 활성화·공개 차단 조건을 해제하지 않는다.
+승인된 정리 SSM `6cc30327-8aeb-46c1-a423-e340d0d7d14b`는 실행 직전에도 정확히
+nginx 파일 3개·이메일 79건, journal archive 7개·이메일 7건인지 확인했다. nginx 압축
+로그는 이메일 부분만 `[REDACTED_EMAIL]`로 치환해 나머지 진단 내용을 보존했고, 현재 활성
+journal을 제외한 해당 archive 7개만 제거했다.
+
+정리 직후 같은 실제 요청 검사를 다시 실행한 최종 결과는 다음과 같다.
+
+- HTTP redirect 301, 이메일 조회 200, 좌표 검증 실패 400, 로그인 실패 401,
+  알 수 없는 Host 연결 종료, 과대 헤더 400
+- named·기본 거부 access log 증가, 기존 요청 error log 크기 불변
+- nginx 파일 22개·20,683행, 최근 14일 backend/nginx journal 5,361행 검사
+- 시험 표식 0건, 이메일·좌표·비밀값 일반 패턴 모두 0건, `passed=true`
+
+SSM `43b6eeb6-68c9-4c83-b256-a837de9d3b1e`에서 `journalctl --verify`, `nginx -t`,
+nginx·backend active 상태를 다시 확인했다. journal 파일은 9개, 사용량은 41.8MB였고
+세 nginx 로그의 권한은 모두 `0640 www-data:adm`이었다. staging의 과거 로그 차단 사유는
+해소됐다.
 
 ## production
 
@@ -79,5 +95,5 @@ sudo python3 backend/deploy/validation/check-server-log-privacy.py \
   --legacy-error-log runninggu-production.error.log
 ```
 
-production의 TLS·백엔드 검사와 staging 과거 로그 86건 정리가 모두 완료되기 전에는 전체
-로그 보안 항목을 완료로 표시하지 않는다.
+production의 TLS·백엔드 검사가 완료되기 전에는 전체 로그 보안 항목을 완료로 표시하지
+않는다.

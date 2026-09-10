@@ -454,7 +454,10 @@ cd ..\backend
   - 예외 원문 제거, Hibernate 제약 오류 로그 차단, nginx 최소 접속 로그와 실서버 표식
     검사기를 적용한다. 자동 테스트와 로컬 설정 검사가 끝난 뒤 staging·운영의 nginx 파일 및
     backend/nginx journal에서 `forbiddenMatches=0`과 최근 보존 로그의 일반 민감정보 패턴
-    0건을 각각 확인해야 체크한다. [로컬 구현·검증 기록](deploy/evidence/server-log-privacy-local-20260910.md)
+    0건을 각각 확인해야 체크한다. staging은 과거 로그 86건 정리 뒤 전체 검사가 통과했고,
+    production은 HTTP bootstrap만 통과해 TLS·backend 검사가 남았다.
+    [로컬 구현·검증 기록](deploy/evidence/server-log-privacy-local-20260910.md) ·
+    [실서버 적용·검증 기록](deploy/evidence/server-log-privacy-staging-production-20260910.md)
 - [x] **nginx 파일 로그 14일 정책 적용(2026-09-07):** 저장소 관리 logrotate 정책(`daily`, `rotate 14`, `maxage 14`, 압축, `0640`)을 `/etc/logrotate.d/nginx`에 설치하고 `nginx -t`, timer·1회 실행, 현재 파일 권한, HTTPS API를 확인했다. [적용 기록](deploy/evidence/nginx-log-location-audit-20260907.md)을 따른다(결정-61)
 - [ ] 장애 감지·담당자 알림·운영사무국 심사 기간 대응 체계 확정
 - [ ] 배포 직전 DB 백업과 직전 앱/서버 artifact 보관
