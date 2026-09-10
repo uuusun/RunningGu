@@ -1,0 +1,70 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListProductionGraphArtifacts",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::runninggu-staging-artifacts-987622176638",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": "graphhopper/production/*"
+        }
+      }
+    },
+    {
+      "Sid": "ReadProductionGraphArtifacts",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::runninggu-staging-artifacts-987622176638/graphhopper/production/*"
+    },
+    {
+      "Sid": "ListProductionBackups",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-seoul",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": "runninggu/production/*"
+        }
+      }
+    },
+    {
+      "Sid": "ManageProductionBackups",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-seoul/runninggu/production/*"
+    },
+    {
+      "Sid": "UseBackupEncryptionKey",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "arn:aws:kms:ap-northeast-2:987622176638:key/b18b8374-922a-46bb-bda9-78c98a22d679"
+    },
+    {
+      "Sid": "ReadProductionRuntimeSecrets",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "arn:aws:ssm:ap-northeast-2:987622176638:parameter/runninggu/production/*"
+    },
+    {
+      "Sid": "PublishProductionAlerts",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:ap-northeast-2:987622176638:runninggu-production-alerts"
+    }
+  ]
+}
