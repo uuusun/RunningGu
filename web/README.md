@@ -68,7 +68,8 @@ grep -c 'class="todo"' web/privacy/index.html   # 남은 개수
 
 > **⚠️ 이 둘을 지우는 것만으로 공개해도 되는 상태가 되지는 않는다.** `noindex` 는
 > **검색 노출 제어이지 접근 차단이 아니다** — 주소를 아는 사람은 지금도 볼 수 있다.
-> 아래 값이 채워지고 법률 검토(#195 · #230)가 끝나야 게시할 수 있다.
+> 아래 값이 채워지고 내부 사실 대조와 #195의 별도 후속 확인이 끝나야 게시할 수 있다.
+> 외부 법률 검토는 최초 출시 차단 조건에서 제외했으며, 완료했다고 표시하지 않는다.
 
 ### 확정된 값 (더 물을 필요 없음)
 
@@ -78,6 +79,8 @@ grep -c 'class="todo"' web/privacy/index.html   # 남은 개수
 | 개인정보 보호·고충처리 담당 | `루트메이트 개인정보보호 담당` — #230 |
 | 문의 주소 | `runninggu.play@gmail.com` — #230 |
 | AWS 수탁 법인명 | `Amazon Web Services Korea LLC` — 2026-09-06 AWS Billing 확인 (#230) |
+| 메일 발송 수탁자 | `Plus Five Five, Inc. (Resend)` — Resend DPA·스테이징 전환 확인 (#321) |
+| Resend 국외 처리 | 이메일 데이터·기록은 미국에 저장, 일반 요금제 기준 30일 보유 |
 | 서버 접속·오류 파일 로그 보관 | **14일 보관 후 정기 삭제** — SPEC 결정-61 · #313 |
 | 앱 API HTTP·HTTPS 접속 기록 | 두 연결 모두 질의 문자열 제외 — [2026-09-07 적용 기록](../docs/deploy/evidence/nginx-log-location-audit-20260907.md) |
 
