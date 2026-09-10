@@ -270,41 +270,6 @@ class ItineraryPersistenceApiIntegrationTest extends PostgreSqlContainerSupport 
                 .andExpect(jsonPath("$.days[1].blocks[2].id").value(secondUserId));
     }
 
-    /**
-     * **시각은 자리에 붙는다.** 블록을 위로 올리면 그 자리의 이른 시각을 받는다. (#319)
-     *
-     * 예전에는 시각이 블록을 따라다녔다. `17:00` 일정을 첫 줄로 올려도 `17:00` 이라
-     * 사용자가 "위로 올렸는데 시간이 그대로" 를 보게 됐다. 사용자가 읽는 것은 **그 자리의
-     * 시각**이므로 순서를 바꾸면 시각도 자리를 따라야 한다.
-     */
-    @Test
-    void 순서를_바꾸면_시각도_자리를_따라간다() throws Exception {
-        long userId = insertUser("시각러너", "slot-runner");
-        long contestId = insertContest("slot-running", "슬롯 대회장");
-        String accessToken = accessToken(userId);
-        long itineraryId = save(accessToken, contestId, "첫 관광");
-        JsonNode detail = details(accessToken, itineraryId);
-        // 둘째 날에 RACE 하나와 USER 둘이 있다. USER 두 개만 자리를 맞바꾼다.
-        JsonNode day = detail.path("days").get(1);
-        long dayId = day.path("id").asLong();
-        long firstId = day.path("blocks").get(1).path("id").asLong();
-        long secondId = day.path("blocks").get(2).path("id").asLong();
-        String firstTime = day.path("blocks").get(1).path("startTime").asText();
-        String secondTime = day.path("blocks").get(2).path("startTime").asText();
-
-        mockMvc.perform(put("/api/itineraries/{id}/days/{dayId}/blocks/order", itineraryId, dayId)
-                        .header("Authorization", bearer(accessToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"blockIds\":[" + secondId + "," + firstId + "]}"))
-                .andExpect(status().isOk())
-                // 자리는 그대로다 — 첫 줄이 이른 시각, 둘째 줄이 늦은 시각
-                .andExpect(jsonPath("$.blocks[1].startTime").value(firstTime))
-                .andExpect(jsonPath("$.blocks[2].startTime").value(secondTime))
-                // 그 자리에 들어간 블록만 바뀐다
-                .andExpect(jsonPath("$.blocks[1].id").value(secondId))
-                .andExpect(jsonPath("$.blocks[2].id").value(firstId));
-    }
-
     @Test
     void 소유권과_재생성contestId를_검증하고_삭제한다() throws Exception {
         long ownerId = insertUser("소유러너", "owner-runner");

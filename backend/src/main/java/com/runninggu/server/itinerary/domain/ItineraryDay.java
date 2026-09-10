@@ -15,7 +15,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -110,12 +109,6 @@ public class ItineraryDay {
                 .map(ItineraryBlock::getOrderNo)
                 .sorted()
                 .toList();
-        // **시각도 슬롯이다.** 자리의 시각을 모아 두었다가 새 순서대로 다시 나눠 준다 —
-        // 블록을 위로 올리면 그 자리의 이른 시각을 받는다(#319).
-        List<LocalTime> userTimes = userBlocks.stream()
-                .sorted(Comparator.comparingInt(ItineraryBlock::getOrderNo))
-                .map(ItineraryBlock::getStartTime)
-                .toList();
         List<Integer> raceSlots = blocks.stream()
                 .filter(block -> block.getBlockType() == BlockType.RACE)
                 .map(ItineraryBlock::getOrderNo)
@@ -133,7 +126,6 @@ public class ItineraryDay {
         for (int index = 0; index < blockIds.size(); index++) {
             ItineraryBlock block = userBlocksById.get(blockIds.get(index));
             block.changeOrder(userSlots.get(index));
-            block.changeStartTime(userTimes.get(index));
         }
         blocks.sort(Comparator.comparingInt(ItineraryBlock::getOrderNo));
         return ReorderResult.REORDERED;

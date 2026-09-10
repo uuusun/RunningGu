@@ -116,28 +116,9 @@ object ItineraryEdits {
             if (crossesFixedBlock(day.blocks, from, to)) return@mapDay day
             val blocks = day.blocks.toMutableList()
             blocks.add(to, blocks.removeAt(from))
-            day.copy(blocks = restoreTimeSlots(day.blocks, blocks))
+            day.copy(blocks = blocks)
         }
 
-    /**
-     * **시각은 자리에 붙는다.** 옮긴 뒤에도 각 줄의 시각은 원래 그 자리의 것이다. (#319)
-     *
-     * 예전에는 시각이 블록을 따라다녀서 `17:00` 일정을 위로 올려도 `17:00` 이었다.
-     * 사용자가 읽는 것은 "그 자리의 시각" 이라 순서를 바꾸면 시각도 자리를 따라야 한다.
-     *
-     * **대회 블록은 제 시각을 지킨다** — 대회 시작 시각은 우리가 정하는 값이 아니다.
-     * 서버 `reorder` 도 같은 규칙이다(`ItineraryDay.reorderUserBlocks`).
-     */
-    private fun restoreTimeSlots(
-        before: List<ItineraryBlock>,
-        after: List<ItineraryBlock>,
-    ): List<ItineraryBlock> {
-        val slots = before.filter { canEdit(it) }.map { it.time }
-        var next = 0
-        return after.map { block ->
-            if (canEdit(block) && next < slots.size) block.copy(time = slots[next++]) else block
-        }
-    }
 
     /**
      * 블록 하나의 시각을 바꾸고 **시각순으로 다시 세운다.** (#319)
