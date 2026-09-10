@@ -23,6 +23,7 @@ runs:
     - name: Validate EC2 Compose model
       env:
         DB_PASSWORD: compose-config-check
+        PGBACKREST_REPO1_PATH: /runninggu/compose-check
         PGBACKREST_S3_BUCKET: runninggu-compose-check
         PGBACKREST_S3_KMS_KEY_ID: arn:aws:kms:ap-northeast-2:000000000000:key/compose-check
         PGBACKREST_S3_ROLE: runninggu-compose-check
@@ -39,7 +40,7 @@ runs:
         docker compose \
           -f compose.recovery.yaml \
           config --format json > build-compose-recovery.json
-        python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
+        python3 -c 'import json; d=json.load(open("build-compose-recovery.json", encoding="utf-8")); s=d["services"]["postgres"]; assert not s.get("ports"); assert "archive_mode=off" in s["command"]; assert s["environment"]["PGBACKREST_REPO1_PATH"]=="/runninggu/compose-check"; assert any(v["target"]=="/var/lib/postgresql/data" and v["type"]=="volume" for v in s["volumes"]); assert any(v["target"]=="/etc/pgbackrest/pgbackrest.conf" and v["read_only"] for v in s["volumes"])'
 
     - name: Validate backup monitoring assets
       shell: bash
