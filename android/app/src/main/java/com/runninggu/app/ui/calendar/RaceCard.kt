@@ -33,7 +33,7 @@ import com.runninggu.app.ui.theme.Ink4
 import com.runninggu.app.ui.theme.Ink5
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
-import com.runninggu.app.ui.common.ElevationLine
+import com.runninggu.app.ui.common.DecorativeElevationStrip
 import com.runninggu.app.ui.theme.Ink3
 import com.runninggu.app.ui.theme.NumeralLabel
 import com.runninggu.app.ui.theme.NumeralLarge
@@ -154,9 +154,11 @@ fun RaceCard(
                     }
                 }
 
-                // 코스 고도 스트립. (목업 .racerow .elevline)
+                // **장식이다. 이 대회의 실제 고도가 아니다.** (목업 `.racerow .elevline`)
+                // 목업도 씨앗에서 만든 곡선이고 `aria-hidden="true"` 가 붙어 있다.
+                // 대회 코스 고도 API 가 생기면 `ElevationLine` 으로 바꾼다(#326).
                 Spacer(Modifier.height(9.dp))
-                ElevationLine(
+                DecorativeElevationStrip(
                     seed = race.id.hashCode(),
                     closed = closed,
                     modifier = Modifier.fillMaxWidth().height(28.dp),

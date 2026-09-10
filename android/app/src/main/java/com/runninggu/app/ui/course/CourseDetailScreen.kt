@@ -174,9 +174,8 @@ private fun Content(detail: SavedCourseDetail) {
                 )
                 Spacer(Modifier.height(8.dp))
                 ElevationLine(
-                    seed = course.id.toInt(),
-                    closed = false,
                     profile = profile,
+                    closed = false,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(72.dp),
