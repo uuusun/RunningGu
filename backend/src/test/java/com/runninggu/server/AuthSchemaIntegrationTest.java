@@ -2,18 +2,30 @@ package com.runninggu.server;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
 class AuthSchemaIntegrationTest extends PostgreSqlContainerSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @BeforeEach
     void reset() {
@@ -39,6 +51,31 @@ class AuthSchemaIntegrationTest extends PostgreSqlContainerSupport {
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> insertEmailIdentity(secondUser, "runner@example.com"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void DB_제약오류의_이메일을_Hibernate_로그에_남기지_않는다(CapturedOutput output) {
+        String privateEmail = "db-log-private-user@example.test";
+        long firstUser = insertUser("로그첫째", "로그첫째");
+        long secondUser = insertUser("로그둘째", "로그둘째");
+        insertEmailIdentity(firstUser, privateEmail);
+
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(ignored ->
+                entityManager.createNativeQuery(
+                                """
+                                INSERT INTO login_identity(
+                                    user_id, provider, provider_subject, password_hash,
+                                    email_verified_at, created_at)
+                                VALUES (:userId, 'EMAIL', :email, 'password-hash',
+                                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                """)
+                        .setParameter("userId", secondUser)
+                        .setParameter("email", privateEmail)
+                        .executeUpdate()))
+                .isInstanceOf(RuntimeException.class);
+
+        org.assertj.core.api.Assertions.assertThat(output.getAll())
+                .doesNotContain(privateEmail);
     }
 
     @Test

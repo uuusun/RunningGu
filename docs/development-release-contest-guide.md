@@ -450,7 +450,11 @@ cd ..\backend
   - 추가 [읽기 전용 검증](deploy/evidence/api-readonly-boundaries-20260904.md): 공개·미인증 경계 14항목 2회 및 앱 재시작 후 GET `/me` 200 확인. 마케팅 결함은 민지 태그 이슈 #287로 분리했으며, 두 번째 계정·재설정·전체 혼합 부하는 여전히 미완료
   - 같은 후속 기록에서 두 번째 정상 가입도 확인했다. 테스트 계정 2개가 준비됐으며, 데이터 분리·제한된 쓰기·재설정·전체 혼합 부하는 계속 미완료다
   - 2026-09-10 AWS SES 프로덕션 액세스 미승인으로 Resend로 전환했다. `runninggu.store` 도메인과 STARTTLS 연결을 확인하고, 스테이징에서 가입 인증은 204, 비밀번호 재설정 요청은 202, 두 발송 모두 Resend `Delivered` 상태를 확인했다. 받은편지함 확인과 인증 코드·재설정 링크의 끝까지 E2E는 남아 있어 체크는 유지한다. [전환 기록](deploy/evidence/resend-smtp-staging-20260910.md)을 따른다
-- [ ] 로그에 토큰·비밀번호·이메일·좌표가 없는지 샘플 검사
+- [ ] 로그에 토큰·비밀번호·이메일·좌표가 없는지 표식 검사
+  - 예외 원문 제거, Hibernate 제약 오류 로그 차단, nginx 최소 접속 로그와 실서버 표식
+    검사기를 적용한다. 자동 테스트와 로컬 설정 검사가 끝난 뒤 staging·운영의 nginx 파일 및
+    backend/nginx journal에서 `forbiddenMatches=0`과 최근 보존 로그의 일반 민감정보 패턴
+    0건을 각각 확인해야 체크한다. [로컬 구현·검증 기록](deploy/evidence/server-log-privacy-local-20260910.md)
 - [x] **nginx 파일 로그 14일 정책 적용(2026-09-07):** 저장소 관리 logrotate 정책(`daily`, `rotate 14`, `maxage 14`, 압축, `0640`)을 `/etc/logrotate.d/nginx`에 설치하고 `nginx -t`, timer·1회 실행, 현재 파일 권한, HTTPS API를 확인했다. [적용 기록](deploy/evidence/nginx-log-location-audit-20260907.md)을 따른다(결정-61)
 - [ ] 장애 감지·담당자 알림·운영사무국 심사 기간 대응 체계 확정
 - [ ] 배포 직전 DB 백업과 직전 앱/서버 artifact 보관

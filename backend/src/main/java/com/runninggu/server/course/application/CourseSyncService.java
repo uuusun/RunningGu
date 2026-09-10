@@ -116,11 +116,12 @@ public class CourseSyncService {
             return CourseSyncResult.failed(bundle.courses().size());
         } catch (RuntimeException exception) {
             long durationMs = Duration.between(startedAt, clock.instant()).toMillis();
+            // 공급자 예외 원문에는 요청 URL과 좌표가 포함될 수 있다. (SPEC §9.4)
             log.error(
-                    "두루누비 메타 동기화 중 내부 오류가 발생해 기존 snapshot을 유지합니다. bundleCount={} durationMs={}",
+                    "두루누비 메타 동기화 중 내부 오류가 발생해 기존 snapshot을 유지합니다. bundleCount={} durationMs={} exceptionType={}",
                     bundle.courses().size(),
                     durationMs,
-                    exception);
+                    exception.getClass().getName());
             return CourseSyncResult.failed(bundle.courses().size());
         }
     }

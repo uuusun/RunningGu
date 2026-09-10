@@ -131,6 +131,9 @@ assets.srcDir(rootProject.file("../docs/agreements"))
 
 ### 활성화를 막는 최종 확인
 
+- [ ] 백엔드 예외 원문 제거와 nginx 최소 접속 로그를 운영 환경에 적용하고, 가짜 이메일·
+      좌표·토큰 표식 및 최근 보존 로그의 일반 민감정보 패턴이 nginx 파일·backend/nginx
+      journal에서 0건인지 확인했다
 - [ ] #227의 인증·세션 정리와 탈퇴 데이터 복구 절차가 구현·검증됐다
 - [ ] #228의 A2 별도 체크박스, 두 가입 API `ageOver14` 검증, 가입 `CODE_EXPIRED`의
       `mustResend=true`·재발송 안내가 구현·검증됐다
