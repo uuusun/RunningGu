@@ -53,7 +53,10 @@ mkdir -p -- "$graph_root"
 graph_root=$(readlink -f -- "$graph_root")
 case "$graph_root" in ""|/) echo "graph root가 안전하지 않습니다." >&2; exit 1 ;; esac
 
-descriptor="$repository_root/backend/graphhopper/graph-release.json"
+case "$GRAPHHOPPER_ENVIRONMENT" in
+  staging) descriptor="$repository_root/backend/graphhopper/graph-release.json" ;;
+  production) descriptor="$repository_root/backend/graphhopper/graph-release.production.json" ;;
+esac
 verifier="$repository_root/scripts/osm/import/verify-artifact.sh"
 [ -r "$descriptor" ] || { echo "release descriptor가 없습니다: $descriptor" >&2; exit 1; }
 [ -x "$verifier" ] || { echo "artifact 검증기를 실행할 수 없습니다: $verifier" >&2; exit 1; }

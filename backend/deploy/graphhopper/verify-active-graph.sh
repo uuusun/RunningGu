@@ -32,8 +32,13 @@ active_dir=$(readlink -f -- "$current")
 [ "$active_dir" = "$graph_root/$artifact_id" ] || { echo "current가 graph root 밖을 가리킵니다." >&2; exit 1; }
 [ -d "$active_dir" ] || { echo "활성 graph directory가 없습니다." >&2; exit 1; }
 
-descriptor="$repository_root/backend/graphhopper/graph-release.json"
+case "$GRAPHHOPPER_ENVIRONMENT" in
+  staging) descriptor="$repository_root/backend/graphhopper/graph-release.json" ;;
+  production) descriptor="$repository_root/backend/graphhopper/graph-release.production.json" ;;
+esac
 verifier="$repository_root/scripts/osm/import/verify-artifact.sh"
+[ -r "$descriptor" ] || { echo "release descriptor가 없습니다: $descriptor" >&2; exit 1; }
+[ -x "$verifier" ] || { echo "artifact 검증기를 실행할 수 없습니다: $verifier" >&2; exit 1; }
 "$verifier" \
   --manifest "$active_dir/graph-manifest.json" \
   --graph-dir "$active_dir" \
