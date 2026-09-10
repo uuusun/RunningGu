@@ -53,6 +53,12 @@ sudo install -m 0640 -o root -g runninggu \
 생성한다. 값은 명령 인자·shell history·Git·CI·문서에 남기지 않는다. 두 env 파일의
 `DB_PASSWORD`만 같은 값을 사용한다.
 
+운영 비밀값은 고객 관리형 KMS key로 암호화한 Parameter Store `SecureString`으로 보관한다.
+경로는 `/runninggu/production/<name>`으로 제한하며, EC2 role이 복호화해 접근 제한된 env 파일을
+만든 뒤 애플리케이션을 시작한다. 현재 이름은 `db-password`, `jwt-secret`, `smtp-password`,
+`kto-service-key`, `kakao-rest-key`, `kakao-app-id`다. 조회 명령이나 배포 증거에는 복호화한 값을
+출력하지 않는다.
+
 ## 3. S3·KMS·IAM
 
 백업 bucket은 `runninggu-production-backup-987622176638-seoul`로 분리한다. AWS가
@@ -67,6 +73,7 @@ sudo install -m 0640 -o root -g runninggu \
 - graph 원본: `runninggu-staging-artifacts-987622176638/graphhopper/production/*` 읽기
 - 운영 백업: 운영 bucket의 `runninggu/production/*` 목록·읽기·쓰기·삭제
 - KMS: 위 key의 Encrypt·Decrypt·ReEncrypt·GenerateDataKey·DescribeKey
+- Parameter Store: `parameter/runninggu/production/*`의 GetParameter·GetParameters
 - 알림: 운영 SNS topic에 Publish
 
 정적 AWS access key는 서버에 두지 않는다. 현재 승인된 graph artifact 세 파일은 payload를

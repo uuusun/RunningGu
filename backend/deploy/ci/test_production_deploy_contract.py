@@ -63,10 +63,13 @@ class ProductionDeployContractTest(unittest.TestCase):
         serialized = json.dumps(policy, sort_keys=True)
         self.assertIn("graphhopper/production/*", serialized)
         self.assertIn("runninggu/production/*", serialized)
+        self.assertIn("parameter/runninggu/production/*", serialized)
         self.assertIn("runninggu-production-alerts", serialized)
         self.assertNotIn("graphhopper/staging/*", serialized)
         self.assertNotIn("runninggu/staging/*", serialized)
+        self.assertNotIn("parameter/runninggu/staging/*", serialized)
         self.assertNotIn('"Action": "s3:*"', serialized)
+        self.assertNotIn('"Action": "ssm:*"', serialized)
 
 
 if __name__ == "__main__":
