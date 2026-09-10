@@ -140,6 +140,98 @@ object ItineraryEdits {
     }
 
     /**
+     * 블록 하나의 시각을 바꾸고 **시각순으로 다시 세운다.** (#319)
+     *
+     * 시각을 직접 고칠 수 있으면 목록 순서와 시각이 어긋날 수 있다 — `14:30` 을 `09:00`
+     * 으로 바꿔 놓고 자리가 셋째 줄이면 읽는 사람이 헷갈린다. **시각이 정답이고 순서가
+     * 그것을 따른다.**
+     *
+     * **대회 블록은 제자리를 지킨다.** 대회 앞뒤 구간(segment)은 시스템이 고정하므로,
+     * 재정렬도 그 구간 안에서만 한다.
+     */
+    fun changeBlockTime(
+        days: List<ItineraryDay>,
+        dayIndex: Int,
+        blockId: String,
+        time: String,
+    ): List<ItineraryDay> = mapDay(days, dayIndex) { day ->
+        val target = day.blocks.firstOrNull { it.id == blockId } ?: return@mapDay day
+        if (!canEdit(target)) return@mapDay day
+        val changed = day.blocks.map { if (it.id == blockId) it.copy(time = time) else it }
+        day.copy(blocks = sortWithinSegments(changed))
+    }
+
+    /**
+     * 대회 블록으로 나뉜 구간마다 시각순 정렬. 대회 블록 자체는 자리를 지킨다.
+     *
+     * 같은 시각이 둘이면 **원래 순서를 유지**한다(안정 정렬) — 방금 고친 것이 위로
+     * 튀어 오르지 않는다.
+     */
+    private fun sortWithinSegments(blocks: List<ItineraryBlock>): List<ItineraryBlock> {
+        val result = mutableListOf<ItineraryBlock>()
+        val segment = mutableListOf<ItineraryBlock>()
+        for (block in blocks) {
+            if (canEdit(block)) {
+                segment += block
+            } else {
+                result += segment.sortedBy { it.time }
+                segment.clear()
+                result += block
+            }
+        }
+        result += segment.sortedBy { it.time }
+        return result
+    }
+
+    /**
+     * 새 블록을 넣을 시각. (#319)
+     *
+     * - **맨 끝에 붙일 때** — 마지막 시각에서 한 시간 뒤. 4개(…17:00)에 둘을 더하면
+     *   `18:00` · `19:00` 이 된다. 계약 기본값 `13:00` 을 쓰면 이미 지난 시각이 끼어든다
+     * - **사이에 넣을 때** — 앞뒤의 가운데. `12:30` 과 `14:30` 사이면 `13:30`
+     * - 넣을 자리가 첫 줄이면 그 뒤 블록보다 한 시간 앞
+     * - 비어 있으면 계약 기본값
+     *
+     * `index` 는 넣을 자리다 — `blocks.size` 면 맨 끝이다.
+     */
+    fun timeForNewBlock(blocks: List<ItineraryBlock>, index: Int): String {
+        val editable = blocks.filter { canEdit(it) }
+        if (editable.isEmpty()) return DEFAULT_NEW_BLOCK_TIME
+        val position = index.coerceIn(0, editable.size)
+        val previous = editable.getOrNull(position - 1)?.time?.let(::minutesOf)
+        val next = editable.getOrNull(position)?.time?.let(::minutesOf)
+        val minutes = when {
+            previous != null && next != null -> (previous + next) / 2
+            previous != null -> previous + ONE_HOUR_MINUTES
+            next != null -> next - ONE_HOUR_MINUTES
+            else -> return DEFAULT_NEW_BLOCK_TIME
+        }
+        return formatMinutes(minutes)
+    }
+
+    /** `HH:mm` → 자정부터의 분. 형식이 깨졌으면 null 이다. */
+    private fun minutesOf(time: String): Int? {
+        val parts = time.split(":")
+        if (parts.size != 2) return null
+        val hour = parts[0].toIntOrNull() ?: return null
+        val minute = parts[1].toIntOrNull() ?: return null
+        if (hour !in 0..23 || minute !in 0..59) return null
+        return hour * 60 + minute
+    }
+
+    /** 자정부터의 분 → `HH:mm`. 하루를 넘지 않게 자른다. */
+    private fun formatMinutes(minutes: Int): String {
+        val clamped = minutes.coerceIn(0, DAY_END_MINUTES)
+        return "%02d:%02d".format(clamped / 60, clamped % 60)
+    }
+
+    private const val ONE_HOUR_MINUTES = 60
+    private const val DAY_END_MINUTES = 23 * 60 + 59
+
+    /** 하루가 비어 있을 때 쓰는 값. 계약 기본값과 같다(§5-7). */
+    const val DEFAULT_NEW_BLOCK_TIME = "13:00"
+
+    /**
      * [from] 에서 [to] 로 가는 길에 옮길 수 없는 블록이 있는가. (API 명세 §5-10)
      *
      * 대회 블록의 위치는 시스템이 고정하므로 그 사이를 지나는 이동은 저장할 수 없다.

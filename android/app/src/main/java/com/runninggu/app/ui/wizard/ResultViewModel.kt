@@ -570,6 +570,35 @@ class ResultViewModel(
      * 시트의 검색어가 바뀌었다. **글자마다 조회하지 않는다** — 입력은 즉시 반영하고,
      * 서버 조회는 [onSheetSearch] 로 사용자가 확정할 때만 한다.
      */
+    /**
+     * 블록의 시각을 사용자가 직접 고쳤다. **고친 뒤 시각순으로 다시 선다.** (#319)
+     *
+     * 시각을 정할 수 있으면 목록 순서와 시각이 어긋날 수 있다 — `14:30` 을 `09:00` 으로
+     * 바꿔 놓고 자리는 셋째 줄이면 읽는 사람이 헷갈린다. 시각이 정답이고 순서가 따른다.
+     */
+    fun onBlockTimeChange(blockId: String, time: String) {
+        if (_uiState.value.isSavedEditing) {
+            val at = _uiState.value.activeDayIndex
+            val sorted = ItineraryEdits.changeBlockTime(daysNow(), at, blockId, time)
+            val userIds = sorted.getOrNull(at)?.blocks
+                ?.filter { !it.systemManaged }
+                ?.mapNotNull { it.id.toLongOrNull() }
+                .orEmpty()
+            savedEdit(blockId) { itineraryId, dayId, dayIndex ->
+                // 시각을 먼저 저장하고, 그 결과로 정해진 순서를 이어서 보낸다.
+                repository.updateBlock(
+                    itineraryId, dayId, blockId.toLong(), BlockPatch(startTime = time),
+                )
+                val blocks = repository.reorderBlocks(itineraryId, dayId, userIds)
+                replaceDayBlocks(dayIndex, blocks)
+            }
+            return
+        }
+        editActiveDay { days, dayIndex ->
+            ItineraryEdits.changeBlockTime(days, dayIndex, blockId, time)
+        }
+    }
+
     fun onSheetQueryChange(query: String) {
         _uiState.update { state ->
             state.copy(sheet = state.sheet?.copy(query = query))
@@ -631,6 +660,13 @@ class ResultViewModel(
                     val sending = NewBlock(
                         title = item.name,
                         category = catKey,
+                        // **계약 기본값 13:00 을 쓰지 않는다** (#319). 이미 17:00 까지 찬
+                        // 하루에 13:00 이 끼어들면 사용자가 "왜 여기로 가지" 를 겪는다.
+                        // 맨 끝에 붙으므로 마지막 시각 한 시간 뒤다.
+                        startTime = ItineraryEdits.timeForNewBlock(
+                            blocksOf(dayIndex),
+                            blocksOf(dayIndex).size,
+                        ),
                         place = place,
                         description = item.description,
                     ).normalized()
@@ -665,7 +701,10 @@ class ResultViewModel(
                     days, dayIndex,
                     ItineraryBlock(
                         id = "", // addBlock 이 새 id 를 붙인다
-                        time = ADDED_BLOCK_TIME,
+                        time = ItineraryEdits.timeForNewBlock(
+                            days[dayIndex].blocks,
+                            days[dayIndex].blocks.size,
+                        ),
                         title = item.name,
                         catKey = catKey,
                         place = place,

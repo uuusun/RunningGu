@@ -154,6 +154,16 @@ public class ItineraryGenerator {
                             picker.pick(PoiCategory.TOUR),
                             ""));
                 }
+                // **체크아웃은 11시다** — 숙소 대부분이 그 시각이라 그때 짐을 뺀다.
+                // 마지막 블록으로 두면 `17:00 체크아웃` 이 되어 실제 일정과 어긋난다(#319).
+                if (date.equals(plan.endDate())) {
+                    blocks.add(block(
+                            "11:00",
+                            "숙소 체크아웃",
+                            BlockCategory.LODGING,
+                            hotel,
+                            "짐 정리하고 나서기"));
+                }
                 blocks.add(block(
                         "12:30",
                         "로컬 점심",
@@ -167,14 +177,6 @@ public class ItineraryGenerator {
                         blockCategory(theme.category()),
                         theme.place(),
                         ""));
-                if (date.equals(plan.endDate())) {
-                    blocks.add(block(
-                            "17:00",
-                            "체크아웃·귀가",
-                            BlockCategory.LODGING,
-                            hotel,
-                            "여행 마무리"));
-                }
                 note = rule.dplus();
             }
 

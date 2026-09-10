@@ -45,10 +45,16 @@ class ItineraryGeneratorTest {
                 .containsExactly("🏁 춘천마라톤 스타트", "오후 자유 관광", "카페 한 잔", "맛집 저녁");
         assertThat(day(half, 1).blocks())
                 .extracting(GeneratedBlock::title)
-                .doesNotContain("체크아웃·귀가");
+                .doesNotContain("숙소 체크아웃");
+        // **체크아웃은 11시라 마지막이 아니라 오전과 점심 사이다** (#319).
+        // 숙소 대부분이 그 시각이고, 짐을 뺀 뒤에도 그날 일정은 이어진다.
         assertThat(day(half, 2).blocks())
                 .extracting(GeneratedBlock::title)
-                .endsWith("체크아웃·귀가");
+                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "오후 관광");
+        assertThat(day(half, 2).blocks())
+                .filteredOn(block -> block.title().equals("숙소 체크아웃"))
+                .extracting(block -> block.startTime().toString())
+                .containsExactly("11:00");
     }
 
     @Test

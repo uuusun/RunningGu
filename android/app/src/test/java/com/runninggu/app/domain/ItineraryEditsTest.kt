@@ -255,6 +255,100 @@ class ItineraryEditsTest {
         assertEquals(raceTime, after[i].blocks.first { it.blockType == BlockType.RACE }.time)
     }
 
+    // ── 시각 직접 수정 (#319) ───────────────────────────────────────────────
+
+    /** 시각을 바꾸면 **그 시각에 맞는 자리로 옮겨진다.** 시각이 정답이고 순서가 따른다. */
+    @Test
+    fun `시각을 바꾸면 시각순으로 다시 선다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val last = days[i].blocks.last { canEditIn(days[i].blocks, it) }
+
+        // 마지막 블록을 이른 시각으로 — 대회 뒤 구간의 첫 자리로 와야 한다
+        val after = ItineraryEdits.changeBlockTime(days, i, last.id, "09:05")
+
+        val userBlocks = after[i].blocks.filter { !it.systemManaged }
+        assertEquals(last.id, userBlocks.first().id)
+        assertEquals("09:05", userBlocks.first().time)
+    }
+
+    /** 대회 블록은 자리를 지킨다 — 시각순 정렬이 그 경계를 넘지 않는다. */
+    @Test
+    fun `시각을 바꿔도 대회 블록은 제자리다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceIndex = days[i].blocks.indexOfFirst { it.blockType == BlockType.RACE }
+        val target = days[i].blocks.last { !it.systemManaged }
+
+        val after = ItineraryEdits.changeBlockTime(days, i, target.id, "00:10")
+
+        assertEquals(raceIndex, after[i].blocks.indexOfFirst { it.blockType == BlockType.RACE })
+    }
+
+    /** 대회 블록의 시각은 사용자가 못 고친다. */
+    @Test
+    fun `대회 블록의 시각은 바꿀 수 없다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val race = days[i].blocks.first { it.blockType == BlockType.RACE }
+
+        val after = ItineraryEdits.changeBlockTime(days, i, race.id, "23:00")
+
+        assertEquals(race.time, after[i].blocks.first { it.blockType == BlockType.RACE }.time)
+    }
+
+    // ── 새 블록의 시각 (#319) ───────────────────────────────────────────────
+
+    /** **맨 끝에 붙이면 마지막 시각 한 시간 뒤다.** 계약 기본값 13:00 은 이미 지난 시각이다. */
+    @Test
+    fun `맨 끝에 넣으면 마지막 시각 한 시간 뒤다`() {
+        val blocks = listOf(
+            block("b1", "10:00"),
+            block("b2", "12:30"),
+            block("b3", "14:30"),
+            block("b4", "17:00"),
+        )
+
+        assertEquals("18:00", ItineraryEdits.timeForNewBlock(blocks, blocks.size))
+    }
+
+    /** 사이에 넣으면 앞뒤의 가운데다. */
+    @Test
+    fun `사이에 넣으면 앞뒤의 가운데다`() {
+        val blocks = listOf(block("b1", "12:30"), block("b2", "14:30"))
+
+        assertEquals("13:30", ItineraryEdits.timeForNewBlock(blocks, 1))
+    }
+
+    /** 첫 줄에 넣으면 그 뒤 블록보다 한 시간 앞이다. */
+    @Test
+    fun `첫 줄에 넣으면 뒤 블록보다 한 시간 앞이다`() {
+        val blocks = listOf(block("b1", "12:30"))
+
+        assertEquals("11:30", ItineraryEdits.timeForNewBlock(blocks, 0))
+    }
+
+    /** 하루가 비어 있으면 계약 기본값이다. */
+    @Test
+    fun `비어 있으면 계약 기본값이다`() {
+        assertEquals(
+            ItineraryEdits.DEFAULT_NEW_BLOCK_TIME,
+            ItineraryEdits.timeForNewBlock(emptyList(), 0),
+        )
+    }
+
+    private fun block(id: String, time: String) = ItineraryBlock(
+        id = id,
+        time = time,
+        title = id,
+        catKey = BlockCategory.TOUR,
+        place = null,
+        desc = "",
+    )
+
+    private fun canEditIn(blocks: List<ItineraryBlock>, block: ItineraryBlock) =
+        ItineraryEdits.canEdit(block)
+
     @Test
     fun `사용자 블록은 대회 블록을 넘어갈 수 없다`() {
         // 계약이 대회 블록의 고정 위치를 넘는 요청을 `409 SYSTEM_BLOCK_IMMUTABLE` 로

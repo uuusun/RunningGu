@@ -45,6 +45,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -303,6 +304,7 @@ private fun ResultContent(
                     onMoveBlock = viewModel::onMoveBlock,
                     onReplaceBlock = viewModel::onReplaceBlock,
                     onAddPlace = viewModel::onAddPlace,
+                    onTimeChange = viewModel::onBlockTimeChange,
                 )
             }
 
@@ -336,6 +338,7 @@ private fun Content(
     onMoveBlock: (Int, Int) -> Unit,
     onReplaceBlock: (ItineraryBlock) -> Unit,
     onAddPlace: () -> Unit,
+    onTimeChange: (String, String) -> Unit,
 ) {
     // 스와이프로 삭제 버튼을 연 행. 화면에 하나만 열려 있고, 바깥을 건드리면 닫힌다.
     var openedBlockId by remember(state.isEditing) { mutableStateOf<String?>(null) }
@@ -524,6 +527,9 @@ private fun Content(
                                 onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
                                 onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
                                 onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
+                                onTimeChange = { id, time ->
+                                    if (!state.editInFlight) onTimeChange(id, time)
+                                },
                             )
                             Spacer(Modifier.height(10.dp))
                             AddPlaceButton(onClick = onAddPlace, enabled = !state.editInFlight)
@@ -750,6 +756,7 @@ internal fun EditList(
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
+    onTimeChange: (String, String) -> Unit = { _, _ -> },
 ) {
     // 드래그 제스처 코루틴이 여러 리컴포지션에 걸쳐 살아 있으므로 최신 목록을 State 로 읽는다.
     val blocks by rememberUpdatedState(day.blocks)
@@ -767,6 +774,20 @@ internal fun EditList(
      * 방금 옮긴 것을 도로 되돌릴 수 있다.
      */
     var pendingMoveFrom by remember { mutableIntStateOf(NO_PENDING_MOVE) }
+
+    /** 시각을 고치는 중인 블록. null 이면 다이얼로그가 닫혀 있다. (#319) */
+    var editingTimeOf by remember { mutableStateOf<ItineraryBlock?>(null) }
+
+    editingTimeOf?.let { target ->
+        TimePickerDialog(
+            initial = target.time,
+            onDismiss = { editingTimeOf = null },
+            onConfirm = { time ->
+                editingTimeOf = null
+                onTimeChange(target.id, time)
+            },
+        )
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         day.blocks.forEachIndexed { index, block ->
@@ -899,7 +920,16 @@ internal fun EditList(
                                 },
                                 maxLines = 1,
                                 // 고정 폭이라 자릿수가 달라도 아래 행과 줄이 맞는다.
-                                modifier = Modifier.width(TIME_SLOT_WIDTH),
+                                // 누르면 시각을 직접 고친다 — 대회 블록은 못 고친다(#319).
+                                modifier = Modifier
+                                    .width(TIME_SLOT_WIDTH)
+                                    .then(
+                                        if (editable) {
+                                            Modifier.clickable { editingTimeOf = block }
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
                             )
                             Spacer(Modifier.width(8.dp))
 
@@ -1108,6 +1138,73 @@ private fun DragGrip(
                 }
             },
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * 시각을 숫자로 고치는 다이얼로그. (#319)
+ *
+ * **`TimePicker` 대신 숫자 입력이다.** 시·분을 돌리는 다이얼은 `18:30` 처럼 30분 단위를
+ * 맞추는 데 손이 많이 간다. 여기 값들은 대부분 정각·30분이라 키패드가 빠르다.
+ *
+ * 확인은 `HH:mm` 이 될 때만 열린다 — 잘못된 값을 넣고 닫으면 그 값이 그대로 서버로 간다.
+ */
+@Composable
+private fun TimePickerDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var hour by remember { mutableStateOf(initial.substringBefore(":", "13")) }
+    var minute by remember { mutableStateOf(initial.substringAfter(":", "00")) }
+    val valid = hour.toIntOrNull()?.let { it in 0..23 } == true &&
+        minute.toIntOrNull()?.let { it in 0..59 } == true
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("시각 바꾸기") },
+        text = {
+            Column {
+                Text(
+                    "시각을 바꾸면 그 시각에 맞는 자리로 옮겨져요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = hour,
+                        onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) hour = it },
+                        modifier = Modifier.width(84.dp),
+                        singleLine = true,
+                        label = { Text("시") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Text(
+                        "  :  ",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    OutlinedTextField(
+                        value = minute,
+                        onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) minute = it },
+                        modifier = Modifier.width(84.dp),
+                        singleLine = true,
+                        label = { Text("분") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm("%02d:%02d".format(hour.toInt(), minute.toInt()))
+                },
+                enabled = valid,
+            ) { Text("확인") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
 }
 
