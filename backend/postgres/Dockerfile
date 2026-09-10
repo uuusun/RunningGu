@@ -4,6 +4,7 @@ ARG PGBACKREST_VERSION=2.55.1-1
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
         "pgbackrest=${PGBACKREST_VERSION}" \
     && pgbackrest version \
     && install -d -o postgres -g postgres -m 0750 \

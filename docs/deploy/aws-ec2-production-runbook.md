@@ -101,6 +101,16 @@ sudo install -m 0640 -o root -g runninggu \
 EC2에서 소스를 빌드하거나, 검증 전 graph symlink를 수동으로 우회하거나, PostgreSQL volume을
 지우는 `docker compose down -v`를 실행하지 않는다.
 
+pgBackRest의 `pg1-user`는 Compose의 고정 DB 역할 `runninggu`와 같아야 한다. 공식 PostgreSQL
+이미지는 `POSTGRES_USER=runninggu`일 때 `postgres` 역할을 별도로 만들지 않으므로, 이 값을
+생략하면 첫 `stanza-create`가 `role "postgres" does not exist`로 실패한다.
+PostgreSQL 이미지에는 S3 TLS 인증서를 검증할 `ca-certificates`도 포함한다. 인증서 검증을 끄는
+설정으로 우회하지 않는다.
+
+복구 전용 `/etc/runninggu/recovery-compose.env`에도
+`PGBACKREST_REPO1_PATH=/runninggu/production`을 명시한다. 복구 Compose는 이 값을 필수로 받아
+staging 백업을 운영 복구 리허설에 잘못 사용하는 것을 막는다.
+
 ## 5. DNS·Nginx·TLS
 
 가비아 DNS에 `api` A 레코드 `3.37.39.89`를 추가한다. 외부 DNS 전파가 확인되기 전에는

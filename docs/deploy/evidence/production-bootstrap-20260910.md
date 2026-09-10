@@ -1,7 +1,7 @@
 # 운영 EC2 부트스트랩 증거 — 2026-09-10
 
-> 상태: **기반 자원·호스트 설치 완료, 애플리케이션 배포 전**. 운영 DNS, 외부 API 키,
-> 정식 `develop`/`main` CI artifact가 준비되기 전에는 백엔드와 데이터베이스를 시작하지 않는다.
+> 상태: **기반 자원·PostgreSQL·GraphHopper·백업/복구 리허설 완료, Spring Boot 공개 전**.
+> 운영 DNS와 외부 API 운영 키, 로그 보안 변경이 머지되기 전에는 Spring Boot를 시작하지 않는다.
 
 ## 자원 정리와 운영 자원
 
@@ -32,7 +32,8 @@
 - Resend에는 `runninggu.store` 전송만 허용한 운영 전용 Sending key를 생성했다.
 - 세 값은 지정 KMS key를 쓰는 Parameter Store `SecureString`으로 저장했다. 경로 이름만
   `/runninggu/production/db-password`, `jwt-secret`, `smtp-password`로 기록하고 값은 출력하지 않았다.
-- 운영 SNS topic `runninggu-production-alerts`를 만들었다. 이메일 구독은 확인 메일 승인 대기다.
+- 운영 SNS topic `runninggu-production-alerts`를 만들었다. 이메일 구독 상태 `Confirmed` 1건과
+  시험 알림 전송·수신을 확인했다.
 - AWS Budget `runninggu-production-monthly`를 월 USD 70, 비용 필터
   `Environment=production`으로 만들었다. 실제 비용 80%, 예상 비용 100% 알림 두 건을 확인했다.
 
@@ -55,15 +56,31 @@ SSM `683ba0c8-44ae-4d72-a51c-1217ee3bbdba`로 다음 버전을 설치했다.
 - 호스트 SSH service·socket을 중지·비활성·mask했다. 확인 시 외부 listener는 80번뿐이었다.
 - Nginx는 ACME challenge 경로 외 요청을 404로 거부한다. 외부 `http://3.37.39.89/`도 HTTP 404였다.
 
+## CI 산출물·DB·그래프·복구 리허설
+
+- `develop` push CI가 성공한 exact commit `da4799089b9cf774adf89ef590cadde83b644eb5`의
+  backend artifact를 내려받아 네 파일의 `SHA256SUMS`를 확인하고 운영 서버에 설치했다.
+- 운영 PostgreSQL은 loopback에서 healthy다. 최초 `stanza-create`에서 확인한 DB 역할·TLS CA
+  누락은 PR #331의 설정을 운영 서버에 임시 적용해 바로잡았고, full backup·WAL archive·
+  `pgbackrest check`가 성공했다. 운영 S3 객체가 고객 관리형 KMS로 암호화된 것도 확인했다.
+- 승인된 GraphHopper artifact를 production prefix에서 설치했고 route readiness와 systemd active를
+  확인했다. backup·WAL 감시 timer도 active다.
+- SSM `76654c7a-109d-4247-9cc3-13c08226c600`과
+  `38a8cca8-e07f-4ba2-b00d-479c746bc0cd`로 full backup을
+  `runninggu-recovery` 전용 볼륨에 복원했다. 복원 DB는 `runninggu`, recovery 종료 상태 `false`,
+  public table 0개로 확인됐다. 운영 DB 볼륨 이름이 바뀌지 않은 것을 확인한 뒤 복구 컨테이너·
+  네트워크·볼륨·임시 환경 파일을 삭제했고 운영 PostgreSQL health가 유지됐다.
+- 운영 Nginx HTTP bootstrap에 URI·query·Host·User-Agent를 기록하지 않는 최소 로그 형식을
+  적용했다. 가짜 이메일·좌표 요청의 시험 표식 0건과 method allowlist 기록을 확인했다.
+
 ## 아직 완료하지 않은 항목
 
-1. SNS 구독 확인 메일 승인과 시험 알림 실제 수신
-2. 가비아 `api.runninggu.store` A record를 EIP로 연결
-3. 운영 전용 KTO service key, Kakao app·REST key·app ID 발급과 SecureString 저장
-4. 이 배포 변경 PR을 리뷰·머지한 뒤 성공한 `develop` 또는 `main` push CI의 exact commit
-   artifact 설치
-5. 운영 env 생성, PostgreSQL·pgBackRest·GraphHopper·Spring Boot systemd 시작
-6. Flyway·Importer, 내부 readiness, DNS 전파, TLS 발급과 외부 API smoke
-7. 최초 full backup·WAL archive·복구 목록·재부팅 자동 복구·실패 알림 검증
+1. 가비아 `api.runninggu.store` A record를 EIP로 연결
+2. 운영 KTO service key 정책 확정, Kakao app·REST key·app ID 발급과 SecureString 저장
+3. PR #331과 로그 보안 PR #332를 리뷰·머지한 뒤 성공한 `develop` 또는 `main` push CI의 exact
+   commit artifact로 임시 운영 설정을 교체
+4. Flyway·Importer와 Spring Boot 시작, 내부 readiness 확인
+5. DNS 전파, TLS 발급, 외부 API·포트·문서 비활성·로그 개인정보 smoke
+6. 재부팅 자동 복구와 실제 실패 알림 검증
 
 PR head artifact는 staging 전용 계약이므로 운영 서버에 설치하지 않는다.
