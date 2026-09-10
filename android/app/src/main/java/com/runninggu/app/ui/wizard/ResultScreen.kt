@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -492,50 +493,20 @@ private fun Content(
                 // 것은 화면에 그대로 있다 — 무엇이 안 됐는지 계속 보여야 다시 누를지
                 // 판단한다.
                 //
-                // **이 배치는 테스트가 안 지킨다.** `if (state.isEditing)` 안으로
-                // 도로 넣어도 단위 테스트 11개가 다 통과한다 — 상태는 그대로고
-                // 그리는 자리만 바뀌기 때문이다(#311 리뷰 · 민지님 · 이슈 #315).
-                if (state.editInFlight || state.editError != null) {
-                    item(key = "savedEditStatus") {
-                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                            Spacer(Modifier.height(8.dp))
-                            state.editError?.let { SavedEditError(it) }
-                                ?: Text(
-                                    text = "고치는 중이에요…",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                        }
-                    }
-                }
+                // 배치 자체는 [savedEditSection] 안에 갇혀 있고 계측이 지킨다(#315).
+                savedEditSection(
+                    state = state,
+                    day = day,
+                    openedBlockId = openedBlockId,
+                    onOpenedChange = { openedBlockId = it },
+                    onRemoveBlock = onRemoveBlock,
+                    onMoveBlock = onMoveBlock,
+                    onReplaceBlock = onReplaceBlock,
+                    onAddPlace = onAddPlace,
+                    onTimeChange = onTimeChange,
+                )
 
-                if (state.isEditing) {
-                    // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
-                    // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
-                    // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
-                    item(key = "editList") {
-                        Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                            EditNotice()
-
-                            Spacer(Modifier.height(10.dp))
-                            // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
-                            // 반응하면 "됐다" 로 읽힌다
-                            EditList(
-                                day = day,
-                                openedId = openedBlockId,
-                                onOpenedChange = { openedBlockId = it },
-                                onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
-                                onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
-                                onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
-                                onTimeChange = { id, time ->
-                                    if (!state.editInFlight) onTimeChange(id, time)
-                                },
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            AddPlaceButton(onClick = onAddPlace, enabled = !state.editInFlight)
-                        }
-                    }
-                } else {
+                if (!state.isEditing) {
                     item(key = "dayNote") {
                         Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
                             DayNote(day.note)
@@ -692,6 +663,71 @@ private fun RecoveryDot() {
     )
 }
 
+/**
+ * 저장 동선 편집의 **안내와 편집 목록**. 순서와 조건이 여기 갇혀 있다.
+ *
+ * **안내가 `isEditing` 밖에 있는 것이 핵심이다.** `[완료]` 는 요청 중에도 눌리는데,
+ * 안내가 편집 모드 안에 있으면 **완료 화면에서 실패가 안 보인다** — 서버에는 안 갔는데
+ * 사용자는 됐다고 믿는다(#311 리뷰 · 선경님).
+ *
+ * **이 배치는 단위 테스트가 못 지킨다.** 안으로 도로 넣어도 상태는 그대로라 VM 테스트가
+ * 볼 것이 없다 — 실제로 되돌려도 전부 통과했다. 그래서 `ResultScreen` 에서 이 함수만
+ * 떼어 냈다. ViewModel 을 세우지 않고 `LazyColumn` 에 넣어 그릴 수 있어서 계측이
+ * 배치를 지킨다(#315 · `EditListAccessibilityTest`).
+ */
+internal fun LazyListScope.savedEditSection(
+    state: ResultUiState,
+    day: ItineraryDay,
+    openedBlockId: String?,
+    onOpenedChange: (String?) -> Unit,
+    onRemoveBlock: (String) -> Unit,
+    onMoveBlock: (Int, Int) -> Unit,
+    onReplaceBlock: (ItineraryBlock) -> Unit,
+    onAddPlace: () -> Unit,
+    onTimeChange: (String, String) -> Unit,
+) {
+    if (state.editInFlight || state.editError != null) {
+        item(key = "savedEditStatus") {
+            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                Spacer(Modifier.height(8.dp))
+                state.editError?.let { SavedEditError(it) }
+                    ?: Text(
+                        text = "고치는 중이에요…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+            }
+        }
+    }
+
+    if (state.isEditing) {
+        // **편집 목록은 쪼개지 않는다.** 편집 중에는 지도 동기화가 멈추므로(§4.10)
+        // 행 단위로 보일 필요가 없고, 드래그·스와이프가 한 목록 안에서 서로를
+        // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
+        item(key = "editList") {
+            Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
+                EditNotice()
+
+                Spacer(Modifier.height(10.dp))
+                // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
+                // 반응하면 "됐다" 로 읽힌다
+                EditList(
+                    day = day,
+                    openedId = openedBlockId,
+                    onOpenedChange = onOpenedChange,
+                    onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
+                    onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
+                    onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
+                    onTimeChange = { id, time -> if (!state.editInFlight) onTimeChange(id, time) },
+                )
+                Spacer(Modifier.height(10.dp))
+                AddPlaceButton(onClick = onAddPlace, enabled = !state.editInFlight)
+            }
+        }
+    }
+}
+
+
 /** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
 @Composable
 private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Unit)?) {
@@ -756,7 +792,7 @@ internal fun EditList(
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
-    onTimeChange: (String, String) -> Unit = { _, _ -> },
+    onTimeChange: (String, String) -> Unit,
 ) {
     // 드래그 제스처 코루틴이 여러 리컴포지션에 걸쳐 살아 있으므로 최신 목록을 State 로 읽는다.
     val blocks by rememberUpdatedState(day.blocks)

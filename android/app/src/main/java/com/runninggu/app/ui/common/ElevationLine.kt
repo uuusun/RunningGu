@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -17,7 +18,7 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 /**
- * 대회 카드의 코스 고도 스트립. (목업 v2 `.elev`)
+ * **실제 고도**를 그리는 선. (목업 v2 `.elev`)
  *
  * ```
  * .elev .line { stroke: var(--blue); stroke-width: 2 }
@@ -25,19 +26,52 @@ import kotlin.math.sin
  * .elev.closed .line { stroke:#C9CBD1 }  .elev.closed .area { fill:#F1F1F2 }
  * ```
  *
- * 코스 고도 API가 아직 없으므로 [seed]로 결정적인 능선을 만든다 — 같은 대회는 항상 같은
- * 모양이라 목록을 다시 그려도 흔들리지 않는다.
+ * **[profile] 이 필수다.** 예전에는 `null` 이면 [seed] 로 사인파를 그리는 폴백이 있었는데,
+ * 그 폴백이 있는 줄 모르고 부른 화면에서 **코스와 무관한 능선이 「고도」 라벨 아래 그려졌다**
+ * (#316). 장식이 필요한 자리는 [DecorativeElevationStrip] 을 쓴다 — 이름이 갈라져 있으면
+ * 같은 사고가 다시 안 난다(#326).
  *
  * @param profile **0..1 로 정규화한** 높이. 미터 원값을 그대로 넘기면 안 된다 —
  *  [elevationUnitProfile] 로 옮겨서 넘긴다. `1f - v` 가
- *  음수가 되어 캔버스 밖에 그려진다. 실제 고도 배열을 쓰는 쪽에서 최소·최대로 나눠 넘긴다.
+ *  음수가 되어 캔버스 밖에 그려진다.
  */
 @Composable
 fun ElevationLine(
+    profile: List<Float>,
+    closed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    ElevationCanvas(points = profile, closed = closed, modifier = modifier)
+}
+
+/**
+ * **장식용 능선 스트립.** 실제 고도가 아니다. (목업 v2 `.racerow .elevline`)
+ *
+ * 대회 카드가 쓴다. 목업도 `elevStrip(SEEDS[c.id] || 3, …)` 로 **씨앗에서 만든 곡선**이고,
+ * 거기에 **`aria-hidden="true"` 가 붙어 있다** — 목업 저자가 "정보가 아니라 장식" 이라고
+ * 표시한 것이다. 그래서 여기도 접근성 트리에서 뺀다.
+ *
+ * **대회 코스 고도 API 는 없다.** 생기면 이 자리를 [ElevationLine] 으로 바꾼다.
+ */
+@Composable
+fun DecorativeElevationStrip(
     seed: Int,
     closed: Boolean,
     modifier: Modifier = Modifier,
-    profile: List<Float>? = null,
+) {
+    ElevationCanvas(
+        points = generateProfile(seed, SAMPLE_COUNT),
+        closed = closed,
+        // 스크린 리더가 읽을 것이 없다 — 목업의 `aria-hidden="true"` 와 같다
+        modifier = modifier.clearAndSetSemantics { },
+    )
+}
+
+@Composable
+private fun ElevationCanvas(
+    points: List<Float>,
+    closed: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val lineColor = if (closed) ClosedLine else Blue
     val areaColor = if (closed) ClosedArea else BlueSoft.copy(alpha = 0.9f)
@@ -45,7 +79,6 @@ fun ElevationLine(
     // 범위를 벗어난 값이 와도 **레이아웃을 망가뜨리지는 않게** 자른다. 안 자르면 캔버스
     // 밖까지 칠해져서 아래 텍스트를 통째로 덮는다(실제로 겪었다 — 이슈 #100).
     Canvas(modifier = modifier.clipToBounds()) {
-        val points = profile ?: generateProfile(seed, SAMPLE_COUNT)
         if (points.size < 2) return@Canvas
 
         val stepX = size.width / (points.size - 1)

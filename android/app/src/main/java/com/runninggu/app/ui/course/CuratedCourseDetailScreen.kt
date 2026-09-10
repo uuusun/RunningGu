@@ -140,9 +140,8 @@ private fun Content(detail: CuratedCourseDetail) {
                 Text("고도", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 ElevationLine(
-                    seed = detail.courseId.hashCode(),
-                    closed = false,
                     profile = profile,
+                    closed = false,
                     modifier = Modifier.fillMaxWidth().height(72.dp),
                 )
             }
