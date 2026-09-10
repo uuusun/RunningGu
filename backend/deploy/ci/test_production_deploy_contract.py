@@ -56,6 +56,15 @@ class ProductionDeployContractTest(unittest.TestCase):
                     if key in content:
                         self.assertIn(f"{key}=\n", content + "\n")
 
+    def test_pgbackrest_connects_with_the_deployment_database_role(self):
+        compose_env = (BACKEND / "deploy/env/compose.production.env.example").read_text(encoding="utf-8")
+        pgbackrest = (BACKEND / "deploy/pgbackrest/pgbackrest.conf").read_text(encoding="utf-8")
+        postgres_image = (BACKEND / "postgres/Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("DB_USERNAME=runninggu\n", compose_env)
+        self.assertIn("pg1-user=runninggu\n", pgbackrest)
+        self.assertIn("        ca-certificates \\\n", postgres_image)
+
     def test_runtime_iam_policy_is_scoped_to_production_paths(self):
         policy = json.loads(
             (BACKEND / "deploy/aws/runninggu-production-runtime-access.json").read_text(encoding="utf-8")
