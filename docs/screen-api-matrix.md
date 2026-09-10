@@ -292,7 +292,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지. **`startTime` 은 앱이 계산해 보낸다** — 맨 끝이면 마지막 시각 한 시간 뒤다. 계약 기본값 `13:00` 은 하루가 빌 때만(#319) |
 | 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체. **`startTime` 을 보내면 이어서 §5-10 으로 순서도 맞춘다**(#319) |
 | 저장 후 삭제 | DELETE `.../blocks/{blockId}` | 204 | PostgreSQL | RACE는 409 |
-| 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409. **서버가 시각도 자리에 맞춰 다시 매긴다**(#319) |
+| 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409. **시각은 블록을 따라간다** — 순서만 바뀌고 서버가 시각을 다시 매기지 않는다(#319 · 드래그 재배치는 #335) |
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
 | Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
 | 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
