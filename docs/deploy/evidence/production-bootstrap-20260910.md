@@ -31,8 +31,9 @@
 - 운영 DB password와 JWT secret을 새로 생성했다.
 - Resend에는 `runninggu.store` 전송만 허용한 운영 전용 Sending key를 생성했다.
 - 운영 Kakao 앱 `런닝구 운영`을 만들고 운영 전용 REST key·app ID를 저장했다.
-- KTO service key는 2026-09-10 운영 결정에 따라 staging과 공유했다. 원문을 출력하지 않고
-  staging 서버에서 KMS로 암호화해 전달했으며, 두 환경의 호출 쿼터를 합산 관리한다.
+- KTO service key는 결정-63에 따라 staging과 공유했다. 원문을 출력하지 않고 staging 서버에서
+  KMS로 암호화해 전달했으며, 두 환경의 호출 쿼터를 합산 관리한다. 운영계정 승인 뒤 실제
+  쿼터와 별도 키 발급 가능 여부를 확인해 필요하면 환경별 키로 분리한다.
 - 여섯 값은 지정 KMS key를 쓰는 Parameter Store `SecureString`으로 저장했다. 경로 이름만
   `/runninggu/production/db-password`, `jwt-secret`, `smtp-password`, `kto-service-key`,
   `kakao-rest-key`, `kakao-app-id`로 기록하고 값은 출력하지 않았다.
