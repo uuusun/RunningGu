@@ -284,15 +284,15 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 |---|---|---|---|---|
 | 새 결과 표시 | 로컬 | generate DTO | 저장 전 없음 | 날짜 탭, 지도 핀, 회복 배지 |
 | POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | `provider` 포함 장소 snapshot 후보, `placeId/fetchedAt/cachedAt` 없음 | 시트 Loading/Empty/Error |
-| 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서 | ResultUiState | RACE 편집 UI 미노출 |
+| 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서/**시각** | ResultUiState | RACE 편집 UI 미노출. **시각을 고치면 그 시각 자리로 재정렬**한다(#319) |
 | 새 동선 저장 | `POST /api/itineraries` | 편집된 전체 DTO→201 id 또는 200 replaced | PostgreSQL | 게스트 modal, 성공→보관함 |
 | 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | Room cache | RACE는 저장 당시 값 유지. 변경 시 안내(P0) · 재생성 CTA(후속 §5-7~5-10), 403/404/Error |
 | 변경 대회 재생성 | `POST /api/itineraries/generate` | 최신 canonical 기준 입력 | 저장 전 임시 DTO | "직접 고친 장소는 사라져요" 확인 뒤 호출, 기존 저장본 유지 |
 | 재생성 최종 교체 | `PUT /api/itineraries/{id}` | 새 편집 DTO→200 same id/replaced | PostgreSQL | 저장 성공 시에만 기존 트리 교체, USER 편집 자동 병합 없음 |
-| 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지 |
-| 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체 |
+| 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지. **`startTime` 은 앱이 계산해 보낸다** — 맨 끝이면 마지막 시각 한 시간 뒤다. 계약 기본값 `13:00` 은 하루가 빌 때만(#319) |
+| 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체. **`startTime` 을 보내면 이어서 §5-10 으로 순서도 맞춘다**(#319) |
 | 저장 후 삭제 | DELETE `.../blocks/{blockId}` | 204 | PostgreSQL | RACE는 409 |
-| 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409 |
+| 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409. **서버가 시각도 자리에 맞춰 다시 매긴다**(#319) |
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
 | Error 재시도 | 같은 generate 재호출 | 기존 요청 | 없음 | 기존 결과·입력 유지 |
 | 숙소 주변에서 뛰기 | S8 이동 | `CourseLaunchContext(startLat,startLng,startName,targetKm=min(walk,5))` | LOCAL_STATE | 종목·난이도는 전달하지 않음; SavedStateHandle/그래프 상태, 좌표를 route 문자열에 넣지 않음 |
