@@ -434,9 +434,8 @@ private fun NearbyRow(
                     elevationUnitProfile(item.elevationProfileM)?.let { profile ->
                         Spacer(Modifier.height(6.dp))
                         ElevationLine(
-                            seed = item.routeId.hashCode(),
-                            closed = false,
                             profile = profile,
+                            closed = false,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(28.dp),
