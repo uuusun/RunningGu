@@ -55,7 +55,8 @@ sudo install -m 0640 -o root -g runninggu \
 
 ## 3. S3·KMS·IAM
 
-백업 bucket은 `runninggu-production-backup-987622176638-ap-northeast-2-an`으로 분리한다.
+백업 bucket은 `runninggu-production-backup-987622176638-seoul`로 분리한다. AWS가
+`--<region>-an` 형태의 접미사를 계정·리전 네임스페이스용으로 예약하므로 사용하지 않는다.
 버전 관리는 끄고 public access는 모두 차단한다. 기본 암호화는 기존 고객 관리형 KMS key
 `b18b8374-922a-46bb-bda9-78c98a22d679`을 사용하고 Bucket Key를 켠다. 별도 KMS key의 고정
 월 비용을 추가하지 않되 key user에 운영 role을 추가한다.

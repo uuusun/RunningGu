@@ -22,7 +22,7 @@
       "Sid": "ListProductionBackups",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-ap-northeast-2-an",
+      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-seoul",
       "Condition": {
         "StringLike": {
           "s3:prefix": "runninggu/production/*"
@@ -37,7 +37,7 @@
         "s3:PutObject",
         "s3:DeleteObject"
       ],
-      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-ap-northeast-2-an/runninggu/production/*"
+      "Resource": "arn:aws:s3:::runninggu-production-backup-987622176638-seoul/runninggu/production/*"
     },
     {
       "Sid": "UseBackupEncryptionKey",
