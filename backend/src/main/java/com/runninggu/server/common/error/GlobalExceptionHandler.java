@@ -84,7 +84,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             Exception exception,
             HttpServletRequest request) {
         String traceId = problemDetailFactory.traceId(request);
-        log.error("처리되지 않은 서버 오류가 발생했습니다. traceId={}", traceId, exception);
+        // 예외 message/cause/stack에는 이메일·좌표·토큰 같은 입력값이 섞일 수 있다.
+        // 서버가 정한 분류와 traceId만 기록한다. (SPEC §9.4, NFR-19)
+        log.error(
+                "처리되지 않은 서버 오류가 발생했습니다. code={} exceptionType={} traceId={}",
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                exception.getClass().getName(),
+                traceId);
 
         ProblemDetail problem = problemDetailFactory.create(
                 ErrorCode.INTERNAL_SERVER_ERROR,

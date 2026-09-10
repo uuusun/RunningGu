@@ -53,6 +53,15 @@ runs:
         grep -q '^OnCalendar=\*:0/10$' \
           deploy/systemd/runninggu-postgres-wal-archive-check.timer
 
+    - name: Validate nginx log privacy policy
+      shell: bash
+      working-directory: backend
+      run: |
+        python3 deploy/nginx/test_log_privacy.py
+        python3 deploy/validation/test_check_server_log_privacy.py
+        python3 -m py_compile deploy/nginx/test_nginx_runtime.py
+        python3 -m py_compile deploy/validation/check-server-log-privacy.py
+
     - name: Validate GraphHopper artifact and operational load tools
       shell: bash
       working-directory: backend

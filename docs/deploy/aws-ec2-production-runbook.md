@@ -114,6 +114,8 @@ dig +short api.runninggu.store
 
 ```bash
 sudo install -d -m 0755 /var/www/certbot
+sudo install -m 0644 backend/deploy/nginx/runninggu-log-privacy.conf \
+  /etc/nginx/conf.d/runninggu-log-privacy.conf
 sudo install -m 0644 \
   backend/deploy/nginx/production-api.bootstrap.conf \
   /etc/nginx/sites-available/runninggu-production
@@ -168,7 +170,7 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다.
 - HTTP가 HTTPS로 이동하고 TLS hostname·chain 검증이 성공하는가
 - 외부에서 5432·8080·8989에 연결할 수 없는가
 - Swagger와 `/v3/api-docs`가 비활성인가
-- access log에 query string이 남지 않는가
+- access log에 URI·query·Host·User-Agent가 남지 않고 method가 허용 목록 값으로 축약되는가
 - 운영 DB·JWT·SMTP·KTO·Kakao 값이 스테이징과 다른가
 - GraphHopper가 승인된 기존 graph를 불러오며 import·SRTM download를 시작하지 않는가
 - full backup·WAL archive·실패 알림·예산 알림 구독이 확인됐는가
