@@ -884,6 +884,25 @@ internal fun EditList(
                             NumberRail(index + 1)
                             Spacer(Modifier.width(10.dp))
 
+                            // **시각을 왼쪽 열로 뺀다** (#319). 부제목에 `15:00 · 씨야드스테이 ·
+                            // 숙소` 로 묶여 있으면 시각이 그 블록의 속성처럼 읽힌다. 실제로는
+                            // **자리에 붙은 값**이라 — 순서를 바꾸면 그 자리의 시각을 받는다 —
+                            // 세로로 줄맞춤해 두면 "이 자리는 15:00" 이 눈에 들어온다.
+                            Text(
+                                text = block.time,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (editable) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                maxLines = 1,
+                                // 고정 폭이라 자릿수가 달라도 아래 행과 줄이 맞는다.
+                                modifier = Modifier.width(TIME_SLOT_WIDTH),
+                            )
+                            Spacer(Modifier.width(8.dp))
+
                             Column(Modifier.weight(1f)) {
                                 // 스와이프로 폭이 줄어들 때 줄바꿈이 생기면 행 높이가 튀고,
                                 // 그 높이로 판정하는 그립 드래그까지 흔들린다. 그래서 한 줄로 고정한다.
@@ -897,8 +916,9 @@ internal fun EditList(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = if (editable) {
-                                        listOfNotNull(block.time, block.place?.name, block.catKey.label)
+                                        listOfNotNull(block.place?.name, block.catKey.label)
                                             .joinToString(" · ")
+                                            .ifEmpty { block.catKey.label }
                                     } else {
                                         "관리자 업데이트"
                                     },
@@ -1048,6 +1068,9 @@ private val DELETE_REVEAL_WIDTH = 84.dp
 
 /** 대기 중인 이동이 없음. [Int] 인덱스와 섞이지 않게 음수를 쓴다. */
 private const val NO_PENDING_MOVE = -1
+
+/** 편집 행 왼쪽 시각 열의 폭. `08:30` 이 안 접히는 최소치다. */
+private val TIME_SLOT_WIDTH = 48.dp
 
 /**
  * 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립")

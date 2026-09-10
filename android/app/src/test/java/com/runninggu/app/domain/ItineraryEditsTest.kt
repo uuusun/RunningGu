@@ -221,6 +221,40 @@ class ItineraryEditsTest {
         assertEquals(before[1], after[i].blocks[2].id)
     }
 
+    /**
+     * **시각은 자리에 붙는다.** 옮겨도 각 줄의 시각은 원래 그 자리의 것이다. (#319)
+     *
+     * 예전에는 시각이 블록을 따라다녀서 `17:00` 일정을 위로 올려도 `17:00` 이었다.
+     * 사용자가 읽는 것은 "그 자리의 시각" 이다.
+     */
+    @Test
+    fun `순서를 바꿔도 시각은 자리에 남는다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val before = days[i].blocks
+        val beforeTimes = before.map { it.time }
+
+        val after = ItineraryEdits.moveBlock(days, i, 1, 2)
+
+        // 자리의 시각은 그대로다
+        assertEquals(beforeTimes, after[i].blocks.map { it.time })
+        // 그 자리에 들어간 블록만 바뀐다
+        assertEquals(before[2].id, after[i].blocks[1].id)
+        assertEquals(before[1].id, after[i].blocks[2].id)
+    }
+
+    /** 대회 블록은 제 시각을 지킨다 — 대회 시작 시각은 우리가 정하는 값이 아니다. */
+    @Test
+    fun `대회 블록의 시각은 순서 변경에 휩쓸리지 않는다`() {
+        val days = itinerary()
+        val i = days.ddayIndex()
+        val raceTime = days[i].blocks.first { it.blockType == BlockType.RACE }.time
+
+        val after = ItineraryEdits.moveBlock(days, i, 1, 2)
+
+        assertEquals(raceTime, after[i].blocks.first { it.blockType == BlockType.RACE }.time)
+    }
+
     @Test
     fun `사용자 블록은 대회 블록을 넘어갈 수 없다`() {
         // 계약이 대회 블록의 고정 위치를 넘는 요청을 `409 SYSTEM_BLOCK_IMMUTABLE` 로
