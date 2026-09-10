@@ -40,6 +40,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -308,6 +313,8 @@ private fun ResultContent(
                     onCategorySelect = viewModel::onSheetCategorySelect,
                     onSelect = viewModel::onCandidateSelect,
                     onRetry = viewModel::onSheetRetry,
+                onQueryChange = viewModel::onSheetQueryChange,
+                onSearch = viewModel::onSheetSearch,
                 )
             }
         }
@@ -1105,6 +1112,8 @@ private fun CandidateSheet(
     onCategorySelect: (PoiCategory) -> Unit,
     onSelect: (PoiItem) -> Unit,
     onRetry: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         // 작은 화면·가로 모드에서 후보 8건이 시트 최대 높이를 넘을 수 있어 스크롤을 준다.
@@ -1128,6 +1137,24 @@ private fun CandidateSheet(
                     SourceBadge(sheet.source)
                 }
             }
+
+            // **검색으로도 넣을 수 있어야 한다** (#319). 추천만으로는 사용자가 아는
+            // 가게를 못 넣어서, 우리가 고른 곳을 그대로 받아들이는 수밖에 없었다.
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = sheet.query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("장소 이름으로 찾기") },
+                trailingIcon = {
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Filled.Search, contentDescription = "검색")
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            )
 
             if (!sheet.isReplace) {
                 Spacer(Modifier.height(10.dp))

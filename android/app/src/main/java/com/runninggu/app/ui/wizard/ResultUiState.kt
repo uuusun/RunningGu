@@ -254,14 +254,32 @@ data class CandidateSheetState(
     val items: List<PoiItem> = emptyList(),
     /** `LIVE` · `SAMPLE` · `SYNTH` 소스 배지. (NFR-2) */
     val source: String = "",
+    /**
+     * 검색어. 비어 있으면 기준점 주변 추천이다.
+     *
+     * **추천만으로는 사용자가 원하는 곳을 못 넣는다**(#319). 서버 `GET /api/places` 는
+     * 처음부터 `query` 를 받고 있었고 `PoiRepository` 도 넘길 수 있었는데, 시트에 입력
+     * 자리가 없어 안 쓰이고 있었다.
+     */
+    val query: String = "",
 ) {
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 
     val isReplace: Boolean get() = replaceBlockId != null
 
-    /** "{카테고리} {교체|추가} · 인근" — 시트 헤더. (SPEC §4.10) */
+    /** 서버에 보낼 검색어. 짧으면 주변 추천으로 돌아간다. */
+    val effectiveQuery: String?
+        get() = query.trim().takeIf { it.length >= MIN_QUERY_LENGTH }
+
+    /** "{카테고리} {교체|추가} · {인근|검색}" — 시트 헤더. (SPEC §4.10) */
     val title: String
-        get() = "${category.label} ${if (isReplace) "교체" else "추가"} · 인근"
+        get() = "${category.label} ${if (isReplace) "교체" else "추가"} · " +
+            if (effectiveQuery != null) "검색" else "인근"
+
+    companion object {
+        /** 서버가 400 을 주기 전에 앱이 거르는 최소 글자 수. */
+        const val MIN_QUERY_LENGTH = 2
+    }
 }
 
 /**

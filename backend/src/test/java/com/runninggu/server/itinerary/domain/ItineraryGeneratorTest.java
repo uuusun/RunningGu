@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ItineraryGeneratorTest {
@@ -245,6 +246,145 @@ class ItineraryGeneratorTest {
                         new BigDecimal("127.7200000"))
                 : null;
         return new ItineraryPlan(race, hotel, event, themes, start, end);
+    }
+
+    // ── 추천 품질 (#319) ────────────────────────────────────────────────────
+
+    /**
+     * **식사 자리에 프랜차이즈 빵집·패스트푸드를 넣지 않는다.**
+     *
+     * 카카오 `FD6` 는 음식점을 통째로 담아서 파리바게뜨·맘스터치가 함께 온다. `sort=distance`
+     * 로 받아 첫 항목을 집던 예전 방식에서는 그것이 저녁으로 뽑혔다.
+     */
+    @Test
+    void 식사_자리에는_프랜차이즈_빵집과_패스트푸드를_넣지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.FOOD, List.of(
+                place("파리바게뜨 거제서정점", "음식점 > 간식 > 제과,베이커리 > 파리바게뜨"),
+                place("맘스터치 거제서정점", "음식점 > 패스트푸드 > 맘스터치"),
+                place("각산애식당", "음식점 > 한식")));
+
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                new PoiPools(places, sourcesOf(places)));
+
+        assertThat(day(result, -1).blocks())
+                .filteredOn(block -> block.title().contains("저녁"))
+                .extracting(block -> block.place().name())
+                .containsExactly("각산애식당");
+    }
+
+    /** 거를 것만 남으면 **빈 블록보다 낫다** — 거르지 않은 목록으로 돌아간다. */
+    @Test
+    void 식사로_쓸_곳이_하나도_없으면_거르지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.FOOD, List.of(
+                place("파리바게뜨 거제서정점", "음식점 > 간식 > 제과,베이커리 > 파리바게뜨")));
+
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                new PoiPools(places, sourcesOf(places)));
+
+        assertThat(day(result, -1).blocks())
+                .filteredOn(block -> block.title().contains("저녁"))
+                .extracting(block -> block.place().name())
+                .containsExactly("파리바게뜨 거제서정점");
+    }
+
+    /**
+     * **같은 요청을 다시 하면 다른 곳이 나온다.**
+     *
+     * 예전에는 목록 순서대로 첫 미사용 항목을 집어서 매번 같은 동선이었다. 추천을 다시
+     * 받아도 달라지지 않으면 추천이 아니라 고정 값이다.
+     */
+    @Test
+    void 같은_조건이어도_매번_같은_곳만_고르지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        List<ItineraryPlace> nearby = new ArrayList<>();
+        for (int index = 1; index <= 10; index++) {
+            nearby.add(place("식당-" + index, "음식점 > 한식"));
+        }
+        places.put(PoiCategory.FOOD, nearby);
+        PoiPools pools = new PoiPools(places, sourcesOf(places));
+
+        Set<String> picked = new java.util.HashSet<>();
+        for (int attempt = 0; attempt < 30; attempt++) {
+            GeneratedItinerary result = generate(
+                    plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                    pools);
+            day(result, -1).blocks().stream()
+                    .filter(block -> block.title().contains("저녁"))
+                    .forEach(block -> picked.add(block.place().name()));
+        }
+
+        assertThat(picked).hasSizeGreaterThan(1);
+    }
+
+    /** **너무 먼 곳은 후보에서 뺀다** — 하루 안에 못 도는 일정이 된다. */
+    @Test
+    void 가장_가까운_곳에서_멀리_떨어진_곳은_고르지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.FOOD, List.of(
+                place("가까운식당", "음식점 > 한식"),
+                // 위도 0.1도 ≈ 11km. NEARBY_SPREAD_M(2km) 밖이다.
+                new ItineraryPlace("먼식당", "주소", new BigDecimal("34.9545247800561"),
+                        new BigDecimal("128.576145697347"), "음식점 > 한식")));
+        PoiPools pools = new PoiPools(places, sourcesOf(places));
+
+        Set<String> picked = new java.util.HashSet<>();
+        for (int attempt = 0; attempt < 30; attempt++) {
+            GeneratedItinerary result = generate(
+                    plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                    pools);
+            day(result, -1).blocks().stream()
+                    .filter(block -> block.title().contains("저녁"))
+                    .forEach(block -> picked.add(block.place().name()));
+        }
+
+        assertThat(picked).containsExactly("가까운식당");
+    }
+
+    /** 대회 전날 저녁 문구에서 **"카보로딩" 을 뺐다** — 러너가 아니면 모르는 말이다. */
+    @Test
+    void 대회_전날_저녁에_카보로딩이라는_말을_쓰지_않는다() {
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                pools(8));
+
+        assertThat(day(result, -1).blocks())
+                .extracting(GeneratedBlock::title)
+                .noneMatch(title -> title.contains("카보로딩"));
+        assertThat(day(result, -1).blocks())
+                .extracting(GeneratedBlock::description)
+                .noneMatch(description -> description.contains("탄수화물"));
+    }
+
+    private ItineraryPlace place(String name, String categoryName) {
+        return new ItineraryPlace(
+                name,
+                "경남 거제시",
+                new BigDecimal("34.8545247800561"),
+                new BigDecimal("128.576145697347"),
+                categoryName);
+    }
+
+    /** FOOD 를 뺀 나머지 카테고리는 기본 풀을 쓴다. */
+    private Map<PoiCategory, List<ItineraryPlace>> mealPools() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>();
+        for (PoiCategory category : PoiCategory.values()) {
+            List<ItineraryPlace> items = new ArrayList<>();
+            for (int index = 1; index <= 8; index++) {
+                items.add(place(category.name() + "-" + index, category.name()));
+            }
+            places.put(category, items);
+        }
+        return places;
+    }
+
+    private Map<PoiCategory, String> sourcesOf(Map<PoiCategory, List<ItineraryPlace>> places) {
+        Map<PoiCategory, String> sources = new LinkedHashMap<>();
+        places.keySet().forEach(category -> sources.put(category, "LIVE"));
+        return sources;
     }
 
     private PoiPools pools(int countPerCategory) {
