@@ -5,7 +5,7 @@
 | 환경 | EC2 | 검사 시점 상태 | 이번 판정 |
 |---|---|---|---|
 | staging | `i-07aa483968f4daddc` | nginx·인증서·백엔드 active | 과거 로그 정리 후 전체 표식 검사 통과 |
-| production | `i-0c9f040b65d41d6c1` | HTTP bootstrap만 active, 인증서·백엔드 없음 | bootstrap 비노출 확인, TLS·백엔드 검사는 미완료 |
+| production | `i-0c9f040b65d41d6c1` | nginx·인증서·백엔드 active | 전체 표식·과거 패턴 검사 통과 |
 
 검사는 로그 원문과 시험 표식을 출력하지 않고 상태, 조회 행 수와 검출 건수만 남겼다.
 백엔드·staging 설정 기준은 `90a4ad0`, production 설정 기준은 `607c944`이며 두 커밋은
@@ -81,19 +81,18 @@ nginx·backend active 상태를 다시 확인했다. journal 파일은 9개, 사
   허용 목록 밖 `TRACE` 405를 확인했다. 두 access log가 증가했고 nginx 파일 15행과 시험
   시점 journal을 검사한 결과 표식 0건, 최소 형식 불일치 0건, `passed=true`였다.
 
-### 남은 검사
+### TLS·백엔드 전체 검사
 
-production은 검사 시점에 인증서와 backend service가 없어 HTTPS API·backend journal을
-검사할 수 없었다. 운영 배포 작업이 최종 TLS 설정을 설치할 때 `runninggu_minimal`과
-`error_log /dev/null crit`를 모든 server에 유지해야 한다. 인증서·백엔드가 active가 되면
-다음 명령으로 전체 표식 검사를 다시 실행한다.
+- SSM `94063a98-bcf2-4d85-9dff-fe6844c21a85`로 최종 Nginx 설정을 적용했다. named·기본
+  거부 server 모두 `runninggu_minimal`과 `error_log /dev/null crit`를 유지했고 `nginx -t`,
+  HTTP 301, HTTPS API 200이 통과했다.
+- SSM `7b103e33-a943-4111-9710-62183d2a50dd`에서 HTTPS와 백엔드가 active인 상태로 전체
+  검사기를 실행했다. HTTP redirect 301, 이메일 조회 200, 좌표 검증 실패 400, 로그인 실패
+  401, 알 수 없는 Host 연결 종료, 과대 헤더 400이었다.
+- named·기본 거부 access log가 모두 증가했고 기존 요청 error log 크기는 변하지 않았다.
+  nginx 파일 4개·59행과 최근 14일 backend/nginx journal 234행을 검사했다.
+- 시험 표식 0건, 이메일·좌표·비밀값 일반 패턴 모두 0건으로 `passed=true`였다. 인증서 갱신
+  모의 실행과 Nginx reload hook도 같은 명령에서 성공했다.
 
-```bash
-sudo python3 backend/deploy/validation/check-server-log-privacy.py \
-  --host api.runninggu.store \
-  --named-access-log runninggu-production.access.log \
-  --legacy-error-log runninggu-production.error.log
-```
-
-production의 TLS·백엔드 검사가 완료되기 전에는 전체 로그 보안 항목을 완료로 표시하지
-않는다.
+따라서 약관 활성화 차단 조건이었던 staging·production 서버 로그 개인정보 검증은 모두
+완료됐다.

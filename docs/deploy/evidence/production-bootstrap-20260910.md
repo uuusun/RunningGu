@@ -1,7 +1,7 @@
 # 운영 EC2 부트스트랩 증거 — 2026-09-10
 
-> 상태: **기반 자원·PostgreSQL·GraphHopper·백업/복구 리허설 완료, Spring Boot 공개 전**.
-> 운영 DNS와 외부 API 운영 키, 로그 보안 변경이 머지되기 전에는 Spring Boot를 시작하지 않는다.
+> 상태: **운영 환경 구성·배포 완료**. 성공한 `develop` push의 exact artifact를 설치했고,
+> DNS·HTTPS·백업 복구·로그 개인정보·재부팅 자동 복구까지 검증했다.
 
 ## 자원 정리와 운영 자원
 
@@ -30,10 +30,14 @@
 
 - 운영 DB password와 JWT secret을 새로 생성했다.
 - Resend에는 `runninggu.store` 전송만 허용한 운영 전용 Sending key를 생성했다.
-- 세 값은 지정 KMS key를 쓰는 Parameter Store `SecureString`으로 저장했다. 경로 이름만
-  `/runninggu/production/db-password`, `jwt-secret`, `smtp-password`로 기록하고 값은 출력하지 않았다.
-- 운영 SNS topic `runninggu-production-alerts`를 만들었다. 이메일 구독 상태 `Confirmed` 1건과
-  시험 알림 전송·수신을 확인했다.
+- 운영 Kakao 앱 `런닝구 운영`을 만들고 운영 전용 REST key·app ID를 저장했다.
+- KTO service key는 2026-09-10 운영 결정에 따라 staging과 공유했다. 원문을 출력하지 않고
+  staging 서버에서 KMS로 암호화해 전달했으며, 두 환경의 호출 쿼터를 합산 관리한다.
+- 여섯 값은 지정 KMS key를 쓰는 Parameter Store `SecureString`으로 저장했다. 경로 이름만
+  `/runninggu/production/db-password`, `jwt-secret`, `smtp-password`, `kto-service-key`,
+  `kakao-rest-key`, `kakao-app-id`로 기록하고 값은 출력하지 않았다.
+- 운영 SNS topic `runninggu-production-alerts`의 이메일 구독을 확인하고 시험 알림의 실제 수신을
+  확인했다.
 - AWS Budget `runninggu-production-monthly`를 월 USD 70, 비용 필터
   `Environment=production`으로 만들었다. 실제 비용 80%, 예상 비용 100% 알림 두 건을 확인했다.
 
@@ -56,31 +60,50 @@ SSM `683ba0c8-44ae-4d72-a51c-1217ee3bbdba`로 다음 버전을 설치했다.
 - 호스트 SSH service·socket을 중지·비활성·mask했다. 확인 시 외부 listener는 80번뿐이었다.
 - Nginx는 ACME challenge 경로 외 요청을 404로 거부한다. 외부 `http://3.37.39.89/`도 HTTP 404였다.
 
-## CI 산출물·DB·그래프·복구 리허설
+## 백업·복구 리허설
 
-- `develop` push CI가 성공한 exact commit `da4799089b9cf774adf89ef590cadde83b644eb5`의
-  backend artifact를 내려받아 네 파일의 `SHA256SUMS`를 확인하고 운영 서버에 설치했다.
 - 운영 PostgreSQL은 loopback에서 healthy다. 최초 `stanza-create`에서 확인한 DB 역할·TLS CA
-  누락은 PR #331의 설정을 운영 서버에 임시 적용해 바로잡았고, full backup·WAL archive·
-  `pgbackrest check`가 성공했다. 운영 S3 객체가 고객 관리형 KMS로 암호화된 것도 확인했다.
+  누락은 PR #331의 설정으로 바로잡았고, full backup·WAL archive·`pgbackrest check`가 성공했다.
+  운영 S3 객체의 고객 관리형 KMS 암호화와 backup·WAL 검사 timer active 상태도 확인했다.
 - 승인된 GraphHopper artifact를 production prefix에서 설치했고 route readiness와 systemd active를
-  확인했다. backup·WAL 감시 timer도 active다.
+  확인했다.
 - SSM `76654c7a-109d-4247-9cc3-13c08226c600`과
-  `38a8cca8-e07f-4ba2-b00d-479c746bc0cd`로 full backup을
-  `runninggu-recovery` 전용 볼륨에 복원했다. 복원 DB는 `runninggu`, recovery 종료 상태 `false`,
-  public table 0개로 확인됐다. 운영 DB 볼륨 이름이 바뀌지 않은 것을 확인한 뒤 복구 컨테이너·
-  네트워크·볼륨·임시 환경 파일을 삭제했고 운영 PostgreSQL health가 유지됐다.
-- 운영 Nginx HTTP bootstrap에 URI·query·Host·User-Agent를 기록하지 않는 최소 로그 형식을
-  적용했다. 가짜 이메일·좌표 요청의 시험 표식 0건과 method allowlist 기록을 확인했다.
+  `38a8cca8-e07f-4ba2-b00d-479c746bc0cd`로 full backup을 `runninggu-recovery` 전용 볼륨에
+  복원했다. 복원 DB는 `runninggu`, recovery 종료 상태 `false`, public table 0개였다. 운영 DB
+  볼륨이 바뀌지 않은 것을 확인하고 복구 컨테이너·네트워크·볼륨·임시 환경 파일을 정리했다.
 
-## 아직 완료하지 않은 항목
+## 애플리케이션 릴리스
 
-1. 가비아 `api.runninggu.store` A record를 EIP로 연결
-2. 운영 KTO service key 정책 확정, Kakao app·REST key·app ID 발급과 SecureString 저장
-3. PR #331과 로그 보안 PR #332를 리뷰·머지한 뒤 성공한 `develop` 또는 `main` push CI의 exact
-   commit artifact로 임시 운영 설정을 교체
-4. Flyway·Importer와 Spring Boot 시작, 내부 readiness 확인
-5. DNS 전파, TLS 발급, 외부 API·포트·문서 비활성·로그 개인정보 smoke
-6. 재부팅 자동 복구와 실제 실패 알림 검증
+- 최초 기동에는 `develop` push CI run `34465367313`의 exact commit
+  `801fa7d5ce8bf8df3e831d72df60a55e7a827618` artifact를 사용했다.
+- Importer의 Flyway·초기 snapshot 적재가 종료 코드 0으로 끝났다. 백엔드는 11초 뒤 내부
+  `GET /api/contests?size=1`에 200을 반환했고 `NRestarts=0`이었다.
+- PR #331 승인·머지 후 성공한 `develop` push CI run `34487652241`의 exact commit
+  `a2c7700671f6c9ca60c67687b9e7863cfeb144a6` artifact로 최종 전환했다.
+- CloudShell·S3·EC2에서 bundle과 내부 `SHA256SUMS`, `release-manifest.txt`를 검증했다.
+  최종 bundle은 119,563,022바이트이고 SHA-256은
+  `34aee9319f1034009a0741199f9ff85fbb3800dad1511ccca043a868d144eb51`다.
+- SSM `a1a32bc5-8fe9-4d90-8989-a70299b44ba8`에서 현재 release symlink와 서버 저장소 HEAD를
+  같은 commit으로 맞추고 저장소가 clean인지 확인했다. API는 기동 후 200, `NRestarts=0`이었다.
+
+## DNS·TLS·공개 경계
+
+- 가비아에 `api.runninggu.store` A record를 `3.37.39.89`, TTL 600으로 저장했다. 가비아 권한
+  DNS 세 곳과 Google·KT 공개 resolver가 모두 같은 값을 반환했다.
+- Let's Encrypt 인증서를 발급하고 최종 Nginx 설정을 적용했다. 인증서 만료일은 2026-12-09이며
+  certbot·logrotate timer가 active다. SSM `94063a98-bcf2-4d85-9dff-fe6844c21a85`에서
+  HTTP 301·HTTPS API 200과 `nginx -t`를 확인했다.
+- SSM `7b103e33-a943-4111-9710-62183d2a50dd`에서 인증서 갱신 모의 실행과 deploy hook이
+  성공했다. 같은 명령에서 운영 로그 개인정보 검사도 통과했다.
+- CloudShell 외부 요청에서 HTTPS 인증서 검증 결과 0, API 200, HTTP 301과 정확한 HTTPS
+  redirect를 확인했다. `/v3/api-docs`와 Swagger는 404였고 22·5432·8080·8989는 닫혀 있었다.
+
+## 재부팅 자동 복구
+
+- 운영 EC2를 재부팅한 뒤 SSM이 다시 Online이 됐고, SSM
+  `fe88ddbe-4768-4f7a-a292-99285ae83c68`에서 Docker·Nginx·GraphHopper·백엔드와
+  certbot·logrotate·PostgreSQL backup·WAL 검사 timer가 모두 active인지 확인했다.
+- 현재 release와 저장소 HEAD는 최종 exact commit이고 저장소는 clean이었다. API 200,
+  문서 API 404, `NRestarts=0`, `nginx -t`도 다시 통과했다.
 
 PR head artifact는 staging 전용 계약이므로 운영 서버에 설치하지 않는다.
