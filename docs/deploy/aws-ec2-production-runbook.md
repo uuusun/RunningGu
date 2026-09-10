@@ -107,6 +107,10 @@ pgBackRest의 `pg1-user`는 Compose의 고정 DB 역할 `runninggu`와 같아야
 PostgreSQL 이미지에는 S3 TLS 인증서를 검증할 `ca-certificates`도 포함한다. 인증서 검증을 끄는
 설정으로 우회하지 않는다.
 
+복구 전용 `/etc/runninggu/recovery-compose.env`에도
+`PGBACKREST_REPO1_PATH=/runninggu/production`을 명시한다. 복구 Compose는 이 값을 필수로 받아
+staging 백업을 운영 복구 리허설에 잘못 사용하는 것을 막는다.
+
 ## 5. DNS·Nginx·TLS
 
 가비아 DNS에 `api` A 레코드 `3.37.39.89`를 추가한다. 외부 DNS 전파가 확인되기 전에는

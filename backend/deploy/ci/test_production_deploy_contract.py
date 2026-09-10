@@ -65,6 +65,14 @@ class ProductionDeployContractTest(unittest.TestCase):
         self.assertIn("pg1-user=runninggu\n", pgbackrest)
         self.assertIn("        ca-certificates \\\n", postgres_image)
 
+    def test_recovery_compose_requires_explicit_backup_repository_path(self):
+        recovery = (BACKEND / "compose.recovery.yaml").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "PGBACKREST_REPO1_PATH: ${PGBACKREST_REPO1_PATH:?PGBACKREST_REPO1_PATH를 설정해야 합니다}",
+            recovery,
+        )
+
     def test_runtime_iam_policy_is_scoped_to_production_paths(self):
         policy = json.loads(
             (BACKEND / "deploy/aws/runninggu-production-runtime-access.json").read_text(encoding="utf-8")
