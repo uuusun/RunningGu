@@ -44,9 +44,12 @@ class ProductionDeployContractTest(unittest.TestCase):
                 self.assertNotIn("staging-api.runninggu.store", content)
         public_config = (BACKEND / "deploy/nginx/production-api.conf").read_text(encoding="utf-8")
         self.assertIn("server_name api.runninggu.store;", public_config)
-        log_format = public_config.split("server {", 1)[0]
-        self.assertIn("$request_method $uri $server_protocol", log_format)
-        self.assertNotIn("$request_uri", log_format)
+        self.assertIn(
+            "access_log /var/log/nginx/runninggu-production.access.log runninggu_minimal;",
+            public_config,
+        )
+        self.assertIn("error_log /dev/null crit;", public_config)
+        self.assertNotIn("runninggu_noqs", public_config)
 
     def test_no_example_contains_secret_values(self):
         for name in ("application.production.env.example", "compose.production.env.example"):
