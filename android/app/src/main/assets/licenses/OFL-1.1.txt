@@ -16,6 +16,7 @@ with Reserved Font Name 'M PLUS 1'.
 
 Archivo Variable
 Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
+Archivo is a trademark of Omnibus-Type.
 
 Both font files are distributed under the SIL Open Font License, Version 1.1.
 
