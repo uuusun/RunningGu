@@ -123,16 +123,6 @@ public class ItineraryBlock {
         description = normalizeNullable(draft.description());
     }
 
-    /**
-     * 시각을 슬롯 값으로 바꾼다. **블록이 아니라 자리에 시간이 붙는다**(#319).
-     *
-     * 예전에는 시각이 블록을 따라다녀서, `17:00` 일정을 위로 올려도 `17:00` 이었다.
-     * 사용자가 보는 것은 "그 자리의 시각" 이라 순서를 바꾸면 시각도 자리를 따라야 한다.
-     */
-    void changeStartTime(LocalTime startTime) {
-        this.startTime = startTime;
-    }
-
     void changeOrder(int orderNo) {
         this.orderNo = orderNo;
     }
