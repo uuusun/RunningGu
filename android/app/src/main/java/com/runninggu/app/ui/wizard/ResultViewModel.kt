@@ -567,22 +567,6 @@ class ResultViewModel(
     }
 
     /**
-     * 저장 전 블록의 시각을 사용자가 직접 고쳤다. **고친 뒤 시각순으로 다시 선다.** (#319)
-     *
-     * 시각을 정할 수 있으면 목록 순서와 시각이 어긋날 수 있다 — `14:30` 을 `09:00` 으로
-     * 바꿔 놓고 자리는 셋째 줄이면 읽는 사람이 헷갈린다. 시각이 정답이고 순서가 따른다.
-     *
-     * 저장 후 편집에서는 호출하지 않는다. 시각 PATCH와 순서 PUT을 이어 보내면 두 번째
-     * 실패 때 반쪽만 저장되므로, 원자적 계약을 #335에서 정하기 전까지 막는다(SPEC §4.10).
-     */
-    fun onBlockTimeChange(blockId: String, time: String) {
-        if (_uiState.value.isSavedEditing) return
-        editActiveDay { days, dayIndex ->
-            ItineraryEdits.changeBlockTime(days, dayIndex, blockId, time)
-        }
-    }
-
-    /**
      * 시트의 검색어가 바뀌었다. **글자마다 조회하지 않는다** — 입력은 즉시 반영하고,
      * 서버 조회는 [onSheetSearch] 로 사용자가 확정할 때만 한다.
      */
@@ -647,13 +631,9 @@ class ResultViewModel(
                     val sending = NewBlock(
                         title = item.name,
                         category = catKey,
-                        // **계약 기본값 13:00 을 쓰지 않는다** (#319). 이미 17:00 까지 찬
-                        // 하루에 13:00 이 끼어들면 사용자가 "왜 여기로 가지" 를 겪는다.
-                        // 맨 끝에 붙으므로 마지막 시각 한 시간 뒤다.
-                        startTime = ItineraryEdits.timeForNewBlock(
-                            blocksOf(dayIndex),
-                            blocksOf(dayIndex).size,
-                        ),
+                        // 서버 startTime 계약은 호환을 위해 유지하지만 앱에서는
+                        // 시각을 노출·편집하지 않는다(SPEC §4.10).
+                        startTime = ADDED_BLOCK_TIME,
                         place = place,
                         description = item.description,
                     ).normalized()
@@ -688,10 +668,7 @@ class ResultViewModel(
                     days, dayIndex,
                     ItineraryBlock(
                         id = "", // addBlock 이 새 id 를 붙인다
-                        time = ItineraryEdits.timeForNewBlock(
-                            days[dayIndex].blocks,
-                            days[dayIndex].blocks.size,
-                        ),
+                        time = ADDED_BLOCK_TIME,
                         title = item.name,
                         catKey = catKey,
                         place = place,
@@ -750,7 +727,7 @@ class ResultViewModel(
     }
 
     private companion object {
-        /** 추가 블록의 기본 시간. (SPEC §4.10 "추가=새 블록(13:00) 맨 끝") */
+        /** API 호환을 위해 새 블록에 보내는 기본 시각. 앱에서는 노출하지 않는다(SPEC §4.10). */
         const val ADDED_BLOCK_TIME = "13:00"
     }
 

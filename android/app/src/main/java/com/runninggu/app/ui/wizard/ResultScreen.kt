@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -46,7 +45,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -305,7 +303,6 @@ private fun ResultContent(
                     onMoveBlock = viewModel::onMoveBlock,
                     onReplaceBlock = viewModel::onReplaceBlock,
                     onAddPlace = viewModel::onAddPlace,
-                    onTimeChange = viewModel::onBlockTimeChange,
                 )
             }
 
@@ -339,7 +336,6 @@ private fun Content(
     onMoveBlock: (Int, Int) -> Unit,
     onReplaceBlock: (ItineraryBlock) -> Unit,
     onAddPlace: () -> Unit,
-    onTimeChange: (String, String) -> Unit,
 ) {
     // 스와이프로 삭제 버튼을 연 행. 화면에 하나만 열려 있고, 바깥을 건드리면 닫힌다.
     var openedBlockId by remember(state.isEditing) { mutableStateOf<String?>(null) }
@@ -503,7 +499,6 @@ private fun Content(
                     onMoveBlock = onMoveBlock,
                     onReplaceBlock = onReplaceBlock,
                     onAddPlace = onAddPlace,
-                    onTimeChange = onTimeChange,
                 )
 
                 if (!state.isEditing) {
@@ -684,7 +679,6 @@ internal fun LazyListScope.savedEditSection(
     onMoveBlock: (Int, Int) -> Unit,
     onReplaceBlock: (ItineraryBlock) -> Unit,
     onAddPlace: () -> Unit,
-    onTimeChange: (String, String) -> Unit,
 ) {
     if (state.editInFlight || state.editError != null) {
         item(key = "savedEditStatus") {
@@ -706,7 +700,7 @@ internal fun LazyListScope.savedEditSection(
         // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
         item(key = "editList") {
             Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                EditNotice(canChangeTime = !state.isSavedEditing)
+                EditNotice()
 
                 Spacer(Modifier.height(10.dp))
                 // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
@@ -718,8 +712,6 @@ internal fun LazyListScope.savedEditSection(
                     onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
                     onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
                     onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
-                    canChangeTime = !state.isSavedEditing,
-                    onTimeChange = { id, time -> if (!state.editInFlight) onTimeChange(id, time) },
                 )
                 Spacer(Modifier.height(10.dp))
                 AddPlaceButton(onClick = onAddPlace, enabled = !state.editInFlight)
@@ -753,20 +745,15 @@ private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Un
 
 /** 편집 모드 안내. 대회 일정을 왜 못 바꾸는지 미리 알린다. (SPEC §4.10) */
 @Composable
-private fun EditNotice(canChangeTime: Boolean) {
+private fun EditNotice() {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text = if (canChangeTime) {
-                "일반 장소는 시각 변경 · 순서 변경 · 교체 · 삭제할 수 있어요. " +
-                    "대회 일정은 변경할 수 없어요."
-            } else {
-                "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
-                    "대회 일정은 변경할 수 없어요."
-            },
+            text = "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
+                "대회 일정은 변경할 수 없어요.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -778,7 +765,7 @@ private fun EditNotice(canChangeTime: Boolean) {
  * 편집 목록. (SPEC §4.10 · §5.7)
  *
  * 행 종류가 둘이다.
- * - USER: 번호 + 제목 + "{시간}·{장소}·{카테고리}" + 교체 · 휴지통 + **오른쪽 끝 그립**.
+ * - USER: 번호 + 제목 + "{장소}·{카테고리}" + 교체 · 휴지통 + **오른쪽 끝 그립**.
  *   순서 변경은 그립을 **길게 눌러 끄는** 드래그 — 이웃 행의 절반을 넘을 때마다
  *   실제 목록을 한 칸씩 옮기므로 놓는 순간 이미 반영돼 있다.
  *   삭제는 두 길이다 — 휴지통 탭, 또는 행을 **왼쪽으로 스와이프**하면 나타나는
@@ -799,8 +786,6 @@ internal fun EditList(
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
-    canChangeTime: Boolean,
-    onTimeChange: (String, String) -> Unit,
 ) {
     // 드래그 제스처 코루틴이 여러 리컴포지션에 걸쳐 살아 있으므로 최신 목록을 State 로 읽는다.
     val blocks by rememberUpdatedState(day.blocks)
@@ -818,20 +803,6 @@ internal fun EditList(
      * 방금 옮긴 것을 도로 되돌릴 수 있다.
      */
     var pendingMoveFrom by remember { mutableIntStateOf(NO_PENDING_MOVE) }
-
-    /** 시각을 고치는 중인 블록. null 이면 다이얼로그가 닫혀 있다. (#319) */
-    var editingTimeOf by remember { mutableStateOf<ItineraryBlock?>(null) }
-
-    editingTimeOf?.let { target ->
-        TimePickerDialog(
-            initial = target.time,
-            onDismiss = { editingTimeOf = null },
-            onConfirm = { time ->
-                editingTimeOf = null
-                onTimeChange(target.id, time)
-            },
-        )
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         day.blocks.forEachIndexed { index, block ->
@@ -948,35 +919,6 @@ internal fun EditList(
                         ) {
                             NumberRail(index + 1)
                             Spacer(Modifier.width(10.dp))
-
-                            // **시각을 왼쪽 열로 뺀다** (#319). 블록의 시각을 세로로 줄맞춤해
-                            // 일정 순서를 빠르게 읽게 한다. 저장 전에는 직접 고칠 수 있지만,
-                            // 저장 후에는 원자적 계약을 #335에서 정하기 전까지 표시만 한다.
-                            Text(
-                                text = block.time,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (editable && canChangeTime) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                maxLines = 1,
-                                // 최소 폭으로 줄을 맞추되 큰 글꼴에서는 잘리지 않게 늘어난다.
-                                modifier = Modifier
-                                    .widthIn(min = TIME_SLOT_WIDTH)
-                                    .then(
-                                        if (editable && canChangeTime) {
-                                            Modifier.clickable(
-                                                onClickLabel = "${block.title} 시각 바꾸기",
-                                                onClick = { editingTimeOf = block },
-                                            )
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
-                            )
-                            Spacer(Modifier.width(8.dp))
 
                             Column(Modifier.weight(1f)) {
                                 // 스와이프로 폭이 줄어들 때 줄바꿈이 생기면 행 높이가 튀고,
@@ -1144,9 +1086,6 @@ private val DELETE_REVEAL_WIDTH = 84.dp
 /** 대기 중인 이동이 없음. [Int] 인덱스와 섞이지 않게 음수를 쓴다. */
 private const val NO_PENDING_MOVE = -1
 
-/** 편집 행 왼쪽 시각 열의 폭. `08:30` 이 안 접히는 최소치다. */
-private val TIME_SLOT_WIDTH = 48.dp
-
 /**
  * 순서 변경 그립. **길게 누른 채 끌면** 행이 따라온다. (SPEC §4.10 "그립")
  *
@@ -1183,73 +1122,6 @@ private fun DragGrip(
                 }
             },
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-/**
- * 시각을 숫자로 고치는 다이얼로그. (#319)
- *
- * **`TimePicker` 대신 숫자 입력이다.** 시·분을 돌리는 다이얼은 `18:30` 처럼 30분 단위를
- * 맞추는 데 손이 많이 간다. 여기 값들은 대부분 정각·30분이라 키패드가 빠르다.
- *
- * 확인은 `HH:mm` 이 될 때만 열린다 — 잘못된 값을 넣고 닫으면 그 값이 그대로 서버로 간다.
- */
-@Composable
-private fun TimePickerDialog(
-    initial: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var hour by remember { mutableStateOf(initial.substringBefore(":", "13")) }
-    var minute by remember { mutableStateOf(initial.substringAfter(":", "00")) }
-    val valid = hour.toIntOrNull()?.let { it in 0..23 } == true &&
-        minute.toIntOrNull()?.let { it in 0..59 } == true
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("시각 바꾸기") },
-        text = {
-            Column {
-                Text(
-                    "시각을 바꾸면 그 시각에 맞는 자리로 옮겨져요.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = hour,
-                        onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) hour = it },
-                        modifier = Modifier.width(84.dp),
-                        singleLine = true,
-                        label = { Text("시") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
-                    Text(
-                        "  :  ",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    OutlinedTextField(
-                        value = minute,
-                        onValueChange = { if (it.length <= 2 && it.all(Char::isDigit)) minute = it },
-                        modifier = Modifier.width(84.dp),
-                        singleLine = true,
-                        label = { Text("분") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm("%02d:%02d".format(hour.toInt(), minute.toInt()))
-                },
-                enabled = valid,
-            ) { Text("확인") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )
 }
 
@@ -1420,7 +1292,7 @@ private fun DayNote(note: String) {
     }
 }
 
-/** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
+/** 순서 카드 하나. 번호 레일 + 제목 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
 private fun TimelineRow(
     number: Int,
@@ -1445,13 +1317,6 @@ private fun TimelineRow(
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = block.time,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = block.title,
                         style = MaterialTheme.typography.titleSmall,

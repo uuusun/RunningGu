@@ -48,7 +48,6 @@ import java.time.LocalDate
  * - `reorderBlocks` 에 RACE 를 섞으면 → `순서는 USER 블록만 보낸다` 만
  * - `savedEditMessage` 의 `SYSTEM_BLOCK_IMMUTABLE` 갈래를 빼면 → `대회 블록은 못 고친다고 말한다` 만
  * - `editInFlight` 가드를 빼면 → `보내는 중에는 또 안 보낸다` 만
- * - 저장 후 시각 변경 가드를 빼면 → `저장 후 시각 변경은 서버에 보내지 않는다` 만
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SavedItineraryEditTest {
@@ -195,20 +194,6 @@ class SavedItineraryEditTest {
         advanceUntilIdle()
 
         assertEquals(1, repo.calls)
-    }
-
-    @Test
-    fun `저장 후 시각 변경은 서버에 보내지 않는다`() = runTest(dispatcher) {
-        val repo = FakeRepo()
-        val vm = restored(repo)
-        advanceUntilIdle()
-        val before = vm.uiState.value.activeDay?.blocks
-
-        vm.onBlockTimeChange("12", "09:05")
-        advanceUntilIdle()
-
-        assertEquals(0, repo.calls)
-        assertEquals(before, vm.uiState.value.activeDay?.blocks)
     }
 
     companion object {
