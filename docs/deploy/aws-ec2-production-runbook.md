@@ -21,7 +21,9 @@
 | 공개 주소 | `https://api.runninggu.store/api/` |
 
 SSH key pair와 22번 포트는 사용하지 않는다. SSM Session Manager로 접속하며 IMDSv2를 강제한다.
-종료 방지는 활성화 상태를 유지한다. 스테이징 EC2·DB·시크릿과 운영 값을 공유하지 않는다.
+종료 방지는 활성화 상태를 유지한다. 스테이징 EC2·DB와 운영 비밀값은 분리한다. 단 KTO service
+key는 결정-63에 따라 같은 계정의 staging 값과 공유하며 호출 쿼터도 합산 관리한다. 운영계정
+승인 뒤 실제 쿼터와 별도 키 발급 가능 여부를 확인해 필요하면 환경별 키로 분리한다.
 
 ## 2. 운영 환경 파일
 
@@ -49,9 +51,10 @@ sudo install -m 0640 -o root -g runninggu \
 | 문서 API | springdoc·Swagger 모두 비활성 |
 | 부하 시험 가드 | 항상 비활성 |
 
-`DB_PASSWORD`, `JWT_SECRET`, Resend API key, KTO service key, Kakao REST key는 운영 전용으로
-생성한다. 값은 명령 인자·shell history·Git·CI·문서에 남기지 않는다. 두 env 파일의
-`DB_PASSWORD`만 같은 값을 사용한다.
+`DB_PASSWORD`, `JWT_SECRET`, Resend API key, Kakao REST key·app ID는 운영 전용으로 생성한다.
+KTO service key는 결정-63에 따라 staging과 공유하고 staging 실호출은 기능 확인으로 제한한다.
+운영계정 승인 뒤 필요하면 환경별 키로 분리한다. 값은 명령 인자·shell history·Git·CI·문서에
+남기지 않는다. 두 env 파일의 `DB_PASSWORD`만 같은 값을 사용한다.
 
 운영 비밀값은 고객 관리형 KMS key로 암호화한 Parameter Store `SecureString`으로 보관한다.
 경로는 `/runninggu/production/<name>`으로 제한하며, EC2 role이 복호화해 접근 제한된 env 파일을
@@ -181,7 +184,9 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다.
 - 외부에서 5432·8080·8989에 연결할 수 없는가
 - Swagger와 `/v3/api-docs`가 비활성인가
 - access log에 URI·query·Host·User-Agent가 남지 않고 method가 허용 목록 값으로 축약되는가
-- 운영 DB·JWT·SMTP·KTO·Kakao 값이 스테이징과 다른가
+- 운영 DB·JWT·SMTP·Kakao 값이 스테이징과 다르고, KTO만 승인된 공유값인가
+- 공유 KTO key의 staging·production 호출량과 쿼터를 합산해 관리하는가
+- 운영계정 승인 뒤 실제 쿼터·별도 키 발급 가능 여부를 확인하고 분리 필요성을 다시 판단했는가
 - GraphHopper가 승인된 기존 graph를 불러오며 import·SRTM download를 시작하지 않는가
 - full backup·WAL archive·실패 알림·예산 알림 구독이 확인됐는가
 - 재부팅 뒤 PostgreSQL, GraphHopper, Spring Boot, Nginx, certbot timer가 자동 복구되는가
