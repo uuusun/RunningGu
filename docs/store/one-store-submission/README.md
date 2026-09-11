@@ -1,0 +1,25 @@
+# 원스토어 제출 첨부 자료
+
+이 폴더는 `docs/store/store-listing.md`의 원스토어 등록 초안에서 이어지는 실제 제출 첨부 자료를 둔다.
+
+## 지식재산권
+
+- 원스토어 기본정보의 지식재산권 사용 여부는 `예`로 답한다.
+- 이는 침해를 인정한다는 뜻이 아니라, 앱이 외부 데이터와 오픈소스 글꼴을 적법한 이용 조건 안에서 사용한다는 뜻이다.
+- 첨부 파일: `intellectual-property-evidence.pdf`
+
+PDF는 다음 근거를 한 문서로 묶는다.
+
+- 한국관광공사 관광정보 API, 두루누비, 웰니스 관광정보 활용 근거
+- 카카오 Developers 앱 등록 및 지도/로컬 API 이용 근거
+- OpenStreetMap ODbL 조건 및 앱 내 `© OpenStreetMap contributors` 표시
+- 한국등산·트레킹지원센터 데이터 이용 조건
+- Pretendard, Archivo의 SIL Open Font License 1.1
+- 앱 아이콘, 로고, 앱 내 문구의 자체 제작 확인
+
+## 제출 전 보강 필요
+
+현재 PDF에는 승인 화면 원본 대신 자리표시가 들어간 부분이 있다. 콘솔 제출 전에는 다음 화면을 캡처해 API 키를 완전히 가린 뒤 PDF에 반영한다.
+
+- 공공데이터포털 한국관광공사 API 활용신청 승인 화면
+- Kakao Developers 앱 등록 및 지도/로컬 API 사용 설정 화면
