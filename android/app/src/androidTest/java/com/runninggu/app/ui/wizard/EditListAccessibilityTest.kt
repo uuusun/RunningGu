@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -75,6 +77,7 @@ class EditListAccessibilityTest {
                 onRemove = {},
                 onMove = onMove,
                 onReplace = {},
+                canChangeTime = true,
                 onTimeChange = { _, _ -> },
             )
         }
@@ -168,7 +171,7 @@ class EditListAccessibilityTest {
             LazyColumn {
                 savedEditSection(
                     state = state,
-                    day = day(block("b1", "첫째 일정"), block("b2", "둘째 일정")),
+                    day = day(block("b1", "첫째 일정"), block("b2", "둘째 일정").copy(time = "12:30")),
                     openedBlockId = null,
                     onOpenedChange = {},
                     onRemoveBlock = {},
@@ -223,6 +226,24 @@ class EditListAccessibilityTest {
         setSection(ResultUiState(isEditing = true))
 
         compose.onNodeWithText("고치는 중이에요…").assertDoesNotExist()
+    }
+
+    @Test
+    fun 저장_전_편집에는_시각_변경을_노출한다() {
+        setSection(ResultUiState(isEditing = true))
+
+        compose.onNodeWithText("일반 장소는 시각 변경 · 순서 변경 · 교체 · 삭제할 수 있어요. " +
+            "대회 일정은 변경할 수 없어요.").assertExists()
+        compose.onNodeWithText("10:00").assertHasClickAction()
+    }
+
+    @Test
+    fun 저장_후_편집에는_시각_변경을_노출하지_않는다() {
+        setSection(ResultUiState(isEditing = true, restoredItineraryId = 42L))
+
+        compose.onNodeWithText("일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
+            "대회 일정은 변경할 수 없어요.").assertExists()
+        compose.onNodeWithText("10:00").assertHasNoClickAction()
     }
 }
 

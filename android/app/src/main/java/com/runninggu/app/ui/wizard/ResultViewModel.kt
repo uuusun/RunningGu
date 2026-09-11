@@ -567,38 +567,25 @@ class ResultViewModel(
     }
 
     /**
-     * 시트의 검색어가 바뀌었다. **글자마다 조회하지 않는다** — 입력은 즉시 반영하고,
-     * 서버 조회는 [onSheetSearch] 로 사용자가 확정할 때만 한다.
-     */
-    /**
-     * 블록의 시각을 사용자가 직접 고쳤다. **고친 뒤 시각순으로 다시 선다.** (#319)
+     * 저장 전 블록의 시각을 사용자가 직접 고쳤다. **고친 뒤 시각순으로 다시 선다.** (#319)
      *
      * 시각을 정할 수 있으면 목록 순서와 시각이 어긋날 수 있다 — `14:30` 을 `09:00` 으로
      * 바꿔 놓고 자리는 셋째 줄이면 읽는 사람이 헷갈린다. 시각이 정답이고 순서가 따른다.
+     *
+     * 저장 후 편집에서는 호출하지 않는다. 시각 PATCH와 순서 PUT을 이어 보내면 두 번째
+     * 실패 때 반쪽만 저장되므로, 원자적 계약을 #335에서 정하기 전까지 막는다(SPEC §4.10).
      */
     fun onBlockTimeChange(blockId: String, time: String) {
-        if (_uiState.value.isSavedEditing) {
-            val at = _uiState.value.activeDayIndex
-            val sorted = ItineraryEdits.changeBlockTime(daysNow(), at, blockId, time)
-            val userIds = sorted.getOrNull(at)?.blocks
-                ?.filter { !it.systemManaged }
-                ?.mapNotNull { it.id.toLongOrNull() }
-                .orEmpty()
-            savedEdit(blockId) { itineraryId, dayId, dayIndex ->
-                // 시각을 먼저 저장하고, 그 결과로 정해진 순서를 이어서 보낸다.
-                repository.updateBlock(
-                    itineraryId, dayId, blockId.toLong(), BlockPatch(startTime = time),
-                )
-                val blocks = repository.reorderBlocks(itineraryId, dayId, userIds)
-                replaceDayBlocks(dayIndex, blocks)
-            }
-            return
-        }
+        if (_uiState.value.isSavedEditing) return
         editActiveDay { days, dayIndex ->
             ItineraryEdits.changeBlockTime(days, dayIndex, blockId, time)
         }
     }
 
+    /**
+     * 시트의 검색어가 바뀌었다. **글자마다 조회하지 않는다** — 입력은 즉시 반영하고,
+     * 서버 조회는 [onSheetSearch] 로 사용자가 확정할 때만 한다.
+     */
     fun onSheetQueryChange(query: String) {
         _uiState.update { state ->
             state.copy(sheet = state.sheet?.copy(query = query))
@@ -876,4 +863,3 @@ internal const val SAVED_EDIT_FAILED = "고치지 못했어요. 잠시 후 다�
  * 고치지 않는다** — 화면에서는 고쳐졌는데 서버에는 안 간 상태가 제일 나쁘다.
  */
 internal const val SAVED_EDIT_NO_SERVER_ID = "이 동선은 지금 고칠 수 없어요. 다시 열어 주세요."
-

@@ -1,14 +1,13 @@
 package com.runninggu.app.ui.wizard
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -316,8 +316,8 @@ private fun ResultContent(
                     onCategorySelect = viewModel::onSheetCategorySelect,
                     onSelect = viewModel::onCandidateSelect,
                     onRetry = viewModel::onSheetRetry,
-                onQueryChange = viewModel::onSheetQueryChange,
-                onSearch = viewModel::onSheetSearch,
+                    onQueryChange = viewModel::onSheetQueryChange,
+                    onSearch = viewModel::onSheetSearch,
                 )
             }
         }
@@ -706,7 +706,7 @@ internal fun LazyListScope.savedEditSection(
         // 알아야 한다 — 열린 행은 하나뿐이고 드래그는 이웃 행의 위치를 본다.
         item(key = "editList") {
             Column(Modifier.padding(horizontal = HORIZONTAL_PADDING)) {
-                EditNotice()
+                EditNotice(canChangeTime = !state.isSavedEditing)
 
                 Spacer(Modifier.height(10.dp))
                 // 왕복 중에는 조작을 막는다 — 눌러도 가드에 막히는데 화면이
@@ -718,6 +718,7 @@ internal fun LazyListScope.savedEditSection(
                     onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
                     onMove = { from, to -> if (!state.editInFlight) onMoveBlock(from, to) },
                     onReplace = { if (!state.editInFlight) onReplaceBlock(it) },
+                    canChangeTime = !state.isSavedEditing,
                     onTimeChange = { id, time -> if (!state.editInFlight) onTimeChange(id, time) },
                 )
                 Spacer(Modifier.height(10.dp))
@@ -752,14 +753,20 @@ private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Un
 
 /** 편집 모드 안내. 대회 일정을 왜 못 바꾸는지 미리 알린다. (SPEC §4.10) */
 @Composable
-private fun EditNotice() {
+private fun EditNotice(canChangeTime: Boolean) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text = "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요.",
+            text = if (canChangeTime) {
+                "일반 장소는 시각 변경 · 순서 변경 · 교체 · 삭제할 수 있어요. " +
+                    "대회 일정은 변경할 수 없어요."
+            } else {
+                "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
+                    "대회 일정은 변경할 수 없어요."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -792,6 +799,7 @@ internal fun EditList(
     onRemove: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onReplace: (ItineraryBlock) -> Unit,
+    canChangeTime: Boolean,
     onTimeChange: (String, String) -> Unit,
 ) {
     // 드래그 제스처 코루틴이 여러 리컴포지션에 걸쳐 살아 있으므로 최신 목록을 State 로 읽는다.
@@ -941,27 +949,28 @@ internal fun EditList(
                             NumberRail(index + 1)
                             Spacer(Modifier.width(10.dp))
 
-                            // **시각을 왼쪽 열로 뺀다** (#319). 부제목에 `15:00 · 씨야드스테이 ·
-                            // 숙소` 로 묶여 있으면 시각이 그 블록의 속성처럼 읽힌다. 실제로는
-                            // **자리에 붙은 값**이라 — 순서를 바꾸면 그 자리의 시각을 받는다 —
-                            // 세로로 줄맞춤해 두면 "이 자리는 15:00" 이 눈에 들어온다.
+                            // **시각을 왼쪽 열로 뺀다** (#319). 블록의 시각을 세로로 줄맞춤해
+                            // 일정 순서를 빠르게 읽게 한다. 저장 전에는 직접 고칠 수 있지만,
+                            // 저장 후에는 원자적 계약을 #335에서 정하기 전까지 표시만 한다.
                             Text(
                                 text = block.time,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = if (editable) {
+                                color = if (editable && canChangeTime) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                                 maxLines = 1,
-                                // 고정 폭이라 자릿수가 달라도 아래 행과 줄이 맞는다.
-                                // 누르면 시각을 직접 고친다 — 대회 블록은 못 고친다(#319).
+                                // 최소 폭으로 줄을 맞추되 큰 글꼴에서는 잘리지 않게 늘어난다.
                                 modifier = Modifier
-                                    .width(TIME_SLOT_WIDTH)
+                                    .widthIn(min = TIME_SLOT_WIDTH)
                                     .then(
-                                        if (editable) {
-                                            Modifier.clickable { editingTimeOf = block }
+                                        if (editable && canChangeTime) {
+                                            Modifier.clickable(
+                                                onClickLabel = "${block.title} 시각 바꾸기",
+                                                onClick = { editingTimeOf = block },
+                                            )
                                         } else {
                                             Modifier
                                         },
@@ -1663,4 +1672,3 @@ private fun SavedEditError(message: String) {
         )
     }
 }
-

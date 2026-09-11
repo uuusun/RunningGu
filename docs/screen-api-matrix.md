@@ -290,7 +290,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | 변경 대회 재생성 | `POST /api/itineraries/generate` | 최신 canonical 기준 입력 | 저장 전 임시 DTO | "직접 고친 장소는 사라져요" 확인 뒤 호출, 기존 저장본 유지 |
 | 재생성 최종 교체 | `PUT /api/itineraries/{id}` | 새 편집 DTO→200 same id/replaced | PostgreSQL | 저장 성공 시에만 기존 트리 교체, USER 편집 자동 병합 없음 |
 | 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지. **`startTime` 은 앱이 계산해 보낸다** — 맨 끝이면 마지막 시각 한 시간 뒤다. 계약 기본값 `13:00` 은 하루가 빌 때만(#319) |
-| 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체. **`startTime` 을 보내면 이어서 §5-10 으로 순서도 맞춘다**(#319) |
+| 저장 후 수정 | PATCH `.../blocks/{blockId}` | 변경 필드→200 갱신 block 전체 | PostgreSQL | 응답 block으로 해당 항목 교체. 앱은 장소·설명·카테고리 수정만 사용하며, **`startTime` UI는 원자적 재정렬 계약을 #335에서 정하기 전까지 열지 않는다** — PATCH 뒤 §5-10을 이어 보내 부분 성공 상태를 만들지 않는다(#319) |
 | 저장 후 삭제 | DELETE `.../blocks/{blockId}` | 204 | PostgreSQL | RACE는 409 |
 | 저장 후 순서 | PUT `.../blocks/order` | 전체 USER blockIds→200 해당 일자 전체 blocks | PostgreSQL | 응답 blocks로 일자 상태 교체, set mismatch/409. **시각은 블록을 따라간다** — 순서만 바뀌고 서버가 시각을 다시 매기지 않는다(#319 · 드래그 재배치는 #335) |
 | Empty 조건 수정 | 위저드 복귀 | 기존 WizardUiState | 없음 | 입력 유지 후 조건 수정 |
