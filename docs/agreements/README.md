@@ -131,11 +131,12 @@ assets.srcDir(rootProject.file("../docs/agreements"))
 
 ### 활성화를 막는 최종 확인
 
-- [ ] 백엔드 예외 원문 제거와 nginx 최소 접속 로그를 운영 환경에 적용하고, 가짜 이메일·
+- [x] 백엔드 예외 원문 제거와 nginx 최소 접속 로그를 운영 환경에 적용하고, 가짜 이메일·
       좌표·토큰 표식 및 최근 보존 로그의 일반 민감정보 패턴이 nginx 파일·backend/nginx
       journal에서 0건인지 확인했다
-      - 2026-09-10 staging은 과거 로그 86건 정리 뒤 전체 0건·`passed=true`를 확인했다.
-        production은 HTTP bootstrap만 통과했고 TLS·backend 검사가 남아 있어 체크는 유지한다.
+      - staging은 과거 로그 86건 정리와 `a2c7700` 배포 뒤 전체 0건·`passed=true`, production은
+        안전 release 전 archive 1건 정리 뒤 nginx 4개·216행과 최근 14일 journal 211행의
+        시험 표식·일반 패턴 0건·`passed=true`를 확인했다.
         [실서버 적용·검증 기록](../deploy/evidence/server-log-privacy-staging-production-20260910.md)
 - [ ] #227의 인증·세션 정리와 탈퇴 데이터 복구 절차가 구현·검증됐다
 - [ ] #228의 A2 별도 체크박스, 두 가입 API `ageOver14` 검증, 가입 `CODE_EXPIRED`의
