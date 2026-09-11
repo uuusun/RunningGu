@@ -47,7 +47,8 @@ import com.runninggu.app.data.local.LoginProvider
 /**
  * 계정 관리 — 마이 설정에서 여는 별도 화면. (SPEC §4.13 정보 수정 · D-22 · AP-13)
  *
- * 닉네임 · 마케팅 수신 동의 · 비밀번호 변경(EMAIL 가입자만) · 로그아웃 · 회원 탈퇴.
+ * 닉네임 · 마케팅 수신 동의 · 비밀번호 변경(EMAIL 가입자만) · 오픈소스 라이선스 ·
+ * 로그아웃 · 회원 탈퇴.
  * 로그인 방식 변경과 이메일 주소 변경은 MVP 범위 밖이다(#59 결정-22 개정).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +61,7 @@ fun AccountScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showsOpenSourceLicenses by remember { mutableStateOf(false) }
     // 카카오 재인증이 SDK 를 부르는 데 필요하다 (§2-2)
     val context = LocalContext.current
 
@@ -142,6 +144,14 @@ fun AccountScreen(
             }
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            SectionTitle("정보")
+            SettingRow(
+                label = "오픈소스 라이선스",
+                value = "",
+                onClick = { showsOpenSourceLicenses = true },
+            )
+
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionTitle("계정")
             SettingRow(label = "로그아웃", value = "", onClick = viewModel::onLogout)
             SettingRow(
@@ -192,6 +202,15 @@ fun AccountScreen(
             onConfirmKakao = { viewModel.onWithdrawWithKakao(context) },
         )
     }
+
+    if (showsOpenSourceLicenses) {
+        OpenSourceLicensesDialog(
+            text = remember(context) {
+                context.assets.open("licenses/OFL-1.1.txt").bufferedReader().use { it.readText() }
+            },
+            onDismiss = { showsOpenSourceLicenses = false },
+        )
+    }
 }
 
 // ── 조각 ────────────────────────────────────────────────────────
@@ -203,6 +222,28 @@ private fun SectionTitle(text: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 4.dp),
+    )
+}
+
+/** 번들 폰트의 저작권 고지와 OFL 1.1 전문. (NFR-18) */
+@Composable
+private fun OpenSourceLicensesDialog(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("오픈소스 라이선스", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
     )
 }
 

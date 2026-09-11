@@ -8,8 +8,9 @@
 | `app/src/main/res/font/pretendard_variable.ttf` | Pretendard Variable v1.3.9 | 본문 (`--font-body`) | SIL Open Font License 1.1 | https://github.com/orioncactus/pretendard |
 | `app/src/main/res/font/archivo_variable.ttf` | Archivo Variable | 숫자·영문 라벨 (`--font-num`) | SIL Open Font License 1.1 | https://github.com/google/fonts/tree/main/ofl/archivo |
 
-두 폰트 모두 OFL 1.1이라 앱 번들·배포에 제약이 없다. 다만 OFL은 **저작권·라이선스 고지**를
-요구하므로, 스토어 배포 전 앱 내 "오픈소스 라이선스" 화면에 위 내용을 넣어야 한다.
+두 폰트 모두 OFL 1.1이다. 저작권 고지와 공식 라이선스 전문은
+`app/src/main/assets/licenses/OFL-1.1.txt`에 번들하며, 계정 관리의
+**오픈소스 라이선스** 화면에서 사용자가 직접 열 수 있다.
 
 ## 용량 메모
 
