@@ -175,7 +175,10 @@ AWS Budget은 운영 자원용 월 USD 70 기준으로 만든다. 실제 비용 
 PostgreSQL은 매일 03:20 KST 전체 백업, 연속 WAL, 7일 보존을 유지한다. 최초 수동 full backup,
 `pgbackrest info --output=json`, WAL check, 운영 bucket 객체·SSE-KMS 상태를 확인한 뒤에만
 `runninggu-postgres-backup.timer`를 활성화한다. 백업 존재만으로 복구 완료로 보지 않으며 별도
-volume을 사용하는 복구 리허설을 출시 전 수행한다.
+volume을 사용하는 복구 리허설을 출시 전 수행한다. 리허설에서는 합성 사용자와 종속 데이터를
+만들어 백업한 뒤 사용자를 탈퇴시키고 WAL을 보관한다. 백업 시점만 복원하면 사용자가 존재하고,
+최신 WAL까지 적용하면 사용자와 종속 데이터가 모두 사라지는지 확인한다. 리허설 컨테이너는
+네트워크를 차단하고 운영 데이터 volume을 마운트하지 않는다.
 
 ## 7. 완료 확인
 
@@ -189,6 +192,7 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다.
 - 운영계정 승인 뒤 실제 쿼터·별도 키 발급 가능 여부를 확인하고 분리 필요성을 다시 판단했는가
 - GraphHopper가 승인된 기존 graph를 불러오며 import·SRTM download를 시작하지 않는가
 - full backup·WAL archive·실패 알림·예산 알림 구독이 확인됐는가
+- 합성 사용자 탈퇴 전 백업과 탈퇴 후 최신 WAL 복원에서 삭제 상태가 유지되는가
 - 재부팅 뒤 PostgreSQL, GraphHopper, Spring Boot, Nginx, certbot timer가 자동 복구되는가
 
 각 항목의 명령·시각·결과를 배포 증거 문서에 남긴다. 로그와 증거에는 토큰·비밀번호·인증 코드·
