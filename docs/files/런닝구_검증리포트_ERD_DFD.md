@@ -26,7 +26,7 @@
 - `UNIQUE(user_id)`와 `UNIQUE(provider, provider_subject)`를 적용하고 P0 연결·추가·해제·전환을 제공하지 않는다.
 - 대표 이메일은 EMAIL의 `provider_subject`, KAKAO의 nullable `email_snapshot`에서 파생한다. `GET /me.email`은 항상 포함하는 `string|null`이며, KAKAO가 이메일을 제공하지 않으면 앱이 이메일 행을 숨긴다.
 - EMAIL은 `password_hash`·`email_verified_at`이 필수이고 KAKAO는 둘 다 null이며, nullable `last_login_at`을 유지한다.
-- 약관은 `USER_AGREEMENT`에 append-only 이력으로 저장하고 가입 시 활성 `TOS/PRIVACY/MARKETING=1.0` 세 행을 같은 시각에 기록한다.
+- 약관은 `USER_AGREEMENT`에 append-only 이력으로 저장하고 가입 시 활성 `TOS=1.1 · PRIVACY=1.2 · MARKETING=1.1` 세 행을 같은 시각에 기록한다.
 - 인증 코드·재설정 토큰과 refresh token은 원문이 아니라 hash만 저장한다. refresh는 `family_id UUID`로 기기 세션을 구분하고 family별 활성 행을 하나로 제한하며 과거 토큰 재사용 시 같은 family만 전부 revoke한다.
 - 이메일 인증 목적은 `SIGNUP/PASSWORD_RESET`으로 통일한다.
 
