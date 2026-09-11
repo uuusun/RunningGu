@@ -21,7 +21,7 @@ PDF는 다음 근거를 한 문서로 묶는다.
 - 앱 러닝코스 화면의 Kakao 지도 워터마크 표시 캡처
 - 공공데이터포털 국문 관광정보, 두루누비, 웰니스 관광정보 승인/상세 캡처
 - Kakao Developers Android 앱 등록, REST API 키, 카카오 로그인, 카카오맵 설정 캡처
-- 한국등산·트레킹지원센터 공공데이터 이용 근거 캡처
+- 한국등산트레킹지원센터 공공데이터 이용 근거 캡처
 - 앱 내 OpenStreetMap 출처 표시 캡처
 
 ## 제출 전 보강 필요
@@ -40,7 +40,7 @@ PDF 12쪽의 제출자와 확인일은 원스토어 콘솔 제출 직전에 실�
 `evidence/REST API_마스킹.png`는 `evidence/REST API.png`에서 REST API 키와 클라이언트 시크릿 값을
 가린 제출용 이미지다. PDF에는 마스킹본만 반영한다.
 
-`evidence/한국등산트레킹지원센터.png`는 한국등산·트레킹지원센터 공공데이터 이용 근거 화면이다.
+`evidence/한국등산트레킹지원센터.png`는 한국등산트레킹지원센터 공공데이터 이용 근거 화면이다.
 
 `evidence/앱_OSM_출처표시.png`는 staging APK에서 러닝코스 출발지 주변 목록 하단의
 `© OpenStreetMap contributors` 표시를 캡처한 제출용 이미지다.
