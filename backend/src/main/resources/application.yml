@@ -107,9 +107,9 @@ runninggu:
       access-ttl: 30m
       refresh-ttl: 14d
     agreements:
-      tos-version: "1.0"
-      privacy-version: "1.0"
-      marketing-version: "1.0"
+      tos-version: "1.1"
+      privacy-version: "1.2"
+      marketing-version: "1.1"
   mail:
     enabled: ${MAIL_ENABLED:false}
     from-address: ${SMTP_FROM_ADDRESS:}

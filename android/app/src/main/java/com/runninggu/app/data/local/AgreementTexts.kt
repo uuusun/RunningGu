@@ -21,10 +21,11 @@ import java.io.IOException
  * 서버 활성 버전이 **반드시 같아야** 한다 — 어느 한쪽만 올리면 안 된다(D-32 · 이슈 #111).
  *
  * **버전은 약관마다 따로 든다**([AgreementDoc.version]). 서버도
- * `tos-version` · `privacy-version` · `marketing-version` 을 각각 관리한다. 실제로 TOS 는
- * `v1.1`, PRIVACY 는 `v1.1`·`v1.2` 초안이 서로 다른 시점에 준비됐다. 하나로 묶으면
- * PRIVACY 를 `v1.2`로 올리는 순간 있지도 않은 `v1.2/tos.md`를 읽어 **두 문안이 안
- * 열리고 버전 표시까지 틀린다**(#191 리뷰).
+ * `tos-version` · `privacy-version` · `marketing-version` 을 각각 관리한다. 지금 활성은
+ * TOS `v1.1` · PRIVACY `v1.2` · MARKETING `v1.1` 로 **셋이 서로 다르다** — PRIVACY 만
+ * `v1.1` 을 건너뛰고 `v1.2` 로 갔다(기기 위치 기능이 빠져서다 · #215). 하나로 묶었다면
+ * 이 순간 있지도 않은 `v1.2/tos.md`를 읽어 **두 문안이 안 열리고 버전 표시까지
+ * 틀렸다**(#191 리뷰).
  */
 object AgreementTexts {
 
@@ -41,7 +42,7 @@ object AgreementTexts {
         null
     }
 
-    /** `docs/agreements/v1.0/tos.md` 가 assets 에서는 `v1.0/tos.md` 다. */
+    /** `docs/agreements/v1.1/tos.md` 가 assets 에서는 `v1.1/tos.md` 다. */
     fun assetPath(doc: AgreementDoc): String = "v${doc.version}/${doc.fileName}"
 }
 
@@ -54,10 +55,10 @@ object AgreementTexts {
  * @param required 필수인가. 마케팅만 선택이고, **미동의도 정상 가입**이다 —
  *  그때도 `agreed=false` 이력이 남는다(이슈 #111).
  * @param version 이 약관의 활성 버전. 서버 `runninggu.auth.agreements.{type}-version` 과
- *  **같아야 한다.** 셋을 하나로 묶지 않는 이유는 서버가 따로 관리하고 TOS `v1.1`과
- *  PRIVACY `v1.1`·`v1.2`처럼 다음 버전도 따로 준비되기 때문이다. 하나로 묶으면 한 문안을
- *  올릴 때 나머지 파일 경로가 깨진다(#191 리뷰). 올릴 때는 서버 설정과 **같은 PR 에서**
- *  바꾼다(D-32).
+ *  **같아야 한다.** 셋을 하나로 묶지 않는 이유는 서버가 따로 관리하고 실제로 버전이
+ *  갈리기 때문이다 — 지금도 TOS `1.1` · PRIVACY `1.2` · MARKETING `1.1` 이다. 하나로
+ *  묶으면 한 문안을 올릴 때 나머지 파일 경로가 깨진다(#191 리뷰). 올릴 때는 서버 설정과
+ *  **같은 PR 에서** 바꾼다(D-32).
  */
 enum class AgreementDoc(
     val label: String,
@@ -65,9 +66,9 @@ enum class AgreementDoc(
     val required: Boolean,
     val version: String,
 ) {
-    TOS("이용약관", "tos.md", required = true, version = "1.0"),
-    PRIVACY("개인정보 수집·이용", "privacy.md", required = true, version = "1.0"),
-    MARKETING("마케팅 정보 수신", "marketing.md", required = false, version = "1.0"),
+    TOS("이용약관", "tos.md", required = true, version = "1.1"),
+    PRIVACY("개인정보 수집·이용", "privacy.md", required = true, version = "1.2"),
+    MARKETING("마케팅 정보 수신", "marketing.md", required = false, version = "1.1"),
     ;
 
     /** 체크박스에 쓰는 말. "(필수) 이용약관 동의" */

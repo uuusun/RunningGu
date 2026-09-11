@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runninggu.server.auth.application.IssuedTokenPair;
 import com.runninggu.server.auth.application.RefreshTokenHasher;
 import com.runninggu.server.auth.application.TokenIssuer;
+import com.runninggu.server.auth.infrastructure.AgreementProperties;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,6 +43,19 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AgreementProperties agreementProperties;
+
+    /** 저장된 이력의 버전은 **그 약관의 활성 설정값**과 같아야 한다. 셋이 서로 다르다(#265). */
+    private String activeVersion(Object agreementType) {
+        return switch (agreementType.toString()) {
+            case "TOS" -> agreementProperties.tosVersion();
+            case "PRIVACY" -> agreementProperties.privacyVersion();
+            case "MARKETING" -> agreementProperties.marketingVersion();
+            default -> throw new IllegalArgumentException("알 수 없는 약관 " + agreementType);
+        };
+    }
 
     @Autowired
     @Qualifier("accessJwtDecoder")
@@ -91,7 +105,10 @@ class AuthSessionApiIntegrationTest extends PostgreSqlContainerSupport {
         List<Map<String, Object>> agreements = jdbcTemplate.queryForList(
                 "SELECT agreement_type, version, agreed, changed_at FROM user_agreement ORDER BY agreement_type");
         assertThat(agreements).hasSize(3);
-        assertThat(agreements).allSatisfy(row -> assertThat(row.get("version")).isEqualTo("1.0"));
+        // 활성 버전은 약관마다 다르다 — PRIVACY 만 1.2 다(#265 · D-32). 하나로 묶어
+        // 단언하면 한쪽만 올라간 사고를 못 잡는다. 값 자체는 ApplicationContextTest 가 박는다.
+        assertThat(agreements).allSatisfy(row -> assertThat(row.get("version"))
+                .isEqualTo(activeVersion(row.get("agreement_type"))));
         assertThat(agreements.stream().map(row -> row.get("changed_at")).distinct()).hasSize(1);
         assertThat(agreements).anySatisfy(row -> {
             assertThat(row.get("agreement_type")).isEqualTo("MARKETING");
