@@ -131,7 +131,9 @@ class MemberProfileApiIntegrationTest extends PostgreSqlContainerSupport {
 
         assertThat(agreementCount(userId)).isEqualTo(4);
         assertThat(latestMarketing(userId)).isTrue();
-        assertThat(latestMarketingVersion(userId)).isEqualTo("1.0");
+        // 시드는 1.0 으로 넣어 두고 여기서 1.1 을 본다 — 동의를 다시 받으면 **그때의 활성
+        // 버전**으로 이력이 남아야 한다(NFR-12). 옛 이력은 그대로 둔다.
+        assertThat(latestMarketingVersion(userId)).isEqualTo("1.1");
 
         mockMvc.perform(patch("/api/me/agreements")
                         .header("Authorization", bearer(userId))

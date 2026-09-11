@@ -67,18 +67,27 @@ class AgreementTextsTest {
     }
 
     @Test
-    fun `아직 켜지 않은 버전은 읽지 않는다`() {
-        // v1.1 · v1.2 privacy 도 저장소에 있어 함께 번들되지만, A2 연결과 서버 전환을 같은
-        // 계약으로 맞추기 전에는 쓰지 않는다(#111 운영 규칙 1). 지금 경로가 v1.0 인지 본다.
-        // v1.1 은 켜지 못한 채 v1.2 로 대체됐다 — 기기 위치 기능이 없어져서다(#215).
-        assertEquals("v1.0/privacy.md", AgreementTexts.assetPath(AgreementDoc.PRIVACY))
+    fun `지금 활성인 버전이 셋 다 이것이다`() {
+        // **켜는 순간 "아직 안 켰다" 를 지키던 테스트는 목적이 사라진다.** 지우지 않고
+        // 바꾼다 — 이제는 활성 버전 세 개를 못으로 박아, 다음에 누가 한쪽만 올리면
+        // 여기서 걸리게 한다(#278 리뷰 · 민지).
+        //
+        // 셋이 서로 다르다. PRIVACY 만 v1.1 을 건너뛰고 v1.2 로 갔다 — 기기 위치 기능이
+        // 없어져서다(#215). 앱만 올리고 서버 설정을 안 바꾸면 서버는 옛 버전으로 이력을
+        // 남긴다(D-32). 바꿀 때는 `application.yml` 의 세 값과 **같은 PR 에서** 바꾼다.
+        assertEquals("1.1", AgreementDoc.TOS.version)
+        assertEquals("1.2", AgreementDoc.PRIVACY.version)
+        assertEquals("1.1", AgreementDoc.MARKETING.version)
+        assertEquals("v1.1/tos.md", AgreementTexts.assetPath(AgreementDoc.TOS))
+        assertEquals("v1.2/privacy.md", AgreementTexts.assetPath(AgreementDoc.PRIVACY))
+        assertEquals("v1.1/marketing.md", AgreementTexts.assetPath(AgreementDoc.MARKETING))
     }
 
     @Test
     fun `버전은 약관마다 따로 든다`() {
         // 서버가 tos-version · privacy-version · marketing-version 을 각각 관리하고,
-        // TOS 1.1 과 PRIVACY 1.1·1.2 초안도 서로 따로 준비됐다. 하나로 묶으면 PRIVACY 를
-        // 1.2 로 올릴 때 있지도 않은 v1.2/tos.md 를 읽어 문안과 버전 표시가 깨진다(#191 리뷰).
+        // 활성 버전도 실제로 갈렸다 — PRIVACY 만 1.2 다. 하나로 묶었다면 PRIVACY 를
+        // 1.2 로 올리는 순간 있지도 않은 v1.2/tos.md 를 읽어 깨졌다(#191 리뷰).
         AgreementDoc.entries.forEach { doc ->
             assertEquals("v${doc.version}/${doc.fileName}", AgreementTexts.assetPath(doc))
         }

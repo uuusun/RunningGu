@@ -94,8 +94,12 @@ class AgreementMarkdownTest {
         assertFalse("표 구분선이 남았다", plain.contains("|---"))
         assertFalse("인용 표시가 남았다", plain.lineSequence().any { it.trimStart().startsWith(">") })
         assertFalse("칸 구분자가 남았다", plain.contains("|"))
-        // 표 내용은 살아 있다
-        assertTrue(plain.contains("로그인 세션"))
+        // **표 내용은 살아 있다.** 기호만 걷고 칸 내용까지 날리면 보유기간을 못 읽는다.
+        //
+        // 예전에는 `로그인 세션` 을 봤는데 PRIVACY 1.2 에 그 말이 없다 — 보유기간 표가
+        // `로그인 유지 토큰 해시` 로 다시 쓰였다(#323). **문안이 바뀌면 여기도 바뀐다** —
+        // 이 단언이 지키는 것은 특정 낱말이 아니라 "표 칸이 평문에 남는가" 다.
+        assertTrue(plain.contains("로그인 유지 토큰 해시"))
     }
 
     @Test

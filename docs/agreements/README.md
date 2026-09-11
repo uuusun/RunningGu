@@ -1,8 +1,8 @@
 # 약관·동의 문안
 
 A2 회원가입에서 사용자에게 보여주는 문안이다. 서버가 `USER_AGREEMENT` 에 저장하는
-**버전과 여기 문안이 1:1로 대응해야 한다** — 서버는 `1.0` 을 저장하는데 앱이 보여준 게
-다른 글이면 동의 이력이 무엇에 대한 동의인지 알 수 없다(NFR-12).
+**버전과 여기 문안이 1:1로 대응해야 한다** — 서버는 `PRIVACY 1.2` 를 저장하는데 앱이
+보여준 게 다른 글이면 동의 이력이 무엇에 대한 동의인지 알 수 없다(NFR-12).
 
 > ## ⚠️ 이 문서들은 **법률 검토를 받지 않은 초안**이다
 >
@@ -32,16 +32,19 @@ A2 회원가입에서 사용자에게 보여주는 문안이다. 서버가 `USER
 
 | 파일 | `AgreementType` | 필수 | 서버 활성 |
 |---|---|---|---|
-| [`v1.0/tos.md`](v1.0/tos.md) | `TOS` | ✅ | ✅ `1.0` |
-| [`v1.1/tos.md`](v1.1/tos.md) | `TOS` | ✅ | ⏸ **아직 아님** (#228) |
-| [`v1.0/privacy.md`](v1.0/privacy.md) | `PRIVACY` | ✅ | ✅ `1.0` |
-| [`v1.0/marketing.md`](v1.0/marketing.md) | `MARKETING` | 선택 | ✅ `1.0` |
-| [`v1.1/privacy.md`](v1.1/privacy.md) | `PRIVACY` | ✅ | ❌ **켜지 않는다** — v1.2 로 대체 (#215) |
-| [`v1.2/privacy.md`](v1.2/privacy.md) | `PRIVACY` | ✅ | ⏸ **아직 아님** (#111) |
+| [`v1.1/tos.md`](v1.1/tos.md) | `TOS` | ✅ | ✅ `1.1` |
+| [`v1.2/privacy.md`](v1.2/privacy.md) | `PRIVACY` | ✅ | ✅ `1.2` |
+| [`v1.1/marketing.md`](v1.1/marketing.md) | `MARKETING` | 선택 | ✅ `1.1` |
+| [`v1.0/tos.md`](v1.0/tos.md) | `TOS` | ✅ | 🕓 지난 버전 — 이 번호로 받은 동의가 있다 |
+| [`v1.0/privacy.md`](v1.0/privacy.md) | `PRIVACY` | ✅ | 🕓 지난 버전 — 이 번호로 받은 동의가 있다 |
+| [`v1.0/marketing.md`](v1.0/marketing.md) | `MARKETING` | 선택 | 🕓 지난 버전 — 이 번호로 받은 동의가 있다 |
+| [`v1.1/privacy.md`](v1.1/privacy.md) | `PRIVACY` | ✅ | ❌ **켜지 않았다** — v1.2 로 대체 (#215) |
+
+**셋의 번호가 서로 다르다.** PRIVACY 만 `1.1` 을 건너뛰었다 — 아래 "버전 규칙" 을 보라.
 
 ## 버전 규칙
 
-- 디렉터리 이름이 곧 버전이다. `v1.0/` ↔ 서버 `runninggu.auth.agreements.*-version: "1.0"`
+- 디렉터리 이름이 곧 버전이다. `v1.2/privacy.md` ↔ 서버 `privacy-version: "1.2"`
 - **한 번이라도 활성이었던 버전의 문안을 고치면 버전을 올린다.** 오타 수정도 마찬가지다 —
   같은 버전에 다른 글이 있으면 이력이 가리키는 대상이 흔들린다
 - **이미 나간 버전의 파일은 고치지 않는다.** 서버가 그 번호로 저장한 동의 이력이
@@ -141,8 +144,10 @@ assets.srcDir(rootProject.file("../docs/agreements"))
 - [ ] #227의 인증·세션 정리와 탈퇴 데이터 복구 절차가 구현·검증됐다
 - [ ] #228의 A2 별도 체크박스, 두 가입 API `ageOver14` 검증, 가입 `CODE_EXPIRED`의
       `mustResend=true`·재발송 안내가 구현·검증됐다
-- [ ] 서버 활성 버전을 `TOS=1.1`, `PRIVACY=1.2`, `MARKETING=1.1`로 바꾸고 앱 문안 버전과
+- [x] 서버 활성 버전을 `TOS=1.1`, `PRIVACY=1.2`, `MARKETING=1.1`로 바꾸고 앱 문안 버전과
       같은 배포에서 맞췄다
+      - 서버 `application.yml` 세 값과 앱 `AgreementDoc` 세 값을 같은 PR(#278)에서 바꿨다.
+        `ApplicationContextTest` 와 `AgreementTextsTest` 가 양쪽 값을 각각 못으로 박는다.
 - [ ] AWS 호스팅 계약 법인명과 Resend 법인·미국 처리·보유 사실을 각 서비스의 실제 계정·공식 문서와 내부 대조했다
 - [ ] 외부 법률 검토를 완료했다고 표시하지 않고, 내부 `⚠️`·이슈 번호·초안 안내를 공개 문안에서 제거했다
 

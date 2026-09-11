@@ -15,6 +15,7 @@ import com.runninggu.server.auth.application.KakaoUserInfoException;
 import com.runninggu.server.auth.application.KakaoUserInfoException.Reason;
 import com.runninggu.server.auth.application.KakaoUserInfoProvider;
 import com.runninggu.server.auth.application.KakaoUserProfile;
+import com.runninggu.server.auth.infrastructure.AgreementProperties;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +46,19 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AgreementProperties agreementProperties;
+
+    /** 저장된 이력의 버전은 **그 약관의 활성 설정값**과 같아야 한다. 셋이 서로 다르다(#265). */
+    private String activeVersion(Object agreementType) {
+        return switch (agreementType.toString()) {
+            case "TOS" -> agreementProperties.tosVersion();
+            case "PRIVACY" -> agreementProperties.privacyVersion();
+            case "MARKETING" -> agreementProperties.marketingVersion();
+            default -> throw new IllegalArgumentException("알 수 없는 약관 " + agreementType);
+        };
+    }
 
     @MockitoBean
     private KakaoUserInfoProvider userInfoProvider;
@@ -110,8 +124,8 @@ class KakaoAuthApiIntegrationTest extends PostgreSqlContainerSupport {
         List<Map<String, Object>> agreements = jdbcTemplate.queryForList(
                 "SELECT agreement_type, version, agreed FROM user_agreement");
         assertThat(agreements).hasSize(3);
-        assertThat(agreements).allSatisfy(row ->
-                assertThat(row.get("version")).isEqualTo("1.0"));
+        assertThat(agreements).allSatisfy(row -> assertThat(row.get("version"))
+                .isEqualTo(activeVersion(row.get("agreement_type"))));
         assertThat(agreements).anySatisfy(row -> {
             assertThat(row.get("agreement_type")).isEqualTo("MARKETING");
             assertThat(row.get("agreed")).isEqualTo(false);
