@@ -336,4 +336,3 @@ class SavedItineraryEditTest {
         assertNull("추가 API 가 불렸다", repo.added)
     }
 }
-

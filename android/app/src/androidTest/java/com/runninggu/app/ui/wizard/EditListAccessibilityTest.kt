@@ -167,7 +167,7 @@ class EditListAccessibilityTest {
             LazyColumn {
                 savedEditSection(
                     state = state,
-                    day = day(block("b1", "첫째 일정"), block("b2", "둘째 일정")),
+                    day = day(block("b1", "첫째 일정"), block("b2", "둘째 일정").copy(time = "12:30")),
                     openedBlockId = null,
                     onOpenedChange = {},
                     onRemoveBlock = {},
@@ -221,6 +221,16 @@ class EditListAccessibilityTest {
         setSection(ResultUiState(isEditing = true))
 
         compose.onNodeWithText("고치는 중이에요…").assertDoesNotExist()
+    }
+
+    @Test
+    fun 편집_목록에는_시각을_노출하지_않는다() {
+        setSection(ResultUiState(isEditing = true))
+
+        compose.onNodeWithText("일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
+            "대회 일정은 변경할 수 없어요.").assertExists()
+        compose.onNodeWithText("10:00").assertDoesNotExist()
+        compose.onNodeWithText("12:30").assertDoesNotExist()
     }
 }
 

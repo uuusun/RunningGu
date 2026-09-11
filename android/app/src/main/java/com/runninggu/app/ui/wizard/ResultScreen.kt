@@ -1,14 +1,13 @@
 package com.runninggu.app.ui.wizard
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +40,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -309,6 +313,8 @@ private fun ResultContent(
                     onCategorySelect = viewModel::onSheetCategorySelect,
                     onSelect = viewModel::onCandidateSelect,
                     onRetry = viewModel::onSheetRetry,
+                    onQueryChange = viewModel::onSheetQueryChange,
+                    onSearch = viewModel::onSheetSearch,
                 )
             }
         }
@@ -652,7 +658,6 @@ private fun RecoveryDot() {
     )
 }
 
-/** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
 /**
  * 저장 동선 편집의 **안내와 편집 목록**. 순서와 조건이 여기 갇혀 있다.
  *
@@ -716,6 +721,7 @@ internal fun LazyListScope.savedEditSection(
 }
 
 
+/** 일자 라벨 줄 + [편집]↔[완료]. (SPEC §4.10) */
 @Composable
 private fun DayHeader(label: String, isEditing: Boolean, onToggleEdit: (() -> Unit)?) {
     Row(
@@ -746,7 +752,8 @@ private fun EditNotice() {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text = "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. 대회 일정은 변경할 수 없어요.",
+            text = "일반 장소는 순서 변경 · 교체 · 삭제할 수 있어요. " +
+                "대회 일정은 변경할 수 없어요.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -758,7 +765,7 @@ private fun EditNotice() {
  * 편집 목록. (SPEC §4.10 · §5.7)
  *
  * 행 종류가 둘이다.
- * - USER: 번호 + 제목 + "{시간}·{장소}·{카테고리}" + 교체 · 휴지통 + **오른쪽 끝 그립**.
+ * - USER: 번호 + 제목 + "{장소}·{카테고리}" + 교체 · 휴지통 + **오른쪽 끝 그립**.
  *   순서 변경은 그립을 **길게 눌러 끄는** 드래그 — 이웃 행의 절반을 넘을 때마다
  *   실제 목록을 한 칸씩 옮기므로 놓는 순간 이미 반영돼 있다.
  *   삭제는 두 길이다 — 휴지통 탭, 또는 행을 **왼쪽으로 스와이프**하면 나타나는
@@ -926,8 +933,9 @@ internal fun EditList(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = if (editable) {
-                                        listOfNotNull(block.time, block.place?.name, block.catKey.label)
+                                        listOfNotNull(block.place?.name, block.catKey.label)
                                             .joinToString(" · ")
+                                            .ifEmpty { block.catKey.label }
                                     } else {
                                         "관리자 업데이트"
                                     },
@@ -1141,6 +1149,8 @@ private fun CandidateSheet(
     onCategorySelect: (PoiCategory) -> Unit,
     onSelect: (PoiItem) -> Unit,
     onRetry: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         // 작은 화면·가로 모드에서 후보 8건이 시트 최대 높이를 넘을 수 있어 스크롤을 준다.
@@ -1164,6 +1174,24 @@ private fun CandidateSheet(
                     SourceBadge(sheet.source)
                 }
             }
+
+            // **검색으로도 넣을 수 있어야 한다** (#319). 추천만으로는 사용자가 아는
+            // 가게를 못 넣어서, 우리가 고른 곳을 그대로 받아들이는 수밖에 없었다.
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = sheet.query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("장소 이름으로 찾기") },
+                trailingIcon = {
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Filled.Search, contentDescription = "검색")
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            )
 
             if (!sheet.isReplace) {
                 Spacer(Modifier.height(10.dp))
@@ -1264,7 +1292,7 @@ private fun DayNote(note: String) {
     }
 }
 
-/** 시간순 카드 하나. 번호 레일 + 제목·시간 + 태그·장소명 + 설명. (SPEC §4.10) */
+/** 순서 카드 하나. 번호 레일 + 제목 + 태그·장소명 + 설명. (SPEC §4.10) */
 @Composable
 private fun TimelineRow(
     number: Int,
@@ -1289,13 +1317,6 @@ private fun TimelineRow(
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = block.time,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = block.title,
                         style = MaterialTheme.typography.titleSmall,
@@ -1516,4 +1537,3 @@ private fun SavedEditError(message: String) {
         )
     }
 }
-

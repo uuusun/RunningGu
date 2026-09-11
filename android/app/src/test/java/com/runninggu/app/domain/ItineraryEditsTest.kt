@@ -131,10 +131,12 @@ class ItineraryEditsTest {
         val i = days.ddayIndex()
         val target = days.dday().userBlock()
 
-        val after = ItineraryEdits.updateBlock(days, i, target.id) { it.copy(time = "12:00", desc = "바꾼 설명") }
+        val after = ItineraryEdits.updateBlock(days, i, target.id) {
+            it.copy(title = "바꾼 일정", desc = "바꾼 설명")
+        }
 
         val block = after[i].blocks.first { it.id == target.id }
-        assertEquals("12:00", block.time)
+        assertEquals("바꾼 일정", block.title)
         assertEquals("바꾼 설명", block.desc)
         assertEquals(target.id, block.id) // §6.3 안정적 id
     }

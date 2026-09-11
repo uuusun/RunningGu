@@ -566,6 +566,21 @@ class ResultViewModel(
         openSheet(sheet.copy(category = category))
     }
 
+    /**
+     * 시트의 검색어가 바뀌었다. **글자마다 조회하지 않는다** — 입력은 즉시 반영하고,
+     * 서버 조회는 [onSheetSearch] 로 사용자가 확정할 때만 한다.
+     */
+    fun onSheetQueryChange(query: String) {
+        _uiState.update { state ->
+            state.copy(sheet = state.sheet?.copy(query = query))
+        }
+    }
+
+    /** 검색 실행. 검색어가 짧으면 주변 추천으로 돌아간다. */
+    fun onSheetSearch() {
+        _uiState.value.sheet?.let(::openSheet)
+    }
+
     fun onSheetDismiss() {
         sheetRequestId++ // 진행 중이던 조회 응답을 무효화한다
         _uiState.update { it.copy(sheet = null) }
@@ -616,6 +631,9 @@ class ResultViewModel(
                     val sending = NewBlock(
                         title = item.name,
                         category = catKey,
+                        // 서버 startTime 계약은 호환을 위해 유지하지만 앱에서는
+                        // 시각을 노출·편집하지 않는다(SPEC §4.10).
+                        startTime = ADDED_BLOCK_TIME,
                         place = place,
                         description = item.description,
                     ).normalized()
@@ -678,7 +696,9 @@ class ResultViewModel(
             return
         }
         viewModelScope.launch {
-            val outcome = runCatchingUnlessCancelled { poiRepository.search(sheet.category, lat, lng) }
+            val outcome = runCatchingUnlessCancelled {
+                poiRepository.search(sheet.category, lat, lng, sheet.effectiveQuery)
+            }
             _uiState.update { state ->
                 // 그 사이 닫혔거나 새 조회가 시작됐으면 낡은 응답을 버린다. 대상 비교가 아니라
                 // 세대 비교다 — 같은 대상을 닫았다 다시 열어도 이전 응답이 새 결과를 못 덮는다.
@@ -707,7 +727,7 @@ class ResultViewModel(
     }
 
     private companion object {
-        /** 추가 블록의 기본 시간. (SPEC §4.10 "추가=새 블록(13:00) 맨 끝") */
+        /** API 호환을 위해 새 블록에 보내는 기본 시각. 앱에서는 노출하지 않는다(SPEC §4.10). */
         const val ADDED_BLOCK_TIME = "13:00"
     }
 
@@ -820,4 +840,3 @@ internal const val SAVED_EDIT_FAILED = "고치지 못했어요. 잠시 후 다�
  * 고치지 않는다** — 화면에서는 고쳐졌는데 서버에는 안 간 상태가 제일 나쁘다.
  */
 internal const val SAVED_EDIT_NO_SERVER_ID = "이 동선은 지금 고칠 수 없어요. 다시 열어 주세요."
-

@@ -22,7 +22,7 @@ object ItineraryEdits {
     fun canEdit(block: ItineraryBlock): Boolean = block.blockType != BlockType.RACE
 
     /**
-     * 블록 필드 수정(시간·제목·설명 등). 블록 id 는 유지된다. (SPEC §5.7 · §6.3)
+     * 블록 필드 수정(제목·설명 등). 블록 id 는 유지된다. (SPEC §5.7 · §6.3)
      *
      * [transform] 이 무엇을 돌려주든 `id` · `blockType` · `systemManaged` 는 원래 값을 지킨다 —
      * 편집으로 USER 블록이 RACE 가 되거나 그 반대가 되면 안 된다.
@@ -118,6 +118,7 @@ object ItineraryEdits {
             blocks.add(to, blocks.removeAt(from))
             day.copy(blocks = blocks)
         }
+
 
     /**
      * [from] 에서 [to] 로 가는 길에 옮길 수 없는 블록이 있는가. (API 명세 §5-10)
