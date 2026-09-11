@@ -205,6 +205,8 @@ fun AccountScreen(
 
     if (showsOpenSourceLicenses) {
         OpenSourceLicensesDialog(
+            // 현재 OFL 고지 1개라 composition 안 동기 읽기로 충분하다. 라이선스 파일이 늘면
+            // ViewModel/비동기 로더로 옮긴다.
             text = remember(context) {
                 context.assets.open("licenses/OFL-1.1.txt").bufferedReader().use { it.readText() }
             },
@@ -225,7 +227,7 @@ private fun SectionTitle(text: String) {
     )
 }
 
-/** 번들 폰트의 저작권 고지와 OFL 1.1 전문. (NFR-18) */
+/** 번들 폰트의 저작권 고지와 OFL 1.1 전문. (NFR-7) */
 @Composable
 private fun OpenSourceLicensesDialog(
     text: String,
