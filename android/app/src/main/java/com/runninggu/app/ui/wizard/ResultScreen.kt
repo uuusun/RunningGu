@@ -264,7 +264,6 @@ private fun ResultContent(
             )
         },
         bottomBar = {
-            // 복원 화면에는 저장 바가 없다 — 누를 수 있으면 A 경로로 통째 저장된다 (#213)
             // **복원 화면에는 저장 CTA 가 없다.** 이미 저장된 것이고, 통째 저장은
             // RACE 블록을 재구성해서 쓰면 안 된다(§5-2). 편집은 §5-7~5-10 으로 이미
             // 서버에 갔다 — 누를 것이 없다.
@@ -1475,7 +1474,8 @@ private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Un
     // CTA 를 이 공통 바로 모아 `navigationBarsPadding` 을 먹였는데, #257 이 S7-R 복원을
     // 붙이면서 이 함수만 예전 모양(Surface + Column)으로 되돌아갔다. 그 결과 3버튼 내비
     // 기기에서 [이 동선 저장하기] 아래 절반이 내비바에 다시 가렸다 — P0 흐름의 마지막
-    // 단추다. 나머지 네 화면(S3 · S4 · S5)은 그대로 공통 바를 쓰고 있었다.
+    // 단추다. 나머지 네 화면(S3 · S4 · S5 · S6)은 그대로 공통 바를 쓰고 있었다 — S4 · S5 는
+    // `NextBar`, S3 · S6 은 직접 `BottomActionBar` 다.
     BottomActionBar {
         Button(
             onClick = onSave,
