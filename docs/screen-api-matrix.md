@@ -373,6 +373,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | 마케팅 메일 | P0에서 호출 없음 | 없음 | Resend는 가입 인증·비밀번호 재설정 거래성 메일만 발송. 찜 지역으로 관심 지역을 추정하지 않음 | 실제 발송 기능을 열 때 공개 수신거부 계약과 MARKETING 1.1 선행 |
 | 비밀번호 변경 | `PUT /api/me/password` | currentPassword,newPassword | EMAIL 수단에만 메뉴 노출, 200 새 token pair로 원자 교체 |
 | 가입 로그인 방식 | `GET /api/me` | 없음 | `loginProvider`. EMAIL만 비밀번호 메뉴 노출, P0 연결·해제·전환 없음 |
+| 오픈소스 라이선스 | 앱 asset | 없음 | Pretendard·Archivo 저작권 고지와 SIL OFL 1.1 전문을 로컬에서 표시. 네트워크 불필요 |
 | 로그아웃 | Authenticator 없는 클라이언트로 `POST /api/auth/logout` | refreshToken, Access 불필요 | 활성·revoked·만료·unknown 모두 204 → 로컬 세션 삭제→로그인 |
 | 탈퇴 재인증 | `POST /api/me/reauth` | EMAIL password 또는 KAKAO SDK token | 5분 reauthToken |
 | 회원 탈퇴 | 확인 modal→`DELETE /api/me` | `X-Reauth-Token` | 204→모든 세션·사용자 캐시 삭제→로그인 |
