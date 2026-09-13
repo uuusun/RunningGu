@@ -5,12 +5,14 @@ on:
     paths:
       - "android/**"
       - "scripts/check_spec_drift.py"
+      - "scripts/check_bottom_bar_inset.py"
       - ".github/workflows/android.yml"
   push:
     branches: [develop, main]
     paths:
       - "android/**"
       - "scripts/check_spec_drift.py"
+      - "scripts/check_bottom_bar_inset.py"
       - ".github/workflows/android.yml"
 
 # 같은 브랜치에 연달아 push 하면 앞의 실행은 취소한다.
@@ -56,6 +58,14 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v4
+
+      # 하단 CTA 가 BottomActionBar 를 거치는지 구조로 본다. 같은 inset 버그가 두 번 났고
+      # (#266 → #270 → #257 되돌림 → #342) 계측은 CI 가 안 돌리니 여기서 막는다. (#346 · SPEC §3-5)
+      - name: Bottom CTA inset guard
+        working-directory: scripts
+        run: |
+          python3 -m unittest test_check_bottom_bar_inset -v
+          python3 check_bottom_bar_inset.py ../android/app/src/main/java/com/runninggu/app/ui
 
       # domain 은 Android 의존이 없는 순수 Kotlin 이라 기기 없이 검증된다. (SPEC §5)
       - name: Unit tests
