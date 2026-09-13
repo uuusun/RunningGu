@@ -18,7 +18,8 @@
 | 보안 그룹 | `sg-08477f351ef86f7fe`, 인바운드 TCP 80·443만 허용 |
 | IAM role | `runninggu-production-ec2`, SSM 관리 권한 적용 |
 | root EBS | `vol-04d095c35ef87133b`, 암호화 gp3 30GiB, 종료 시 삭제 |
-| 공개 주소 | `https://api.runninggu.store/api/` |
+| 공개 API | `https://api.runninggu.store/api/` |
+| 공개 개인정보처리방침 | `https://runninggu.store/privacy/` (웹 버전 1.0, 2026-09-13 시행) |
 
 SSH key pair와 22번 포트는 사용하지 않는다. SSM Session Manager로 접속하며 IMDSv2를 강제한다.
 종료 방지는 활성화 상태를 유지한다. 스테이징 EC2·DB와 운영 비밀값은 분리한다. 단 KTO service
@@ -116,11 +117,13 @@ staging 백업을 운영 복구 리허설에 잘못 사용하는 것을 막는�
 
 ## 5. DNS·Nginx·TLS
 
-가비아 DNS에 `api` A 레코드 `3.37.39.89`를 추가한다. 외부 DNS 전파가 확인되기 전에는
-인증서를 요청하지 않는다.
+가비아 DNS에 `api`와 루트(`@`) A 레코드 `3.37.39.89`를 추가한다. 루트에는 IPv6 서비스가
+없으므로 AAAA 레코드를 만들지 않는다. 가비아 관리 화면에서 선택 가능한 최소 TTL인 600초를
+사용하며 외부 DNS 전파가 확인되기 전에는 인증서를 요청하지 않는다.
 
 ```bash
 dig +short api.runninggu.store
+dig +short runninggu.store
 ```
 
 먼저 HTTP challenge 전용 설정을 설치한다.
@@ -138,15 +141,33 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-DNS 전파 뒤 인증서를 발급하고 최종 설정을 설치한다.
+DNS 전파 뒤 기존 `api.runninggu.store` 인증서 lineage를 루트 도메인까지 확장한다. 새 인증서가
+성공적으로 발급되기 전에는 기존 인증서와 최종 nginx 설정을 바꾸지 않는다. 개인정보처리방침은
+저장소의 정적 HTML 한 파일만 `/var/www/runninggu-web/privacy/index.html`에 설치한다.
+
+이미 API TLS가 운영 중이면 DNS 변경 전에 루트 도메인의 HTTP challenge server만 별도
+설치한다. 이 파일에는 443 server가 없으므로 기존 API TLS를 건드리지 않는다.
 
 ```bash
-sudo certbot certonly --webroot \
+sudo install -m 0644 backend/deploy/nginx/production-root.bootstrap.conf \
+  /etc/nginx/sites-available/runninggu-production-root-bootstrap
+sudo ln -sfn /etc/nginx/sites-available/runninggu-production-root-bootstrap \
+  /etc/nginx/sites-enabled/runninggu-production-root-bootstrap
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+```bash
+sudo certbot certonly --webroot --cert-name api.runninggu.store --expand \
   --webroot-path /var/www/certbot \
   --domain api.runninggu.store \
+  --domain runninggu.store \
   --email runninggu.play@gmail.com \
   --agree-tos --no-eff-email
 
+sudo install -d -m 0755 -o root -g root /var/www/runninggu-web/privacy
+sudo install -m 0644 web/privacy/index.html \
+  /var/www/runninggu-web/privacy/index.html
 sudo install -m 0644 backend/deploy/nginx/runninggu-ssl-params.conf \
   /etc/nginx/snippets/runninggu-ssl-params.conf
 sudo install -m 0644 backend/deploy/nginx/production-api.conf \
@@ -155,12 +176,33 @@ sudo install -m 0644 backend/deploy/nginx/default-reject.production.conf \
   /etc/nginx/sites-available/default-reject
 sudo ln -sfn /etc/nginx/sites-available/default-reject \
   /etc/nginx/sites-enabled/default-reject
+sudo unlink /etc/nginx/sites-enabled/runninggu-production-root-bootstrap
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
 Certbot 갱신 hook과 timer를 설치한 뒤 `certbot renew --dry-run --run-deploy-hooks`까지 성공해야
 HTTPS 완료로 기록한다.
+
+루트 `/`는 향후 홈페이지가 생길 수 있으므로 브라우저에 영구 저장되지 않는 `302`로
+`/privacy/`에 이동시킨다. `/privacy`만 canonical trailing slash 주소로 `301` 이동하고,
+`/privacy/`는 인증 없이 정적 HTML을 `200`으로 반환한다. 그 밖의 루트 도메인 경로는 `404`다.
+API host의 프록시 설정과 `/api` 인증 계약은 바꾸지 않는다.
+
+```bash
+curl --fail --silent --show-error --output /dev/null \
+  https://api.runninggu.store/api/contests?size=1
+curl --silent --show-error --output /dev/null \
+  --write-out '%{http_code} %{redirect_url}\n' \
+  https://runninggu.store/
+curl --fail --silent --show-error --output /dev/null \
+  --write-out '%{http_code}\n' \
+  https://runninggu.store/privacy/
+```
+
+정적 문서 또는 nginx 적용이 실패하면 먼저 직전 site 설정과 정적 파일 백업을 복원하고
+`nginx -t` 통과 뒤 reload한다. 인증서 확장만 실패했다면 기존 lineage와 API 설정을 그대로
+유지하고 루트 도메인 HTTPS server를 설치하지 않는다.
 
 ## 6. 백업·장애·비용 알림
 
@@ -183,7 +225,11 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다. 리허설에
 ## 7. 완료 확인
 
 - `https://api.runninggu.store/api/contests?size=1`이 HTTP 200인가
+- 외부 두 네트워크에서 준비 엔드포인트를 10초 간격으로 30회 호출했을 때 전부 HTTP 200인가
+- nginx 또는 backend 재시작 뒤 같은 준비 엔드포인트를 10초 간격으로 10회 호출했을 때 전부 HTTP 200인가
 - HTTP가 HTTPS로 이동하고 TLS hostname·chain 검증이 성공하는가
+- `https://runninggu.store/`가 `/privacy/`로 302 이동하고 `/privacy/`가 인증 없이 HTTPS 200인가
+- 공개 처리방침에 초안·`noindex`·`[확인 필요]`가 없고 웹 버전 1.0과 2026-09-13 시행일이 표시되는가
 - 외부에서 5432·8080·8989에 연결할 수 없는가
 - Swagger와 `/v3/api-docs`가 비활성인가
 - access log에 URI·query·Host·User-Agent가 남지 않고 method가 허용 목록 값으로 축약되는가
@@ -197,3 +243,23 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다. 리허설에
 
 각 항목의 명령·시각·결과를 배포 증거 문서에 남긴다. 로그와 증거에는 토큰·비밀번호·인증 코드·
 이메일 주소·사용자 좌표를 기록하지 않는다.
+
+## 8. API 연결 거부 진단과 복구
+
+TCP 연결 거부는 HTTP 401·502와 구분한다. 외부 `443` 연결이 거부되면 다음 순서로 범위를
+좁힌다.
+
+1. EC2가 `running`, 시스템·인스턴스 상태 검사가 모두 통과하며 Elastic IP가 이 인스턴스에
+   연결됐는지 확인한다.
+2. `ss -ltn`으로 80·443·8080·8989·5432 리스너를 확인한다. 443이 없으면 nginx,
+   8080이 없으면 backend를 우선 조사한다.
+3. nginx·backend·GraphHopper·Docker의 `ActiveState`, `Result`, `ExecMainStatus`,
+   `NRestarts`, `StartLimit*`, `Restart`를 확인한다.
+4. `nginx -t`, loopback nginx 요청, loopback backend 준비 요청, 외부 HTTPS 준비 요청을
+   차례로 실행해 네트워크·프록시·애플리케이션 경계를 분리한다.
+5. 커널 OOM·프로세스 강제 종료·systemd start-limit·PostgreSQL/GraphHopper 준비 실패 건수를
+   확인한다. 개인정보가 포함될 수 있는 요청·예외 원문은 출력하지 않는다.
+
+nginx 설정이 유효하지만 inactive이면 nginx만 시작하고, backend 준비 요청만 실패하면 DB와
+GraphHopper 상태를 먼저 복구한 뒤 backend를 시작한다. 원인 확인 없이 EC2 전체 재부팅부터 하지
+않는다. 자동 재시작 설정을 바꿀 때는 현재 unit과 drop-in을 백업하고 한 서비스씩 적용한다.
