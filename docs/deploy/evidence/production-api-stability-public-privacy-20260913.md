@@ -51,27 +51,48 @@ GraphHopper는 계속 active였다. 외부 준비 요청도 200이었다. 기존
 | 보안 헤더 | CSP, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` 확인 |
 | 로그 보호 | 무해한 경로·질의 표식을 보낸 뒤 nginx 파일 로그에 표식이 남지 않음을 확인 |
 
-배포 번들은 기존 운영 백업 버킷의 배포 경로에 KMS 암호화로 두었고, EC2에서 SHA-256
-`0dd36a59eca795edb0bfe8232316a5a68542d10c918d89a9c4bfec0ce8c8fc91` 일치를 확인한 뒤
-설치했다.
+최종 공개 문안은 `origin/develop` `8fbd0bf9`에서 분기한 commit
+`09c0bb142d0f2c135fdbc049cf13b1457c4e471d`의 `web/privacy/index.html`을 사용했다.
+기존 운영 백업 버킷의
+`runninggu/production/deployments/09c0bb142d0f2c135fdbc049cf13b1457c4e471d/web/privacy/index.html`
+경로에 KMS 암호화로 업로드하고, EC2에서 SHA-256
+`38710e24e102125950c22363218e4edc3f719d80bcecb9a532083c66832c0724`와 42,735바이트
+일치를 확인한 뒤 원자적으로 교체했다.
+
+교체 전 운영 파일은 SHA-256
+`bd2920d2f9312bb6631cce146d7195fc9d6aaabf14048dbd702301c7111970cd`,
+39,082바이트였으며
+`/var/backups/runninggu-public-20260913T060650Z/privacy.index.html.before`에 보관했다.
+첫 전달 시 EC2 역할이 허용하지 않는 S3 prefix를 사용해 `HeadObject 403`으로 중단됐고,
+백업·설치 전 단계였으므로 운영 파일은 바뀌지 않았다. IAM 정책을 읽어 허용된
+`runninggu/production/*` 경로를 확인한 뒤 재시도했으며, 잘못 올린 중복 객체는 삭제했다.
+이 정적 파일 교체에는 nginx reload와 backend·GraphHopper 재시작이 없었다.
 
 ## 반복 안정성 검사
 
-최종 nginx reload와 backend 재시작 이후의 결과를 검사한다. 응답 본문은 저장하지 않고 시각과
-HTTP 상태만 집계한다.
+초기 nginx 적용과 backend 통제 재시작 이후의 결과에 최종 정적 문안 교체 직후 검사를
+추가했다. 응답 본문은 저장하지 않고 시각과 HTTP 상태만 집계한다.
 
 | 외부 네트워크 위치 | 검사 시각(KST) | 간격·횟수 | 준비 API | 처리방침 |
 |---|---|---|---|---|
 | AWS CloudShell 서울 | 11:16:28~11:21:20 | 10초 간격 30회 | 30/30 HTTP 200 | 30/30 HTTP 200 |
 | AWS CloudShell 도쿄 | 11:17:33~11:22:31 | 10초 간격 30회 | 30/30 HTTP 200 | 30/30 HTTP 200 |
+| 작업 PC 외부망 | 15:08~15:10 | 10초 간격 10회 | 10/10 HTTP 200 | 10/10 HTTP 200 |
 
-두 검사는 backend 통제 재시작과 최종 nginx reload 뒤에 수행했다. 따라서 각 위치의 첫 10회는
-재시작 뒤 10초 간격 10회 기준도 함께 충족한다. 작업 PC의 제한된 명령 실행 경로에서는 세 차례
-연결 결과가 `000`이었으나, 같은 시각 서로 다른 두 AWS 리전 외부망과 공개 브라우저에서 정상
-응답을 확인했다. 이 제한 경로의 결과는 운영 합격 표본에 포함하지 않았다.
+AWS의 두 검사는 backend 통제 재시작과 최종 nginx reload 뒤에 수행했다. 따라서 각 위치의
+첫 10회는 재시작 뒤 10초 간격 10회 기준도 함께 충족한다. 초기 조사에서 작업 PC의 제한된
+명령 실행 경로는 세 차례 `000`이었으나 같은 시각 두 AWS 리전에서 정상이었고, 최종 문안
+교체 뒤에는 작업 PC 외부 경로도 10/10 성공했다.
+
+최종 외부 HTTPS 검증에서 루트는 `/privacy/`로 302, `/privacy`는 301,
+`/privacy/`는 200 `text/html`, 없는 처리방침 경로는 404였다. 공개 문서의 바이트 수와
+SHA-256은 설치 파일과 같았고 버전·시행일 표식은 각각 1개, Google 이전 국가 문구는 존재,
+초안·`noindex`·todo·`[확인 필요]` 표식은 0개였다. API 준비 엔드포인트는 200이고
+`/api`는 기존 계약대로 401 `application/problem+json`이었다.
 
 ## 롤백 지점
 
+- 최종 문안 교체 전 정적 파일: `/var/backups/runninggu-public-20260913T060650Z/privacy.index.html.before`
 - 최종 적용 직전 nginx 설정: `/var/backups/runninggu-public-20260913T1116Z/runninggu-production.before`
 - 초기 root bootstrap 적용 전 nginx 설정: `/var/backups/runninggu-public-20260913T0200Z/runninggu-production.before`
 - 정적 파일 또는 최종 가상 호스트 문제 시 직전 설정을 복원하고 root bootstrap symlink를 다시
@@ -82,7 +103,9 @@ HTTP 상태만 집계한다.
 
 - `backend/deploy/nginx/test_log_privacy.py -v`: 4개 테스트 통과
 - `backend/deploy/ci/test_production_deploy_contract.py -v`: 9개 테스트 통과
-- 공개 페이지 브라우저 렌더링: 제목·목차 13개·버전·시행일·국외 이전 문구 확인
+- Android `AgreementPublishGuardTest`·`AgreementTextsTest`: 통과, 앱·서버 활성
+  `PRIVACY 1.2` 유지 확인
+- 공개 페이지 HTTPS 원본: commit 파일과 바이트 수·SHA-256 일치
 
 ## 비용·중단
 
@@ -91,3 +114,4 @@ HTTP 상태만 집계한다.
   미미하다.
 - nginx는 reload로 적용해 관측된 API 중단이 없었다. backend 통제 재시작의 준비 복구에는 약
   12초가 걸렸지만 외부 단일 관측에서는 계속 200이었다.
+- 최종 문안은 정적 파일만 원자적으로 교체해 서비스·nginx 재시작과 관측된 중단이 없었다.
