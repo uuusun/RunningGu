@@ -13,6 +13,7 @@ SERVER_FILES = [
     ROOT / "staging-api.conf",
     ROOT / "default-reject.conf",
     ROOT / "production-api.bootstrap.conf",
+    ROOT / "production-root.bootstrap.conf",
     ROOT / "production-api.conf",
     ROOT / "default-reject.production.conf",
 ]
