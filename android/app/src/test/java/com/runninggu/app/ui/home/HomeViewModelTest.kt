@@ -261,6 +261,7 @@ class HomeViewModelTest {
         region = "세종",
         imageUrl = null,
         inProgress = false,
+        officialUrl = null,
     )
 }
 

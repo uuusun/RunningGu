@@ -16,6 +16,7 @@ public class CacheConfig {
     public static final String GEOCODE_CACHE = "geocode";
     public static final String HOME_FESTIVALS_CACHE = "homeFestivals";
     public static final String NEARBY_FESTIVALS_CACHE = "nearbyFestivals";
+    public static final String FESTIVAL_OFFICIAL_URL_CACHE = "festivalOfficialUrl";
     public static final String POI_CACHE = "poi";
     public static final String WALKING_SPOTS_CACHE = "walkingSpots";
 
@@ -39,6 +40,13 @@ public class CacheConfig {
                 NEARBY_FESTIVALS_CACHE,
                 Caffeine.newBuilder()
                         .maximumSize(500)
+                        .expireAfterWrite(Duration.ofDays(1))
+                        .build());
+        // 축제 공식 페이지는 contentId 당 detailCommon2 한 번. 하루 캐시로 KTO 쿼터를 지킨다 (SPEC §9.5)
+        cacheManager.registerCustomCache(
+                FESTIVAL_OFFICIAL_URL_CACHE,
+                Caffeine.newBuilder()
+                        .maximumSize(2_000)
                         .expireAfterWrite(Duration.ofDays(1))
                         .build());
         cacheManager.registerCustomCache(

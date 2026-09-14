@@ -10,4 +10,12 @@ public record HomeFestival(
         LocalDate endDate,
         String region,
         String imageUrl,
-        boolean inProgress) {}
+        boolean inProgress,
+        /** 공식 페이지. KTO 에 등록되지 않았거나 조회에 실패하면 null 이다. */
+        String officialUrl) {
+
+    public HomeFestival withOfficialUrl(String officialUrl) {
+        return new HomeFestival(
+                contentId, name, startDate, endDate, region, imageUrl, inProgress, officialUrl);
+    }
+}

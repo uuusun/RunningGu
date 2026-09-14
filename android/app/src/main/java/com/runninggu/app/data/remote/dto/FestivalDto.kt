@@ -24,4 +24,6 @@ data class FestivalDto(
     val imageUrl: String? = null,
     /** `start <= 오늘 <= end`. **서버가 판정한다** — 앱이 다시 계산하지 않는다. */
     val inProgress: Boolean = false,
+    /** 공식 페이지. KTO 에 없거나 서버가 못 가져오면 null — 앱은 버튼을 숨긴다. */
+    val officialUrl: String? = null,
 )

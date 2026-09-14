@@ -23,6 +23,7 @@ fun FestivalDto.toDomain(): Festival = Festival(
     imageUrl = imageUrl?.takeIf { it.isNotBlank() },
     // 진행 중 판정은 서버 몫이다 (§4-1)
     inProgress = inProgress,
+    officialUrl = officialUrl?.takeIf { it.isNotBlank() },
 )
 
 private fun String.toLocalDateOrNull(): LocalDate? =

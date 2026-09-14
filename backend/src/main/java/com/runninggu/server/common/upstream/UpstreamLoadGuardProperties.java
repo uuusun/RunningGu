@@ -45,6 +45,7 @@ public record UpstreamLoadGuardProperties(
             case KAKAO_ACCESS_TOKEN_INFO -> endpoints.kakaoAccessTokenInfo();
             case KAKAO_USER_ME -> endpoints.kakaoUserMe();
             case KTO_SEARCH_FESTIVAL -> endpoints.ktoSearchFestival();
+            case KTO_DETAIL_COMMON -> endpoints.ktoDetailCommon();
             case KTO_KOR_LOCATION -> endpoints.ktoKorLocation();
             case KTO_WELLNESS_LOCATION -> endpoints.ktoWellnessLocation();
             case KTO_DURUNUBI_COURSE -> endpoints.ktoDurunubiCourse();
@@ -76,6 +77,7 @@ public record UpstreamLoadGuardProperties(
             Integer kakaoAccessTokenInfo,
             Integer kakaoUserMe,
             Integer ktoSearchFestival,
+            Integer ktoDetailCommon,
             Integer ktoKorLocation,
             Integer ktoWellnessLocation,
             Integer ktoDurunubiCourse) {
@@ -91,6 +93,8 @@ public record UpstreamLoadGuardProperties(
                     "endpoints.kakao-user-me", kakaoUserMe, MAX_KAKAO_ENDPOINT_LIMIT);
             requireWithinApprovedLimit(
                     "endpoints.kto-search-festival", ktoSearchFestival, MAX_KTO_ENDPOINT_LIMIT);
+            requireWithinApprovedLimit(
+                    "endpoints.kto-detail-common", ktoDetailCommon, MAX_KTO_ENDPOINT_LIMIT);
             requireWithinApprovedLimit(
                     "endpoints.kto-kor-location", ktoKorLocation, MAX_KTO_ENDPOINT_LIMIT);
             requireWithinApprovedLimit(

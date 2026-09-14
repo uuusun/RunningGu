@@ -73,7 +73,9 @@ public class CachedHomeFestivalQuery {
                 festival.endDate(),
                 region,
                 festival.imageUrl(),
-                isInProgress(festival, today));
+                isInProgress(festival, today),
+                // 공식 페이지는 노출분(size)만 HomeFestivalService 가 붙인다 — 월 전체에 붙이면 쿼터가 샌다
+                null);
     }
 
     private boolean overlaps(

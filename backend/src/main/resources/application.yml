@@ -87,6 +87,7 @@ runninggu:
       kakao-access-token-info: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
       kakao-user-me: ${UPSTREAM_LOAD_GUARD_KAKAO_ENDPOINT_LIMIT:0}
       kto-search-festival: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
+      kto-detail-common: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
       kto-kor-location: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
       kto-wellness-location: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}
       kto-durunubi-course: ${UPSTREAM_LOAD_GUARD_KTO_ENDPOINT_LIMIT:0}

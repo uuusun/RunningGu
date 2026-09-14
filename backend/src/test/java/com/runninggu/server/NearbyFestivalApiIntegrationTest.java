@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,7 @@ class NearbyFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
         jdbcTemplate.execute(
                 "TRUNCATE TABLE contest_snapshot_import, contest_event, contest_source, contest RESTART IDENTITY CASCADE");
         cacheManager.getCache(CacheConfig.NEARBY_FESTIVALS_CACHE).clear();
+        cacheManager.getCache(CacheConfig.FESTIVAL_OFFICIAL_URL_CACHE).clear();
     }
 
     @Test
@@ -65,6 +67,8 @@ class NearbyFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
         given(festivalProvider.searchStartingFrom(requestedStart)).willReturn(List.of(
                 festival("far", "먼 축제", new BigDecimal("36.5500000")),
                 festival("near", "가까운 축제", CONTEST_LAT)));
+        given(festivalProvider.findOfficialUrl("near"))
+                .willReturn(Optional.of("https://near.test"));
 
         MockHttpServletRequestBuilder request =
                 get("/api/contests/{id}/festivals", contestId);
@@ -79,11 +83,37 @@ class NearbyFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items[0].distanceKm").value(0.0))
                 .andExpect(jsonPath("$.items[0].imageUrl").doesNotExist())
                 .andExpect(jsonPath("$.items[0].address").value(""))
-                .andExpect(jsonPath("$.items[1].contentId").value("far"));
+                .andExpect(jsonPath("$.items[0].officialUrl").value("https://near.test"))
+                .andExpect(jsonPath("$.items[1].contentId").value("far"))
+                .andExpect(jsonPath("$.items[1].officialUrl").doesNotExist());
 
         mockMvc.perform(request).andExpect(status().isOk());
 
         verify(festivalProvider, times(1)).searchStartingFrom(requestedStart);
+    }
+
+    @Test
+    void 공식_페이지_조회가_한_번_실패해도_하루_캐시에_굳지_않고_다음_요청이_다시_시도한다() throws Exception {
+        long contestId = insertContest("festival-retry", CONTEST_LAT, CONTEST_LNG);
+        LocalDate requestedStart = CONTEST_DATE.minusDays(14);
+        given(festivalProvider.searchStartingFrom(requestedStart)).willReturn(List.of(
+                festival("flaky", "가까운 축제", CONTEST_LAT)));
+        given(festivalProvider.findOfficialUrl("flaky"))
+                .willThrow(new FestivalProviderException(Reason.TIMEOUT))
+                .willReturn(Optional.of("https://flaky.test"));
+
+        MockHttpServletRequestBuilder request =
+                get("/api/contests/{id}/festivals", contestId);
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].officialUrl").doesNotExist());
+        mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].officialUrl").value("https://flaky.test"));
+
+        // 기본 목록은 하루 캐시를 그대로 탔고, 링크만 다시 물었다
+        verify(festivalProvider, times(1)).searchStartingFrom(requestedStart);
+        verify(festivalProvider, times(2)).findOfficialUrl("flaky");
     }
 
     @Test

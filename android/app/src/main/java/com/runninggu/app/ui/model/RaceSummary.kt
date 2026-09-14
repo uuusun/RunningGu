@@ -119,6 +119,11 @@ data class NearbyFestival(
     val distanceKm: Double,
     val imageUrl: String?,
     val address: String,
+    /**
+     * 공식 페이지. **없을 수 있다** — KTO 에 등록되지 않은 축제가 많고, 서버가 못 가져와도
+     * 목록은 살린다(§3-5). 화면은 `openableWebUrl` 을 통과한 것만 [공식 페이지 ↗] 로 낸다.
+     */
+    val officialUrl: String? = null,
 )
 
 /** 홈 축제 캐러셀 항목. 출처는 한국관광공사 고정 표기. (NFR-7) */
@@ -136,6 +141,12 @@ data class FestivalSummary(
      * 원천 URL 을 손대기 시작하면 어느 쪽이 틀렸는지 추적이 안 된다.
      */
     val imageUrl: String? = null,
+    /**
+     * 공식 페이지. **없을 수 있다** — KTO 에 등록되지 않은 축제가 많고, 서버가 못 가져와도
+     * 목록은 살린다(§4-1). 펼친 카드에서만 [공식 페이지 ↗] 로 낸다 — 대회 상세와 같은 기준으로
+     * `openableWebUrl` 을 통과한 것만.
+     */
+    val officialUrl: String? = null,
 )
 
 /** 필터에 쓰는 종목. (SPEC §4.5 · 결정-12) */

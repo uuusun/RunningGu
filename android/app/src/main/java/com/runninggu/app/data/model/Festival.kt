@@ -16,4 +16,6 @@ data class Festival(
     val region: String,
     val imageUrl: String?,
     val inProgress: Boolean,
+    /** 공식 페이지. 없으면 null. 열기 전 검사는 화면(`openableWebUrl`)이 한다. */
+    val officialUrl: String?,
 )
