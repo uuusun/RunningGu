@@ -260,6 +260,7 @@ private fun RaceDetailContent(
                 phase = festivalPhase,
                 festivals = festivals,
                 onRetry = onRetryFestivals,
+                onCannotOpen = onCannotOpenOfficialPage,
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -441,6 +442,7 @@ private fun NearbyFestivalSection(
     phase: RaceDetailUiState.FestivalPhase,
     festivals: List<NearbyFestival>,
     onRetry: () -> Unit,
+    onCannotOpen: () -> Unit,
 ) {
     Column {
         SectionHeader(title = "대회 인근 축제", trailing = "한국관광공사")
@@ -466,14 +468,21 @@ private fun NearbyFestivalSection(
 
             else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Spacer(Modifier.height(4.dp))
-                festivals.forEach { FestivalRow(it) }
+                festivals.forEach { FestivalRow(it, onCannotOpen = onCannotOpen) }
             }
         }
     }
 }
 
+/**
+ * 축제 한 줄. 공식 페이지가 있으면 오른쪽 끝에 [공식 페이지 ↗] 를 단다 (§3-5 `officialUrl`).
+ *
+ * 대회 [공식 페이지 ↗] 와 같은 기준이다 — `openableWebUrl` 을 통과한 주소만 Custom Tabs 로 열고,
+ * 없으면 버튼 자체를 내지 않는다.
+ */
 @Composable
-private fun FestivalRow(festival: NearbyFestival) {
+private fun FestivalRow(festival: NearbyFestival, onCannotOpen: () -> Unit) {
+    val context = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         // KTO `firstimage`. **없으면 빈 자리를 그대로 둔다** — 명세 §8.3 이 nullable 로
         // 두었고, 사진 하나 없다고 축제를 목록에서 빼지 않는다(§3-5).
@@ -506,6 +515,15 @@ private fun FestivalRow(festival: NearbyFestival) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        openableWebUrl(festival.officialUrl)?.let { url ->
+            Spacer(Modifier.width(8.dp))
+            TextButton(
+                onClick = { if (!openInCustomTab(context, url)) onCannotOpen() },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+            ) {
+                Text("공식 페이지 ↗")
+            }
         }
     }
 }

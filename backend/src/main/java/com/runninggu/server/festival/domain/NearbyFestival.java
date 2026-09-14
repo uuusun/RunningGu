@@ -10,4 +10,12 @@ public record NearbyFestival(
         LocalDate endDate,
         double distanceKm,
         String imageUrl,
-        String address) {}
+        String address,
+        /** 공식 페이지. KTO 에 등록되지 않았거나 조회에 실패하면 null 이다. */
+        String officialUrl) {
+
+    public NearbyFestival withOfficialUrl(String officialUrl) {
+        return new NearbyFestival(
+                contentId, name, startDate, endDate, distanceKm, imageUrl, address, officialUrl);
+    }
+}

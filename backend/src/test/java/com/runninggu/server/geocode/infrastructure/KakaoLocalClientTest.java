@@ -142,7 +142,7 @@ class KakaoLocalClientTest {
                 "staging",
                 "kakao-429-test",
                 100,
-                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100, 100)));
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer guardedServer = MockRestServiceServer.bindTo(builder).build();
         KakaoLocalClient guardedClient = new KakaoLocalClient(

@@ -26,6 +26,11 @@ public enum UpstreamEndpoint {
             UpstreamProvider.KTO,
             "apis.data.go.kr",
             "/B551011/KorService2/searchFestival2"),
+    /** 축제 공식 페이지(`homepage`) 조회. searchFestival2가 주지 않는 값이라 건별로 부른다. */
+    KTO_DETAIL_COMMON(
+            UpstreamProvider.KTO,
+            "apis.data.go.kr",
+            "/B551011/KorService2/detailCommon2"),
     KTO_KOR_LOCATION(
             UpstreamProvider.KTO,
             "apis.data.go.kr",

@@ -2,7 +2,10 @@ package com.runninggu.server.festival.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.runninggu.server.common.error.ApiException;
@@ -39,11 +42,14 @@ class NearbyFestivalServiceTest {
     @Mock
     private FestivalProvider festivalProvider;
 
+    @Mock
+    private FestivalOfficialUrlQuery officialUrlQuery;
+
     private NearbyFestivalService service;
 
     @BeforeEach
     void setUp() {
-        service = new NearbyFestivalService(contestRepository, festivalProvider);
+        service = new NearbyFestivalService(contestRepository, festivalProvider, officialUrlQuery);
     }
 
     @Test
@@ -94,6 +100,26 @@ class NearbyFestivalServiceTest {
                         "festival-4",
                         "festival-5",
                         "festival-6");
+        // 일곱째는 잘려 나갔으니 공식 페이지도 묻지 않는다 (§3-5)
+        verify(officialUrlQuery, never()).findOrNull("festival-7");
+    }
+
+    @Test
+    void 공식_페이지를_붙이고_없으면_null로_둔다() {
+        Contest contest = contest(CONTEST_LAT, CONTEST_LNG);
+        LocalDate windowStart = CONTEST_DATE.minusDays(14);
+        given(contestRepository.findById(CONTEST_ID)).willReturn(Optional.of(contest));
+        given(festivalProvider.searchStartingFrom(windowStart)).willReturn(List.of(
+                festival("with-site", CONTEST_DATE, CONTEST_DATE, "37.0100000"),
+                festival("no-site", CONTEST_DATE, CONTEST_DATE, "37.0200000")));
+        given(officialUrlQuery.findOrNull("with-site")).willReturn("https://with-site.test");
+        given(officialUrlQuery.findOrNull("no-site")).willReturn(null);
+
+        assertThat(service.findNearby(CONTEST_ID))
+                .extracting(NearbyFestival::contentId, NearbyFestival::officialUrl)
+                .containsExactly(
+                        tuple("with-site", "https://with-site.test"),
+                        tuple("no-site", null));
     }
 
     @Test

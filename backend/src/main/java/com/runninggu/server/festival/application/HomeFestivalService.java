@@ -25,12 +25,15 @@ public class HomeFestivalService {
                     .withResolverStyle(ResolverStyle.STRICT);
 
     private final CachedHomeFestivalQuery cachedQuery;
+    private final FestivalOfficialUrlQuery officialUrlQuery;
     private final Clock businessClock;
 
     public HomeFestivalService(
             CachedHomeFestivalQuery cachedQuery,
+            FestivalOfficialUrlQuery officialUrlQuery,
             Clock businessClock) {
         this.cachedQuery = cachedQuery;
+        this.officialUrlQuery = officialUrlQuery;
         this.businessClock = businessClock;
     }
 
@@ -43,6 +46,9 @@ public class HomeFestivalService {
         validateSize(size);
         return cachedQuery.find(yearMonth, LocalDate.now(businessClock)).stream()
                 .limit(size)
+                // 잘라낸 뒤에 붙인다 — 노출되지 않는 축제까지 detailCommon2 를 부르지 않는다 (§4-1)
+                .map(festival -> festival.withOfficialUrl(
+                        officialUrlQuery.findOrNull(festival.contentId())))
                 .toList();
     }
 
