@@ -312,6 +312,6 @@ class KtoPoiClientTest {
                 "staging",
                 "poi-test",
                 100,
-                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100, 100)));
     }
 }

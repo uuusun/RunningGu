@@ -23,6 +23,7 @@ fun NearbyFestivalDto.toDomain(): NearbyFestival = NearbyFestival(
     distanceKm = distanceKm,
     imageUrl = imageUrl?.takeIf { it.isNotBlank() },
     address = address,
+    officialUrl = officialUrl?.takeIf { it.isNotBlank() },
 )
 
 private fun String.toLocalDateOrNull(): LocalDate? =

@@ -204,6 +204,7 @@ class RaceDetailViewModelTest {
         distanceKm = 3.2,
         imageUrl = null,
         address = "세종특별자치시",
+        officialUrl = null,
     )
 
     @Test

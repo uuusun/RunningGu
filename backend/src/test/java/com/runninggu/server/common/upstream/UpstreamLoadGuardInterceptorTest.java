@@ -422,6 +422,7 @@ class UpstreamLoadGuardInterceptorTest {
                         endpointLimit,
                         endpointLimit,
                         endpointLimit,
+                        endpointLimit,
                         endpointLimit));
     }
 

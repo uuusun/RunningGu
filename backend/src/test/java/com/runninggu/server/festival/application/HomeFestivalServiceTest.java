@@ -3,6 +3,7 @@ package com.runninggu.server.festival.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -31,6 +32,9 @@ class HomeFestivalServiceTest {
     @Mock
     private CachedHomeFestivalQuery cachedQuery;
 
+    @Mock
+    private FestivalOfficialUrlQuery officialUrlQuery;
+
     private HomeFestivalService service;
 
     @BeforeEach
@@ -38,7 +42,7 @@ class HomeFestivalServiceTest {
         Clock clock = Clock.fixed(
                 Instant.parse("2026-08-20T15:00:00Z"),
                 ClockConfig.KST);
-        service = new HomeFestivalService(cachedQuery, clock);
+        service = new HomeFestivalService(cachedQuery, officialUrlQuery, clock);
     }
 
     @Test
@@ -51,7 +55,8 @@ class HomeFestivalServiceTest {
                         TODAY,
                         "서울",
                         null,
-                        true))
+                        true,
+                        null))
                 .toList();
         given(cachedQuery.find(CURRENT_MONTH, TODAY))
                 .willReturn(cached);
@@ -59,6 +64,32 @@ class HomeFestivalServiceTest {
         assertThat(service.find(null, null)).hasSize(HomeFestivalService.DEFAULT_SIZE);
 
         verify(cachedQuery).find(CURRENT_MONTH, TODAY);
+    }
+
+    @Test
+    void 공식_페이지는_노출되는_축제에만_붙이고_없으면_null이다() {
+        List<HomeFestival> cached = IntStream.rangeClosed(1, 3)
+                .mapToObj(index -> new HomeFestival(
+                        "festival-" + index,
+                        "축제 " + index,
+                        TODAY,
+                        TODAY,
+                        "서울",
+                        null,
+                        true,
+                        null))
+                .toList();
+        given(cachedQuery.find(CURRENT_MONTH, TODAY)).willReturn(cached);
+        given(officialUrlQuery.findOrNull("festival-1")).willReturn("https://festival-1.test");
+        given(officialUrlQuery.findOrNull("festival-2")).willReturn(null);
+
+        List<HomeFestival> result = service.find(null, 2);
+
+        assertThat(result)
+                .extracting(HomeFestival::officialUrl)
+                .containsExactly("https://festival-1.test", null);
+        // size 로 잘려 나간 축제까지 detailCommon2 를 부르면 쿼터가 샌다 (SPEC §9.5)
+        verify(officialUrlQuery, never()).findOrNull("festival-3");
     }
 
     @Test

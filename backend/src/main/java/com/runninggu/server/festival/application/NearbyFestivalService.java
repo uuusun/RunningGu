@@ -26,12 +26,15 @@ public class NearbyFestivalService {
 
     private final ContestRepository contestRepository;
     private final FestivalProvider festivalProvider;
+    private final FestivalOfficialUrlQuery officialUrlQuery;
 
     public NearbyFestivalService(
             ContestRepository contestRepository,
-            FestivalProvider festivalProvider) {
+            FestivalProvider festivalProvider,
+            FestivalOfficialUrlQuery officialUrlQuery) {
         this.contestRepository = contestRepository;
         this.festivalProvider = festivalProvider;
+        this.officialUrlQuery = officialUrlQuery;
     }
 
     /** 대회일 ±14일·반경 40km 축제를 거리순 여섯 건까지 반환한다. (SPEC §8.3) */
@@ -62,6 +65,9 @@ public class NearbyFestivalService {
                 .filter(festival -> festival.distanceKm() <= MAX_DISTANCE_KM)
                 .sorted(Comparator.comparingDouble(NearbyFestival::distanceKm))
                 .limit(MAX_RESULTS)
+                // 여섯 건으로 자른 뒤에 공식 페이지를 붙인다 (§3-5)
+                .map(festival -> festival.withOfficialUrl(
+                        officialUrlQuery.findOrNull(festival.contentId())))
                 .toList();
     }
 
@@ -109,7 +115,8 @@ public class NearbyFestivalService {
                 festival.endDate(),
                 distanceKm,
                 festival.imageUrl(),
-                festival.address());
+                festival.address(),
+                null);
     }
 
     static double haversineKm(

@@ -21,9 +21,11 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -112,6 +114,77 @@ class KtoFestivalClientTest {
             assertThat(festival.address()).isEqualTo("서울특별시 종로구");
         });
         server.verify();
+    }
+
+    @Test
+    void detailCommon2로_homepage의_href를_공식_페이지로_꺼낸다() {
+        server.expect(request -> {
+                    var uri = request.getURI();
+                    var params = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
+                    assertThat(uri.getPath())
+                            .isEqualTo("/B551011/KorService2/detailCommon2");
+                    assertThat(URLDecoder.decode(
+                                    params.getFirst("serviceKey"),
+                                    StandardCharsets.UTF_8))
+                            .isEqualTo("decoded+/=key");
+                    assertThat(params.getFirst("MobileOS")).isEqualTo("ETC");
+                    assertThat(params.getFirst("MobileApp")).isEqualTo("runninggu");
+                    assertThat(params.getFirst("_type")).isEqualTo("json");
+                    assertThat(params.getFirst("contentId")).isEqualTo("2764321");
+                })
+                .andRespond(withSuccess(
+                        // KTO 실측 형태 그대로 — JSON 문자열 안에 HTML 앵커가 들어 있다
+                        detailBody("\"<a href=\\\"https://festival.test/main\\\" target=\\\"_blank\\\""
+                                + " title=\\\"새창 : 홈페이지\\\">https://festival.test/main</a>\""),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.findOfficialUrl("2764321"))
+                .contains("https://festival.test/main");
+        server.verify();
+    }
+
+    @Test
+    void homepage가_비어_있으면_공식_페이지가_없는_것이다() {
+        server.expect(request -> {})
+                .andRespond(withSuccess(detailBody("\"\""), MediaType.APPLICATION_JSON));
+
+        assertThat(client.findOfficialUrl("2764321")).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void detailCommon2_실패코드는_외부오류다() {
+        server.expect(request -> {})
+                .andRespond(withSuccess(
+                        """
+                        {"response":{"header":{"resultCode":"30","resultMsg":"SERVICE KEY ERROR"}}}
+                        """,
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.findOfficialUrl("2764321"))
+                .isInstanceOfSatisfying(
+                        FestivalProviderException.class,
+                        exception -> assertThat(exception.reason()).isEqualTo(Reason.ERROR));
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                // 태그 없이 주소만 오는 경우
+                "http://plain.test/|http://plain.test/",
+                // 첫 href 만 쓴다
+                "<a href=\"http://first.test\">x</a> <a href=\"http://second.test\">y</a>|http://first.test",
+                // 스킴이 http·https 가 아니면 버린다 — 앱이 Custom Tabs 로 여는 값이다
+                "<a href=\"javascript:alert(1)\">x</a>|",
+                "mailto:info@festival.test|",
+                // 공백이 든 주소는 브라우저마다 해석이 달라 버린다
+                "<a href=\"http://a.test/b c\">x</a>|",
+            })
+    void homepage_추출은_http_https_href_하나만_남긴다(String homepage, String expected) {
+        assertThat(KtoFestivalClient.extractHomepageUrl(homepage))
+                .isEqualTo(Optional.ofNullable(expected));
     }
 
     @Test
@@ -283,6 +356,15 @@ class KtoFestivalClientTest {
                         exception -> assertThat(exception.reason()).isEqualTo(expected));
     }
 
+    private String detailBody(String homepageJson) {
+        return """
+                {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},"body":{
+                  "items":{"item":[{"contentid":"2764321","title":"세종 빛 축제","homepage":%s}]},
+                  "numOfRows":10,"pageNo":1,"totalCount":1
+                }}}
+                """.formatted(homepageJson);
+    }
+
     private String successBody(int totalCount, String items) {
         return """
                 {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},"body":{
@@ -321,6 +403,6 @@ class KtoFestivalClientTest {
                 "staging",
                 "festival-test",
                 100,
-                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100, 100)));
     }
 }

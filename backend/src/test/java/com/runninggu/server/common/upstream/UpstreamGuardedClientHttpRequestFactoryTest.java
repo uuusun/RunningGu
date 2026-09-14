@@ -69,6 +69,7 @@ class UpstreamGuardedClientHttpRequestFactoryTest {
                         10,
                         10,
                         10,
+                        10,
                         10));
     }
 

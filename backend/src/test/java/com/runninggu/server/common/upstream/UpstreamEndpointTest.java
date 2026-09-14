@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class UpstreamEndpointTest {
 
     @Test
-    void 승인된_endpoint_목록은_정확히_여덟_개다() {
+    void 승인된_endpoint_목록은_정확히_아홉_개다() {
         assertThat(UpstreamEndpoint.values())
                 .containsExactly(
                         UpstreamEndpoint.KAKAO_CATEGORY,
@@ -16,6 +16,7 @@ class UpstreamEndpointTest {
                         UpstreamEndpoint.KAKAO_ACCESS_TOKEN_INFO,
                         UpstreamEndpoint.KAKAO_USER_ME,
                         UpstreamEndpoint.KTO_SEARCH_FESTIVAL,
+                        UpstreamEndpoint.KTO_DETAIL_COMMON,
                         UpstreamEndpoint.KTO_KOR_LOCATION,
                         UpstreamEndpoint.KTO_WELLNESS_LOCATION,
                         UpstreamEndpoint.KTO_DURUNUBI_COURSE);
@@ -38,6 +39,9 @@ class UpstreamEndpointTest {
         assertResolved(
                 "https://apis.data.go.kr/B551011/KorService2/searchFestival2",
                 UpstreamEndpoint.KTO_SEARCH_FESTIVAL);
+        assertResolved(
+                "https://apis.data.go.kr/B551011/KorService2/detailCommon2",
+                UpstreamEndpoint.KTO_DETAIL_COMMON);
         assertResolved(
                 "https://apis.data.go.kr/B551011/KorService2/locationBasedList2",
                 UpstreamEndpoint.KTO_KOR_LOCATION);

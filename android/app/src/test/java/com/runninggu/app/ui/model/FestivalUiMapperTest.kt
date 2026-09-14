@@ -19,6 +19,7 @@ class FestivalUiMapperTest {
         imageUrl: String? = "http://tong.visitkorea.or.kr/cms/a.jpg",
         start: LocalDate? = LocalDate.of(2026, 8, 1),
         end: LocalDate? = LocalDate.of(2026, 8, 9),
+        officialUrl: String? = "https://www.bfo.or.kr/",
     ) = Festival(
         contentId = "2764321",
         name = "부산 바다축제",
@@ -27,7 +28,15 @@ class FestivalUiMapperTest {
         region = "부산",
         imageUrl = imageUrl,
         inProgress = true,
+        officialUrl = officialUrl,
     )
+
+    @Test
+    fun `공식 페이지 주소를 화면까지 그대로 넘긴다`() {
+        // 열 수 있는 값인지는 화면(`openableWebUrl`)이 본다 — 여기서 고치거나 거르지 않는다
+        assertEquals("https://www.bfo.or.kr/", festival().toFestivalSummary().officialUrl)
+        assertNull(festival(officialUrl = null).toFestivalSummary().officialUrl)
+    }
 
     @Test
     fun `이미지 주소를 화면까지 그대로 넘긴다`() {

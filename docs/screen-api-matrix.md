@@ -212,8 +212,9 @@ Compose 화면
 | ~~달력·지도·코스·관광 아이콘~~ | — | — | — | — | **제거**(2026-09-14 · SPEC §4.4-2). 하단 탭과 겹쳐 아이콘 행을 빼고 그 자리에 검색 카드를 뒀다. 결정-15 폐기 |
 | 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4. **히어로 배경은 대회 `imageUrl` 이 아니라 홈 축제 사진**(아래 행) — 대회 `imageUrl` 은 공식 홈페이지 스크린샷이라 쓰지 않는다(SPEC §4.4 히어로 배경). 히어로 대표 대회 블록에는 `sources`·`checkedAt` 을 그리지 않는다 — S2·S3 이 보여 준다(A3) |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB / Room `cached_closing_soon` | 영역별 Loading/Empty/Error. 오프라인이면 24시간 미만 snapshot 으로 그린다(아래 행) |
-| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보). **히어로 배경**: 사진 있는 항목들을 무작위 장부터 6초 간격으로 돌려 보여준다(진행 중 먼저) — 장식이라 탭 없음, 다음 장은 미리 받아 성공 시에만 교체, 로고 옆 "사진 · {축제명} · 한국관광공사" 크레딧(NFR-7). 없으면 지형 그림 폴백(SPEC §4.4 히어로 배경 · #247 후속) |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress, officialUrl(nullable) | KTO_LIVE/5분 TTL cache · officialUrl 은 contentId 별 1일 cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼친 카드에는 [공식 페이지 ↗](officialUrl 있을 때만) 가 붙고 Custom Tabs 로 연다(2026-09-14). 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보). **히어로 배경**: 사진 있는 항목들을 무작위 장부터 6초 간격으로 돌려 보여준다(진행 중 먼저) — 장식이라 탭 없음, 다음 장은 미리 받아 성공 시에만 교체, 로고 옆 "사진 · {축제명} · 한국관광공사" 크레딧(NFR-7). 없으면 지형 그림 폴백(SPEC §4.4 히어로 배경 · #247 후속) |
 | 축제 카드 탭 | 로컬 상태 | 없음 | 없음 | LOCAL_STATE | **제자리 확대**(카드 200→300dp · 사진 116→186dp) + 고른 카드를 가운데로 스크롤. 화면 이동 없음 |
+| 축제 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null 이면 버튼 숨김. 대회 상세 [공식 페이지 ↗] 와 같은 `openableWebUrl` 기준. 브라우저가 없는 기기는 조용히 실패한다(홈에는 스낵바 통로가 없다) |
 | 오프라인 | Room `cached_closing_soon` | cachedAt | 마지막 성공 마감임박 snapshot — 서버가 준 `rank` 순서 보존, `dDayApply` 는 저장하지 않고 `applyEnd` + 조회 시점 KST 로 재계산 | LOCAL_CACHE + cachedAt 표기 | `cachedAt` 24시간 미만만 유효. 접수 종료(`applyEnd < 오늘`) 항목 제외, 제외 후 0건이면 정상 Empty. cache 없음·24시간 초과는 **Empty 가 아니라** 네트워크 Error + [다시 시도]. 새로고침/쓰기 제한 |
 
 홈 마감 임박은 4건으로 확정했다(D-03). 홈 축제는 사용자 위치를 받지 않는 전국 월간 목록이다(D-04).
@@ -238,7 +239,7 @@ Compose 화면
 |---|---|---|---|---|
 | 상세 본문 | `GET /api/contests/{contestId}` | 카드 필드, nullable imageUrl, organizer, officialUrl, nullable lat/lng, dDay, favorite, active | SERVER_DB/Room | 비활성도 404가 아닌 Content: 흐림+"정보 제공 종료". 이미지 null은 placeholder |
 | 찜 | S2와 같은 PUT/DELETE | 204 | SERVER_DB | 게스트 modal, 실패 원복. **캐시로 그린 화면에서는 앱바 하트를 잠근다** — S2 와 같은 기준·같은 문구 (공통 오프라인 읽기 · #307) |
-| 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address | KTO_LIVE/서버 1일 cache | active일 때만 호출. 본문과 독립 Loading/Empty/502/504. `409 CONTEST_LOCATION_UNAVAILABLE` = **재시도 버튼 없는 별도 오류**("인근 축제를 확인할 수 없어요") — 좌표는 재시도로 생기지 않는다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 인근 축제 | `GET /api/contests/{contestId}/festivals` | contentId, name, 기간, distanceKm, imageUrl, address, officialUrl(nullable) | KTO_LIVE/서버 1일 cache | active일 때만 호출. 행 오른쪽 끝 [공식 페이지 ↗] 는 officialUrl 있을 때만, 대회 공식 페이지와 같은 Custom Tabs·`openableWebUrl` 기준(2026-09-14). 본문과 독립 Loading/Empty/502/504. `409 CONTEST_LOCATION_UNAVAILABLE` = **재시도 버튼 없는 별도 오류**("인근 축제를 확인할 수 없어요") — 좌표는 재시도로 생기지 않는다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
 | 공식 페이지 | Custom Tabs | officialUrl | 외부 웹 | null이면 버튼 숨김 |
 | 공유 | Android 공유 시트(`ACTION_SEND`) | `EXTRA_TEXT`=대회명·`MM.dd 요일 HH:mm`·장소·열리는 공식 주소, `EXTRA_SUBJECT`=대회명 | 저장 없음 | **P0**(#279). `createChooser` 로 매번 고르게 한다. `state.race == null` 이면 비활성. 링크는 `openableWebUrl` 을 통과한 것만 — 화면 [공식 페이지 ↗] 와 같은 기준. 카톡 전용 카드(썸네일·버튼)는 P1/AP-17 |
 | 동선 만들기 | S4 이동 | contestId | WizardUiState | 좌표 null 또는 active=false면 CTA 비활성, 좌표 전용 안내 UX는 P1 |
@@ -461,7 +462,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | F-05 | 보관함 설정 아이콘에서 계정 관리 진입 |
 | D-27 / F-06 | 로그인 후 원래 화면 복귀, 저장·찜 자동 실행 없음 |
 | F-07 | 홈·캘린더·보관함의 Loading/Empty/Error와 부분 실패 캡처 추가 |
-| D-05 | 홈 축제 카드는 P0 표시 전용, 플로우에 상세 이동 없음 |
+| D-05 | 홈 축제 카드는 앱 안 상세 화면·route 없음. 2026-09-14 개정: 펼친 카드의 [공식 페이지 ↗] 로 `officialUrl` 을 Custom Tabs 로 연다(출시 후 피드백) |
 | D-06 | Android S3 route는 `raceDetail/{raceId}` |
 | D-07 | 캘린더 month는 route가 아니라 ViewModel 상태 |
 | D-03 | 홈 마감 임박은 4건, API `limit=4` |

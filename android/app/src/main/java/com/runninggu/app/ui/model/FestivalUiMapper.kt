@@ -18,6 +18,7 @@ fun Festival.toFestivalSummary(): FestivalSummary = FestivalSummary(
     isOngoing = inProgress,
     // 서버가 준 것을 그대로 넘긴다. `FestivalMapper` 가 이미 빈 문자열을 null 로 정리했다
     imageUrl = imageUrl,
+    officialUrl = officialUrl,
 )
 
 /**

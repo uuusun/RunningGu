@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.runninggu.app.ui.common.openInCustomTab
+import com.runninggu.app.ui.common.openableWebUrl
 import com.runninggu.app.ui.model.FestivalSummary
 import kotlinx.coroutines.launch
 
@@ -122,7 +126,11 @@ fun FestivalCarousel(
  *
  * **커지는 것은 사진뿐이다.** 글자 크기는 그대로 두고 이미지 자리만 넓힌다 — 확대해서
  * 보고 싶은 것이 사진이지 이름이 아니고, 글자가 같이 커지면 옆 카드와 어긋나 보인다.
- * 응답에 있는 것이 일곱 필드뿐이라 펼쳐도 더 보여줄 정보가 없다(D-05).
+ *
+ * **펼치면 [공식 페이지 ↗] 가 나온다.** 출시 후 "축제를 눌러도 아무것도 안 뜬다" 는 말이
+ * 나와서 붙였다(2026-09-14). 앱 안에 축제 상세 화면을 만드는 대신 서버가 `officialUrl` 을
+ * 내려 주고(§4-1 · D-05 개정) Custom Tabs 로 연다 — 대회 [공식 페이지 ↗] 와 같은 길이다.
+ * 주소가 없거나 열 수 없는 값이면 버튼을 내지 않는다. 눌렀는데 아무 일도 안 나는 것보다 낫다.
  */
 @Composable
 private fun FestivalCard(
@@ -139,6 +147,8 @@ private fun FestivalCard(
         targetValue = if (expanded) EXPANDED_IMAGE else COLLAPSED_IMAGE,
         label = "festivalImageHeight",
     )
+    val context = LocalContext.current
+    val officialUrl = openableWebUrl(festival.officialUrl)
 
     Card(
         modifier = modifier
@@ -151,6 +161,7 @@ private fun FestivalCard(
                     if (festival.isOngoing) append(", 진행 중")
                     append(", ").append(festivalPeriodAndRegion(festival.period, festival.region))
                     append(if (expanded) ", 펼침" else ", 눌러서 크게 보기")
+                    if (expanded && officialUrl != null) append(", 공식 페이지 열 수 있음")
                 }
             },
         shape = RoundedCornerShape(16.dp),
@@ -185,6 +196,17 @@ private fun FestivalCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // 펼친 카드에만 낸다. 접힌 카드까지 버튼이 있으면 캐러셀이 버튼 줄로 보인다
+            if (expanded && officialUrl != null) {
+                TextButton(
+                    // 브라우저가 하나도 없는 기기면 조용히 실패한다 — 홈에는 스낵바 통로가 없고,
+                    // 그 기기는 대회 상세 쪽에서도 같은 안내를 이미 본다
+                    onClick = { openInCustomTab(context, officialUrl) },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text("공식 페이지 ↗")
+                }
+            }
         }
     }
 }

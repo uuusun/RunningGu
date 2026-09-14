@@ -10,7 +10,8 @@ public record NearbyFestivalResponse(
         LocalDate endDate,
         double distanceKm,
         String imageUrl,
-        String address) {
+        String address,
+        String officialUrl) {
 
     public static NearbyFestivalResponse from(NearbyFestival festival) {
         return new NearbyFestivalResponse(
@@ -20,6 +21,7 @@ public record NearbyFestivalResponse(
                 festival.endDate(),
                 festival.distanceKm(),
                 festival.imageUrl(),
-                festival.address());
+                festival.address(),
+                festival.officialUrl());
     }
 }

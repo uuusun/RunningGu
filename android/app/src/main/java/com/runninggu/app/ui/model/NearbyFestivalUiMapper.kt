@@ -18,6 +18,7 @@ fun DataNearbyFestival.toNearbyFestival(): NearbyFestival = NearbyFestival(
     distanceKm = distanceKm,
     imageUrl = imageUrl,
     address = address,
+    officialUrl = officialUrl,
 )
 
 /**
