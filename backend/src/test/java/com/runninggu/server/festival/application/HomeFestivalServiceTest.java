@@ -3,7 +3,6 @@ package com.runninggu.server.festival.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -15,7 +14,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,16 +81,17 @@ class HomeFestivalServiceTest {
                         null))
                 .toList();
         given(cachedQuery.find(CURRENT_MONTH, TODAY)).willReturn(cached);
-        given(officialUrlQuery.findOrNull("festival-1")).willReturn("https://festival-1.test");
-        given(officialUrlQuery.findOrNull("festival-2")).willReturn(null);
+        Map<String, String> urls = new HashMap<>();
+        urls.put("festival-1", "https://festival-1.test");
+        urls.put("festival-2", null);
+        // size 로 잘려 나간 festival-3 은 묻지 않는다 — detailCommon2 를 부르면 쿼터가 샌다 (SPEC §9.5)
+        given(officialUrlQuery.findAll(List.of("festival-1", "festival-2"))).willReturn(urls);
 
         List<HomeFestival> result = service.find(null, 2);
 
         assertThat(result)
                 .extracting(HomeFestival::officialUrl)
                 .containsExactly("https://festival-1.test", null);
-        // size 로 잘려 나간 축제까지 detailCommon2 를 부르면 쿼터가 샌다 (SPEC §9.5)
-        verify(officialUrlQuery, never()).findOrNull("festival-3");
     }
 
     @Test

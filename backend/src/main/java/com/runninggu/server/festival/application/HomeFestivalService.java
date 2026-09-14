@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -44,11 +45,16 @@ public class HomeFestivalService {
                 : parseYearMonth(requestedYearMonth);
         int size = requestedSize == null ? DEFAULT_SIZE : requestedSize;
         validateSize(size);
-        return cachedQuery.find(yearMonth, LocalDate.now(businessClock)).stream()
+        List<HomeFestival> festivals = cachedQuery.find(yearMonth, LocalDate.now(businessClock))
+                .stream()
                 .limit(size)
-                // 잘라낸 뒤에 붙인다 — 노출되지 않는 축제까지 detailCommon2 를 부르지 않는다 (§4-1)
-                .map(festival -> festival.withOfficialUrl(
-                        officialUrlQuery.findOrNull(festival.contentId())))
+                .toList();
+        // 잘라낸 뒤에 붙인다 — 노출되지 않는 축제까지 detailCommon2 를 부르지 않는다 (§4-1).
+        // 한꺼번에 부르고 전체 예산 안에 끝낸다 — 차례로 부르면 앱 timeout 을 넘긴다 (#352 리뷰)
+        Map<String, String> officialUrls = officialUrlQuery.findAll(
+                festivals.stream().map(HomeFestival::contentId).toList());
+        return festivals.stream()
+                .map(festival -> festival.withOfficialUrl(officialUrls.get(festival.contentId())))
                 .toList();
     }
 
