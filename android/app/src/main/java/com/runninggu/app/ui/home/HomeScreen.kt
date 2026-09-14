@@ -1,7 +1,6 @@
 package com.runninggu.app.ui.home
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,42 +22,32 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runninggu.app.R
-import com.runninggu.app.domain.RegistrationStatus
 import com.runninggu.app.domain.today
-import com.runninggu.app.ui.common.EmptyState
 import com.runninggu.app.ui.common.ErrorState
 import com.runninggu.app.ui.common.LoadingState
 import com.runninggu.app.ui.common.SectionHeader
@@ -67,24 +56,23 @@ import com.runninggu.app.ui.common.SectionState
 import com.runninggu.app.ui.common.cachedAt
 import com.runninggu.app.ui.model.FestivalSummary
 import com.runninggu.app.ui.model.RaceSummary
-import com.runninggu.app.ui.model.registrationStatus
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 private val ScreenPadding = 20.dp
 
-/** 퀵바 카드 높이와 히어로에 겹치는 양. (목업 .quickbar) */
-private val QUICKBAR_HEIGHT = 72.dp
-private val QUICKBAR_OVERLAP = 26.dp
+/** 검색 카드 높이와 히어로에 겹치는 양. 겹침은 퀵바가 쓰던 값 그대로다. (목업 .quickbar) */
+private val SEARCH_CARD_HEIGHT = 60.dp
+private val SEARCH_CARD_OVERLAP = 26.dp
 
 /**
  * S1 홈. (SPEC §4.4 / AP-09)
  *
  * 컨셉은 "검색을 먼저 보여주고, 마라톤 검색 → 메인 기능으로".
- * 구성: 헤더 · 검색 바 · 히어로 대회 · 기능 아이콘 행 · 마감 임박 대회 · 축제 추천.
+ * 구성: 히어로(로고 · 축제 사진 배경 · 대표 대회) · 검색 카드 · 마감 임박 대회 · 축제 추천.
+ * 달력·지도·코스·관광 퀵바는 하단 탭과 겹쳐 뺐다(2026-09-14 · SPEC §4.4-2).
  */
 @Composable
 fun HomeScreen(
@@ -92,9 +80,6 @@ fun HomeScreen(
     onSearch: (String) -> Unit = {},
     onRaceClick: (String) -> Unit = {},
     onStartWizard: (String) -> Unit = {},
-    onOpenCalendar: () -> Unit = {},
-    onOpenCourseMap: () -> Unit = {},
-    onOpenCourseRegions: () -> Unit = {},
     viewModel: HomeViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -109,9 +94,6 @@ fun HomeScreen(
         onRetryFestivals = viewModel::loadFestivals,
         onRaceClick = onRaceClick,
         onStartWizard = onStartWizard,
-        onOpenCalendar = onOpenCalendar,
-        onOpenCourseMap = onOpenCourseMap,
-        onOpenCourseRegions = onOpenCourseRegions,
         modifier = modifier,
     )
 }
@@ -126,59 +108,40 @@ private fun HomeContent(
     onRetryFestivals: () -> Unit,
     onRaceClick: (String) -> Unit,
     onStartWizard: (String) -> Unit,
-    onOpenCalendar: () -> Unit,
-    onOpenCourseMap: () -> Unit,
-    onOpenCourseRegions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-
     LazyColumn(
-        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         // 히어로(로고·검색·대표 대회)는 다크 몰입 레지스터 한 덩어리다 (목업 .hero).
+        // 배경 사진은 축제 영역에서 빌려 온다 — 따로 조회하지 않는다 (SPEC §4.4 히어로 배경).
         item {
             HomeHero(
                 race = uiState.featured,
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = onSearch,
+                photos = uiState.heroPhotos,
                 onRaceClick = { uiState.featured?.let { onRaceClick(it.id) } },
                 onStartWizard = { uiState.featured?.let { onStartWizard(it.id) } },
             )
         }
 
-        // 퀵바는 흰 카드로 히어로 하단에 26dp 겹친다 (목업 .quickbar margin-top:-26px).
-        // 조회 결과와 무관한 이동 수단이라 영역 상태를 안 본다.
+        // 검색 카드는 흰 카드로 히어로 하단에 26dp 겹친다 (목업 .quickbar 자리 · margin-top:-26px).
+        // 예전엔 달력·지도·코스·관광 퀵바가 있던 자리다 — 하단 탭과 겹쳐 뺐다 (SPEC §4.4-2).
         item {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(QUICKBAR_HEIGHT - QUICKBAR_OVERLAP)
+                    .height(SEARCH_CARD_HEIGHT - SEARCH_CARD_OVERLAP)
                     // unbounded — 카드가 이 칸보다 커도 잘리지 않고 위로 넘치게 둔다.
                     .wrapContentHeight(align = Alignment.Top, unbounded = true),
             ) {
-                QuickActionRow(
-                    onCalendar = onOpenCalendar,
-                    // [지도]와 [코스]는 **같은 S8 의 다른 탭**이다 (SPEC §4.4-2 · 목업
-                    // v2 L967-968). 예전에는 둘 다 기본 탭으로 보내서, 다르게 생긴
-                    // 버튼 두 개가 같은 화면을 열었다
-                    onMap = onOpenCourseMap,
-                    onCourse = onOpenCourseRegions,
-                    // "관광"은 화면 이동 없이 축제 섹션으로 스크롤한다. (결정-15)
-                    onTour = {
-                        scope.launch {
-                            // 축제는 언제나 마지막 항목이다 — 마감 임박이 접혀도 맞는다
-                            val last = listState.layoutInfo.totalItemsCount - 1
-                            if (last >= 0) listState.animateScrollToItem(last)
-                        }
-                    },
+                HomeSearchCard(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    onSearch = onSearch,
                     modifier = Modifier
-                        .offset(y = -QUICKBAR_OVERLAP)
+                        .offset(y = -SEARCH_CARD_OVERLAP)
                         .padding(horizontal = 22.dp),
                 )
             }
@@ -199,8 +162,6 @@ private fun HomeContent(
             state = uiState.festivals,
             errorMessage = "축제 정보를 불러오지 못했어요",
             onRetry = onRetryFestivals,
-            // 퀵바 [관광]이 이 섹션으로 스크롤한다 — 비어도 자리를 남겨야 겨냥할 곳이 있다
-            empty = { FestivalSectionFrame { EmptyState(title = "추천할 축제가 없어요.") } },
         ) { festivals ->
             FestivalSection(festivals = festivals)
         }
@@ -219,13 +180,6 @@ private fun <T> LazyListScope.section(
     state: SectionState<T>,
     errorMessage: String,
     onRetry: () -> Unit,
-    /**
-     * 비었을 때 자리를 남길 것인가. 기본은 접는다.
-     *
-     * **퀵액션이 겨냥하는 섹션만 넘긴다**(#102 리뷰). 접히면 스크롤할 자리가 사라져서
-     * 버튼이 죽거나 엉뚱한 섹션으로 간다.
-     */
-    empty: (@Composable () -> Unit)? = null,
     content: @Composable (T) -> Unit,
 ) {
     when (state) {
@@ -234,11 +188,8 @@ private fun <T> LazyListScope.section(
         // 결과가 비어 있다" 와 "방금 서버가 0건을 줬다" 가 같은 화면이 된다 — 접수 종료
         // 필터가 다 걸러내면 바로 이 상태라 드물지도 않다. 서버가 준 0건은 지금처럼 접는다.
         is SectionState.Empty -> state.cachedAt?.let { at ->
-            item {
-                CachedNotice(cachedAt = at, modifier = Modifier.padding(horizontal = ScreenPadding))
-                empty?.invoke()
-            }
-        } ?: empty?.let { item { it() } } ?: Unit
+            item { CachedNotice(cachedAt = at, modifier = Modifier.padding(horizontal = ScreenPadding)) }
+        } ?: Unit
         is SectionState.Error -> item {
             // 서버가 준 문구가 있으면 그걸 쓴다. 없을 때만 영역 기본 문구다 (§0-3)
             ErrorState(message = state.message ?: errorMessage, onRetry = onRetry)
@@ -256,143 +207,21 @@ private fun <T> LazyListScope.section(
     }
 }
 
+/**
+ * 검색 카드. 히어로 아래에 걸쳐 뜨는 흰 카드다 — 검색 실행 시 S2 캘린더로 이동하고 검색어를
+ * 넘긴다. (SPEC §4.4-1)
+ *
+ * 원래 히어로 맨 위에 반투명 검색 필드가 있고 이 자리엔 달력·지도·코스·관광 퀵바가 있었다.
+ * 하단 탭(홈·캘린더·러닝코스·마이)이 같은 곳으로 가는 길을 이미 주고 있어 퀵바를 빼고, 검색을
+ * 이 자리로 내렸다(2026-09-14 · 이건모). 히어로에는 사진과 대표 대회만 남아 덜 붐빈다.
+ */
 @Composable
-private fun HomeHeader(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = ScreenPadding, end = ScreenPadding, top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.app_icon),
-            contentDescription = null,
-            modifier = Modifier.size(30.dp),
-        )
-        Spacer(Modifier.width(9.dp))
-        Text(
-            text = "런닝구",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
-        )
-    }
-}
-
-/** 검색 실행 시 S2 캘린더로 이동하고 검색어를 넘긴다. (SPEC §4.4-1) */
-@Composable
-private fun SearchBar(
+private fun HomeSearchCard(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth(),
-        placeholder = { Text("대회·지역 검색") },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-    )
-}
-
-@Composable
-private fun FeaturedRaceCard(
-    race: RaceSummary,
-    onClick: () -> Unit,
-    onStartWizard: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "D-${race.date.daysFromToday()}",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.padding(bottom = 4.dp)) {
-                    Text(
-                        text = race.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "${race.date.toKoreanDate()} ${race.startTime} · ${race.venue}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(13.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusChip(race = race)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = race.source,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Button(
-                onClick = onStartWizard,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Text("이 대회로 동선 만들기", fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusChip(race: RaceSummary, modifier: Modifier = Modifier) {
-    val status = race.registrationStatus()
-    val isOpen = status == RegistrationStatus.OPEN
-    val label = if (isOpen && race.regEnd != null) {
-        "접수중 · ~${race.regEnd.toShortDate()}"
-    } else {
-        status.label
-    }
-    val container = if (isOpen) {
-        // 접수중은 라임 (목업 .chip-open). S2 카드와 같은 색을 쓴다.
-        MaterialTheme.colorScheme.tertiaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = modifier
-            .background(container, CircleShape)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-    )
-}
-
-/** 달력(→S2) · 지도(→S8) · 코스(→S8) · 관광(축제 섹션으로 스크롤). (SPEC §4.4-2) */
-@Composable
-private fun QuickActionRow(
-    onCalendar: () -> Unit,
-    onMap: () -> Unit,
-    onCourse: () -> Unit,
-    onTour: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // 목업 .quickbar — 히어로에 걸쳐 뜨는 흰 카드. 그림자로 떠 보이게 한다.
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -400,37 +229,41 @@ private fun QuickActionRow(
         shadowElevation = 10.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(SEARCH_CARD_HEIGHT)
+                .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            QuickAction("달력", Icons.Filled.DateRange, onCalendar)
-            // 지도는 핀, 코스는 목록이다. 둘 다 핀(`LocationOn`·`Place`)이던 때는
-            // 아이콘만 봐서는 어디로 가는지 구분되지 않았다 — 실제로 가는 곳도 같았다.
-            // 목업의 `map`·`route` 심볼은 `material-icons-core` 48개에 없다
-            QuickAction("지도", Icons.Filled.LocationOn, onMap)
-            QuickAction("코스", Icons.AutoMirrored.Filled.List, onCourse)
-            QuickAction("관광", Icons.Filled.Face, onTour)
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = "대회·지역 검색",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.merge(
+                        MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
-    }
-}
-
-@Composable
-private fun QuickAction(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(25.dp))
-        Spacer(Modifier.height(6.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -525,9 +358,8 @@ private fun ClosingSoonCard(
 }
 
 /**
- * 축제 섹션의 제목까지. 내용과 빈 자리가 **같은 머리를 쓰도록** 갈라 두었다 (#102 리뷰).
- *
- * 비었을 때도 제목이 남아야 퀵바 [관광]이 데려다 놓은 자리가 무엇인지 알 수 있다.
+ * 축제 섹션의 제목과 몸통. 퀵바 [관광]이 있던 때는 빈 상태에도 이 머리를 남겨 스크롤 목적지를
+ * 확보했는데(#102 리뷰), 퀵바가 빠져 지금은 내용이 있을 때만 그린다 — 빈 결과는 접는다(#49).
  */
 @Composable
 private fun FestivalSectionFrame(
@@ -581,5 +413,3 @@ private fun LocalDate.toKoreanDate(): String {
     val dow = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)
     return "%02d.%02d %s".format(monthValue, dayOfMonth, dow)
 }
-
-private fun LocalDate.toShortDate(): String = "%02d.%02d".format(monthValue, dayOfMonth)

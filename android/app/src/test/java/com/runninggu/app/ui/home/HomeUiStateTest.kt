@@ -90,6 +90,56 @@ class HomeUiStateTest {
         assertNull(HomeUiState(closingSoon = SectionState.Error(null)).featured)
     }
 
+    private fun festival(id: String, imageUrl: String?, ongoing: Boolean = false) = FestivalSummary(
+        id = id,
+        name = "축제 $id",
+        region = "세종",
+        period = "09.01~09.30",
+        isOngoing = ongoing,
+        imageUrl = imageUrl,
+    )
+
+    @Test
+    fun `히어로 사진 목록은 사진 있는 축제만 담고 진행 중을 앞에 둔다`() {
+        // 사진 없는 진행 중 축제(a)는 빠지고, 사진 있는 진행 중(c)이 사진 있는 예정(b)보다 앞이다
+        val state = HomeUiState(
+            festivals = SectionState.Content(
+                listOf(
+                    festival("a", imageUrl = null, ongoing = true),
+                    festival("b", imageUrl = "https://img/b"),
+                    festival("c", imageUrl = "https://img/c", ongoing = true),
+                ),
+            ),
+        )
+
+        assertEquals(listOf("c", "b"), state.heroPhotos.map { it.id })
+    }
+
+    @Test
+    fun `진행 중 여부가 같으면 서버가 준 순서를 지킨다`() {
+        // 안정 정렬이어야 한다 — 같은 등급 안에서 순서가 뒤집히면 슬라이드쇼 순서가 매번 달라진다
+        val state = HomeUiState(
+            festivals = SectionState.Content(
+                listOf(
+                    festival("a", imageUrl = null, ongoing = true),
+                    festival("b", imageUrl = "https://img/b"),
+                    festival("c", imageUrl = "https://img/c"),
+                ),
+            ),
+        )
+
+        assertEquals(listOf("b", "c"), state.heroPhotos.map { it.id })
+    }
+
+    @Test
+    fun `사진 있는 축제가 없으면 히어로는 지형 그림으로 남는다`() {
+        // 빈 목록이면 HomeHero 가 HeroTerrain 만 그린다 (#247 — 폴백은 남긴다)
+        assertTrue(HomeUiState(festivals = SectionState.Content(listOf(festival("a", imageUrl = null)))).heroPhotos.isEmpty())
+        assertTrue(HomeUiState(festivals = SectionState.Empty()).heroPhotos.isEmpty())
+        assertTrue(HomeUiState(festivals = SectionState.Loading).heroPhotos.isEmpty())
+        assertTrue(HomeUiState(festivals = SectionState.Error(null)).heroPhotos.isEmpty())
+    }
+
     @Test
     fun `빈 목록은 Empty 이고 내용 아님이다`() {
         // 정상 0건과 오류를 섞지 않는다 (API 명세 §0-3)

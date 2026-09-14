@@ -32,4 +32,20 @@ data class HomeUiState(
      */
     val featured: RaceSummary?
         get() = closingSoon.valueOrNull?.firstOrNull()
+
+    /**
+     * 히어로 배경에 돌려 보여줄 축제 사진들. (SPEC §4.4 히어로 배경 · 이슈 #247 후속)
+     *
+     * 축제 추천 가운데 **사진이 있는 항목 전부**다 — 따로 조회하지 않는다. 진행 중인 축제를
+     * 앞에 둔다: 지금 열리는 곳이 먼저 걸리는 것이 "이번 달" 목록의 뜻에 맞다. 그 안에서는
+     * 서버가 준 순서를 지킨다(안정 정렬). 한 장만 고정으로 깔았더니 열 때마다 같은 사진이라
+     * 배경이 바뀌는 줄을 몰랐다(2026-09-14) — 히어로가 이 목록을 무작위 장부터 돌린다.
+     *
+     * 축제가 로딩·빈·오류거나 사진 있는 항목이 없으면 빈 목록이고 히어로는 지형 그림을 그린다.
+     * 대회 `imageUrl` 을 쓰지 않는 이유는 [HomeHero] KDoc — 공식 홈페이지 스크린샷이다.
+     */
+    val heroPhotos: List<FestivalSummary>
+        get() = festivals.valueOrNull.orEmpty()
+            .filter { it.imageUrl != null }
+            .sortedByDescending { it.isOngoing }
 }

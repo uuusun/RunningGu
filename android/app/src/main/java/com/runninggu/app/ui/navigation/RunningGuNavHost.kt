@@ -67,11 +67,6 @@ fun RunningGuNavHost(
                 onSearch = { query ->
                     navController.navigate(Routes.calendarWithQuery(query))
                 },
-                onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
-                // 퀵바의 [지도]·[코스]는 **같은 S8 의 다른 탭**이다 (SPEC §4.4-2).
-                // 지도는 지도가 그려지는 출발지 주변, 코스는 지역별 목록으로 보낸다
-                onOpenCourseMap = { navController.navigate(Routes.COURSES) },
-                onOpenCourseRegions = { navController.navigate(Routes.coursesByRegion()) },
                 onRaceClick = { raceId -> navController.navigate(Routes.raceDetail(raceId)) },
                 onStartWizard = { raceId -> navController.navigate(Routes.wizard(raceId)) },
             )
