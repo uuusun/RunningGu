@@ -323,7 +323,7 @@ S7-R 은 연산마다 서버 왕복이고 저장 CTA 가 없다 — 이미 저�
 | 지역 목록 | `GET /api/courses` | region?,page,size | `distanceKm ASC, courseId ASC` 큐레이션 page + nullable syncedAt + 현재 `content[]`의 `attributions[]`(OSM 미포함) | 지역 0건 Empty. 번들 fallback·GPX_ONLY의 syncedAt=null, 출처는 완성 문구를 `" · "`로 연결 |
 | 코스 저장 | `POST /api/me/courses` | sourceCourseId?,dataSource,경로·고도 snapshot | 신규 201 / fingerprint 중복 200 기존 id | OSM도 저장 가능, 서버 생성 `name`을 snapshot에 보존하고 routeFingerprint 재계산, 게스트 modal |
 | 코스 선택 | 상세 이동 | sealed `CourseDetailKey.Near/Saved` | LOCAL_STATE | near snapshot은 route 문자열에 넣지 않음 |
-| 걷기 스팟 선택 | 로컬 상태 | 없음 | LOCAL_STATE | **P0 는 출발지로 삼지 않는다** 🔒확정(#269). 선택 표시·지도 포커스만 바뀌고 재조회하지 않으며, `[저장]` 아래에 `걷기 스팟은 저장할 수 없어요. 지도에서 위치만 확인해 주세요.` 표시. 새 `OriginState` 갈래·출발지 이력·확인창 없음. 출발지 승격은 P1 별도 계약 |
+| 걷기 스팟 선택 | `GET /api/courses/loop` 🔧 초안(결정-67) | lat,lng = `PLACE.lat/lng` · targetKm = 슬라이더 · originName = `PLACE.name` | `route`(§6-1 ROUTE 와 같은 필드 · null 가능) + attributions | **출발지는 여전히 바뀌지 않고 목록도 재조회하지 않는다**(#269 유지). 탭 → 선택 표시·지도 포커스 → `loop` 호출 → 카드에 "경로 만드는 중…" → 성공: 그 스팟 기준 왕복 폴리라인(경로 bounds) · 카드에 `{routeKm}km · 약 {분}분 · 상승 {m}m` · `[저장]` 활성 · 하단 출처에 OSM 문구 합류 / `route: null`: 핀 유지 + 비차단 "이 근처엔 자동 경로를 못 만들었어요" / `503`·네트워크: 핀 유지 + 같은 문구 + [다시 시도]. 한 세션 안에서 같은 스팟은 앱이 결과를 기억해 다시 부르지 않는다. 다른 스팟을 탭하면 이전 선은 지운다. 새 `OriginState` 갈래·출발지 이력·확인창은 여전히 없다. `걷기 스팟은 저장할 수 없어요` 문구는 **경로가 만들어진 스팟에서는 내리지 않는다** |
 | 지역별 코스 선택 | `GET /api/courses/{courseId}` | courseId | 목록 필드 + pathPolyline + elevationProfileM + attributions | `courseDetail/curated/{courseId}` 로 이동(#280). **courseId 는 catalog 공개 안정키라 route 에 실어도 된다** — near snapshot 과 다른 점이다. 없는 id 는 `404 COURSE_NOT_FOUND` |
 
 ### S8-D 코스 상세
@@ -503,12 +503,16 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | SPEC 결정-55 | 이메일 로그인은 IP별 모든 요청 30회/고정 1분과 정규화 이메일별 실패 5회/고정 1분을 함께 제한한다. 초과는 `429 RATE_LIMITED`, 성공은 이메일 창만 초기화한다. 존재하지 않는 이메일도 dummy BCrypt 비교 후 동일한 `401 LOGIN_FAILED`를 반환한다 |
 | SPEC 결정-56 | 자동 위치 추정을 제품에서 전부 없앤다. 위치 권한·`FusedLocationProvider`·`play-services-location` 을 두지 않고 Wi-Fi AP·기지국 Cell-ID·BLE·IP GeoIP 로 위치를 추정하지 않는다. 출발지는 검색·프리셋·S7 숙소 좌표뿐이며 `/api/courses/near` 의 `lat/lng` 에 기기 유래 좌표를 넣는 경로를 두지 않는다. R1·R2·`ran`·`/api/runs/**` 는 구현하지 않는다. 서버 요청 IP 기반 횟수 제한은 위치 추정이 아니므로 유지하되 지역 변환·저장·추천 사용은 하지 않는다 (D-25 대체 · 이슈 #215) |
 
-### 미정 계약 — **없다**
+### 미정 계약 — 1건
+
+| ID | 무엇 | 주인 | 상태 |
+|---|---|---|---|
+| D-37 | `GET /api/courses/loop` — 걷기 스팟을 탭하면 그 좌표에서 출발하는 OSM 순환 경로 1건을 만들어 지도에 그린다(SPEC 결정-67). 초안은 API 명세 §6-5. 열린 것: ① 경로 이름에 `originName` 을 쓸지 ② 캐시 5분으로 충분한지 ③ `503` 하나로 갈지 | 백엔드(유선경) | **결정 필요** — 2026-09-14 초안. 서버 담당 확인 뒤 🔒 |
 
 ~~D-21(saved/ran 통합 정렬·페이징)~~ 은 SPEC 결정-56 으로 **사라졌다.** `ran` 이 없으므로
 통합할 대상 자체가 없고, 보관함 코스 목록은 `GET /api/me/courses` 하나다.
 
-P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01은 결정-33의 08-23 재개정으로 확정됐다.
+P0 화면·기능과 물리 DB 계약은 D-37 을 빼고 모두 닫혔다. 저장 코스 DB-01은 결정-33의 08-23 재개정으로 확정됐다.
 
 ---
 
@@ -524,6 +528,7 @@ P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01�
 - block PATCH와 order PUT의 `200` 갱신 응답
 - `POST /api/me/courses`의 fingerprint 멱등 저장
 - `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·구간 기준 표시 난이도·서버 생성 이름·정상 0건/부분 실패·동적 출처 계약
+- `GET /api/courses/loop` — 걷기 스팟 출발 OSM 순환 경로 1건 (🔧 초안 · D-37 · 결정-67)
 - `GET /api/courses`의 Page 최상위 `attributions[]`와 저장 코스 상세의 attribution snapshot 계약
 - `GET /api/courses`·`/regions`의 안정 정렬·nullable `syncedAt`·번들/마지막 정상 snapshot fail-open 계약
 - `PUT /api/me/password`의 token pair 재발급
