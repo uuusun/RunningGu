@@ -507,7 +507,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 
 | ID | 무엇 | 주인 | 상태 |
 |---|---|---|---|
-| D-37 | `GET /api/courses/loop` — 걷기 스팟을 **진입점**으로 하는 OSM 순환 경로 1건을 만들어 지도에 그린다(SPEC 결정-67). 출발지는 화면 출발지 그대로. 초안은 API 명세 §6-5. 열린 것: ① "스팟 = 진입점" 읽기에 동의하는지 ② 캐시 5분으로 충분한지 ③ `503` 하나로 갈지. 캐시는 경로 모양만, 이름·distanceM 은 요청마다 조합(리뷰 반영) | 백엔드(유선경) | **결정 필요** — 2026-09-14 초안. 서버 담당 확인 뒤 🔒 |
+| D-37 | `GET /api/courses/loop` — 걷기 스팟을 **진입점**으로 하는 OSM 순환 경로 1건을 만들어 지도에 그린다(SPEC 결정-67). 출발지는 화면 출발지 그대로. 초안은 API 명세 §6-5. 열린 것: ② 캐시 5분으로 충분한지 ③ `503` 하나로 갈지. ① "스팟 = 진입점" 읽기는 2026-09-15 서버 담당 동의로 닫힘(#353 리뷰). 캐시는 경로 모양만, 이름·distanceM 은 요청마다 조합(리뷰 반영) | 백엔드(유선경) | **결정 필요** — 2026-09-14 초안. 서버 담당 확인 뒤 🔒 |
 
 ~~D-21(saved/ran 통합 정렬·페이징)~~ 은 SPEC 결정-56 으로 **사라졌다.** `ran` 이 없으므로
 통합할 대상 자체가 없고, 보관함 코스 목록은 `GET /api/me/courses` 하나다.
@@ -528,13 +528,16 @@ P0 화면·기능과 물리 DB 계약은 D-37 을 빼고 모두 닫혔다. 저�
 - block PATCH와 order PUT의 `200` 갱신 응답
 - `POST /api/me/courses`의 fingerprint 멱등 저장
 - `GET /api/courses/near`의 목표거리 입력·HARD 제외 큐레이션 우선/품질 상한 OSM fallback·구간 기준 표시 난이도·서버 생성 이름·정상 0건/부분 실패·동적 출처 계약
-- `GET /api/courses/loop` — 걷기 스팟 출발 OSM 순환 경로 1건 (🔧 초안 · D-37 · 결정-67)
 - `GET /api/courses`의 Page 최상위 `attributions[]`와 저장 코스 상세의 attribution snapshot 계약
 - `GET /api/courses`·`/regions`의 안정 정렬·nullable `syncedAt`·번들/마지막 정상 snapshot fail-open 계약
 - `PUT /api/me/password`의 token pair 재발급
 - `POST /api/me/reauth`와 `DELETE /api/me`의 탈퇴 재인증
 - `GET /api/me`의 단일 `loginProvider`와 로그인 수단 연결·해제 API 제거
 - `GET /api/pois`의 항목별 `provider(KAKAO|KTO)`, `placeId`·추적 timestamp 제외, 8→20km 확대·원천 보충·부분 실패·5분 캐시 계약
+
+### 아직 확정되지 않은 계약 (구현 전 §10 확인)
+
+- `GET /api/courses/loop` — 걷기 스팟을 **진입점**으로 하는 OSM 순환 경로 1건 (🔧 초안 · D-37 · 결정-67). 서버 담당이 D-37 의 열린 항목을 닫기 전에는 위 목록에 올리지 않는다
 
 ### 남은 springdoc 상세화 항목
 
