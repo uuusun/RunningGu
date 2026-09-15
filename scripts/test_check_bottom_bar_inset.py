@@ -62,6 +62,62 @@ fun StayScreen() {
 }
 """
 
+# 안전한 바 옆에 inset 없는 라이브러리 composable 을 같이 그린 것 (#350 리뷰). 하나가 안전하다고
+# 슬롯 전체를 통과시키면 이게 샌다.
+MIXED = """
+@Composable
+fun StayScreen() {
+    Scaffold(bottomBar = {
+        BottomActionBar { Button(onClick = onNext) { Text("다음") } }
+        Button(onClick = onSkip) { Text("건너뛰기") }
+    }) { }
+}
+"""
+
+# 같은 혼합이지만 두 번째가 이 저장소의 composable 인 경우 — 파일까지 짚어야 한다.
+MIXED_REPO = """
+@Composable
+fun StayScreen() {
+    Scaffold(bottomBar = {
+        NextBar(enabled = true, onClick = onNext)
+        SkipBar(onClick = onSkip)
+    }) { }
+}
+
+@Composable
+internal fun NextBar(enabled: Boolean, onClick: () -> Unit) {
+    BottomActionBar { Button(onClick = onClick, enabled = enabled) { Text("다음") } }
+}
+
+@Composable
+private fun SkipBar(onClick: () -> Unit) {
+    Surface(shadowElevation = 8.dp) { TextButton(onClick = onClick) { Text("건너뛰기") } }
+}
+"""
+
+# if / else 로 갈라 그려도 가지마다 검사한다.
+BRANCHED = """
+@Composable
+fun ResultScreen() {
+    Scaffold(
+        bottomBar = {
+            if (state.isSavedEditing) {
+                Button(onClick = onDone) { Text("완료") }
+            } else {
+                SaveBar(save = state.save, canSave = state.canSave, onSave = viewModel::onSave)
+            }
+        },
+    ) { }
+}
+
+@Composable
+private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Unit) {
+    BottomActionBar {
+        Button(onClick = onSave, enabled = canSave) { Text("이 동선 저장하기") }
+    }
+}
+"""
+
 # 탭바 — Material NavigationBar 가 inset 을 스스로 먹는다.
 TAB_BAR = """
 @Composable
@@ -120,6 +176,28 @@ class BottomBarInsetGuardTest(unittest.TestCase):
         self.assertEqual(len(violations), 1)
         self.assertIn("StayScreen.kt", violations[0])
         self.assertIn("Button", violations[0])
+
+    def test_안전한_바_옆에_Button_을_같이_그리면_그것만_잡힌다(self):
+        violations = run_on(StayScreen=MIXED)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Button", violations[0])
+        self.assertNotIn("BottomActionBar 를 거치지 않는다 (호출", violations[0])
+
+    def test_안전한_바_옆의_저장소_composable_도_각각_검사한다(self):
+        violations = run_on(StayScreen=MIXED_REPO)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("SkipBar", violations[0])
+        self.assertNotIn("NextBar", violations[0])
+
+    def test_if_else_가지마다_검사한다(self):
+        violations = run_on(ResultScreen=BRANCHED)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Button", violations[0])
+
+    def test_후행_람다_안의_자식은_슬롯의_호출로_세지_않는다(self):
+        # `BottomActionBar { Button { Text } }` 에서 Button · Text 는 바의 자식이다.
+        self.assertEqual(guard.top_level_calls(' BottomActionBar { Button(onClick = a) { Text("x") } } '), ["BottomActionBar"])
+        self.assertEqual(guard.top_level_calls(' if (x) { A() } else { B { } } C(1) { }'), ["A", "B", "C"])
 
     def test_탭바는_NavigationBar_로_통과한다(self):
         self.assertEqual(run_on(RunningGuApp=TAB_BAR), [])

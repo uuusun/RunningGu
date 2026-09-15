@@ -87,6 +87,61 @@ def calls_in(block: str) -> list[str]:
     return [name for name in CALL.findall(block) if name not in NOT_COMPOSABLE]
 
 
+def skip_balanced(text: str, i: int, open_ch: str, close_ch: str) -> int:
+    """`text[i]` 가 `open_ch` 일 때 짝이 맞는 `close_ch` 다음 위치. 문자열 리터럴은 건너뛴다."""
+    depth = 0
+    in_str = False
+    while i < len(text):
+        ch = text[i]
+        if in_str:
+            if ch == "\\":
+                i += 1
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == open_ch:
+            depth += 1
+        elif ch == close_ch:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return len(text)
+
+
+def top_level_calls(block: str) -> list[str]:
+    """슬롯이 **직접** 그리는 composable 만. 호출의 인자와 후행 람다 안은 보지 않는다.
+
+    `Button(...) { Text(..) }` 에서 `Text` 는 `Button` 의 자식이지 슬롯의 것이 아니다.
+    반면 `if (...) { SaveBar() }` 의 `SaveBar` 는 슬롯의 것이다 — `if` · `when` · `else` 같은
+    소문자 제어문의 괄호·중괄호는 투명하게 지나간다. 이렇게 나눠야
+    `BottomActionBar { } ; Button { }` 처럼 안전한 바 옆에 inset 없는 것을 그리는 혼합 케이스가
+    잡힌다 — `any()` 로 뭉뚱그리면 안전한 바 하나가 나머지를 가려 준다(#350 리뷰).
+    """
+    names: list[str] = []
+    i = 0
+    while i < len(block):
+        m = CALL.search(block, i)
+        if not m:
+            break
+        name = m.group(1)
+        if name not in NOT_COMPOSABLE:
+            names.append(name)
+        # 인자 목록 `(...)` 과 그 뒤에 붙는 후행 람다 `{...}` 를 통째로 건너뛴다.
+        i = m.end() - 1
+        if block[i] == "(":
+            i = skip_balanced(block, i, "(", ")")
+            j = i
+            while j < len(block) and block[j].isspace():
+                j += 1
+            if j < len(block) and block[j] == "{":
+                i = skip_balanced(block, j, "{", "}")
+        else:
+            i = skip_balanced(block, i, "{", "}")
+    return names
+
+
 def is_safe(name: str, bodies: dict[str, tuple[str, str]], seen: set[str] | None = None) -> bool:
     """이 composable 이 (직접 또는 한 단계 안에서) inset 을 처리하는가."""
     if name in SAFE_CALLS:
@@ -111,20 +166,23 @@ def check(ui_dir: Path) -> list[str]:
     for path, text in sources.items():
         for m in SLOT_OPEN.finditer(text):
             slot = block_after(text, m.end() - 1)
-            names = calls_in(slot)
-            # 슬롯이 그리는 것 중 하나는 inset 을 처리해야 한다. `Surface(` 나 `Button(` 을
-            # 슬롯에 직접 그리면 여기서 걸린다 — 라이브러리 composable 은 bodies 에 없어서
-            # is_safe 가 False 다.
-            if not any(is_safe(name, bodies) for name in names):
-                violations.append(
-                    f"{path}: bottomBar 슬롯이 BottomActionBar 를 거치지 않는다 (호출: {', '.join(names) or '없음'})"
-                )
+            names = top_level_calls(slot)
+            if not names:
+                violations.append(f"{path}: bottomBar 슬롯이 BottomActionBar 를 거치지 않는다 (호출: 없음)")
                 continue
-            # 이 저장소의 composable 을 슬롯에서 여러 개 부르면 각각이 안전해야 한다.
+            # 슬롯이 직접 그리는 것은 **각각** inset 을 처리해야 한다. 안전한 바가 하나 있어도
+            # 옆에 그린 `Button(` 은 따로 걸린다. 라이브러리 composable 은 bodies 에 없어서
+            # is_safe 가 False 다.
             for name in names:
-                if name in bodies and not is_safe(name, bodies):
+                if is_safe(name, bodies):
+                    continue
+                if name in bodies:
                     violations.append(
                         f"{path}: bottomBar 의 `{name}`({bodies[name][0]}) 이 BottomActionBar 를 거치지 않는다"
+                    )
+                else:
+                    violations.append(
+                        f"{path}: bottomBar 슬롯이 `{name}` 을 BottomActionBar 없이 직접 그린다"
                     )
     return violations
 
