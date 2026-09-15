@@ -1,0 +1,104 @@
+{
+  "date": "2026-09-05",
+  "sourceApkCommit": "375b607757f8695e32d6659e51a2ba8301da44aa",
+  "officialRulesVerified": "2026-09-05",
+  "titleCharacters": 3,
+  "shortDescriptionCharacters": 36,
+  "descriptionCharacters": 619,
+  "keywordCount": 10,
+  "icon": {
+    "width": 512,
+    "height": 512,
+    "unchanged": true
+  },
+  "graphic": {
+    "width": 1024,
+    "height": 578
+  },
+  "uploaded": false,
+  "uploadedMeaning": "전체 제출 자료의 업로드 완료 여부. 개별 반영 상태는 console 참조",
+  "console": {
+    "productId": "0001008828",
+    "androidAid": "OA01008828",
+    "productCreated": true,
+    "status": "등록중",
+    "uploadedAssets": [
+      "06-icon-512.png",
+      "07-feature-graphic.png"
+    ],
+    "assetsReloadVerified": true,
+    "listingTextSaved": false,
+    "missingRequiredFields": [
+      "스크린 샷(최소 2개)",
+      "전화번호"
+    ],
+    "iarcCompleted": true,
+    "apkUploaded": false,
+    "reviewSubmitted": false,
+    "initialIarcCertificateConfirmed": true,
+    "iarcCorrectionPending": false,
+    "koreaAppAgeRatingSaved": true,
+    "iarcCertifiedAtKst": "2026-09-05T20:31:57+09:00",
+    "ratings": {
+      "IARC": "3+",
+      "ESRB": "전체 이용가",
+      "ClassInd": "전체 이용가",
+      "ONEstoreKorea": "3+"
+    },
+    "koreaRatingReloadVerified": true,
+    "finalAnswerTextDirectlyReviewed": false
+  },
+  "screenshotsPrepared": false,
+  "files": [
+    {
+      "name": "01-title.txt",
+      "bytes": 10,
+      "sha256": "8157d411c3c06e0e04adadd3f8540f0ba0645275657c46567c01c729318029c8"
+    },
+    {
+      "name": "02-short-description.txt",
+      "bytes": 89,
+      "sha256": "23a7d741c02c098549864eb8d7fe68bb25ee297fc86856d05686aae549bb961a"
+    },
+    {
+      "name": "03-description.txt",
+      "bytes": 1446,
+      "sha256": "9f21d7468d2cba8420cf122b7d78bba9fd459e3638eb4069c0699aae79994b5d"
+    },
+    {
+      "name": "04-permissions.txt",
+      "bytes": 265,
+      "sha256": "116484ff24e72c29ac0cc0a502ac3c2a12ae648337cb667ef5f01910ed257c16"
+    },
+    {
+      "name": "05-keywords.txt",
+      "bytes": 121,
+      "sha256": "902c8185b720213d4fc13b17e8c63a7af417c8d545896fb437e7441ec9c55451"
+    },
+    {
+      "name": "06-icon-512.png",
+      "bytes": 253556,
+      "sha256": "cffc8e22a755b3ee1efbc3a437f52bd816e39a39651c33f1428fc254ea6b2492"
+    },
+    {
+      "name": "07-feature-graphic.png",
+      "bytes": 120731,
+      "sha256": "c494c4e3975fdb01ce5fb0a2dac53d32d8d44baa050ca7915a3a30c54d8674fe"
+    },
+    {
+      "name": "07-feature-graphic.svg",
+      "bytes": 678520,
+      "sha256": "fde17c5ca67bbf13b255ec1e6457c575123d3052f3ee37bc5056a187ae1de372"
+    },
+    {
+      "name": "08-review-checklist.md",
+      "bytes": 9177,
+      "sha256": "85cddb783ad02bfc1d405f851b15367b349884b3ea20c39601f393004c8c8f5f"
+    },
+    {
+      "name": "README.md",
+      "bytes": 3230,
+      "sha256": "53740f4d78669f37de0eddac97acd8e3fdb0e749c7a9cfde5a5fc0657130508f"
+    }
+  ]
+}

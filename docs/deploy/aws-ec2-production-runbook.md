@@ -23,8 +23,9 @@
 
 SSH key pair와 22번 포트는 사용하지 않는다. SSM Session Manager로 접속하며 IMDSv2를 강제한다.
 종료 방지는 활성화 상태를 유지한다. 스테이징 EC2·DB와 운영 비밀값은 분리한다. 단 KTO service
-key는 결정-63에 따라 같은 계정의 staging 값과 공유하며 호출 쿼터도 합산 관리한다. 운영계정
-승인 뒤 실제 쿼터와 별도 키 발급 가능 여부를 확인해 필요하면 환경별 키로 분리한다.
+key는 결정-63, 카카오 앱(`KAKAO_APP_ID`·`KAKAO_REST_KEY`)은 결정-66에 따라 같은 계정의 staging
+값과 공유하며 호출 쿼터도 합산 관리한다. 운영계정 승인 뒤 실제 쿼터와 별도 키 발급 가능
+여부를 확인해 필요하면 환경별 키로 분리한다.
 
 ## 2. 운영 환경 파일
 
@@ -52,8 +53,9 @@ sudo install -m 0640 -o root -g runninggu \
 | 문서 API | springdoc·Swagger 모두 비활성 |
 | 부하 시험 가드 | 항상 비활성 |
 
-`DB_PASSWORD`, `JWT_SECRET`, Resend API key, Kakao REST key·app ID는 운영 전용으로 생성한다.
-KTO service key는 결정-63에 따라 staging과 공유하고 staging 실호출은 기능 확인으로 제한한다.
+`DB_PASSWORD`, `JWT_SECRET`, Resend API key는 운영 전용으로 생성한다.
+KTO service key는 결정-63, 카카오 앱 `KAKAO_REST_KEY`·`KAKAO_APP_ID`는 결정-66에 따라 staging과
+같은 값을 쓴다. staging의 KTO 실호출은 기능 확인으로 제한한다.
 운영계정 승인 뒤 필요하면 환경별 키로 분리한다. 값은 명령 인자·shell history·Git·CI·문서에
 남기지 않는다. 두 env 파일의 `DB_PASSWORD`만 같은 값을 사용한다.
 
