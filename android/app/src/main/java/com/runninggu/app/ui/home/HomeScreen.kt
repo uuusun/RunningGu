@@ -65,6 +65,9 @@ private val ScreenPadding = 20.dp
 
 /** 검색 카드 높이와 히어로에 겹치는 양. 겹침은 퀵바가 쓰던 값 그대로다. (목업 .quickbar) */
 private val SEARCH_CARD_HEIGHT = 60.dp
+
+/** 검색 칸 힌트. 보이는 글자와 스크린리더가 읽는 글자를 갈라 두지 않는다. */
+private const val SEARCH_HINT = "대회·지역 검색"
 private val SEARCH_CARD_OVERLAP = 26.dp
 
 /**
@@ -242,27 +245,36 @@ private fun HomeSearchCard(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp),
             )
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) {
-                    Text(
-                        text = "대회·지역 검색",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.merge(
-                        MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = LocalTextStyle.current.merge(
+                    MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                // **플레이스홀더를 편집창의 장식 안에 둔다** (#354 리뷰 · 김민지). 밖에 형제로
+                // 두면 힌트가 편집창과 무관한 위치에 놓여, 스크린리더가 둘을 이어 읽을 근거가 없다.
+                //
+                // 접근성 트리는 이렇게 해도 `EditText` + 힌트 `TextView` 두 노드다 — 기기에서
+                // 덤프해 확인했고, **Material3 `OutlinedTextField` 가 내는 구조와 같다**(같은 기기
+                // 에서 S2 캘린더 검색창을 덤프해 대조). 즉 앱의 다른 검색창과 같은 기준이 된다.
+                decorationBox = { inner ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = SEARCH_HINT,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        inner()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }

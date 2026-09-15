@@ -43,7 +43,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,7 +158,10 @@ fun HomeHero(
  * **다음 장은 먼저 받아 놓고 바꾼다.** 보이는 장을 바로 갈아 끼우면 새 사진이 내려오는 동안
  * 아래 지형 그림이 비친다. 그래서 다음 장을 안 보이게(`alpha = 0`) 같은 크기로 미리 받고,
  * 성공했을 때만 넘어간다 — 같은 크기로 받아야 메모리 캐시 키가 같아서 보이는 쪽이 바로 뜬다.
- * 못 받은 장은 건너뛴다. 한 바퀴를 다 실패하면 멈춘다 — 안 그러면 네트워크가 끊긴 채로 헛돈다.
+ * 못 받은 장은 건너뛴다. 한 바퀴를 다 실패하면 **한 장도 못 띄운 경우에만** 멈춘다 — 시계가
+ * 돌 기준점이 없어서다. 이미 한 장이 떠 있으면 시계가 다시 돌아 6초마다 한 장씩 계속 다시
+ * 시도한다. 비행기 모드였다가 돌아온 화면이 스스로 회복하는 쪽이 나아서 그대로 둔다
+ * (#354 리뷰 · 김민지 — 원래 주석은 이 경우에도 멈춘다고 적혀 있었다).
  *
  * **바꿀 때 앞 장을 지우지 않는다.** 두 장을 동시에 반투명으로 섞으면(`Crossfade`) 중간에 둘 다
  * 절반이라 아래 지형 그림의 라임 호가 비쳤다(에뮬레이터 확인 · 2026-09-14). 그래서 앞 장은
@@ -275,6 +277,11 @@ private fun HeroScrim(modifier: Modifier = Modifier) {
  * [photoCredit] 이 있으면 오른쪽에 "사진 · {축제명} · 한국관광공사" 를 적는다 — KTO 이미지는
  * 크레딧이 조건이다(NFR-7). 사진이 떠 있을 때만 넘어온다.
  *
+ * **제공자명은 줄어들지 않는다.** 한 덩어리 문자열로 두고 끝에서 자르면 축제명이 길거나 화면이
+ * 좁을 때 `한국관광공사` 가 **먼저** 사라진다 — 크레딧이 조건인데 그 크레딧이 없어진다
+ * (#354 리뷰 · 유선경). 그래서 줄어드는 쪽(축제명)과 안 줄어드는 쪽(제공자명)을 갈라 두고,
+ * 폭이 모자라면 축제명만 말줄임된다.
+ *
  * 로고 아래 반투명 검색 필드가 있던 때는 이 줄이 검색 위에 얹혔는데, 검색이 히어로 아래
  * 카드로 내려가 지금은 이 줄과 대표 대회 사이가 전부 사진이다.
  */
@@ -300,15 +307,27 @@ private fun BrandRow(photoCredit: String?) {
             color = DeepT1,
         )
         if (photoCredit != null) {
-            Text(
-                text = "사진 · $photoCredit · 한국관광공사",
-                style = MaterialTheme.typography.labelSmall,
-                color = DeepT2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
+            Row(
                 modifier = Modifier.weight(1f).padding(start = 6.dp),
-            )
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "사진 · $photoCredit",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DeepT2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // fill = false — 이름이 짧으면 제 폭만 쓰고, 모자랄 때만 남은 만큼으로 줄어든다
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = " · 한국관광공사",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DeepT2,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
