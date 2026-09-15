@@ -83,10 +83,6 @@ def composable_bodies(sources: dict[str, str]) -> dict[str, tuple[str, str]]:
     return bodies
 
 
-def calls_in(block: str) -> list[str]:
-    return [name for name in CALL.findall(block) if name not in NOT_COMPOSABLE]
-
-
 def skip_balanced(text: str, i: int, open_ch: str, close_ch: str) -> int:
     """`text[i]` 가 `open_ch` 일 때 짝이 맞는 `close_ch` 다음 위치. 문자열 리터럴은 건너뛴다."""
     depth = 0
@@ -143,7 +139,12 @@ def top_level_calls(block: str) -> list[str]:
 
 
 def is_safe(name: str, bodies: dict[str, tuple[str, str]], seen: set[str] | None = None) -> bool:
-    """이 composable 이 (직접 또는 한 단계 안에서) inset 을 처리하는가."""
+    """이 composable 이 (직접 또는 래퍼를 거쳐) inset 을 처리하는가.
+
+    래퍼 본문도 슬롯과 같은 기준이다 — 본문이 **직접** 그리는 호출이 **각각** 안전해야 한다.
+    `if (ok) BottomActionBar { } else Button { }` 처럼 상태별로 갈리는 래퍼는 `any()` 로 보면
+    안전한 가지 하나가 나머지를 가려 준다(#350 리뷰). 본문이 아무것도 그리지 않으면 안전하지 않다.
+    """
     if name in SAFE_CALLS:
         return True
     if name not in bodies:
@@ -153,7 +154,8 @@ def is_safe(name: str, bodies: dict[str, tuple[str, str]], seen: set[str] | None
         return False
     seen.add(name)
     _, body = bodies[name]
-    return any(is_safe(inner, bodies, seen) for inner in calls_in(body))
+    inner = top_level_calls(body)
+    return bool(inner) and all(is_safe(n, bodies, seen) for n in inner)
 
 
 def check(ui_dir: Path) -> list[str]:
