@@ -1476,6 +1476,7 @@ private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Un
     // 기기에서 [이 동선 저장하기] 아래 절반이 내비바에 다시 가렸다 — P0 흐름의 마지막
     // 단추다. 나머지 네 화면(S3 · S4 · S5 · S6)은 그대로 공통 바를 쓰고 있었다 — S4 · S5 는
     // `NextBar`, S3 · S6 은 직접 `BottomActionBar` 다.
+    // 여기를 다시 Surface 로 바꾸면 CI 의 `scripts/check_bottom_bar_inset.py` 가 막는다(#346).
     BottomActionBar {
         Button(
             onClick = onSave,
