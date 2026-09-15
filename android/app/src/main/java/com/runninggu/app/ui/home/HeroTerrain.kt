@@ -24,6 +24,10 @@ import com.runninggu.app.ui.theme.Lime
  *
  * 정지 화면에서 3D와 차이가 크지 않아 OpenGL 뷰를 얹지 않았다.
  * 실제 코스 데이터를 굴려야 하면 이 컴포저블만 교체하면 된다.
+ *
+ * **지금은 폴백이다.** 홈 히어로는 축제 사진이 있으면 그것을 이 위에 깐다([HomeHero] ·
+ * SPEC §4.4 히어로 배경). 사진이 없거나 못 받았을 때, 그리고 사진이 뜨기 전까지 보이는 것이
+ * 이 그림이다 — #247 에서 지우지 않고 남기기로 했다.
  */
 @Composable
 fun HeroTerrain(modifier: Modifier = Modifier) {

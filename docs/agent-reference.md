@@ -132,6 +132,24 @@ cd android
 .\gradlew.bat :app:testDebugUnitTest
 ```
 
+> **Windows 에서 단위 테스트가 전부 `ClassNotFoundException` 으로 떨어지면** — 저장소 경로에
+> 한글이 있을 때(`...\런닝구\RunningGu`) 그렇다. Gradle 이 테스트 워커의 클래스패스를 UTF-8
+> `@argfile` 로 넘기는데 자바 런처가 그 파일을 시스템 코드페이지(CP949)로 읽어 경로가 깨진다.
+> 컴파일은 되고 `Test process encountered an unexpected problem` 만 남으니 코드 탓으로 보기 쉽다.
+> 데몬 인코딩을 코드페이지에 맞추면 된다(2026-09-14 확인 · Gradle 9.5 · JDK 21):
+>
+> ```powershell
+> .\gradlew.bat :app:testDebugUnitTest "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=MS949"
+> ```
+>
+> 저장소를 영문 경로에 두면 옵션 없이 돈다. `subst` 드라이브 별칭으로는 안 풀린다 — Gradle 이
+> 실제 경로로 되돌려 놓는다.
+>
+> **디버그 빌드의 API 는 `http://10.0.2.2:8080/api/`(호스트 PC 의 로컬 백엔드) 로 고정**이다
+> (`app/build.gradle.kts` `buildTypes.debug`). `local.properties` 의 `API_BASE_URL` 은 릴리스에만
+> 들어간다. 백엔드 없이 에뮬레이터에서 실데이터를 보려면 호스트 8080 에서 스테이징으로 넘겨 주는
+> 릴레이(파이썬 `http.server` 30줄)를 띄우면 된다.
+
 JDK 는 **21** (`android/gradle/gradle-daemon-jvm.properties` 의 `toolchainVersion`).
 
 백엔드는 독립 Gradle wrapper를 사용한다. 통합 테스트 전에 Docker를 실행한다.

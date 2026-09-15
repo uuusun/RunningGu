@@ -86,7 +86,7 @@ Compose 화면
 | A2 회원가입 | 입력값·인증 상태·가입 결과 | 로컬 폼 + JSON DTO | `LOCAL_STATE` + `SERVER_DB` | USER·LOGIN_IDENTITY·AGREEMENT | 가입 완료 전 폼 상태만 |
 | A3 비밀번호 재설정 | 이메일·reset token | JSON + 이메일 링크 웹 | `SERVER_DB` | reset token 해시 | 영구 저장 없음 |
 | S1 홈 | 히어로·마감 임박 대회 | 대회 카드 DTO | `SERVER_DB` | canonical CONTEST | Room 읽기 캐시 |
-| S1 홈 축제 | 이번 달 추천 축제 | 축제 카드 DTO | `KTO_LIVE` | 영구 저장 없음 | Room/서버 TTL 캐시 |
+| S1 홈 축제 | 이번 달 추천 축제 · 히어로 배경 사진 | 축제 카드 DTO | `KTO_LIVE` | 영구 저장 없음 | Room/서버 TTL 캐시 |
 | S2 캘린더 | 대회 목록·날짜별 건수·찜 | 커서 목록 + counts | `SERVER_DB` | CONTEST·FAVORITE | Room 읽기 캐시 |
 | S3 대회 상세 | 대회·주최자·좌표·공식 URL | Contest detail DTO | `SERVER_DB` | canonical CONTEST | Room 읽기 캐시 |
 | S3 인근 축제 | 대회일 전후·반경 40km 축제 | `items[]` | `KTO_LIVE` | 영구 저장 없음 | 서버 1일 캐시 |
@@ -208,11 +208,11 @@ Compose 화면
 
 | UI/행동 | API/로컬 | 요청 | 응답에서 쓰는 값 | 원천·저장 | 상태 |
 |---|---|---|---|---|---|
-| 검색 제출 | S2 이동 | route q | 없음 | LOCAL_STATE | 빈 검색은 캘린더 기본 목록 |
-| 달력·지도·코스·관광 아이콘 | Navigation/scroll | 지도=`courses` · 코스=`courses?tab=region` | 없음 | LOCAL_STATE | **지도와 코스는 같은 S8 의 다른 탭**(SPEC §4.4-2) — 지도는 [출발지 주변], 코스는 [지역별]. 탭은 좌표와 달리 route 인자로 넘긴다(감출 값이 아니다 · D-15 대비). 관광은 축제 영역 스크롤 |
-| 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4 |
+| 검색 제출 | S2 이동 | route q | 없음 | LOCAL_STATE | 빈 검색은 캘린더 기본 목록. 검색 카드는 히어로 아래 흰 카드(옛 퀵바 자리 · SPEC §4.4-1) |
+| ~~달력·지도·코스·관광 아이콘~~ | — | — | — | — | **제거**(2026-09-14 · SPEC §4.4-2). 하단 탭과 겹쳐 아이콘 행을 빼고 그 자리에 검색 카드를 뒀다. 결정-15 폐기 |
+| 히어로·대회 카드 | 로컬 선택 | contestId | 카드 DTO | SERVER_DB/Room | 선택→S3, CTA→S4. **히어로 배경은 대회 `imageUrl` 이 아니라 홈 축제 사진**(아래 행) — 대회 `imageUrl` 은 공식 홈페이지 스크린샷이라 쓰지 않는다(SPEC §4.4 히어로 배경). 히어로 대표 대회 블록에는 `sources`·`checkedAt` 을 그리지 않는다 — S2·S3 이 보여 준다(A3) |
 | 마감 임박 | `GET /api/contests/closing-soon` | limit=4 | 카드 필드(`regStatus`, nullable `applyStart/applyEnd` 포함), dDayApply, favorite | SERVER_DB / Room `cached_closing_soon` | 영역별 Loading/Empty/Error. 오프라인이면 24시간 미만 snapshot 으로 그린다(아래 행) |
-| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보) |
+| 홈 축제 | `GET /api/festivals` | yearMonth(`YYYY-MM`, 기본 KST 이번 달), size(기본 6·1~20) | contentId, name, 기간, region(17개 시도 단축명 또는 `""`), imageUrl, inProgress | KTO_LIVE/5분 TTL cache | 전국 월간, 위치 권한 없음, `addr1` 지역 판별 불가 항목도 `region: ""`으로 유지, 영역별 Loading/Empty/502/504. **P0 제자리 확대만 — 상세 route 없음**(D-05 · #247). 카드를 누르면 그 카드의 사진이 커지고 다시 누르면 접힌다. 화면 이동이 아니므로 D-05 가 막은 "상세 화면과 그 route" 에 걸리지 않는다. 펼쳐도 보여줄 것은 응답의 일곱 필드뿐이다. 추적 메타데이터(fetchedAt/cachedAt)는 응답에 없다(서버 내부 운영 정보). **히어로 배경**: 사진 있는 항목들을 무작위 장부터 6초 간격으로 돌려 보여준다(진행 중 먼저) — 장식이라 탭 없음, 다음 장은 미리 받아 성공 시에만 교체, 로고 옆 "사진 · {축제명} · 한국관광공사" 크레딧(NFR-7). 없으면 지형 그림 폴백(SPEC §4.4 히어로 배경 · #247 후속) |
 | 축제 카드 탭 | 로컬 상태 | 없음 | 없음 | LOCAL_STATE | **제자리 확대**(카드 200→300dp · 사진 116→186dp) + 고른 카드를 가운데로 스크롤. 화면 이동 없음 |
 | 오프라인 | Room `cached_closing_soon` | cachedAt | 마지막 성공 마감임박 snapshot — 서버가 준 `rank` 순서 보존, `dDayApply` 는 저장하지 않고 `applyEnd` + 조회 시점 KST 로 재계산 | LOCAL_CACHE + cachedAt 표기 | `cachedAt` 24시간 미만만 유효. 접수 종료(`applyEnd < 오늘`) 항목 제외, 제외 후 0건이면 정상 Empty. cache 없음·24시간 초과는 **Empty 가 아니라** 네트워크 Error + [다시 시도]. 새로고침/쓰기 제한 |
 
