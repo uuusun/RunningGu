@@ -31,7 +31,7 @@ end
 
 subgraph RES["버전 관리 정적 리소스"]
   GPX[("두루누비 261코스 + 라이선스 검증 GPX<br/>courseId · 경로·고도 · attribution")]
-  APP[("앱 오프라인 번들<br/>대회 초기본 · GPX 축약본")]
+  APP[("앱 오프라인 번들<br/>대회 초기본 races.json<br/>(GPX 축약본은 P1 · 결정-68)")]
 end
 
 subgraph ROUTING["서버 내부 라우팅 — 외부 포트 비공개"]
@@ -102,8 +102,8 @@ GH <--> OSMGRAPH
 GH -->|"품질 상한 통과 경로 최대 1건"| COURSE
 COURSE -->|"카카오 걷기 스팟 내부 조회"| POIP
 COURSE -->|"큐레이션/OSM 경로 + 카카오 장소"| U
-GPX --> APP
-APP -.->|"네트워크 불가 시 읽기 폴백"| U
+%% GPX --> APP 는 P1 (SPEC 결정-68). P0 번들은 대회 초기본뿐이다
+APP -.->|"네트워크 불가 시 대회 읽기 폴백"| U
 
 classDef store fill:#EEF2FF,stroke:#2B5CFF,color:#15161B
 classDef ext fill:#FFF3CC,stroke:#A66A00,color:#15161B
