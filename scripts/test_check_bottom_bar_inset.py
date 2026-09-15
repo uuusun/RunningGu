@@ -118,6 +118,18 @@ private fun SaveBar(save: SaveItineraryState, canSave: Boolean, onSave: () -> Un
 }
 """
 
+# 래퍼 안에서 상태별로 갈리는 것 (#350 재리뷰). 안전한 가지 하나가 Button 가지를 가리면 안 된다.
+BRANCHED_WRAPPER = """
+@Composable
+fun Screen() { Scaffold(bottomBar = { Wrapper(ok) }) { } }
+
+@Composable
+fun Wrapper(ok: Boolean) {
+    if (ok) BottomActionBar { }
+    else Button(onClick = {}) { }
+}
+"""
+
 # 탭바 — Material NavigationBar 가 inset 을 스스로 먹는다.
 TAB_BAR = """
 @Composable
@@ -198,6 +210,11 @@ class BottomBarInsetGuardTest(unittest.TestCase):
         # `BottomActionBar { Button { Text } }` 에서 Button · Text 는 바의 자식이다.
         self.assertEqual(guard.top_level_calls(' BottomActionBar { Button(onClick = a) { Text("x") } } '), ["BottomActionBar"])
         self.assertEqual(guard.top_level_calls(' if (x) { A() } else { B { } } C(1) { }'), ["A", "B", "C"])
+
+    def test_래퍼_안에서_가지마다_갈리면_안전하지_않은_가지가_잡힌다(self):
+        violations = run_on(Screen=BRANCHED_WRAPPER)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Wrapper", violations[0])
 
     def test_탭바는_NavigationBar_로_통과한다(self):
         self.assertEqual(run_on(RunningGuApp=TAB_BAR), [])
