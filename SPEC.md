@@ -536,7 +536,7 @@ pre 전날부터[-1,0] · post 대회+다음날[0,+1] · around 전후로[-1,+1]
 | ~~`android/app/src/main/assets/durunubi_courses.json`~~ | ~~GPX 기반 261코스 축약 경로~~ — **P1 로 미룸**(결정-68). P0 번들에 없다 | P1 초안: `data/courses.json` 261코스 좌표만 소수 5자리(고도·누적거리 제외), APK 안 300 KB 이하 |
 | `android/app/src/main/assets/pois/{contestId}.json` *(선택)* | 동선 UI 데모용 POI | 운영 SSOT가 아니며 SAMPLE 배지 강제 |
 
-- 로딩: 온라인이면 서버 조회 → Room 읽기 캐시 갱신, 오프라인이면 Room/asset 폴백. assets는 서버 데이터보다 우선하지 않는다. P0 에서 asset 폴백은 `races.json` 뿐이다.
+- 로딩: 온라인이면 서버 조회 → Room 읽기 캐시 갱신, 오프라인이면 Room/asset 폴백. assets는 서버 데이터보다 우선하지 않는다. **P0 에서 이 갱신·폴백의 대상은 대회·마감임박(`cached_contest` · `cached_closing_soon` · asset `races.json`)뿐이다.** 마이 세 목록(S10)·저장 동선(S7)·코스(S8)는 P0 에 Room 갱신도 폴백도 없어 오프라인이면 오류 상태다 — 결정-68 · 결정-69.
 
 ### 6.2 canonical Contest 계약
 
