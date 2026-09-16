@@ -832,6 +832,65 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 정렬한다. 0건인 시도는 만들지 않으며, `count` 합은 필터 없는 6-2의 `totalElements`와 같다.
 KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두 지역 API를 계속 제공한다.
 
+### 6-5 `GET /api/courses/loop` — 걷기 스팟을 진입점으로 하는 순환 경로 🔒 확정 (결정-68 · 2026-09-15)
+
+> **왜 생겼나.** 출시 후 "러닝코스 탭인데 공원은 핀만 서 있고 경로가 없다" 는 피드백. 걷기 스팟은 카카오
+> 장소 검색 결과라 좌표 하나뿐이고 경로 데이터가 없다(§4-3). 앱 안에서 경로를 만들 수 없으니(결정-42)
+> **서버가 이미 가진 `generateOsmRoundTrip` 을 스팟 좌표로도 돌릴 수 있게 문을 하나 더 연다.**
+> 목록·출발지는 그대로 두고 **사용자가 탭한 스팟 하나의 경로만** 만든다 — `near` 응답에 스팟마다 경로를
+> 미리 붙이면 요청당 GraphHopper 를 최대 12번 돌려 첫 화면이 느려진다.
+
+**출발지 의미는 바뀌지 않는다 🔒 — 스팟은 출발지가 아니라 경로의 진입점(entry point)이다.**
+`near` 의 큐레이션 `ROUTE` 가 이미 그렇다: 출발지에서 `distanceM` 만큼 떨어진 진입점에서 경로가 시작하고,
+저장 snapshot 의 `entryLat/entryLng` 도 출발지가 아니라 경로 시작점이다(§7-A). 이 API 는 그 진입점을
+사용자가 탭한 스팟으로 두는 것뿐이다. 그래서 **출발지 SSOT 는 화면의 출발지(`lat/lng`) 하나**고,
+`OriginState`·출발지 이력·복원 규칙(#269 · 결정-56)은 건드리지 않는다. 응답 `distanceM` 은 `near` 와
+같은 뜻 — **출발지에서 경로 시작점까지** — 이라 서버가 출발지 좌표를 받아 계산한다.
+
+`?lat=&lng=&entryLat=&entryLng=&targetKm=5&entryName=`
+
+| 파라미터 | 설명 |
+|---|---|
+| `lat`, `lng` | **출발지.** `near` 를 부를 때 쓴 값과 같다(검색·프리셋·S7 숙소). `distanceM` 계산에만 쓴다. 기기 유래 좌표를 넣는 경로는 두지 않는다(결정-56) |
+| `entryLat`, `entryLng` | **진입점.** 순환 경로가 시작하고 끝나는 점. 앱은 `near` 응답 `PLACE` 항목의 `lat/lng` 를 그대로 보낸다 |
+| `targetKm` | 1~21, 0.5 단위. 화면 슬라이더 값 |
+| `entryName` | 선택. 경로 이름에만 쓴다 — `near` 의 `PLACE.name`. 서버는 제어문자를 제거하고 앞뒤 공백을 제거한다. 정제 결과가 비면 값이 없는 것으로 처리해 §6-1 의 기본 이름(`출발지 주변 …`)을 쓴다. 50자를 초과하면 **Unicode 코드 포인트 기준 앞 50자**로 잘라 쓴다. `entryName` 때문에 `400 VALIDATION_FAILED` 를 반환하지 않는다 🔒확정(2026-09-16 서버 담당) |
+
+```json
+{
+  "route": {
+    "kind": "ROUTE",
+    "routeId": "osm:7f1c0a9e2b31",
+    "dataSource": "OSM_GENERATED",
+    "name": "여의도공원 주변 5km 평지 러닝코스",
+    "distanceM": 650,
+    "lat": 37.5264, "lng": 126.9227,
+    "difficulty": "EASY",
+    "routeKm": 5.06, "durationMin": 46,
+    "gainM": 21,
+    "elevationProfileM": [12, 13, 15, 14, 12],
+    "shortfall": false,
+    "pathPolyline": "인코딩된 왕복 경로"
+  },
+  "attributions": ["© OpenStreetMap contributors"]
+}
+```
+
+- `route` 는 **§6-1 의 `ROUTE` 항목과 필드가 같다.** 앱은 새 DTO 를 만들지 않고 `near` 의 `ROUTE` 매퍼를 그대로 쓴다. `route.lat/lng` 는 실제 경로 시작점(≈ 진입점), `distanceM` 은 출발지(`lat/lng`)에서 그 시작점까지다.
+- **OSM 생성만 한다.** 큐레이션(두루누비) 은 시도하지 않는다 — 스팟 반경의 큐레이션 경로는 이미 `near` 목록에 `ROUTE` 로 들어 있다. 생성 규칙·품질 상한·난이도·`durationMin`·`shortfall` 은 §6-1 OSM 규칙과 §0-6 을 그대로 따른다. **상한 완화 없음.**
+- **캐시는 경로 모양(geometry)만** — `entryLat/entryLng` 를 소수 4자리로 반올림한 값 + `targetKm` 를 키로 **5분**(§0-5 공통). 캐시에 드는 것은 `pathPolyline`·`routeKm`·`gainM`·`elevationProfileM`·`difficulty`·시작점 좌표까지다. **`name` 과 `distanceM` 은 캐시 밖에서 요청마다 조합한다** — 전체 응답을 캐시하면 먼저 요청한 사람의 `entryName` 이 다른 사용자 응답에 섞인다. 같은 공원을 여러 사용자가 눌러도 GraphHopper 는 한 번만 돈다.
+- `name` — `entryName` 이 있으면 `{entryName} 주변 {routeKm 반올림}km {평지|완만} 러닝코스`, 없으면 §6-1 기존 규칙. 서버는 `entryName` 의 제어문자를 제거하고 앞뒤 공백을 제거한 뒤, 비면 없는 것으로 보고 50자를 넘으면 Unicode 코드 포인트 기준 앞 50자로 자른다. 그 외 검증·조회·캐시 키·GraphHopper 입력에는 쓰지 않는다. — 경로 생성의 핵심 입력이 아니라 화면에 붙이는 이름이고, 값의 출처도 서버 자신의 `near` 응답이라 이것 때문에 경로 생성을 400 으로 막으면 사용자가 복구할 방법이 없다(#353 리뷰 · 2026-09-16 서버 담당 확정). 저장 시 `courseName` snapshot 은 이 값이다(§7-A).
+- 품질 상한을 통과한 후보가 없으면 **정상 0건** — `200 {"route": null, "attributions": []}`. 앱은 핀을 그대로 두고 "이 근처엔 자동 경로를 못 만들었어요" 를 비차단으로 보여준다. 0건도 5분 캐시한다(같은 키로 GraphHopper 를 다시 돌리지 않는다).
+- GraphHopper 호출 실패·타임아웃(§0-6 5초)·readiness 미완료는 `503 COURSE_SOURCES_UNAVAILABLE`. 이 API 는 원천이 하나라 `degradedSources` 를 두지 않는다. 실패는 캐시하지 않는다.
+- `400 VALIDATION_FAILED` — 좌표 범위 밖 · `targetKm` 범위/단위 위반. `entryName` 때문에 400 을 반환하지 않는다 — 비거나 길면 위 규칙대로 정제한다.
+- **저장** — 응답 `route` 를 §7-A `POST /me/courses` 에 `dataSource=OSM_GENERATED` 로 그대로 보낸다. `entryLat/entryLng` 는 `route.lat/lng`(경로 시작점) — 큐레이션 경로를 저장할 때와 같은 규칙이다. 서버는 `routeFingerprint` 를 다시 계산하므로 `near` 에서 만든 경로와 같은 멱등 규칙이다. `sourceCourseId` 는 없다.
+- 앱 동작은 `docs/screen-api-matrix.md` S8 "걷기 스팟 선택" 행. **출발지는 바뀌지 않고 목록도 재조회하지 않는다.**
+
+**확정 근거** (2026-09-15 · 서버 담당 결정 · #353):
+1. "스팟 = 진입점" 읽기로 출발지 충돌을 푼다. `near` 의 큐레이션 `ROUTE` 가 이미 화면 출발지와 경로 진입점을 `distanceM` 으로 분리하고 있어 일관된다.
+2. 캐시는 **5분 유지.** 서버의 위치·외부 조회 공통 Caffeine TTL 과 같고, graph artifact 를 교체했을 때 이전 geometry 가 남는 시간도 5분으로 묶인다. 운영 부하 근거 없이 먼저 늘리지 않는다 — artifact 버전을 캐시 키에 넣거나 교체 시 evict 하는 계약이 생기면 그때 다시 본다.
+3. 오류는 **`503 COURSE_SOURCES_UNAVAILABLE` 하나.** 비활성·readiness 미완료·호출 실패·timeout 모두 앱에서는 같은 요청을 다시 시도하는 상태이고 `near` 와도 같다. 원인은 공개 오류 코드를 늘리지 않고 서버 로그·운영 지표에서 구분한다.
+
 ---
 
 ## 7. 마이 API (인증)
@@ -936,7 +995,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | 6 동선 결과 | 저장 / 빈 상태 재추천 | 5-2 / 5-1 |
 | 6 편집(저장 후) | 순서·교체·삭제·추가 / 후보 시트 | 5-10·5-8·5-9·5-7 / 4-2 |
 | 6 연계 카드 | 숙소 주변에서 뛰기 | →S8 진입(6-1, 출발지=숙소·목표 min(walk,5)km — walk는 5-5의 `event`로 파생) |
-| 7 러닝코스 출발지 주변 | 출발지 검색/프리셋 / 경로·장소 통합 목록 | 4-4·(클라 상수) / 6-1 |
+| 7 러닝코스 출발지 주변 | 출발지 검색/프리셋 / 경로·장소 통합 목록 / 걷기 스팟 탭 → 순환 경로 | 4-4·(클라 상수) / 6-1 / 6-5 🔧초안 |
 | 7 러닝코스 지역별 | 지역 칩 / 목록 | 6-3 / 6-2 |
 | 7 코스 저장 | 저장 | 7-A POST |
 | 9 마이 동선 | 목록 / 열기 / 재생성 교체 / 삭제 | 5-4 / 5-5 / 5-3 / 5-6 |
@@ -1010,7 +1069,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | `SEND_COOLDOWN` / `TOO_MANY_ATTEMPTS` | 429 | 재발송 60초 / 코드 5회 초과 |
 | `RATE_LIMITED` | 429 | 공개 중복 확인 또는 이메일 로그인 시도 제한 초과 |
 | `INTERNAL_SERVER_ERROR` | 500 | 처리되지 않은 서버 내부 오류. 내부 메시지·스택 트레이스는 응답하지 않음 |
-| `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` 원천 실패로 표시할 경로·장소가 하나도 없음 |
+| `COURSE_SOURCES_UNAVAILABLE` | 503 | `/courses/near` — 원천 실패로 표시할 경로·장소가 하나도 없음. `/courses/loop` — GraphHopper 호출 실패·타임아웃·readiness 미완료로 경로를 못 만듦(§6-5). 두 API 모두 앱은 같은 요청을 다시 시도하는 상태다 |
 | `COURSE_NOT_FOUND` | 404 | `/courses/{courseId}`의 현재 catalog snapshot에 해당 코스가 없음 |
 | `EXTERNAL_API_ERROR` | 502 | 외부 API가 오류·비정상 응답 반환(동선 생성 제외 — NFR-3) |
 | `EXTERNAL_API_TIMEOUT` | 504 | 외부 API 제한시간 초과(동선 생성 제외 — NFR-3) |
