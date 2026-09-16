@@ -130,6 +130,63 @@ fun Wrapper(ok: Boolean) {
 }
 """
 
+# 기본 람다 인자가 있는 composable (#350 재리뷰). `fun` 뒤 첫 `{` 를 본문으로 잡으면 기본값
+# `{ BottomActionBar { } }` 를 본문으로 읽어, 실제 본문이 Button 인데도 통과한다.
+DEFAULT_LAMBDA_ARG = """
+@Composable fun Screen() { Scaffold(bottomBar = { Unsafe() }) { } }
+@Composable fun Unsafe(
+    extra: @Composable () -> Unit = { BottomActionBar { } },
+) { Button(onClick = {}) { } }
+"""
+
+# 반대 방향 — 기본 람다는 Button 인데 실제 본문은 안전하다. 기본값을 본문으로 읽으면 이번엔 오탐이다.
+DEFAULT_LAMBDA_ARG_SAFE = """
+@Composable fun Screen() { Scaffold(bottomBar = { Safe() }) { } }
+@Composable fun Safe(
+    extra: @Composable () -> Unit = { Button(onClick = {}) { } },
+) { BottomActionBar { } }
+"""
+
+# 형제 경로가 같은 안전한 래퍼를 거친다 (#350 재리뷰). `seen` 을 형제끼리 공유하면 두 번째 경로에서
+# `Safe` 를 순환으로 오인해 멀쩡한 화면이 실패한다.
+SHARED_SAFE_WRAPPER = """
+@Composable
+fun Screen() { Scaffold(bottomBar = { Outer() }) { } }
+
+@Composable
+fun Outer() { A(); B() }
+
+@Composable
+fun A() { Safe() }
+
+@Composable
+fun B() { Safe() }
+
+@Composable
+fun Safe() { BottomActionBar { } }
+"""
+
+# 같은 안전한 래퍼를 두 번 호출하는 것도 마찬가지다.
+REPEATED_SAFE_WRAPPER = """
+@Composable
+fun Screen() { Scaffold(bottomBar = { Outer() }) { } }
+
+@Composable
+fun Outer() { Safe(); Safe() }
+
+@Composable
+fun Safe() { BottomActionBar { } }
+"""
+
+# 진짜 순환은 여전히 실패해야 한다 — 사본으로 넘겨도 같은 경로 안에서는 잡힌다.
+RECURSIVE_WRAPPER = """
+@Composable
+fun Screen() { Scaffold(bottomBar = { Loop() }) { } }
+
+@Composable
+fun Loop() { Loop() }
+"""
+
 # 탭바 — Material NavigationBar 가 inset 을 스스로 먹는다.
 TAB_BAR = """
 @Composable
@@ -215,6 +272,22 @@ class BottomBarInsetGuardTest(unittest.TestCase):
         violations = run_on(Screen=BRANCHED_WRAPPER)
         self.assertEqual(len(violations), 1)
         self.assertIn("Wrapper", violations[0])
+
+    def test_기본_람다_인자를_본문으로_오인하지_않는다(self):
+        violations = run_on(Screen=DEFAULT_LAMBDA_ARG)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Unsafe", violations[0])
+        # 반대로 기본값이 Button 이고 본문이 안전하면 통과해야 한다.
+        self.assertEqual(run_on(Screen=DEFAULT_LAMBDA_ARG_SAFE), [])
+
+    def test_형제_경로가_같은_안전한_래퍼를_거쳐도_통과한다(self):
+        self.assertEqual(run_on(Screen=SHARED_SAFE_WRAPPER), [])
+        self.assertEqual(run_on(Screen=REPEATED_SAFE_WRAPPER), [])
+
+    def test_진짜_순환은_여전히_잡힌다(self):
+        violations = run_on(Screen=RECURSIVE_WRAPPER)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Loop", violations[0])
 
     def test_탭바는_NavigationBar_로_통과한다(self):
         self.assertEqual(run_on(RunningGuApp=TAB_BAR), [])

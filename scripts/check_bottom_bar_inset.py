@@ -75,8 +75,11 @@ def composable_bodies(sources: dict[str, str]) -> dict[str, tuple[str, str]]:
     bodies: dict[str, tuple[str, str]] = {}
     for path, text in sources.items():
         for m in FUN_DEF.finditer(text):
-            # 시그니처 끝의 `{` 를 찾는다 — 반환형 생략 composable 은 `) {`.
-            brace = text.find("{", m.end())
+            # 파라미터 목록 `(...)` 을 짝 맞춰 건너뛴 **뒤**의 첫 `{` 가 본문이다. `fun` 이름 뒤 첫 `{` 를
+            # 잡으면 `extra: @Composable () -> Unit = { BottomActionBar { } }` 같은 기본 람다 인자를
+            # 본문으로 오인해서, 실제 본문이 `Button` 이어도 통과한다(#350 재리뷰).
+            after_params = skip_balanced(text, m.end() - 1, "(", ")")
+            brace = text.find("{", after_params)
             if brace == -1:
                 continue
             bodies[m.group(1)] = (path, block_after(text, brace))
@@ -152,7 +155,10 @@ def is_safe(name: str, bodies: dict[str, tuple[str, str]], seen: set[str] | None
     seen = seen or set()
     if name in seen:
         return False
-    seen.add(name)
+    # `seen` 은 **지금 내려가는 경로**만 담는다 — 형제 경로와 공유하면 `Outer { A(); B() }` 에서
+    # A 가 거친 `Safe` 를 B 가 다시 만날 때 순환으로 오인해 멀쩡한 래퍼가 실패한다(#350 재리뷰).
+    # 그래서 mutable 집합을 add 하지 않고 이 경로용 사본을 만들어 넘긴다.
+    seen = seen | {name}
     _, body = bodies[name]
     inner = top_level_calls(body)
     return bool(inner) and all(is_safe(n, bodies, seen) for n in inner)
