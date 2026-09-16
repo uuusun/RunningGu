@@ -4,6 +4,7 @@ import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.data.repository.CoursePage
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeGeocodeRepository
@@ -111,6 +112,15 @@ private class CountingCourses : CourseRepository {
     // 이 테스트는 상세를 안 쓴다 — 불러야 할 곳이 있으면 그게 버그다 (#280)
     override suspend fun detail(courseId: String): CuratedCourseDetail =
         error("이 테스트는 상세를 부르지 않는다")
+
+    override suspend fun loop(
+        lat: Double,
+        lng: Double,
+        entryLat: Double,
+        entryLng: Double,
+        targetKm: Double,
+        entryName: String?,
+    ): SpotLoop = error("이 테스트는 스팟 경로를 부르지 않는다")
 }
 
 /** 탭 진입만 보는 테스트라 저장은 부르지 않는다. */

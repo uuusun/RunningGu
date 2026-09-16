@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.CourseDataSource
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.data.model.SaveCourseResult
 import com.runninggu.app.data.model.SavedCourseDetail
 import com.runninggu.app.data.repository.CoursePage
@@ -489,6 +490,15 @@ private class StubCourseRepository(private val items: List<NearbyItem>) : Course
     // 이 테스트는 상세를 안 쓴다 (#280)
     override suspend fun detail(courseId: String): CuratedCourseDetail =
         error("이 테스트는 상세를 부르지 않는다")
+
+    override suspend fun loop(
+        lat: Double,
+        lng: Double,
+        entryLat: Double,
+        entryLng: Double,
+        targetKm: Double,
+        entryName: String?,
+    ): SpotLoop = SpotLoop(route = null) // 스팟 탭이 경로를 요청하지만(§6-5) 이 테스트는 "경로 없는 스팟" 을 본다
 }
 
 /** 무엇을 저장하라고 시켰는지 적어 두는 가짜. */

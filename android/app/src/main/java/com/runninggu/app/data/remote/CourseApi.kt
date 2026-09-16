@@ -1,6 +1,7 @@
 package com.runninggu.app.data.remote
 
 import com.runninggu.app.data.remote.dto.CourseDetailDto
+import com.runninggu.app.data.remote.dto.CourseLoopDto
 import com.runninggu.app.data.remote.dto.CoursePageDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
 import com.runninggu.app.data.remote.dto.CoursesNearDto
@@ -57,6 +58,25 @@ interface CourseApi {
     /** 지역 칩. 코스 수 내림차순. (§6-3) */
     @GET("courses/regions")
     suspend fun regions(): CourseRegionsDto
+
+    /**
+     * 걷기 스팟을 진입점으로 하는 OSM 순환 경로 1건. (§6-5 · 결정-68)
+     *
+     * **스팟은 출발지가 아니라 진입점이다.** [lat]·[lng] 는 `near` 를 부를 때 쓴 화면
+     * 출발지 그대로고 응답 `distanceM` 계산에만 쓴다(결정-56). [entryLat]·[entryLng] 는
+     * `near` 응답 `PLACE` 의 좌표를 그대로 보낸다.
+     *
+     * @param entryName `PLACE.name`. 경로 이름에만 쓴다. 서버가 정제하므로 앱이 자르지 않는다
+     */
+    @GET("courses/loop")
+    suspend fun loop(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("entryLat") entryLat: Double,
+        @Query("entryLng") entryLng: Double,
+        @Query("targetKm") targetKm: Double,
+        @Query("entryName") entryName: String? = null,
+    ): CourseLoopDto
 
     companion object {
         /** 출발지 주변 기본·최대 항목 수 🔒(§6-1). */

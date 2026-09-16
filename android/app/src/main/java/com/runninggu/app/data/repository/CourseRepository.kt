@@ -5,11 +5,13 @@ import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.CourseTargetKm
 import com.runninggu.app.data.model.NearbyCourses
+import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.apiCall
 import com.runninggu.app.data.remote.mapper.toNearbyCourses
 import com.runninggu.app.data.remote.mapper.toDomain
 import com.runninggu.app.data.remote.mapper.toRegions
+import com.runninggu.app.data.remote.mapper.toSpotLoop
 import com.runninggu.app.data.remote.mapper.toSummary
 
 /**
@@ -47,6 +49,21 @@ interface CourseRepository {
      * 어디인지 알 수 없다. 없는 id 는 `404 COURSE_NOT_FOUND` 로 온다.
      */
     suspend fun detail(courseId: String): CuratedCourseDetail
+
+    /**
+     * 걷기 스팟을 진입점으로 하는 순환 경로. (§6-5 · 결정-68)
+     *
+     * [SpotLoop.route] 가 null 이면 정상 0건이다. `503 COURSE_SOURCES_UNAVAILABLE` 과
+     * 네트워크 실패는 `ApiException` 으로 올라온다 — 화면은 둘 다 같은 문구 + [다시 시도] 다.
+     */
+    suspend fun loop(
+        lat: Double,
+        lng: Double,
+        entryLat: Double,
+        entryLng: Double,
+        targetKm: Double,
+        entryName: String?,
+    ): SpotLoop
 
     companion object {
         const val DEFAULT_PAGE_SIZE = 20
@@ -105,4 +122,23 @@ class RemoteCourseRepository(private val api: CourseApi) : CourseRepository {
 
     override suspend fun detail(courseId: String): CuratedCourseDetail =
         apiCall { api.detail(courseId).toDomain() }
+
+    override suspend fun loop(
+        lat: Double,
+        lng: Double,
+        entryLat: Double,
+        entryLng: Double,
+        targetKm: Double,
+        entryName: String?,
+    ): SpotLoop = apiCall {
+        api.loop(
+            lat = lat,
+            lng = lng,
+            entryLat = entryLat,
+            entryLng = entryLng,
+            targetKm = targetKm.coerceIn(CourseTargetKm.MIN, CourseTargetKm.MAX),
+            // 서버가 정제한다(§6-5). 빈 값은 안 보내는 것이 "이름 없음" 과 같아 여기서 거른다
+            entryName = entryName?.takeIf { it.isNotBlank() },
+        ).toSpotLoop()
+    }
 }

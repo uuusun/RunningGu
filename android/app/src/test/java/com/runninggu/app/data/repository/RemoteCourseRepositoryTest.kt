@@ -1,6 +1,7 @@
 package com.runninggu.app.data.repository
 
 import com.runninggu.app.data.remote.dto.CourseDetailDto
+import com.runninggu.app.data.remote.dto.CourseLoopDto
 import com.runninggu.app.data.remote.CourseApi
 import com.runninggu.app.data.remote.dto.CourseDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
@@ -58,5 +59,14 @@ class RemoteCourseRepositoryTest {
         // 이 테스트는 상세를 안 쓴다 — 불러야 할 곳이 있으면 그게 버그다 (#280)
         override suspend fun detail(courseId: String): CourseDetailDto =
             error("이 테스트는 상세를 부르지 않는다")
+
+        override suspend fun loop(
+            lat: Double,
+            lng: Double,
+            entryLat: Double,
+            entryLng: Double,
+            targetKm: Double,
+            entryName: String?,
+        ): CourseLoopDto = error("이 테스트는 스팟 경로를 부르지 않는다")
     }
 }

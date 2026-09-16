@@ -61,6 +61,15 @@ class CuratedCourseDetailTest {
 
         override suspend fun regions(): List<CourseRegion> = error("안 쓴다")
 
+        override suspend fun loop(
+            lat: Double,
+            lng: Double,
+            entryLat: Double,
+            entryLng: Double,
+            targetKm: Double,
+            entryName: String?,
+        ): com.runninggu.app.data.model.SpotLoop = error("이 테스트는 스팟 경로를 부르지 않는다")
+
         override suspend fun detail(courseId: String): CuratedCourseDetail {
             calls++
             failure?.let { throw it }
