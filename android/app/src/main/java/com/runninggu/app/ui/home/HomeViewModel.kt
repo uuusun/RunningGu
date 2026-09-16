@@ -38,6 +38,10 @@ class HomeViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    /** 한 번 보여주고 지우는 안내. 지금은 공식 페이지를 못 열었을 때 하나뿐이다. */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
     /** 영역마다 따로 끊는다. 한쪽 재시도가 다른 쪽 조회를 취소하면 안 된다. */
     private var closingSoonJob: Job? = null
     private var festivalsJob: Job? = null
@@ -96,6 +100,20 @@ class HomeViewModel(
             }
             _uiState.update { it.copy(festivals = next) }
         }
+    }
+
+    /**
+     * 축제 공식 페이지를 못 열었다. (SPEC §4.4-4 · §4.6 · AP-11)
+     *
+     * 브라우저가 하나도 없는 기기에서만 온다. 대회 상세와 같은 문구다 — 같은 버튼이 화면마다
+     * 다르게 굴면 안 되고, 눌렀는데 아무 일도 없으면 사용자는 앱이 멈춘 줄 안다(#352 리뷰).
+     */
+    fun onCannotOpenOfficialPage() {
+        _message.value = "브라우저를 열 수 없어요. 기본 브라우저를 확인해 주세요."
+    }
+
+    fun onMessageShown() {
+        _message.value = null
     }
 
     private companion object {

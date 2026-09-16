@@ -78,6 +78,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun FestivalCarousel(
     festivals: List<FestivalSummary>,
+    onCannotOpenOfficialPage: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = 22.dp),
 ) {
@@ -96,6 +97,7 @@ fun FestivalCarousel(
             FestivalCard(
                 festival = festival,
                 expanded = festival.id == expandedId,
+                onCannotOpen = onCannotOpenOfficialPage,
                 onClick = {
                     val opening = festival.id != expandedId
                     expandedId = if (opening) festival.id else null
@@ -137,6 +139,7 @@ private fun FestivalCard(
     festival: FestivalSummary,
     expanded: Boolean,
     onClick: () -> Unit,
+    onCannotOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val width by animateDpAsState(
@@ -199,9 +202,10 @@ private fun FestivalCard(
             // 펼친 카드에만 낸다. 접힌 카드까지 버튼이 있으면 캐러셀이 버튼 줄로 보인다
             if (expanded && officialUrl != null) {
                 TextButton(
-                    // 브라우저가 하나도 없는 기기면 조용히 실패한다 — 홈에는 스낵바 통로가 없고,
-                    // 그 기기는 대회 상세 쪽에서도 같은 안내를 이미 본다
-                    onClick = { openInCustomTab(context, officialUrl) },
+                    // 브라우저가 하나도 없는 기기면 대회 상세와 같은 안내를 낸다 (#352 리뷰).
+                    // 이 PR 이 "눌러도 아무것도 안 뜬다" 를 고치려는 것인데 그 기기에서 같은
+                    // 경험을 주면 안 된다
+                    onClick = { if (!openInCustomTab(context, officialUrl)) onCannotOpen() },
                     contentPadding = PaddingValues(0.dp),
                 ) {
                     Text("공식 페이지 ↗")
