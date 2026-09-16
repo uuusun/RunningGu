@@ -28,15 +28,21 @@ from pathlib import Path
 
 UI_DIR = Path("android/app/src/main/java/com/runninggu/app/ui")
 
-# `bottomBar = {` 뒤의 블록을 여는 중괄호 위치. 공백·줄바꿈은 자유.
-SLOT_OPEN = re.compile(r"bottomBar\s*=\s*\{")
-# 블록 안의 composable 호출. 대문자로 시작하는 식별자 뒤에 `(` 또는 `{`.
-CALL = re.compile(r"\b([A-Z][A-Za-z0-9_]*)\s*[({]")
+# `bottomBar =` 자리. 뒤가 `{` 면 람다 슬롯이고, 아니면(`::Bar` · 변수) 이 스크립트가 볼 수 없는
+# 모양이라 "확인 불가" 로 낸다 — 못 찾은 것과 통과한 것이 같아 보이면 안 된다(#350 앱 UI 리뷰).
+SLOT_ASSIGN = re.compile(r"\bbottomBar\s*=\s*(?!=)")
+# 블록 안의 composable 호출. 대문자로 시작하는 식별자, 선택적 타입 인자 `<…>`, 그 뒤 `(` 또는 `{`.
+# `Unsafe<Int>()` 를 `<` 에서 끊으면 이름이 목록에 안 들어가 옆의 안전한 바만 검사된다(#350 앱 UI 리뷰).
+CALL = re.compile(r"\b([A-Z][A-Za-z0-9_]*)\s*(?:<(?:[^<>(){}]|<[^<>(){}]*>)*>)?\s*[({]")
 # composable 정의. `fun SaveBar(` 처럼 대문자로 시작하는 함수만.
 FUN_DEF = re.compile(r"\bfun\s+([A-Z][A-Za-z0-9_]*)\s*\(")
 
-# 호출되면 그 자체로 inset 을 처리하는 것.
+# 호출되면 그 자체로 inset 을 처리하는 것. 이름만 믿지는 않는다 — 호출한 파일이 같은 이름을
+# 다시 정의하면 Kotlin 은 그쪽을 잡으므로, 닿는 정의가 아래 파일뿐일 때만 이름을 믿는다.
 SAFE_CALLS = {"BottomActionBar", "NavigationBar"}
+# 안전한 이름의 진짜 정의가 사는 곳(ui/ 기준). 여기 아닌 곳의 동명 정의는 가리기다.
+# NavigationBar 는 Material 것이라 저장소 안 정의는 전부 가리기다.
+SAFE_HOME = {"BottomActionBar": "common/BottomActionBar.kt"}
 # 제어문·수식자 등 composable 이 아닌데 대문자로 시작할 수 있는 것.
 NOT_COMPOSABLE = {"Modifier", "Alignment", "Arrangement", "Color", "Icons"}
 
@@ -66,8 +72,14 @@ def block_after(text: str, open_brace: int) -> str:
 
 
 def strip_comments(text: str) -> str:
+    """주석과 문자열 리터럴을 지운다. 둘 다 코드가 아닌데 `bottomBar = {` 나 composable 이름이
+    들어 있을 수 있다 — 주석은 #342 가 남긴 것이 딱 그 모양이었고, 문자열은 `SLOT_ASSIGN` 이
+    원문에서 돌면 `"bottomBar = { Button() }"` 을 슬롯으로 오인한다(#350 앱 UI 리뷰)."""
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return re.sub(r"//[^\n]*", "", text)
+    text = re.sub(r"//[^\n]*", "", text)
+    # 문자열 — `"""…"""` 먼저, 그다음 한 줄 문자열. 자리는 빈 문자열로 남겨 둔다
+    text = re.sub(r'"""(?:.|\n)*?"""', '""', text)
+    return re.sub(r'"(?:\\.|[^"\\\n])*"', '""', text)
 
 
 def composable_bodies(sources: dict[str, str]) -> dict[str, list[tuple[str, str]]]:
@@ -85,11 +97,40 @@ def composable_bodies(sources: dict[str, str]) -> dict[str, list[tuple[str, str]
             # 잡으면 `extra: @Composable () -> Unit = { BottomActionBar { } }` 같은 기본 람다 인자를
             # 본문으로 오인해서, 실제 본문이 `Button` 이어도 통과한다(#350 재리뷰).
             after_params = skip_balanced(text, m.end() - 1, "(", ")")
-            brace = text.find("{", after_params)
-            if brace == -1:
+            body = function_body(text, after_params)
+            if body is None:
                 continue
-            bodies.setdefault(m.group(1), []).append((path, block_after(text, brace)))
+            bodies.setdefault(m.group(1), []).append((path, body))
     return bodies
+
+
+def function_body(text: str, after_params: int) -> str | None:
+    """파라미터 목록 뒤에서 함수 본문을 찾는다. 블록 본문 `{ … }` 과 식 본문 `= …` 둘 다.
+
+    식 본문에서 파라미터 뒤 첫 `{` 를 잡으면 `= BottomActionBar { Button }` 의 `{` 는
+    BottomActionBar 의 후행 람다라, 본문이 람다 **안쪽**으로 잡혀 `BottomActionBar` 자신이 밖에
+    남는다 — 멀쩡한 `SaveBar` 가 빨간불이 된다(#350 앱 UI 리뷰). 그래서 `{` 보다 `=` 가 먼저
+    오면 식 본문으로 보고, 괄호가 다 닫힌 줄 끝까지를 본문으로 삼는다.
+    """
+    brace = text.find("{", after_params)
+    eq = text.find("=", after_params)
+    if eq != -1 and (brace == -1 or eq < brace):
+        # 식 본문. 괄호 깊이가 0 인 줄바꿈에서 끝난다. 문자열은 strip_comments 가 이미 비웠다
+        depth = 0
+        i = eq + 1
+        while i < len(text):
+            ch = text[i]
+            if ch in "({[":
+                depth += 1
+            elif ch in ")}]":
+                depth -= 1
+            elif ch == "\n" and depth <= 0 and text[eq + 1 : i].strip():
+                break
+            i += 1
+        return text[eq + 1 : i]
+    if brace == -1:
+        return None
+    return block_after(text, brace)
 
 
 def definitions_for(name: str, caller: str, bodies: dict[str, list[tuple[str, str]]]) -> list[tuple[str, str]]:
@@ -173,9 +214,11 @@ def is_safe(
     안전한 가지 하나가 나머지를 가려 준다(#350 리뷰). 본문이 아무것도 그리지 않으면 안전하지 않다.
     동명 정의가 여럿 닿으면 **전부** 안전해야 한다([definitions_for]).
     """
-    if name in SAFE_CALLS:
-        return True
     defs = definitions_for(name, caller, bodies)
+    if name in SAFE_CALLS and all(d[0] == SAFE_HOME.get(name) for d in defs):
+        # 이름을 믿는 것은 닿는 정의가 진짜뿐일 때다. 호출한 파일이 같은 이름을 다시 정의하면
+        # 그 본문을 아래에서 구조로 본다(#350 앱 UI 리뷰 · 동명 가리기와 같은 결)
+        return True
     if not defs:
         return False
     for path, body in defs:
@@ -193,14 +236,21 @@ def is_safe(
 
 def check(ui_dir: Path) -> list[str]:
     sources = {
-        str(p.relative_to(ui_dir)): strip_comments(p.read_text(encoding="utf-8"))
+        p.relative_to(ui_dir).as_posix(): strip_comments(p.read_text(encoding="utf-8"))
         for p in sorted(ui_dir.rglob("*.kt"))
     }
     bodies = composable_bodies(sources)
     violations: list[str] = []
     for path, text in sources.items():
-        for m in SLOT_OPEN.finditer(text):
-            slot = block_after(text, m.end() - 1)
+        for m in SLOT_ASSIGN.finditer(text):
+            if m.end() >= len(text) or text[m.end()] != "{":
+                # `bottomBar = ::Bar` · `bottomBar = bar` — 람다가 아니면 무엇을 그리는지 여기서
+                # 알 수 없다. 조용히 통과시키지 않고 손으로 보라고 낸다
+                violations.append(
+                    f"{path}: bottomBar 에 람다가 아닌 값이 들어간다 — 이 스크립트가 볼 수 없다. 람다로 바꾸거나 손으로 확인한다"
+                )
+                continue
+            slot = block_after(text, m.end())
             names = top_level_calls(slot)
             if not names:
                 violations.append(f"{path}: bottomBar 슬롯이 BottomActionBar 를 거치지 않는다 (호출: 없음)")

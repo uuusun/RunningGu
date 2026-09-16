@@ -207,6 +207,56 @@ SAME_NAME_CALLER_ONLY = """
 @Composable fun Screen() { Scaffold(bottomBar = { Shared() }) { } }
 """
 
+# 식 본문 composable (#350 앱 UI 리뷰). `= BottomActionBar { … }` 에서 파라미터 뒤 첫 `{` 를 본문으로
+# 잡으면 후행 람다 안쪽이 본문이 돼 BottomActionBar 자신이 밖에 남는다 — 멀쩡한 코드가 빨간불.
+EXPRESSION_BODY = """
+@Composable fun Screen() { Scaffold(bottomBar = { SaveBar() }) { } }
+@Composable private fun SaveBar() = BottomActionBar { Button(onClick = {}) { } }
+"""
+
+# 식 본문이 안전하지 않으면 여전히 잡혀야 한다.
+EXPRESSION_BODY_UNSAFE = EXPRESSION_BODY.replace(
+    "= BottomActionBar { Button(onClick = {}) { } }", "= Button(onClick = {}) { }"
+)
+
+# 문자열 리터럴 안의 `bottomBar = {` (#350 앱 UI 리뷰). 슬롯이 아니다.
+STRING_LITERAL = """
+@Composable fun Screen() {
+    val hint = "bottomBar = { Button() }"
+    Scaffold(bottomBar = { SaveBar() }) { }
+}
+@Composable private fun SaveBar() { BottomActionBar { } }
+"""
+
+# 제네릭 호출 (#350 앱 UI 리뷰). `Unsafe<Int>()` 를 `<` 에서 끊으면 이름이 목록에 안 들어간다.
+GENERIC_CALL = """
+@Composable fun Screen() {
+    Scaffold(bottomBar = {
+        BottomActionBar { }
+        Unsafe<Int>()
+    }) { }
+}
+@Composable private fun <T> Unsafe() { Button(onClick = {}) { } }
+"""
+
+# bottomBar 가 람다가 아니다 (#350 앱 UI 리뷰). 무엇을 그리는지 볼 수 없으니 조용히 지나가면 안 된다.
+NON_LAMBDA_SLOT = """
+@Composable fun Screen() { Scaffold(bottomBar = ::Unsafe) { } }
+@Composable fun Unsafe() { Button(onClick = {}) { } }
+"""
+VARIABLE_SLOT = """
+@Composable fun Screen() {
+    val bar: @Composable () -> Unit = { Button(onClick = {}) { } }
+    Scaffold(bottomBar = bar) { }
+}
+"""
+
+# 안전한 이름을 같은 파일에서 다시 정의 (#350 앱 UI 리뷰). 이름만 믿으면 통과한다.
+SHADOWED_SAFE_NAME = """
+@Composable fun Screen() { Scaffold(bottomBar = { BottomActionBar { } }) { } }
+@Composable private fun BottomActionBar(content: @Composable () -> Unit) { Column { content() } }
+"""
+
 # 탭바 — Material NavigationBar 가 inset 을 스스로 먹는다.
 TAB_BAR = """
 @Composable
@@ -324,6 +374,33 @@ class BottomBarInsetGuardTest(unittest.TestCase):
         self.assertIn("Z.kt", violations[0])
         # 둘 다 안전하면 통과.
         self.assertEqual(run_on(A=SAME_NAME_CALLER_ONLY, M=SAME_NAME_OTHER_Z, Z=SAME_NAME_OTHER_Z), [])
+
+    def test_식_본문_composable_을_오탐하지_않는다(self):
+        self.assertEqual(run_on(S=EXPRESSION_BODY), [])
+        violations = run_on(S=EXPRESSION_BODY_UNSAFE)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("SaveBar", violations[0])
+
+    def test_문자열_안의_bottomBar_는_슬롯이_아니다(self):
+        self.assertEqual(run_on(S=STRING_LITERAL), [])
+
+    def test_제네릭_호출도_슬롯의_호출로_센다(self):
+        violations = run_on(S=GENERIC_CALL)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Unsafe", violations[0])
+        self.assertEqual(guard.top_level_calls(" A<Int>() B<List<Int>> { } C() "), ["A", "B", "C"])
+
+    def test_bottomBar_가_람다가_아니면_확인_불가로_낸다(self):
+        for src in (NON_LAMBDA_SLOT, VARIABLE_SLOT):
+            violations = run_on(S=src)
+            self.assertEqual(len(violations), 1)
+            self.assertIn("람다가 아닌 값", violations[0])
+
+    def test_안전한_이름을_같은_파일에서_다시_정의하면_이름을_믿지_않는다(self):
+        violations = run_on(S=SHADOWED_SAFE_NAME)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("BottomActionBar", violations[0])
+        self.assertIn("(S.kt)", violations[0])
 
     def test_탭바는_NavigationBar_로_통과한다(self):
         self.assertEqual(run_on(RunningGuApp=TAB_BAR), [])
