@@ -19,6 +19,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
     @BeforeEach
     void setUp() {
         cacheManager.getCache(CacheConfig.HOME_FESTIVALS_CACHE).clear();
+        cacheManager.getCache(CacheConfig.FESTIVAL_OFFICIAL_URL_CACHE).clear();
     }
 
     @Test
@@ -81,6 +83,10 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                         LocalDate.of(2026, 8, 2),
                         "알수없는지역 행사장",
                         null)));
+        given(festivalProvider.findOfficialUrl("ongoing"))
+                .willReturn(Optional.of("https://ongoing.test"));
+        given(festivalProvider.findOfficialUrl("unknown"))
+                .willThrow(new FestivalProviderException(Reason.ERROR));
 
         MockHttpServletRequestBuilder request = get("/api/festivals")
                 .param("yearMonth", "2026-08")
@@ -97,6 +103,7 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items[0].imageUrl")
                         .value("https://example.test/ongoing.jpg"))
                 .andExpect(jsonPath("$.items[0].inProgress").value(true))
+                .andExpect(jsonPath("$.items[0].officialUrl").value("https://ongoing.test"))
                 .andExpect(jsonPath("$.items[0].lat").doesNotExist())
                 .andExpect(jsonPath("$.items[0].lng").doesNotExist())
                 .andExpect(jsonPath("$.items[0].address").doesNotExist())
@@ -106,9 +113,12 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items[1].contentId").value("unknown"))
                 .andExpect(jsonPath("$.items[1].region").value(""))
                 .andExpect(jsonPath("$.items[1].inProgress").value(false))
+                // 공식 페이지 조회가 실패해도 목록은 살고 그 항목만 링크가 없다
+                .andExpect(jsonPath("$.items[1].officialUrl").doesNotExist())
                 .andExpect(jsonPath("$.items[2].contentId").value("upcoming"))
                 .andExpect(jsonPath("$.items[2].region").value("부산"))
-                .andExpect(jsonPath("$.items[2].inProgress").value(false));
+                .andExpect(jsonPath("$.items[2].inProgress").value(false))
+                .andExpect(jsonPath("$.items[2].officialUrl").doesNotExist());
 
         mockMvc.perform(get("/api/festivals")
                         .param("yearMonth", "2026-08")
@@ -117,6 +127,11 @@ class HomeFestivalApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.items.length()").value(1));
 
         verify(festivalProvider, times(1)).searchStartingFrom(MONTH_START);
+        // 성공(있음·없음 모두)은 contentId 별로 하루 캐시된다 — 두 번째 요청에 다시 나가지 않는다
+        verify(festivalProvider, times(1)).findOfficialUrl("ongoing");
+        verify(festivalProvider, times(1)).findOfficialUrl("upcoming");
+        // 실패는 캐시하지 않아 다음 요청이 다시 시도한다 — 다만 두 번째 요청은 size=1 이라 안 부른다
+        verify(festivalProvider, times(1)).findOfficialUrl("unknown");
     }
 
     @Test

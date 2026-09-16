@@ -34,10 +34,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -87,18 +91,32 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    HomeContent(
-        uiState = uiState,
-        query = query,
-        onQueryChange = viewModel::onSearchQueryChange,
-        onSearch = { onSearch(query) },
-        onRetryClosingSoon = viewModel::loadClosingSoon,
-        onRetryFestivals = viewModel::loadFestivals,
-        onRaceClick = onRaceClick,
-        onStartWizard = onStartWizard,
-        modifier = modifier,
-    )
+    // 공식 페이지를 못 열었을 때 알린다. 마이 화면과 같은 통로다 — 탭 화면이라 Scaffold 를
+    // 겹치지 않고 Box 위에 SnackbarHost 를 얹는다.
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onMessageShown()
+        }
+    }
+
+    Box(modifier) {
+        HomeContent(
+            uiState = uiState,
+            query = query,
+            onQueryChange = viewModel::onSearchQueryChange,
+            onSearch = { onSearch(query) },
+            onRetryClosingSoon = viewModel::loadClosingSoon,
+            onRetryFestivals = viewModel::loadFestivals,
+            onRaceClick = onRaceClick,
+            onStartWizard = onStartWizard,
+            onCannotOpenOfficialPage = viewModel::onCannotOpenOfficialPage,
+        )
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+    }
 }
 
 @Composable
@@ -111,6 +129,7 @@ private fun HomeContent(
     onRetryFestivals: () -> Unit,
     onRaceClick: (String) -> Unit,
     onStartWizard: (String) -> Unit,
+    onCannotOpenOfficialPage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -166,7 +185,7 @@ private fun HomeContent(
             errorMessage = "축제 정보를 불러오지 못했어요",
             onRetry = onRetryFestivals,
         ) { festivals ->
-            FestivalSection(festivals = festivals)
+            FestivalSection(festivals = festivals, onCannotOpenOfficialPage = onCannotOpenOfficialPage)
         }
     }
 }
@@ -391,12 +410,14 @@ private fun FestivalSectionFrame(
 @Composable
 private fun FestivalSection(
     festivals: List<FestivalSummary>,
+    onCannotOpenOfficialPage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FestivalSectionFrame(modifier = modifier) {
         // 사진 카드 캐러셀 — 탭하면 그 카드만 커진다 (#247 · §4.4-4)
         FestivalCarousel(
             festivals = festivals,
+            onCannotOpenOfficialPage = onCannotOpenOfficialPage,
             contentPadding = PaddingValues(horizontal = ScreenPadding),
         )
         Spacer(Modifier.height(10.dp))

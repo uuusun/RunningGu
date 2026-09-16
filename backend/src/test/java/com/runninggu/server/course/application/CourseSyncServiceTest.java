@@ -236,7 +236,7 @@ class CourseSyncServiceTest {
                 "staging",
                 "course-sync-test",
                 100,
-                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100)));
+                new EndpointLimits(100, 100, 100, 100, 100, 100, 100, 100, 100)));
         try {
             guard.tripKtoResultCode(UpstreamEndpoint.KTO_DURUNUBI_COURSE);
             throw new AssertionError("guard가 종료 예외를 던져야 합니다");

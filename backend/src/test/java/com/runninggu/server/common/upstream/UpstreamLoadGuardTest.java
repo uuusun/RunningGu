@@ -230,6 +230,7 @@ class UpstreamLoadGuardTest {
                         endpointLimit,
                         endpointLimit,
                         endpointLimit,
+                        endpointLimit,
                         endpointLimit));
     }
 }

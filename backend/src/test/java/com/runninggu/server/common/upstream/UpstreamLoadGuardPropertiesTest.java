@@ -99,6 +99,7 @@ class UpstreamLoadGuardPropertiesTest {
                         endpointLimit,
                         endpointLimit,
                         endpointLimit,
+                        endpointLimit,
                         endpointLimit));
     }
 
@@ -115,6 +116,7 @@ class UpstreamLoadGuardPropertiesTest {
                         kakaoEndpointLimit,
                         kakaoEndpointLimit,
                         kakaoEndpointLimit,
+                        ktoEndpointLimit,
                         ktoEndpointLimit,
                         ktoEndpointLimit,
                         ktoEndpointLimit,

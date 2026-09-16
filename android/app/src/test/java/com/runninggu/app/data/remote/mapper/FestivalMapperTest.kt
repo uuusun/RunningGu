@@ -28,7 +28,8 @@ class FestivalMapperTest {
               "endDate": "2026-08-10",
               "region": "서울",
               "imageUrl": "https://tong.visitkorea.or.kr/cms/a.jpg",
-              "inProgress": true
+              "inProgress": true,
+              "officialUrl": "https://www.yeouido-festival.test/"
             },
             {
               "contentId": "2870001",
@@ -94,6 +95,18 @@ class FestivalMapperTest {
         assertNull(festival.startDate)
         assertNull(festival.endDate)
         assertEquals("n", festival.name)
+    }
+
+    @Test
+    fun `공식 페이지는 있으면 그대로, 없거나 비어 있으면 null 이다`() {
+        // 명세 §4-1 — `officialUrl` 은 nullable. 옛 서버가 필드를 안 보내도 깨지지 않는다
+        val festivals = parse()
+
+        assertEquals("https://www.yeouido-festival.test/", festivals[0].officialUrl)
+        assertNull(festivals[1].officialUrl)
+
+        val blank = """{"items":[{"contentId":"1","name":"n","startDate":"","endDate":"","officialUrl":" "}]}"""
+        assertNull(ApiJson.decodeFromString(FestivalListDto.serializer(), blank).toDomain().single().officialUrl)
     }
 
     @Test

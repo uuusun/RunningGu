@@ -26,7 +26,8 @@ class NearbyFestivalMapperTest {
               "startDate": "2026-08-20", "endDate": "2026-08-25",
               "distanceKm": 0.8,
               "imageUrl": "http://tong.visitkorea.or.kr/x.jpg",
-              "address": "세종특별자치시 연기면"
+              "address": "세종특별자치시 연기면",
+              "officialUrl": "https://www.sejong.go.kr/festival"
             },
             {
               "contentId": "2764322",
@@ -68,6 +69,15 @@ class NearbyFestivalMapperTest {
 
         assertNull(second.imageUrl)
         assertEquals("먼 축제", second.name)
+    }
+
+    @Test
+    fun `공식 페이지는 있으면 그대로, 없으면 null 이다`() {
+        // 명세 §3-5 — `officialUrl` 은 nullable. 필드를 안 보내는 옛 응답도 깨지지 않는다
+        val festivals = parse()
+
+        assertEquals("https://www.sejong.go.kr/festival", festivals[0].officialUrl)
+        assertNull(festivals[1].officialUrl)
     }
 
     @Test

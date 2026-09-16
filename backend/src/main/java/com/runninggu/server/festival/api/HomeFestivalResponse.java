@@ -10,7 +10,8 @@ public record HomeFestivalResponse(
         LocalDate endDate,
         String region,
         String imageUrl,
-        boolean inProgress) {
+        boolean inProgress,
+        String officialUrl) {
 
     public static HomeFestivalResponse from(HomeFestival festival) {
         return new HomeFestivalResponse(
@@ -20,6 +21,7 @@ public record HomeFestivalResponse(
                 festival.endDate(),
                 festival.region(),
                 festival.imageUrl(),
-                festival.inProgress());
+                festival.inProgress(),
+                festival.officialUrl());
     }
 }
