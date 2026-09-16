@@ -157,9 +157,6 @@ object Routes {
     /** 선택 인자를 포함한 러닝코스 route 패턴. */
     const val COURSES_PATTERN = "$COURSES?$ARG_COURSE_TAB={$ARG_COURSE_TAB}"
 
-    /** 지역별 탭을 펴 둔 채로 S8 을 여는 route. 홈 퀵바의 [코스] 가 쓴다. */
-    fun coursesByRegion(): String = "$COURSES?$ARG_COURSE_TAB=$COURSE_TAB_REGION"
-
     /** 검색어를 실어 캘린더로 이동할 때 쓰는 route. */
     fun calendarWithQuery(query: String): String =
         "$CALENDAR?$ARG_QUERY=${Uri.encode(query)}"
