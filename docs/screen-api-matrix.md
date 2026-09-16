@@ -164,7 +164,7 @@ Compose 화면
 | 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 같은 기기 family에서 회전된 token pair | 실패→세션 삭제·로그인, 과거 토큰 재사용이면 해당 family 폐기 | 서버 SHA-256 hash + DataStore |
 | 게스트 저장·찜 차단 | Android guard | 원래 route와 동작 종류 | 로그인 모달 | 로그인 후 원래 화면 복귀, **자동 실행하지 않음** | route 임시 상태 |
 | 공통 API 오류 | Problem Details parser | status, code | 화면별 Error | Empty로 강등 금지 | 저장 없음 |
-| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 + **출처·시각 표기**(`LOCAL_CACHE` · `cachedAt`) | 쓰기 비활성. `ApiException.Network` 일 때만 폴백 — 서버가 답한 4xx·5xx 에는 쓰지 않는다. **P0 에서 폴백이 있는 화면은 S1 마감임박·S2·S3 뿐**이다. S7 저장 동선·S8 코스·S10 마이는 캐시가 없어 오프라인이면 Error(SPEC 결정-69 · 69) | 기기 캐시 |
+| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 + **출처·시각 표기**(`LOCAL_CACHE` · `cachedAt`) | 쓰기 비활성. `ApiException.Network` 일 때만 폴백 — 서버가 답한 4xx·5xx 에는 쓰지 않는다. **P0 에서 폴백이 있는 화면은 S1 마감임박·S2·S3 뿐**이다. S7 저장 동선·S8 코스·S10 마이는 캐시가 없어 오프라인이면 Error(SPEC 결정-69 · 70) | 기기 캐시 |
 
 ### A1 로그인
 
