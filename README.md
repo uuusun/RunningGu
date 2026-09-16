@@ -82,7 +82,7 @@ runninggu/
 └── reference-web/       # 구 design/ (React 목업 — UX 참조용, 빌드 대상 아님)
 ```
 
-> 참고: `reference-web/`은 **UX·화면흐름·로직 설계 참조**로만 쓴다. 앱의 초기 대회본과 GPX 축약 폴백은 `android/app/src/main/assets/`에 두되, 온라인 데이터의 SSOT는 백엔드다.
+> 참고: `reference-web/`은 **UX·화면흐름·로직 설계 참조**로만 쓴다. 앱의 초기 대회본(`races.json`)은 `android/app/src/main/assets/`에 두되, 온라인 데이터의 SSOT는 백엔드다. GPX 축약 번들은 P0 에 없다(P1 · SPEC 결정-69).
 
 ---
 
