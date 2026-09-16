@@ -23,7 +23,7 @@ Compose 화면
 
 기기 내부
   ├─ DataStore: 세션 토큰·게스트 여부·설정
-  ├─ Room: 마지막 성공 응답의 읽기 캐시 — P0 는 대회·마감임박만(마이 목록 캐시는 P1 · SPEC 결정-69)
+  ├─ Room: 마지막 성공 응답의 읽기 캐시 — P0 는 대회·마감임박만(마이 목록 캐시는 P1 · SPEC 결정-70)
   └─ 임시 상태: 필터·위저드·저장 전 동선
 ```
 
@@ -94,10 +94,10 @@ Compose 화면
 | S5 종목·취향 | event, themes | WizardUiState | `LOCAL_STATE` | 없음 | 화면 그래프 메모리 |
 | S6 숙소 | 주변 숙소·검색 결과 | POI DTO | `KAKAO_LIVE`, KTO 숙박 폴백 | 영구 저장 없음 | 서버 5분 캐시 |
 | S7 새 동선 | recovery, days, blocks | 생성 DTO | 서버 규칙 엔진 + KTO/카카오 POI | 저장 전 없음 | Result ViewModel 임시 DTO |
-| S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | P0 캐시 없음(오프라인 = Error). Room 읽기 캐시는 P1(SPEC 결정-69) |
-| S8 출발지 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 검증된 GraphHopper graph artifact, OSM 응답은 저장 전 임시 | 서버 TTL 캐시. P0 앱은 캐시 없음(오프라인 = Error) — GPX 축약 번들·코스 Room 캐시는 P1(SPEC 결정-68) |
-| S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 버전 번들에서 시작해 최신 전체 KTO 메타를 결합한 서버 메모리 snapshot | P0 앱 캐시 없음(오프라인 = Error). 코스 Room 캐시는 P1(SPEC 결정-68) |
-| S10 보관함 | 동선·저장 코스·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | P0 캐시 없음(오프라인 = Error). Room 읽기 캐시는 P1 — 삭제 계약 먼저(SPEC 결정-69) |
+| S7 저장 동선 | itinerary, day, block | 상세 DTO | `SERVER_DB` | ITINERARY 트리 | P0 캐시 없음(오프라인 = Error). Room 읽기 캐시는 P1(SPEC 결정-70) |
+| S8 출발지 주변 통합 목록 | 큐레이션/OSM 코스 경로 또는 주변 공원·산책 장소 | `kind=ROUTE\|PLACE` items + degradedSources + attributions | `KTO_SYNC_GPX` + `OSM_GRAPH` + `KAKAO_LIVE` | 큐레이션 메타·경로와 검증된 GraphHopper graph artifact, OSM 응답은 저장 전 임시 | 서버 TTL 캐시. P0 앱은 캐시 없음(오프라인 = Error) — GPX 축약 번들·코스 Room 캐시는 P1(SPEC 결정-69) |
+| S8 지역 코스 | 지역·코스 수·목록·출처 | regions + page + attributions | `KTO_SYNC_GPX` | 버전 번들에서 시작해 최신 전체 KTO 메타를 결합한 서버 메모리 snapshot | P0 앱 캐시 없음(오프라인 = Error). 코스 Room 캐시는 P1(SPEC 결정-69) |
+| S10 보관함 | 동선·저장 코스·찜 | Pageable 목록 | `SERVER_DB` | 사용자 소유 데이터 | P0 캐시 없음(오프라인 = Error). Room 읽기 캐시는 P1 — 삭제 계약 먼저(SPEC 결정-70) |
 | M1 계정 관리 | 프로필·약관·가입 로그인 방식 | JSON DTO | `SERVER_DB` | USER·IDENTITY(1:1)·AGREEMENT | 세션만 DataStore |
 
 ---
@@ -164,7 +164,7 @@ Compose 화면
 | 토큰 재발급 | `POST /api/auth/refresh` | refreshToken | 같은 기기 family에서 회전된 token pair | 실패→세션 삭제·로그인, 과거 토큰 재사용이면 해당 family 폐기 | 서버 SHA-256 hash + DataStore |
 | 게스트 저장·찜 차단 | Android guard | 원래 route와 동작 종류 | 로그인 모달 | 로그인 후 원래 화면 복귀, **자동 실행하지 않음** | route 임시 상태 |
 | 공통 API 오류 | Problem Details parser | status, code | 화면별 Error | Empty로 강등 금지 | 저장 없음 |
-| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 + **출처·시각 표기**(`LOCAL_CACHE` · `cachedAt`) | 쓰기 비활성. `ApiException.Network` 일 때만 폴백 — 서버가 답한 4xx·5xx 에는 쓰지 않는다. **P0 에서 폴백이 있는 화면은 S1 마감임박·S2·S3 뿐**이다. S7 저장 동선·S8 코스·S10 마이는 캐시가 없어 오프라인이면 Error(SPEC 결정-68 · 69) | 기기 캐시 |
+| 오프라인 읽기 | Room | 마지막 성공 DTO, cachedAt | 읽기 전용 표시 + **출처·시각 표기**(`LOCAL_CACHE` · `cachedAt`) | 쓰기 비활성. `ApiException.Network` 일 때만 폴백 — 서버가 답한 4xx·5xx 에는 쓰지 않는다. **P0 에서 폴백이 있는 화면은 S1 마감임박·S2·S3 뿐**이다. S7 저장 동선·S8 코스·S10 마이는 캐시가 없어 오프라인이면 Error(SPEC 결정-69 · 69) | 기기 캐시 |
 
 ### A1 로그인
 
@@ -287,7 +287,7 @@ S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `
 | POI 후보 | `GET /api/pois` | category, 기준 좌표, query?, size | `provider` 포함 장소 snapshot 후보, `placeId/fetchedAt/cachedAt` 없음 | 시트 Loading/Empty/Error |
 | 저장 전 편집 | 로컬 immutable 연산 | USER 블록 추가/교체/삭제/순서 | ResultUiState | RACE 편집 UI 미노출. 블록 시각은 표시·편집하지 않고 목록 순서로만 일정을 관리한다(#335) |
 | 새 동선 저장 | `POST /api/itineraries` | 편집된 전체 DTO→201 id 또는 200 replaced | PostgreSQL | 게스트 modal, 성공→보관함 |
-| 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | P0 캐시 없음(P1 · 결정-69) | RACE는 저장 당시 값 유지. 변경 시 안내(P0) · 재생성 CTA(후속 §5-7~5-10), 403/404/Error |
+| 저장 동선 복원 | `GET /api/itineraries/{id}` | snapshot region/recovery/tree + 최신 contest 메타·active + needsRegeneration | P0 캐시 없음(P1 · 결정-70) | RACE는 저장 당시 값 유지. 변경 시 안내(P0) · 재생성 CTA(후속 §5-7~5-10), 403/404/Error |
 | 변경 대회 재생성 | `POST /api/itineraries/generate` | 최신 canonical 기준 입력 | 저장 전 임시 DTO | "직접 고친 장소는 사라져요" 확인 뒤 호출, 기존 저장본 유지 |
 | 재생성 최종 교체 | `PUT /api/itineraries/{id}` | 새 편집 DTO→200 same id/replaced | PostgreSQL | 저장 성공 시에만 기존 트리 교체, USER 편집 자동 병합 없음 |
 | 저장 후 추가 | POST `/itineraries/{id}/days/{dayId}/blocks` | block body→blockId/orderNo | PostgreSQL | 실패 시 기존 UI 유지. API 호환을 위해 `startTime=13:00`을 보내지만 앱에서는 표시·편집하지 않는다(#335) |
@@ -363,7 +363,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | 찜 목록 | `GET /api/me/favorites` | 대회 카드 page, favorite=true, active | 비활성 흐림+"정보 제공 종료", Empty/Error |
 | 찜 해제 | DELETE `/api/me/favorites/{contestId}` | 204 | 실패 시 카드 유지 |
 | 설정 | account 이동 | 없음 | M1 |
-| 오프라인 | 없음(P0) | — | 세 목록 모두 네트워크 Error + [다시 시도]. 마지막 성공 segment 의 Room 읽기 캐시는 P1 — 로그아웃·계정 전환·탈퇴 삭제 계약 먼저(SPEC 결정-69 · #306) |
+| 오프라인 | 없음(P0) | — | 세 목록 모두 네트워크 Error + [다시 시도]. 마지막 성공 segment 의 Room 읽기 캐시는 P1 — 로그아웃·계정 전환·탈퇴 삭제 계약 먼저(SPEC 결정-70 · #306) |
 
 ### M1 내 정보·계정 관리
 
