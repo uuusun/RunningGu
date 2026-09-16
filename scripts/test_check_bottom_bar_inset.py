@@ -187,6 +187,26 @@ fun Screen() { Scaffold(bottomBar = { Loop() }) { } }
 fun Loop() { Loop() }
 """
 
+# 같은 이름이 다른 파일에도 있다 (#350 재리뷰). A 가 부르는 건 A 안의 안전하지 않은 `Shared` 인데,
+# 이름으로 하나만 남기면 정렬상 뒤의 Z 에 있는 안전한 `Shared` 가 그것을 가린다.
+SAME_NAME_CALLER_A = """
+@Composable fun Screen() { Scaffold(bottomBar = { Shared() }) { } }
+@Composable private fun Shared() { Button(onClick = {}) { } }
+"""
+SAME_NAME_OTHER_Z = """
+@Composable private fun Shared() { BottomActionBar { } }
+"""
+
+# 반대 — A 의 것이 안전하고 Z 의 것이 안전하지 않다. A 는 자기 파일 것을 쓰므로 통과해야 한다.
+SAME_NAME_CALLER_A_SAFE = SAME_NAME_CALLER_A.replace("Button(onClick = {}) { }", "BottomActionBar { }")
+SAME_NAME_OTHER_Z_UNSAFE = SAME_NAME_OTHER_Z.replace("BottomActionBar { }", "Button(onClick = {}) { }")
+
+# 호출한 파일에는 정의가 없고 다른 두 파일에 동명이 있다. 어느 것이 import 되는지 모르니
+# 전부 안전해야 통과한다 — 하나라도 안전하지 않으면 잡는다.
+SAME_NAME_CALLER_ONLY = """
+@Composable fun Screen() { Scaffold(bottomBar = { Shared() }) { } }
+"""
+
 # 탭바 — Material NavigationBar 가 inset 을 스스로 먹는다.
 TAB_BAR = """
 @Composable
@@ -288,6 +308,22 @@ class BottomBarInsetGuardTest(unittest.TestCase):
         violations = run_on(Screen=RECURSIVE_WRAPPER)
         self.assertEqual(len(violations), 1)
         self.assertIn("Loop", violations[0])
+
+    def test_같은_이름이_다른_파일에_있어도_호출한_파일의_정의를_본다(self):
+        violations = run_on(A=SAME_NAME_CALLER_A, Z=SAME_NAME_OTHER_Z)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("Shared", violations[0])
+        self.assertIn("(A.kt)", violations[0])
+        # 반대로 자기 파일 것이 안전하면 다른 파일의 안전하지 않은 동명은 상관없다.
+        self.assertEqual(run_on(A=SAME_NAME_CALLER_A_SAFE, Z=SAME_NAME_OTHER_Z_UNSAFE), [])
+
+    def test_호출한_파일에_정의가_없으면_다른_파일의_동명이_전부_안전해야_한다(self):
+        violations = run_on(A=SAME_NAME_CALLER_ONLY, M=SAME_NAME_OTHER_Z_UNSAFE, Z=SAME_NAME_OTHER_Z)
+        self.assertEqual(len(violations), 1)
+        self.assertIn("M.kt", violations[0])
+        self.assertIn("Z.kt", violations[0])
+        # 둘 다 안전하면 통과.
+        self.assertEqual(run_on(A=SAME_NAME_CALLER_ONLY, M=SAME_NAME_OTHER_Z, Z=SAME_NAME_OTHER_Z), [])
 
     def test_탭바는_NavigationBar_로_통과한다(self):
         self.assertEqual(run_on(RunningGuApp=TAB_BAR), [])

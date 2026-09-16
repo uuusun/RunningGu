@@ -70,9 +70,15 @@ def strip_comments(text: str) -> str:
     return re.sub(r"//[^\n]*", "", text)
 
 
-def composable_bodies(sources: dict[str, str]) -> dict[str, tuple[str, str]]:
-    """{이름: (파일, 본문)}. 같은 이름이 둘이면 마지막 것 — 이 코드베이스에는 없다."""
-    bodies: dict[str, tuple[str, str]] = {}
+def composable_bodies(sources: dict[str, str]) -> dict[str, list[tuple[str, str]]]:
+    """{이름: [(파일, 본문), …]}. **같은 이름을 하나로 합치지 않는다.**
+
+    `Content` · `CourseMap` · `DayCell` 처럼 파일마다 private 로 같은 이름을 쓰는 것이 이미
+    8종 있다(#350 재리뷰). 마지막 정의로 덮어쓰면 A 파일이 부르는 안전하지 않은 `Shared` 가
+    정렬상 뒤의 Z 파일에 있는 안전한 `Shared` 에 가려진다. 어느 것을 볼지는 [definitions_for] 가
+    호출한 파일을 보고 고른다.
+    """
+    bodies: dict[str, list[tuple[str, str]]] = {}
     for path, text in sources.items():
         for m in FUN_DEF.finditer(text):
             # 파라미터 목록 `(...)` 을 짝 맞춰 건너뛴 **뒤**의 첫 `{` 가 본문이다. `fun` 이름 뒤 첫 `{` 를
@@ -82,8 +88,21 @@ def composable_bodies(sources: dict[str, str]) -> dict[str, tuple[str, str]]:
             brace = text.find("{", after_params)
             if brace == -1:
                 continue
-            bodies[m.group(1)] = (path, block_after(text, brace))
+            bodies.setdefault(m.group(1), []).append((path, block_after(text, brace)))
     return bodies
+
+
+def definitions_for(name: str, caller: str, bodies: dict[str, list[tuple[str, str]]]) -> list[tuple[str, str]]:
+    """`caller` 파일에서 `name` 을 부르면 닿는 정의들.
+
+    Kotlin 은 같은 파일의 정의를 먼저 잡는다 — 파일마다 겹치는 이름은 전부 `private` 이라
+    다른 파일의 동명은 보이지 않는다. 같은 파일에 없으면 다른 파일의 정의 **전부**를 돌려주고,
+    호출자는 그 전부가 안전해야 통과시킨다. 어느 것이 import 되는지 여기서 알 수 없으니
+    안전한 하나가 나머지를 가리지 못하게 보수적으로 간다.
+    """
+    defs = bodies.get(name, [])
+    same_file = [d for d in defs if d[0] == caller]
+    return same_file or defs
 
 
 def skip_balanced(text: str, i: int, open_ch: str, close_ch: str) -> int:
@@ -141,27 +160,35 @@ def top_level_calls(block: str) -> list[str]:
     return names
 
 
-def is_safe(name: str, bodies: dict[str, tuple[str, str]], seen: set[str] | None = None) -> bool:
-    """이 composable 이 (직접 또는 래퍼를 거쳐) inset 을 처리하는가.
+def is_safe(
+    name: str,
+    caller: str,
+    bodies: dict[str, list[tuple[str, str]]],
+    seen: frozenset[tuple[str, str]] = frozenset(),
+) -> bool:
+    """`caller` 파일이 부르는 이 composable 이 (직접 또는 래퍼를 거쳐) inset 을 처리하는가.
 
     래퍼 본문도 슬롯과 같은 기준이다 — 본문이 **직접** 그리는 호출이 **각각** 안전해야 한다.
     `if (ok) BottomActionBar { } else Button { }` 처럼 상태별로 갈리는 래퍼는 `any()` 로 보면
     안전한 가지 하나가 나머지를 가려 준다(#350 리뷰). 본문이 아무것도 그리지 않으면 안전하지 않다.
+    동명 정의가 여럿 닿으면 **전부** 안전해야 한다([definitions_for]).
     """
     if name in SAFE_CALLS:
         return True
-    if name not in bodies:
+    defs = definitions_for(name, caller, bodies)
+    if not defs:
         return False
-    seen = seen or set()
-    if name in seen:
-        return False
-    # `seen` 은 **지금 내려가는 경로**만 담는다 — 형제 경로와 공유하면 `Outer { A(); B() }` 에서
-    # A 가 거친 `Safe` 를 B 가 다시 만날 때 순환으로 오인해 멀쩡한 래퍼가 실패한다(#350 재리뷰).
-    # 그래서 mutable 집합을 add 하지 않고 이 경로용 사본을 만들어 넘긴다.
-    seen = seen | {name}
-    _, body = bodies[name]
-    inner = top_level_calls(body)
-    return bool(inner) and all(is_safe(n, bodies, seen) for n in inner)
+    for path, body in defs:
+        key = (path, name)
+        if key in seen:
+            return False
+        # `seen` 은 **지금 내려가는 경로**만 담는다 — 형제 경로와 공유하면 `Outer { A(); B() }` 에서
+        # A 가 거친 `Safe` 를 B 가 다시 만날 때 순환으로 오인해 멀쩡한 래퍼가 실패한다(#350 재리뷰).
+        # 그래서 mutable 집합에 add 하지 않고 이 경로용 사본을 만들어 넘긴다.
+        inner = top_level_calls(body)
+        if not inner or not all(is_safe(n, path, bodies, seen | {key}) for n in inner):
+            return False
+    return True
 
 
 def check(ui_dir: Path) -> list[str]:
@@ -182,11 +209,13 @@ def check(ui_dir: Path) -> list[str]:
             # 옆에 그린 `Button(` 은 따로 걸린다. 라이브러리 composable 은 bodies 에 없어서
             # is_safe 가 False 다.
             for name in names:
-                if is_safe(name, bodies):
+                if is_safe(name, path, bodies):
                     continue
-                if name in bodies:
+                defs = definitions_for(name, path, bodies)
+                if defs:
+                    where = " · ".join(d[0] for d in defs)
                     violations.append(
-                        f"{path}: bottomBar 의 `{name}`({bodies[name][0]}) 이 BottomActionBar 를 거치지 않는다"
+                        f"{path}: bottomBar 의 `{name}`({where}) 이 BottomActionBar 를 거치지 않는다"
                     )
                 else:
                     violations.append(
