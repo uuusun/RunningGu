@@ -854,7 +854,7 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 | `lat`, `lng` | **출발지.** `near` 를 부를 때 쓴 값과 같다(검색·프리셋·S7 숙소). `distanceM` 계산에만 쓴다. 기기 유래 좌표를 넣는 경로는 두지 않는다(결정-56) |
 | `entryLat`, `entryLng` | **진입점.** 순환 경로가 시작하고 끝나는 점. 앱은 `near` 응답 `PLACE` 항목의 `lat/lng` 를 그대로 보낸다 |
 | `targetKm` | 1~21, 0.5 단위. 화면 슬라이더 값 |
-| `entryName` | 선택. 경로 이름에만 쓴다 — `near` 의 `PLACE.name`. 서버가 trim·제어문자 제거 뒤 **50자로 잘라서 받는다** — 길이로 거절하지 않는다. 정리 뒤 빈 문자열이면 **없는 것으로** 보고 §6-1 의 기존 규칙(`출발지 주변 …`)으로 짓는다 |
+| `entryName` | 선택. 경로 이름에만 쓴다 — `near` 의 `PLACE.name`. 서버는 제어문자를 제거하고 앞뒤 공백을 제거한다. 정제 결과가 비면 값이 없는 것으로 처리해 §6-1 의 기본 이름(`출발지 주변 …`)을 쓴다. 50자를 초과하면 **Unicode 코드 포인트 기준 앞 50자**로 잘라 쓴다. `entryName` 때문에 `400 VALIDATION_FAILED` 를 반환하지 않는다 🔒확정(2026-09-16 서버 담당) |
 
 ```json
 {
@@ -879,10 +879,10 @@ KTO 동기화 실패 시에도 번들 또는 마지막 정상 snapshot으로 두
 - `route` 는 **§6-1 의 `ROUTE` 항목과 필드가 같다.** 앱은 새 DTO 를 만들지 않고 `near` 의 `ROUTE` 매퍼를 그대로 쓴다. `route.lat/lng` 는 실제 경로 시작점(≈ 진입점), `distanceM` 은 출발지(`lat/lng`)에서 그 시작점까지다.
 - **OSM 생성만 한다.** 큐레이션(두루누비) 은 시도하지 않는다 — 스팟 반경의 큐레이션 경로는 이미 `near` 목록에 `ROUTE` 로 들어 있다. 생성 규칙·품질 상한·난이도·`durationMin`·`shortfall` 은 §6-1 OSM 규칙과 §0-6 을 그대로 따른다. **상한 완화 없음.**
 - **캐시는 경로 모양(geometry)만** — `entryLat/entryLng` 를 소수 4자리로 반올림한 값 + `targetKm` 를 키로 **5분**(§0-5 공통). 캐시에 드는 것은 `pathPolyline`·`routeKm`·`gainM`·`elevationProfileM`·`difficulty`·시작점 좌표까지다. **`name` 과 `distanceM` 은 캐시 밖에서 요청마다 조합한다** — 전체 응답을 캐시하면 먼저 요청한 사람의 `entryName` 이 다른 사용자 응답에 섞인다. 같은 공원을 여러 사용자가 눌러도 GraphHopper 는 한 번만 돈다.
-- `name` — `entryName` 이 있으면 `{entryName} 주변 {routeKm 반올림}km {평지|완만} 러닝코스`, 없으면 §6-1 기존 규칙. 서버는 `entryName` 을 trim 하고 제어문자를 제거한 뒤 50자로 자르며(길이 초과는 400 이 아니다), 정리 뒤 빈 문자열이면 없는 것으로 본다. 그 외 검증·조회에는 쓰지 않는다. — 값의 출처가 서버 자신의 `near` 응답이라 앱이 고칠 수 있는 오류가 아니므로 거절보다 정리가 맞다(#353 리뷰). 저장 시 `courseName` snapshot 은 이 값이다(§7-A).
+- `name` — `entryName` 이 있으면 `{entryName} 주변 {routeKm 반올림}km {평지|완만} 러닝코스`, 없으면 §6-1 기존 규칙. 서버는 `entryName` 의 제어문자를 제거하고 앞뒤 공백을 제거한 뒤, 비면 없는 것으로 보고 50자를 넘으면 Unicode 코드 포인트 기준 앞 50자로 자른다. 그 외 검증·조회·캐시 키·GraphHopper 입력에는 쓰지 않는다. — 경로 생성의 핵심 입력이 아니라 화면에 붙이는 이름이고, 값의 출처도 서버 자신의 `near` 응답이라 이것 때문에 경로 생성을 400 으로 막으면 사용자가 복구할 방법이 없다(#353 리뷰 · 2026-09-16 서버 담당 확정). 저장 시 `courseName` snapshot 은 이 값이다(§7-A).
 - 품질 상한을 통과한 후보가 없으면 **정상 0건** — `200 {"route": null, "attributions": []}`. 앱은 핀을 그대로 두고 "이 근처엔 자동 경로를 못 만들었어요" 를 비차단으로 보여준다. 0건도 5분 캐시한다(같은 키로 GraphHopper 를 다시 돌리지 않는다).
 - GraphHopper 호출 실패·타임아웃(§0-6 5초)·readiness 미완료는 `503 COURSE_SOURCES_UNAVAILABLE`. 이 API 는 원천이 하나라 `degradedSources` 를 두지 않는다. 실패는 캐시하지 않는다.
-- `400 VALIDATION_FAILED` — 좌표 범위 밖 · `targetKm` 범위/단위 위반. `entryName` 은 400 사유가 아니다 — 공백뿐이거나 길면 위 규칙대로 정리한다.
+- `400 VALIDATION_FAILED` — 좌표 범위 밖 · `targetKm` 범위/단위 위반. `entryName` 때문에 400 을 반환하지 않는다 — 비거나 길면 위 규칙대로 정제한다.
 - **저장** — 응답 `route` 를 §7-A `POST /me/courses` 에 `dataSource=OSM_GENERATED` 로 그대로 보낸다. `entryLat/entryLng` 는 `route.lat/lng`(경로 시작점) — 큐레이션 경로를 저장할 때와 같은 규칙이다. 서버는 `routeFingerprint` 를 다시 계산하므로 `near` 에서 만든 경로와 같은 멱등 규칙이다. `sourceCourseId` 는 없다.
 - 앱 동작은 `docs/screen-api-matrix.md` S8 "걷기 스팟 선택" 행. **출발지는 바뀌지 않고 목록도 재조회하지 않는다.**
 
