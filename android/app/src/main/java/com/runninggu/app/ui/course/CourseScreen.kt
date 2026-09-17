@@ -157,16 +157,21 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                 // **번호는 지도 핀과 짝이다.** §4.11-4 가 "리스트 번호 일치" 를 요구하므로
                 // 목록 순서 그대로 1부터 매긴다 — 서버가 거리순으로 준 순서다(§4.11-5).
                 itemsIndexed(near.items) { index, item ->
+                    val selected = state.selectedItem == item
                     NearbyRow(
                         item = item,
                         number = index + 1,
                         targetKm = state.targetKm,
-                        selected = state.selectedItem == item,
+                        selected = selected,
+                        // 고른 스팟에만 서버가 만든 순환 경로가 붙는다 (§6-5 · 결정-68)
+                        spotRoute = if (selected && item is NearbyItem.Place) state.mappedRoute else null,
+                        spotRouteLoading = selected && state.spotRouteLoading,
                         onClick = { viewModel.onItemSelect(item) },
                     )
                 }
-                item { ActionRow(state = state, viewModel = viewModel, hasNoRoute = near.hasNoRoute) }
-                item { Attributions(near.attributions) }
+                item { ActionRow(state = state, viewModel = viewModel) }
+                // 스팟 경로가 만들어지면 OSM 문구가 합류한다 (§6-5)
+                item { Attributions(state.displayedAttributions) }
             }
         }
     }
@@ -382,6 +387,10 @@ private fun NearbyRow(
     targetKm: Double,
     selected: Boolean,
     onClick: () -> Unit,
+    /** 이 스팟을 진입점으로 서버가 만든 경로. 스팟 카드에만 오고, 오면 경로 카드와 같은 모습이다. (§6-5) */
+    spotRoute: NearbyItem.Route? = null,
+    /** 스팟 경로를 만드는 중 — "경로 만드는 중…" */
+    spotRouteLoading: Boolean = false,
 ) {
     Card(
         modifier = Modifier
@@ -426,6 +435,33 @@ private fun NearbyRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
+                // 스팟에 경로가 만들어지면 경로 카드와 같은 줄을 덧붙인다 (매핑표 S8 "걷기 스팟 선택")
+                if (spotRouteLoading) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "경로 만드는 중…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (spotRoute != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = nearbySubtitle(spotRoute),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    elevationUnitProfile(spotRoute.elevationProfileM)?.let { profile ->
+                        Spacer(Modifier.height(6.dp))
+                        ElevationLine(
+                            profile = profile,
+                            closed = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp),
+                        )
+                    }
+                }
 
                 if (item is NearbyItem.Route) {
                     // 그릴 값이 나올 때만 그린다 — `isNotEmpty()` 는 점이 하나여도
@@ -482,7 +518,7 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
  * 어느 코스 이야기인지 알 수 없다.
  */
 @Composable
-private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRoute: Boolean) {
+private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // 버튼은 [저장] 하나다 🔒확정(결정-56). [뛰기] 는 GPS 기록과 함께 제품에서 빠졌다
         OutlinedButton(
@@ -494,6 +530,21 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
         // **왜 회색인지 적는다** (#269). 걷기 스팟은 P0 에서 저장 대상이 아닌데, 그 말이
         // 없으면 사용자는 버튼이 고장난 줄 안다. 저장 결과가 떠 있을 때는 비켜 준다 —
         // 방금 누른 것에 대한 답이 먼저다.
+        // 스팟 경로를 못 만들었거나 실패했다 — 핀은 그대로고 문구만 낸다. 실패에만 [다시 시도] (§6-5)
+        state.spotRouteMessage?.let { message ->
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.canRetrySpotRoute) {
+                    TextButton(onClick = viewModel::onSpotRouteRetry) { Text("다시 시도") }
+                }
+            }
+        }
         if (state.walkSpotPicked && state.save !is SaveCourseState.Done) {
             Spacer(Modifier.height(6.dp))
             Text(
@@ -516,7 +567,8 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
                 },
             )
         }
-        if (hasNoRoute) {
+        // 스팟 경로가 만들어졌으면 내리지 않는다 — 그 위 [저장] 이 켜져 있는데 "없어요" 는 모순이다
+        if (state.showsNoRouteNotice) {
             Spacer(Modifier.height(6.dp))
             Text(
                 // 뒷문장("자유롭게 뛰어도 기록은 남습니다")은 GPS 기록을 전제한 말이라 뺐다

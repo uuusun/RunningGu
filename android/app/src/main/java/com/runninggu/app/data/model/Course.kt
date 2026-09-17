@@ -108,6 +108,18 @@ data class NearbyCourses(
     val attributions: List<String> = emptyList(),
 )
 
+/**
+ * 걷기 스팟을 진입점으로 서버가 만든 순환 경로. (API 명세 §6-5 · 결정-68)
+ *
+ * [route] 가 null 이면 **정상 0건**이다 — 품질 상한을 통과한 후보가 없었다. 실패가 아니라
+ * "이 근처엔 자동 경로를 못 만들었어요" 다. 실패(`503`·네트워크)는 `ApiException` 으로 올라온다.
+ */
+data class SpotLoop(
+    val route: NearbyItem.Route?,
+    /** OSM 문구. 목록 하단 출처에 **합류**시킨다 — 이미 있으면 두 번 적지 않는다. */
+    val attributions: List<String> = emptyList(),
+)
+
 /** 지역별 목록의 코스. 큐레이션만 나온다. (§6-2) */
 data class CourseSummary(
     val courseId: String,

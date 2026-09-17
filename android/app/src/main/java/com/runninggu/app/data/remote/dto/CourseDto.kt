@@ -76,6 +76,19 @@ data class CoursesNearDto(
     val attributions: List<String> = emptyList(),
 )
 
+/**
+ * 걷기 스팟 진입점 순환 경로 응답. (§6-5 · 결정-68)
+ *
+ * `route` 는 **§6-1 의 `ROUTE` 와 필드가 같다** — 계약이 "새 DTO 를 만들지 않고 `near` 의
+ * `ROUTE` 매퍼를 그대로 쓴다" 고 못 박았다. 품질 상한을 통과한 후보가 없으면 `null` 이고
+ * 그건 정상 0건이다.
+ */
+@Serializable
+data class CourseLoopDto(
+    val route: NearItemDto.Route? = null,
+    val attributions: List<String> = emptyList(),
+)
+
 /** 지역별 목록 항목. 큐레이션만. (§6-2) */
 @Serializable
 data class CourseDto(

@@ -67,6 +67,31 @@ class CourseViewModel(
     /** [저장] 연타. 버튼도 막지만, 화면이 다시 만들어지는 경우까지 여기서 끊는다. */
     private var saveJob: Job? = null
 
+    /** 스팟 경로 요청. 다른 스팟을 고르면 끊는다 — 늦게 온 답이 새 스팟 아래 그려지면 안 된다. */
+    private var spotRouteJob: Job? = null
+
+    /**
+     * 한 세션 안에서 같은 스팟은 **다시 부르지 않는다**(매핑표 S8 "걷기 스팟 선택").
+     *
+     * 키는 **요청 인자 전부**다 — 출발지 좌표 + 진입점 좌표 + 목표 거리 + 스팟 이름.
+     * 서버 캐시 키(§6-5)는 진입점 + 목표 거리뿐이지만, 서버는 그걸로 geometry 만 기억하고
+     * 출발지 기준 `distanceM` 과 요청의 `entryName` 은 매번 다시 조합한다. 앱은 응답 전체를
+     * 기억하므로 서버 키를 그대로 쓰면 출발지를 바꾼 뒤 같은 공원이 다시 나올 때 이전
+     * 출발지의 `distanceM` 이, 같은 좌표의 이름이 바뀌면 옛 `name` 이 그려진다(#356 리뷰).
+     * 목록이 재조회돼 `NearbyItem.Place` 인스턴스가 바뀌어도 값이 같으면 같은 답이므로 값으로 잰다.
+     * 실패([SpotRouteState.Error])는 기억하지 않는다 — [다시 시도] 가 실제로 다시 불러야 한다.
+     */
+    private val spotRouteMemory = mutableMapOf<SpotRouteKey, SpotRouteState>()
+
+    private data class SpotRouteKey(
+        val originLat: Double,
+        val originLng: Double,
+        val entryLat: Double,
+        val entryLng: Double,
+        val targetKm: Double,
+        val entryName: String,
+    )
+
     /**
      * 출발지 주변 목록 세대. **조회할 때마다 올라간다.**
      *
@@ -199,10 +224,90 @@ class CourseViewModel(
      * "저장했어요" 가 B 아래에 남아, 아직 안 누른 코스를 저장한 것처럼 읽힌다.
      */
     fun onItemSelect(item: NearbyItem?) {
+        if (_uiState.value.selectedItem == item) return
+        // 다른 것을 골랐으니 이전 스팟의 요청은 끊고 선도 지운다(매핑표 S8)
+        spotRouteJob?.cancel()
         _uiState.update {
-            if (it.selectedItem == item) it
-            else it.copy(selectedItem = item, save = SaveCourseState.Idle)
+            it.copy(selectedItem = item, save = SaveCourseState.Idle, spotRoute = SpotRouteState.Idle)
         }
+        if (item is NearbyItem.Place) requestSpotRoute(item)
+    }
+
+    /** [다시 시도] — 실패한 스팟 경로 요청을 다시 보낸다. 못 만든 것(정상 0건)은 다시 부르지 않는다. */
+    fun onSpotRouteRetry() {
+        val state = _uiState.value
+        if (!state.canRetrySpotRoute) return
+        (state.selectedItem as? NearbyItem.Place)?.let { requestSpotRoute(it) }
+    }
+
+    /**
+     * 고른 걷기 스팟을 진입점으로 순환 경로를 서버에 요청한다. (SPEC §4.11-5 · API 명세 §6-5 · 결정-68)
+     *
+     * **출발지는 그대로다.** `lat/lng` 는 `near` 를 부른 화면 출발지고, 스팟 좌표는
+     * `entryLat/entryLng` 로 간다 — 스팟은 출발지가 아니라 진입점이다(결정-56 유지).
+     * 목록도 재조회하지 않는다.
+     */
+    private fun requestSpotRoute(spot: NearbyItem.Place) {
+        val origin = _uiState.value.origin as? OriginState.Fixed ?: return
+        val targetKm = _uiState.value.targetKm
+        val key = SpotRouteKey(
+            originLat = origin.lat,
+            originLng = origin.lng,
+            entryLat = spot.lat,
+            entryLng = spot.lng,
+            targetKm = targetKm,
+            entryName = spot.name,
+        )
+
+        // 세션 안에서 같은 인자로 본 스팟이면 기억한 답을 그대로 쓴다 — GraphHopper 를 다시 돌리지 않는다.
+        // 기억은 값으로 찾았지만 상태는 **지금 고른 항목**을 들어야 화면 대조가 맞는다
+        spotRouteMemory[key]?.let { remembered ->
+            _uiState.update { it.copy(spotRoute = remembered.withSpot(spot)) }
+            return
+        }
+
+        spotRouteJob?.cancel()
+        // 누르는 순간 "만드는 중" 이어야 한다 — 코루틴이 돌기 전까지 카드가 조용하면 안 눌린 줄 안다
+        _uiState.update { it.copy(spotRoute = SpotRouteState.Loading(spot)) }
+        spotRouteJob = viewModelScope.launch {
+            val result = try {
+                val loop = repository.loop(
+                    lat = origin.lat,
+                    lng = origin.lng,
+                    entryLat = spot.lat,
+                    entryLng = spot.lng,
+                    targetKm = targetKm,
+                    entryName = spot.name,
+                )
+                val route = loop.route
+                if (route == null) SpotRouteState.NotFound(spot)
+                else SpotRouteState.Content(spot, route, loop.attributions)
+            } catch (e: ApiException) {
+                apiFailureLogger("스팟 경로 요청 실패 — ${e.diagnostic()}")
+                SpotRouteState.Error(spot, e.nearbyMessage())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // 계약 밖 예외가 올라오면 코루틴이 죽어 카드가 "만드는 중…" 에 굳는다 — 저장(#252)과
+                // 같은 갈래. 실패로 내려 [다시 시도] 라도 되게 한다
+                apiFailureLogger("스팟 경로 요청 실패 — 계약 밖: ${e.javaClass.simpleName}")
+                SpotRouteState.Error(spot, CourseUiState.SPOT_ROUTE_NOT_FOUND)
+            }
+            if (result !is SpotRouteState.Error) spotRouteMemory[key] = result
+            // 기다리는 사이 다른 것을 골랐으면 이 답은 지금 화면의 것이 아니다.
+            // 기억에는 넣었으니 그 스팟을 다시 고르면 바로 그려진다
+            if (_uiState.value.selectedItem != spot) return@launch
+            _uiState.update { it.copy(spotRoute = result) }
+        }
+    }
+
+    /** 기억한 상태를 지금 고른 항목에 다시 매단다. 좌표는 같아도 목록이 갈리면 인스턴스가 다르다. */
+    private fun SpotRouteState.withSpot(spot: NearbyItem.Place): SpotRouteState = when (this) {
+        is SpotRouteState.Content -> copy(spot = spot)
+        is SpotRouteState.NotFound -> copy(spot = spot)
+        is SpotRouteState.Loading -> copy(spot = spot)
+        is SpotRouteState.Error -> copy(spot = spot)
+        SpotRouteState.Idle -> this
     }
 
     /**
@@ -327,8 +432,11 @@ class CourseViewModel(
         // id 를 재사용하면 남의 결과가 통과한다(#166 리뷰).
         nearbyGeneration++
         nearbyJob?.cancel()
+        // 목록이 갈리면 스팟 경로도 지운다. 기억(`spotRouteMemory`)은 남긴다 — 같은 출발지·거리로
+        // 같은 공원을 다시 고르면 다시 부르지 않는 것이 계약이다(출발지가 바뀌면 키가 달라 다시 부른다)
+        spotRouteJob?.cancel()
         nearbyJob = viewModelScope.launch {
-            _uiState.update { it.copy(nearby = NearbyState.Loading) }
+            _uiState.update { it.copy(nearby = NearbyState.Loading, spotRoute = SpotRouteState.Idle) }
             val state = try {
                 val result = repository.near(
                     lat = origin.lat,

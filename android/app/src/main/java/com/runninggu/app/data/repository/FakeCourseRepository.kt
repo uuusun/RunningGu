@@ -8,9 +8,11 @@ import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
 import com.runninggu.app.data.model.NearbyItem
+import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.domain.LatLng
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * 데모용 코스 스텁. (AP-12 · 매핑표 §12)
@@ -103,6 +105,15 @@ object FakeCourseRepository : CourseRepository {
      * 을 던지면 화면이 오류로 그린다 — 여기서 `ApiException` 을 조립하면 스텁이 와이어
      * 계약을 흉내내기 시작해서, 진짜 서버가 왔을 때 뭐가 스텁이었는지 알기 어려워진다.
      */
+    override suspend fun loop(
+        lat: Double,
+        lng: Double,
+        entryLat: Double,
+        entryLng: Double,
+        targetKm: Double,
+        entryName: String?,
+    ): SpotLoop = fakeSpotLoop(lat, lng, entryLat, entryLng, targetKm, entryName)
+
     override suspend fun detail(courseId: String): CuratedCourseDetail {
         val course = DEMO_COURSES.first { it.courseId == courseId }
         // 데모라 실제 GPX 가 없다 — 시작점 주변으로 그럴듯한 선을 만든다
@@ -196,6 +207,50 @@ object FakeCourseRepository : CourseRepository {
             dataSource = CourseDataSource.GPX_ONLY,
         ),
     )
+}
+
+/**
+ * 걷기 스팟 진입점 순환 경로 스텁. (§6-5)
+ *
+ * 서버 `/api/courses/loop` 가 서기 전까지 S8 의 스팟 탭 흐름을 눈으로 보려고 둔다.
+ * 진입점을 도는 원을 그리고, 이름은 서버 규칙 `{entryName} 주변 {km}km 평지 러닝코스` 를 흉내낸다.
+ */
+private fun fakeSpotLoop(
+    lat: Double,
+    lng: Double,
+    entryLat: Double,
+    entryLng: Double,
+    targetKm: Double,
+    entryName: String?,
+): SpotLoop {
+    val label = entryName?.trim()?.takeIf { it.isNotEmpty() } ?: "출발지"
+    return SpotLoop(
+        route = NearbyItem.Route(
+            routeId = "osm:demo-loop",
+            name = "$label 주변 ${targetKm.toInt()}km 평지 러닝코스",
+            // 출발지에서 진입점까지 — 서버는 실제 거리를 계산하지만 스텁은 평면 근사로 잰다
+            distanceM = distanceMeters(lat, lng, entryLat, entryLng),
+            lat = entryLat,
+            lng = entryLng,
+            dataSource = CourseDataSource.OSM_GENERATED,
+            difficulty = Difficulty.EASY,
+            routeKm = targetKm,
+            durationMin = (targetKm * 1000 / 110).toInt(),
+            gainM = (targetKm * 8).toInt(),
+            elevationProfileM = listOf(10, 11, 13, 12, 10),
+            shortfall = false,
+            pathPolyline = null,
+            path = demoLoop(entryLat, entryLng, targetKm),
+        ),
+        attributions = listOf("© OpenStreetMap contributors"),
+    )
+}
+
+/** 두 좌표 사이 대략 거리(m). 스텁의 `distanceM` 용 — 짧은 거리라 평면 근사로 충분하다. */
+private fun distanceMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Int {
+    val dLatKm = (lat2 - lat1) * 111.0
+    val dLngKm = (lng2 - lng1) * 111.0 * cos(Math.toRadians(lat1)).coerceAtLeast(MIN_COS)
+    return (sqrt(dLatKm * dLatKm + dLngKm * dLngKm) * 1000).toInt()
 }
 
 /**

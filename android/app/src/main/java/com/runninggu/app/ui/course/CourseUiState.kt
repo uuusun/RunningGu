@@ -39,6 +39,14 @@ data class CourseUiState(
      * 주지 않으므로 실제로는 생기지 않는다(§4.11-5).
      */
     val selectedItem: NearbyItem? = null,
+    /**
+     * 고른 걷기 스팟을 진입점으로 서버에 요청한 순환 경로. (SPEC §4.11-5 · API 명세 §6-5 · 결정-68)
+     *
+     * [selectedItem] 이 [NearbyItem.Place] 일 때만 뜻이 있다. 어느 스팟의 것인지를 상태가
+     * 들고 있어서([SpotRouteState.spot]) 다른 스팟을 고른 뒤 늦게 도착한 응답은 화면에
+     * 닿지 않는다 — `mappedRoute` 가 [selectedItem] 과 대조한다.
+     */
+    val spotRoute: SpotRouteState = SpotRouteState.Idle,
     /** [저장] 버튼. (API 명세 §7-A · SPEC §4.11-6) */
     val save: SaveCourseState = SaveCourseState.Idle,
 ) {
@@ -49,9 +57,9 @@ data class CourseUiState(
      * (`CourseViewModel` 이 새 조회마다 지운다) 그때 지도를 비워 두면 목록을 한 번
      * 탭하기 전까지 빈 회색 판이 놓인다. 서버가 거리순으로 준 첫 코스가 기본이다.
      *
-     * **걷기 스팟을 골랐으면 그릴 것이 없다.** 첫 코스로 되돌리면 방금 탭한 것과 아무
-     * 상관 없는 선이 지도에 남는다. §4.11-4 의 번호 핀이 붙기 전까지는 비어 있는 것이
-     * 맞다.
+     * **걷기 스팟을 골랐으면 서버가 그 스팟으로 만든 순환 경로다**(§6-5 · 결정-68). 아직
+     * 안 왔거나 못 만들었으면 null — 첫 코스로 되돌리면 방금 탭한 것과 아무 상관 없는
+     * 선이 지도에 남는다. 그때는 번호 핀이 선다.
      */
     val mappedRoute: NearbyItem.Route?
         get() {
@@ -60,11 +68,67 @@ data class CourseUiState(
                 ?.filterIsInstance<NearbyItem.Route>()
                 ?: return null
             return when (val picked = selectedItem) {
-                is NearbyItem.Place -> null
+                is NearbyItem.Place -> spotRouteFor(picked)
                 is NearbyItem.Route ->
                     routes.firstOrNull { it.routeId == picked.routeId } ?: routes.firstOrNull()
                 null -> routes.firstOrNull()
             }
+        }
+
+    /**
+     * 이 스팟으로 만들어진 경로. **지금 고른 스팟의 것일 때만** 돌려준다.
+     *
+     * A 를 탭해 요청하고 B 를 탭한 뒤 A 응답이 오면 [spotRoute] 는 A 것이다 — 그걸 B 아래에
+     * 그리면 안 된다. 상태가 스팟을 들고 있으니 여기서 대조한다.
+     */
+    private fun spotRouteFor(spot: NearbyItem.Place): NearbyItem.Route? =
+        (spotRoute as? SpotRouteState.Content)?.takeIf { it.spot == spot }?.route
+
+    /**
+     * 카드·버튼 아래에 낼 스팟 경로 안내. 없으면 null. (매핑표 S8 "걷기 스팟 선택")
+     *
+     * 못 만든 것(정상 0건)과 실패(`503`·네트워크)는 **문구가 같다** — 사용자에게는 둘 다
+     * "이 근처엔 자동 경로가 없다" 이고, 다른 점은 실패 쪽에만 [다시 시도] 가 붙는 것뿐이다.
+     * 그건 [canRetrySpotRoute] 가 가른다.
+     */
+    val spotRouteMessage: String?
+        get() {
+            val picked = selectedItem as? NearbyItem.Place ?: return null
+            return when (val state = spotRoute) {
+                is SpotRouteState.NotFound -> SPOT_ROUTE_NOT_FOUND.takeIf { state.spot == picked }
+                is SpotRouteState.Error -> SPOT_ROUTE_NOT_FOUND.takeIf { state.spot == picked }
+                else -> null
+            }
+        }
+
+    /** 고른 스팟의 경로를 만드는 중인가. 카드에 "경로 만드는 중…" 을 낸다. */
+    val spotRouteLoading: Boolean
+        get() {
+            val picked = selectedItem as? NearbyItem.Place ?: return false
+            return (spotRoute as? SpotRouteState.Loading)?.spot == picked
+        }
+
+    /** 고른 스팟의 요청이 **실패**해서 [다시 시도] 를 낼 것인가. 못 만든 것(정상 0건)은 아니다. */
+    val canRetrySpotRoute: Boolean
+        get() {
+            val picked = selectedItem as? NearbyItem.Place ?: return false
+            return (spotRoute as? SpotRouteState.Error)?.spot == picked
+        }
+
+    /**
+     * 목록 하단 출처. `near` 의 것에 스팟 경로의 OSM 문구가 **합류**한다. (§6-5 · 결정-44)
+     *
+     * 이미 있는 문구는 두 번 적지 않는다. 순서·문구는 바꾸지 않는다.
+     */
+    val displayedAttributions: List<String>
+        get() {
+            val base = (nearby as? NearbyState.Content)?.attributions.orEmpty()
+            val picked = selectedItem as? NearbyItem.Place ?: return base
+            val extra = (spotRoute as? SpotRouteState.Content)
+                ?.takeIf { it.spot == picked }
+                ?.attributions
+                .orEmpty()
+            return base + extra.filterNot { it in base }
         }
 
     /**
@@ -107,6 +171,8 @@ data class CourseUiState(
     val activePinId: String?
         get() {
             if (selectedItem !is NearbyItem.Place) return null
+            // 스팟 경로가 그려졌으면 핀이 없다 — 선과 핀을 같이 그리지 않는다
+            if (mappedRoute != null) return null
             val items = (nearby as? NearbyState.Content)?.items ?: return null
             val index = items.indexOf(selectedItem)
             return if (index >= 0) pinId(index) else null
@@ -164,8 +230,66 @@ data class CourseUiState(
      * 그래서 P0 에서 할 수 있는 것은 **지도에서 위치를 보는 것까지**다. 문제는 그게
      * 화면 어디에도 안 적혀 있었다는 것이다 — 12곳을 "이 근처에서 뛸 만한 곳" 이라고
      * 보여주고, 눌러도 [저장] 이 회색인 채로 아무 말이 없었다(#269 관찰).
+     *
+     * **경로가 만들어진 스팟에서는 내리지 않는다**(§6-5 · 매핑표 S8). 그 스팟은 이제
+     * 저장할 수 있다 — [selectedRoute] 가 그 경로다. 만드는 중에도 내리지 않는다 —
+     * "만드는 중" 과 "저장할 수 없어요" 가 같이 보이면 서로 어긋난다.
      */
-    val walkSpotPicked: Boolean get() = selectedItem is NearbyItem.Place
+    val walkSpotPicked: Boolean
+        get() = selectedItem is NearbyItem.Place && mappedRoute == null && !spotRouteLoading
+
+    /**
+     * 버튼 아래 "이 근처엔 따라갈 경로가 없어요" 를 낼지. (§4.11-6)
+     *
+     * [NearbyState.Content.hasNoRoute] 는 `near` 목록만 본다. 서울처럼 목록이 걷기 스팟뿐이어도
+     * 스팟을 탭해 순환 경로가 만들어졌으면(§6-5) 지금 화면엔 따라갈 경로가 있다 — 그 위에
+     * [저장] 이 켜지고 지도에 선이 그려졌는데 바로 아래에 "없어요" 가 남으면 서로 어긋난다(#356 리뷰).
+     * 그래서 `near` 에 경로가 없고 **지금 그릴 경로도 없을 때만** 낸다.
+     *
+     * **스팟을 고른 동안에는 아예 내지 않는다.** 이 문구는 목록에 대한 말인데, 스팟을 탭한 뒤에는
+     * 그 스팟에 대한 답이 카드와 [spotRouteMessage] 로 따로 나온다 — 못 만들었으면
+     * "자동 경로를 못 만들었어요 [다시 시도]" 가 뜨는데 그 아래 "따라갈 경로가 없어요" 까지 있으면
+     * 같은 말이 두 번이고, "없다면서 뭘 다시 시도하나" 가 된다(#356 리뷰 · 건모).
+     */
+    val showsNoRouteNotice: Boolean
+        get() = (nearby as? NearbyState.Content)?.hasNoRoute == true &&
+            mappedRoute == null &&
+            selectedItem !is NearbyItem.Place
+
+    companion object {
+        /** 못 만든 것과 실패 둘 다 이 문구다(매핑표 S8). */
+        const val SPOT_ROUTE_NOT_FOUND = "이 근처엔 자동 경로를 못 만들었어요."
+    }
+}
+
+/**
+ * 걷기 스팟을 진입점으로 요청한 순환 경로. (API 명세 §6-5 · 결정-68)
+ *
+ * 모든 갈래가 **어느 스팟의 것인지**([spot])를 든다. 스팟에는 서버 id 가 없어(§6-1) 항목
+ * 자체로 대조한다 — 같은 장소가 목록에 두 번 오지 않으므로 충분하다.
+ *
+ * **못 만듦과 실패를 가른다.** 품질 상한을 통과한 후보가 없는 것은 서버가 `route: null`
+ * 로 주는 정상 결과다 — 다시 불러도 같다(서버가 0건도 5분 캐시한다). 실패는 `503`·
+ * 네트워크라 [다시 시도] 가 뜻이 있다.
+ */
+sealed interface SpotRouteState {
+    /** 스팟을 고르지 않았거나 목록이 갈려 지웠다. */
+    data object Idle : SpotRouteState
+
+    data class Loading(val spot: NearbyItem.Place) : SpotRouteState
+
+    data class Content(
+        val spot: NearbyItem.Place,
+        /** `near` 의 `ROUTE` 와 같은 모양. `lat/lng` 는 경로 시작점(≈ 스팟)이고 저장은 이 값으로 한다. */
+        val route: NearbyItem.Route,
+        val attributions: List<String>,
+    ) : SpotRouteState
+
+    /** 서버가 `route: null` — 정상 0건. 핀은 그대로 두고 문구만 낸다. */
+    data class NotFound(val spot: NearbyItem.Place) : SpotRouteState
+
+    /** `503`·네트워크. 같은 문구 + [다시 시도]. */
+    data class Error(val spot: NearbyItem.Place, val message: String) : SpotRouteState
 }
 
 /**
@@ -222,7 +346,12 @@ sealed interface NearbyState {
         /** 일부 원천이 실패했다. 목록은 보여주되 비차단 안내를 함께 낸다. */
         val degradedSources: List<CourseSource> = emptyList(),
     ) : NearbyState {
-        /** 따라갈 경로가 하나도 없다 — 버튼 아래 안내를 붙인다. (§4.11-6) */
+        /**
+         * `near` 목록에 따라갈 경로가 하나도 없다. (§4.11-6)
+         *
+         * 화면 안내는 이걸 바로 쓰지 않고 [CourseUiState.showsNoRouteNotice] 를 거친다 —
+         * 스팟으로 만든 순환 경로(§6-5)는 이 목록 밖에 있어서 여기서는 안 보인다.
+         */
         val hasNoRoute: Boolean get() = items.none { it is NearbyItem.Route }
 
         /**

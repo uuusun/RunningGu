@@ -5,6 +5,8 @@ import com.runninggu.app.data.model.CourseRegion
 import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.CuratedCourseDetail
 import com.runninggu.app.data.remote.dto.CourseDetailDto
+import com.runninggu.app.data.remote.dto.CourseLoopDto
+import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.data.model.CourseSummary
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyCourses
@@ -24,6 +26,16 @@ fun CoursesNearDto.toNearbyCourses(): NearbyCourses = NearbyCourses(
     // 서버가 이미 distanceM 오름차순으로 섞어 줬다 — 다시 정렬하지 않는다(§6-1)
     items = items.map { it.toModel() },
     degradedSources = degradedSources.mapNotNull(::courseSourceOf),
+    attributions = attributions,
+)
+
+/**
+ * 순환 경로 응답 → 모델. (§6-5)
+ *
+ * `route` 는 `near` 의 `ROUTE` 와 같은 매퍼를 지난다 — 폴리라인 디코딩·enum 해석이 한 곳이다.
+ */
+fun CourseLoopDto.toSpotLoop(): SpotLoop = SpotLoop(
+    route = route?.toModel() as NearbyItem.Route?,
     attributions = attributions,
 )
 

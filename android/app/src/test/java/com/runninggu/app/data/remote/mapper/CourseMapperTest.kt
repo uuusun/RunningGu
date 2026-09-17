@@ -5,6 +5,7 @@ import com.runninggu.app.data.model.CourseSource
 import com.runninggu.app.data.model.Difficulty
 import com.runninggu.app.data.model.NearbyItem
 import com.runninggu.app.data.remote.ApiJson
+import com.runninggu.app.data.remote.dto.CourseLoopDto
 import com.runninggu.app.data.remote.dto.CoursePageDto
 import com.runninggu.app.data.remote.dto.CourseRegionsDto
 import com.runninggu.app.data.remote.dto.CoursesNearDto
@@ -106,6 +107,52 @@ class CourseMapperTest {
 
         assertTrue(route.path.isEmpty())
         assertEquals("폴리라인 아님", route.pathPolyline)
+    }
+
+    /** 명세 §6-5 응답 예시 그대로. `route` 는 §6-1 `ROUTE` 와 같은 모양이다. */
+    private val loopJson = """
+        {
+          "route": {
+            "kind": "ROUTE",
+            "routeId": "osm:7f1c0a9e2b31",
+            "dataSource": "OSM_GENERATED",
+            "name": "여의도공원 주변 5km 평지 러닝코스",
+            "distanceM": 650,
+            "lat": 37.5264, "lng": 126.9227,
+            "difficulty": "EASY",
+            "routeKm": 5.06, "durationMin": 46,
+            "gainM": 21,
+            "elevationProfileM": [12, 13, 15, 14, 12],
+            "shortfall": false,
+            "pathPolyline": "$realPolyline"
+          },
+          "attributions": ["© OpenStreetMap contributors"]
+        }
+    """.trimIndent()
+
+    @Test
+    fun `스팟 순환 경로는 near 의 ROUTE 와 같은 매퍼를 지난다`() {
+        // §6-5 — 새 DTO 를 만들지 않고 ROUTE 매퍼를 그대로 쓴다. 폴리라인도 같은 자리에서 풀린다
+        val loop = ApiJson.decodeFromString(CourseLoopDto.serializer(), loopJson).toSpotLoop()
+
+        val route = loop.route!!
+        assertEquals("osm:7f1c0a9e2b31", route.routeId)
+        assertEquals("여의도공원 주변 5km 평지 러닝코스", route.name)
+        assertEquals(CourseDataSource.OSM_GENERATED, route.dataSource)
+        assertEquals(650, route.distanceM)
+        assertEquals(37.5264, route.lat, 1e-9)
+        assertEquals(5.06, route.routeKm, 1e-9)
+        assertEquals(3, route.path.size)
+        assertEquals(realPolyline, route.pathPolyline)
+        assertEquals(listOf("© OpenStreetMap contributors"), loop.attributions)
+    }
+
+    @Test
+    fun `스팟 순환 경로가 null 이면 정상 0건으로 읽는다`() {
+        // §6-5 — 품질 상한을 통과한 후보가 없으면 `route: null` 이고 실패가 아니다
+        val loop = ApiJson.decodeFromString(CourseLoopDto.serializer(), """{"route": null, "attributions": []}""").toSpotLoop()
+        assertNull(loop.route)
+        assertTrue(loop.attributions.isEmpty())
     }
 
     @Test
