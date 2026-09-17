@@ -56,6 +56,11 @@ class PlanRangeRuleTest {
         val seven = custom(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 18))
         assertEquals(WizardUiState.MAX_TRIP_DAYS, seven.dayCount)
         assertTrue(seven.canProceed)
+
+        // 정확히 8일은 안 된다 — 경계 하루 차이(off-by-one)를 여기서 지킨다 (#360 리뷰)
+        val eight = custom(LocalDate.of(2026, 10, 11), LocalDate.of(2026, 10, 18))
+        assertEquals(WizardUiState.MAX_TRIP_DAYS + 1, eight.dayCount)
+        assertFalse(eight.canProceed)
     }
 
     @Test
