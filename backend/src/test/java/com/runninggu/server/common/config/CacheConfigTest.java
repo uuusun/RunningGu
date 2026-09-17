@@ -21,6 +21,15 @@ class CacheConfigTest {
         assertCachePolicy(cacheManager.getCache(CacheConfig.POI_CACHE), 2_000, 5);
     }
 
+    @Test
+    void 순환_경로_geometry_캐시는_최대_2000건을_5분간_보관한다() {
+        var cacheManager = new CacheConfig().cacheManager();
+        assertCachePolicy(
+                cacheManager.getCache(CacheConfig.COURSE_LOOP_GEOMETRY_CACHE),
+                2_000,
+                5);
+    }
+
     private void assertCachePolicy(
             org.springframework.cache.Cache cache,
             long maximumSize,

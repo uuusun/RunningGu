@@ -1,6 +1,7 @@
 package com.runninggu.server.course.api;
 
 import com.runninggu.server.course.application.CourseCatalog;
+import com.runninggu.server.course.application.CourseLoopService;
 import com.runninggu.server.course.application.CourseNearService;
 import java.math.BigDecimal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,10 +21,15 @@ public class CourseController {
 
     private final CourseCatalog catalog;
     private final CourseNearService nearService;
+    private final CourseLoopService loopService;
 
-    public CourseController(CourseCatalog catalog, CourseNearService nearService) {
+    public CourseController(
+            CourseCatalog catalog,
+            CourseNearService nearService,
+            CourseLoopService loopService) {
         this.catalog = catalog;
         this.nearService = nearService;
+        this.loopService = loopService;
     }
 
     @Operation(summary = "출발지 주변 경로·장소 통합 목록 조회")
@@ -40,6 +46,31 @@ public class CourseController {
             @RequestParam(defaultValue = "12") int size) {
         return CourseNearResponse.from(
                 nearService.find(lat, lng, targetKm, radiusKm, size));
+    }
+
+    @Operation(summary = "걷기 스팟 진입점 순환 경로 생성")
+    @GetMapping("/loop")
+    public CourseLoopResponse loop(
+            @Parameter(description = "화면에서 선택한 출발지 위도")
+                    @RequestParam
+                    BigDecimal lat,
+            @Parameter(description = "화면에서 선택한 출발지 경도")
+                    @RequestParam
+                    BigDecimal lng,
+            @Parameter(description = "순환 경로 진입점 위도")
+                    @RequestParam
+                    BigDecimal entryLat,
+            @Parameter(description = "순환 경로 진입점 경도")
+                    @RequestParam
+                    BigDecimal entryLng,
+            @Parameter(description = "목표 거리(km), 1~21 범위의 0.5 단위")
+                    @RequestParam
+                    BigDecimal targetKm,
+            @Parameter(description = "경로 이름에만 사용하는 걷기 스팟 이름")
+                    @RequestParam(required = false)
+                    String entryName) {
+        return CourseLoopResponse.from(
+                loopService.find(lat, lng, entryLat, entryLng, targetKm, entryName));
     }
 
     @Operation(summary = "지역별 코스 목록 조회")

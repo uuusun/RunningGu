@@ -121,20 +121,8 @@ public class CourseNearService {
             BigDecimal targetKm,
             BigDecimal radiusKm,
             int size) {
-        if (lat == null
-                || lat.compareTo(BigDecimal.valueOf(-90)) < 0
-                || lat.compareTo(BigDecimal.valueOf(90)) > 0
-                || lng == null
-                || lng.compareTo(BigDecimal.valueOf(-180)) < 0
-                || lng.compareTo(BigDecimal.valueOf(180)) > 0) {
-            throw validation("lat/lng는 WGS84 좌표 범위여야 합니다.");
-        }
-        if (targetKm == null
-                || targetKm.compareTo(BigDecimal.ONE) < 0
-                || targetKm.compareTo(BigDecimal.valueOf(21)) > 0
-                || targetKm.multiply(BigDecimal.TWO).stripTrailingZeros().scale() > 0) {
-            throw validation("targetKm는 1~21km 범위의 0.5km 단위여야 합니다.");
-        }
+        CourseRequestValidator.validateCoordinates(lat, lng, "lat/lng");
+        CourseRequestValidator.validateTargetKm(targetKm);
         if (radiusKm == null
                 || radiusKm.compareTo(BigDecimal.ZERO) <= 0
                 || !Double.isFinite(radiusKm.doubleValue())) {
