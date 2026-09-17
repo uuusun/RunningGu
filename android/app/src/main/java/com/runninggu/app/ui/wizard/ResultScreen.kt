@@ -1,5 +1,6 @@
 package com.runninggu.app.ui.wizard
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -337,6 +338,11 @@ private fun Content(
     onReplaceBlock: (ItineraryBlock) -> Unit,
     onAddPlace: () -> Unit,
 ) {
+    // 편집 중 시스템 back 은 화면을 나가는 게 아니라 **편집을 푼다**(SPEC §3-3 "해제 우선").
+    // 후보 시트는 ModalBottomSheet 가 스스로 닫히지만 편집 모드는 이게 없으면 S6 으로
+    // 나가 버려 고친 순서·추가가 사라진다 (#358 · QA H-13).
+    BackHandler(enabled = state.isEditing, onBack = onToggleEdit)
+
     // 스와이프로 삭제 버튼을 연 행. 화면에 하나만 열려 있고, 바깥을 건드리면 닫힌다.
     var openedBlockId by remember(state.isEditing) { mutableStateOf<String?>(null) }
 
