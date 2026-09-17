@@ -31,6 +31,7 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$['paths']['/api/courses']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/courses/regions']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/courses/near']['get']").exists())
+                .andExpect(jsonPath("$['paths']['/api/courses/loop']['get']").exists())
                 .andExpect(jsonPath("$['paths']['/api/courses/{courseId}']['get']").exists())
                 .andExpect(jsonPath("$.components.schemas.CourseDetailResponse.properties.pathPolyline").exists())
                 .andExpect(jsonPath("$.components.schemas.CourseDetailResponse.properties.elevationProfileM").exists())
@@ -128,6 +129,9 @@ class OpenApiIntegrationTest extends PostgreSqlContainerSupport {
                         .isNotEmpty())
                 .andExpect(jsonPath("$.components.schemas.CourseNearResponse").exists())
                 .andExpect(jsonPath("$.components.schemas.CourseNearItemResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.CourseLoopResponse").exists())
+                .andExpect(jsonPath("$.components.schemas.CourseLoopResponse.properties.route")
+                        .exists())
                 .andExpect(jsonPath("$.components.schemas.AuthUserResponse.properties.email.type"
                                 + "[?(@ == 'null')]")
                         .isNotEmpty())

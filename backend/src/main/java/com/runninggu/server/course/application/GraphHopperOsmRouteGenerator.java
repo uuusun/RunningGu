@@ -1,18 +1,12 @@
 package com.runninggu.server.course.application;
 
-import com.runninggu.server.course.domain.CourseDataSource;
 import com.runninggu.server.course.domain.CourseDifficulty;
 import com.runninggu.server.course.domain.CoursePoint;
 import com.runninggu.server.course.domain.E5PolylineEncoder;
-import com.runninggu.server.course.domain.GeoDistance;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -125,30 +119,20 @@ public class GraphHopperOsmRouteGenerator implements OsmRouteGenerator {
         List<CoursePoint> points = toCoursePoints(candidate.coordinates());
         String pathPolyline = polylineEncoder.encode(points);
         OsmRouteCoordinate entry = candidate.coordinates().getFirst();
-        int accessM = Math.max(0, Math.toIntExact(Math.round(GeoDistance.meters(
-                inputLat,
-                inputLng,
-                entry.lat(),
-                entry.lng()))));
-        int durationMin = Math.max(
-                1,
-                routeKm.multiply(BigDecimal.valueOf(1_000))
-                        .divide(BigDecimal.valueOf(110), 0, RoundingMode.HALF_UP)
-                        .intValueExact());
-        return new OsmGeneratedRoute(
-                routeId(pathPolyline),
-                CourseDataSource.OSM_GENERATED,
-                name(targetKm, difficulty),
-                accessM,
+        OsmRouteGeometry geometry = new OsmRouteGeometry(
                 entry.lat(),
                 entry.lng(),
                 difficulty,
                 routeKm,
-                durationMin,
                 gainM,
                 elevationProfile(points),
-                candidate.distanceM() < targetKm.doubleValue() * 1_000.0 - 300.0,
                 pathPolyline);
+        return OsmGeneratedRouteFactory.create(
+                geometry,
+                inputLat,
+                inputLng,
+                targetKm,
+                null);
     }
 
     private List<CoursePoint> toCoursePoints(List<OsmRouteCoordinate> coordinates) {
@@ -185,20 +169,4 @@ public class GraphHopperOsmRouteGenerator implements OsmRouteGenerator {
         return List.copyOf(samples);
     }
 
-    /** 사용자 선택 출발지 기준 이름이며 기존 저장 snapshot은 소급 변경하지 않는다. (SPEC §4.11, 결정-56) */
-    private String name(BigDecimal targetKm, CourseDifficulty difficulty) {
-        String target = targetKm.stripTrailingZeros().toPlainString();
-        String label = difficulty == CourseDifficulty.EASY ? "평지" : "완만";
-        return "출발지 주변 " + target + "km " + label + " 러닝코스";
-    }
-
-    private String routeId(String pathPolyline) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(pathPolyline.getBytes(StandardCharsets.UTF_8));
-            return "osm:" + HexFormat.of().formatHex(digest, 0, 6);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", exception);
-        }
-    }
 }

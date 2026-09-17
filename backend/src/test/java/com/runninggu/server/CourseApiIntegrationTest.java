@@ -12,6 +12,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import com.runninggu.server.common.config.CacheConfig;
 import com.runninggu.server.course.application.OsmGeneratedRoute;
@@ -19,6 +21,7 @@ import com.runninggu.server.course.application.OsmRouteGenerator;
 import com.runninggu.server.course.application.OsmRouteSearchResult;
 import com.runninggu.server.course.domain.CourseDataSource;
 import com.runninggu.server.course.domain.CourseDifficulty;
+import com.runninggu.server.course.domain.GeoDistance;
 import com.runninggu.server.poi.application.KakaoPoiSource;
 import com.runninggu.server.poi.application.PoiSearchCriteria;
 import com.runninggu.server.poi.application.PoiSourceException;
@@ -61,6 +64,7 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
         given(osmRouteGenerator.generate(any(), any(), any()))
                 .willReturn(OsmRouteSearchResult.normal(Optional.empty()));
         cacheManager.getCache(CacheConfig.WALKING_SPOTS_CACHE).clear();
+        cacheManager.getCache(CacheConfig.COURSE_LOOP_GEOMETRY_CACHE).clear();
     }
 
     @Test
@@ -289,6 +293,128 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
+    void 걷기_스팟을_진입점으로_OSM_순환_경로를_만든다() throws Exception {
+        given(osmRouteGenerator.generate(
+                        eq(new BigDecimal("37.5264")),
+                        eq(new BigDecimal("126.9227")),
+                        eq(new BigDecimal("5"))))
+                .willReturn(OsmRouteSearchResult.normal(Optional.of(osmLoopSourceRoute())));
+        int expectedDistanceM = Math.toIntExact(Math.round(GeoDistance.meters(
+                new BigDecimal("37.5200"),
+                new BigDecimal("126.9200"),
+                new BigDecimal("37.5264"),
+                new BigDecimal("126.9227"))));
+
+        mockMvc.perform(get("/api/courses/loop")
+                        .param("lat", "37.5200")
+                        .param("lng", "126.9200")
+                        .param("entryLat", "37.5264")
+                        .param("entryLng", "126.9227")
+                        .param("targetKm", "5")
+                        .param("entryName", "여의도공원"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.route.kind").value("ROUTE"))
+                .andExpect(jsonPath("$.route.routeId").isString())
+                .andExpect(jsonPath("$.route.dataSource").value("OSM_GENERATED"))
+                .andExpect(jsonPath("$.route.name").value("여의도공원 주변 5km 평지 러닝코스"))
+                .andExpect(jsonPath("$.route.distanceM").value(expectedDistanceM))
+                .andExpect(jsonPath("$.route.lat").value(37.5264))
+                .andExpect(jsonPath("$.route.lng").value(126.9227))
+                .andExpect(jsonPath("$.route.routeKm").value(5.06))
+                .andExpect(jsonPath("$.route.durationMin").value(46))
+                .andExpect(jsonPath("$.route.gainM").value(21))
+                .andExpect(jsonPath("$.route.elevationProfileM", contains(12, 13, 12)))
+                .andExpect(jsonPath("$.route.shortfall").value(false))
+                .andExpect(jsonPath("$.route.pathPolyline").value("???"))
+                .andExpect(jsonPath("$.route.sourceCourseId").doesNotExist())
+                .andExpect(jsonPath("$.route.category").doesNotExist())
+                .andExpect(jsonPath(
+                        "$.attributions",
+                        contains("© OpenStreetMap contributors")));
+    }
+
+    @Test
+    void 순환_경로_geometry만_캐시하고_출발지_거리와_이름은_매번_다시_조합한다()
+            throws Exception {
+        given(osmRouteGenerator.generate(any(), any(), any()))
+                .willReturn(OsmRouteSearchResult.normal(Optional.of(osmLoopSourceRoute())));
+
+        mockMvc.perform(get("/api/courses/loop")
+                        .param("lat", "37.5264")
+                        .param("lng", "126.9227")
+                        .param("entryLat", "37.52641")
+                        .param("entryLng", "126.92271")
+                        .param("targetKm", "5")
+                        .param("entryName", "첫 공원"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.route.name").value("첫 공원 주변 5km 평지 러닝코스"))
+                .andExpect(jsonPath("$.route.distanceM").value(0));
+
+        int secondDistanceM = Math.toIntExact(Math.round(GeoDistance.meters(
+                new BigDecimal("37.5200"),
+                new BigDecimal("126.9200"),
+                new BigDecimal("37.5264"),
+                new BigDecimal("126.9227"))));
+        mockMvc.perform(get("/api/courses/loop")
+                        .param("lat", "37.5200")
+                        .param("lng", "126.9200")
+                        .param("entryLat", "37.52644")
+                        .param("entryLng", "126.92274")
+                        .param("targetKm", "5.0")
+                        .param("entryName", "둘째 공원"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.route.name").value("둘째 공원 주변 5km 평지 러닝코스"))
+                .andExpect(jsonPath("$.route.distanceM").value(secondDistanceM));
+
+        verify(osmRouteGenerator, times(1)).generate(any(), any(), any());
+    }
+
+    @Test
+    void 순환_경로_정상_0건은_캐시한다() throws Exception {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(get("/api/courses/loop")
+                            .param("lat", "37.5200")
+                            .param("lng", "126.9200")
+                            .param("entryLat", "37.5264")
+                            .param("entryLng", "126.9227")
+                            .param("targetKm", "5"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.route").value(nullValue()))
+                    .andExpect(jsonPath("$.attributions", hasSize(0)));
+        }
+
+        verify(osmRouteGenerator, times(1)).generate(any(), any(), any());
+    }
+
+    @Test
+    void 순환_경로_원천_실패는_부분_후보가_있어도_503이고_캐시하지_않는다()
+            throws Exception {
+        given(osmRouteGenerator.generate(any(), any(), any()))
+                .willReturn(OsmRouteSearchResult.degraded(Optional.of(osmLoopSourceRoute())));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(get("/api/courses/loop")
+                            .param("lat", "37.5200")
+                            .param("lng", "126.9200")
+                            .param("entryLat", "37.5264")
+                            .param("entryLng", "126.9227")
+                            .param("targetKm", "5"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value("COURSE_SOURCES_UNAVAILABLE"))
+                    .andExpect(jsonPath("$.instance").value("/api/courses/loop"));
+        }
+
+        verify(osmRouteGenerator, times(2)).generate(any(), any(), any());
+    }
+
+    @Test
+    void 순환_경로_출발지와_진입점과_목표거리_범위를_검증한다() throws Exception {
+        assertLoopValidationFailed("91", "126.92", "37.52", "126.93", "5");
+        assertLoopValidationFailed("37.52", "126.92", "37.52", "181", "5");
+        assertLoopValidationFailed("37.52", "126.92", "37.52", "126.93", "1.25");
+    }
+
+    @Test
     void 출발지_주변_요청값_범위를_검증한다() throws Exception {
         assertNearValidationFailed("targetKm", "1.25");
         assertNearValidationFailed("targetKm", "21.5");
@@ -315,6 +441,22 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
                         .param("lat", "37.57")
                         .param("lng", "126.98")
                         .param(name, value))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    private void assertLoopValidationFailed(
+            String lat,
+            String lng,
+            String entryLat,
+            String entryLng,
+            String targetKm) throws Exception {
+        mockMvc.perform(get("/api/courses/loop")
+                        .param("lat", lat)
+                        .param("lng", lng)
+                        .param("entryLat", entryLat)
+                        .param("entryLng", entryLng)
+                        .param("targetKm", targetKm))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
@@ -346,6 +488,23 @@ class CourseApiIntegrationTest extends PostgreSqlContainerSupport {
                 46,
                 20,
                 List.of(10, 20, 10),
+                false,
+                "???");
+    }
+
+    private OsmGeneratedRoute osmLoopSourceRoute() {
+        return new OsmGeneratedRoute(
+                "osm:discarded",
+                CourseDataSource.OSM_GENERATED,
+                "캐시하면 안 되는 이름",
+                999,
+                new BigDecimal("37.5264"),
+                new BigDecimal("126.9227"),
+                CourseDifficulty.EASY,
+                new BigDecimal("5.06"),
+                46,
+                21,
+                List.of(12, 13, 12),
                 false,
                 "???");
     }

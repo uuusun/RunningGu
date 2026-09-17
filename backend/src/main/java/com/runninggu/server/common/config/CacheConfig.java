@@ -19,6 +19,7 @@ public class CacheConfig {
     public static final String FESTIVAL_OFFICIAL_URL_CACHE = "festivalOfficialUrl";
     public static final String POI_CACHE = "poi";
     public static final String WALKING_SPOTS_CACHE = "walkingSpots";
+    public static final String COURSE_LOOP_GEOMETRY_CACHE = "courseLoopGeometry";
 
     @Bean
     public CacheManager cacheManager() {
@@ -57,6 +58,12 @@ public class CacheConfig {
                         .build());
         cacheManager.registerCustomCache(
                 WALKING_SPOTS_CACHE,
+                Caffeine.newBuilder()
+                        .maximumSize(2_000)
+                        .expireAfterWrite(Duration.ofMinutes(5))
+                        .build());
+        cacheManager.registerCustomCache(
+                COURSE_LOOP_GEOMETRY_CACHE,
                 Caffeine.newBuilder()
                         .maximumSize(2_000)
                         .expireAfterWrite(Duration.ofMinutes(5))
