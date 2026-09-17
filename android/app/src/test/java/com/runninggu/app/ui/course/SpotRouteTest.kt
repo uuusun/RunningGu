@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -284,10 +285,36 @@ class SpotRouteTest {
         assertTrue(vm.uiState.value.canSave)
         assertFalse(vm.uiState.value.showsNoRouteNotice)
 
-        // 못 만든 스팟으로 옮기면 다시 뜬다 — 지금 화면에 그릴 경로가 없다
+        // 못 만든 스팟으로 옮겨도 목록 안내는 내린 채다 — 그 스팟에 대한 답이 따로 말한다
         vm.onItemSelect(otherPark)
         advanceUntilIdle()
         assertNull(vm.uiState.value.mappedRoute)
+        assertEquals(CourseUiState.SPOT_ROUTE_NOT_FOUND, vm.uiState.value.spotRouteMessage)
+        assertFalse(vm.uiState.value.showsNoRouteNotice)
+    }
+
+    @Test
+    fun `스팟을 고른 동안에는 목록 안내와 스팟 안내가 겹치지 않는다`() = runTest(dispatcher) {
+        val repo = LoopStub(items = listOf(park), answer = { throw IllegalStateException("서버 없음") })
+        val vm = ready(repo)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.showsNoRouteNotice)
+
+        // 만드는 중 — 카드가 "경로 만드는 중…" 을 말하는 동안 "없어요" 는 내린다
+        vm.onItemSelect(park)
+        assertTrue(vm.uiState.value.spotRouteLoading)
+        assertFalse(vm.uiState.value.showsNoRouteNotice)
+
+        // 실패 — "못 만들었어요 [다시 시도]" 하나만 남는다. 그 아래 "없어요" 까지 있으면 같은 말이 둘이다
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.canRetrySpotRoute)
+        assertNotNull(vm.uiState.value.spotRouteMessage)
+        assertFalse(vm.uiState.value.showsNoRouteNotice)
+
+        // 스팟 선택을 풀면 목록 안내가 돌아온다
+        vm.onItemSelect(null)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.spotRouteMessage)
         assertTrue(vm.uiState.value.showsNoRouteNotice)
     }
 

@@ -245,9 +245,16 @@ data class CourseUiState(
      * 스팟을 탭해 순환 경로가 만들어졌으면(§6-5) 지금 화면엔 따라갈 경로가 있다 — 그 위에
      * [저장] 이 켜지고 지도에 선이 그려졌는데 바로 아래에 "없어요" 가 남으면 서로 어긋난다(#356 리뷰).
      * 그래서 `near` 에 경로가 없고 **지금 그릴 경로도 없을 때만** 낸다.
+     *
+     * **스팟을 고른 동안에는 아예 내지 않는다.** 이 문구는 목록에 대한 말인데, 스팟을 탭한 뒤에는
+     * 그 스팟에 대한 답이 카드와 [spotRouteMessage] 로 따로 나온다 — 못 만들었으면
+     * "자동 경로를 못 만들었어요 [다시 시도]" 가 뜨는데 그 아래 "따라갈 경로가 없어요" 까지 있으면
+     * 같은 말이 두 번이고, "없다면서 뭘 다시 시도하나" 가 된다(#356 리뷰 · 건모).
      */
     val showsNoRouteNotice: Boolean
-        get() = (nearby as? NearbyState.Content)?.hasNoRoute == true && mappedRoute == null
+        get() = (nearby as? NearbyState.Content)?.hasNoRoute == true &&
+            mappedRoute == null &&
+            selectedItem !is NearbyItem.Place
 
     companion object {
         /** 못 만든 것과 실패 둘 다 이 문구다(매핑표 S8). */
