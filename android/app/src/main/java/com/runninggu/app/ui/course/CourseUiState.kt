@@ -238,6 +238,17 @@ data class CourseUiState(
     val walkSpotPicked: Boolean
         get() = selectedItem is NearbyItem.Place && mappedRoute == null && !spotRouteLoading
 
+    /**
+     * 버튼 아래 "이 근처엔 따라갈 경로가 없어요" 를 낼지. (§4.11-6)
+     *
+     * [NearbyState.Content.hasNoRoute] 는 `near` 목록만 본다. 서울처럼 목록이 걷기 스팟뿐이어도
+     * 스팟을 탭해 순환 경로가 만들어졌으면(§6-5) 지금 화면엔 따라갈 경로가 있다 — 그 위에
+     * [저장] 이 켜지고 지도에 선이 그려졌는데 바로 아래에 "없어요" 가 남으면 서로 어긋난다(#356 리뷰).
+     * 그래서 `near` 에 경로가 없고 **지금 그릴 경로도 없을 때만** 낸다.
+     */
+    val showsNoRouteNotice: Boolean
+        get() = (nearby as? NearbyState.Content)?.hasNoRoute == true && mappedRoute == null
+
     companion object {
         /** 못 만든 것과 실패 둘 다 이 문구다(매핑표 S8). */
         const val SPOT_ROUTE_NOT_FOUND = "이 근처엔 자동 경로를 못 만들었어요."
@@ -328,7 +339,12 @@ sealed interface NearbyState {
         /** 일부 원천이 실패했다. 목록은 보여주되 비차단 안내를 함께 낸다. */
         val degradedSources: List<CourseSource> = emptyList(),
     ) : NearbyState {
-        /** 따라갈 경로가 하나도 없다 — 버튼 아래 안내를 붙인다. (§4.11-6) */
+        /**
+         * `near` 목록에 따라갈 경로가 하나도 없다. (§4.11-6)
+         *
+         * 화면 안내는 이걸 바로 쓰지 않고 [CourseUiState.showsNoRouteNotice] 를 거친다 —
+         * 스팟으로 만든 순환 경로(§6-5)는 이 목록 밖에 있어서 여기서는 안 보인다.
+         */
         val hasNoRoute: Boolean get() = items.none { it is NearbyItem.Route }
 
         /**

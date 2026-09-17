@@ -73,13 +73,24 @@ class CourseViewModel(
     /**
      * 한 세션 안에서 같은 스팟은 **다시 부르지 않는다**(매핑표 S8 "걷기 스팟 선택").
      *
-     * 키는 진입점 좌표 + 목표 거리다 — 서버 캐시 키(§6-5)와 같은 뜻이다. 목록이 재조회돼
-     * `NearbyItem.Place` 인스턴스가 바뀌어도 같은 공원이면 같은 답이므로 좌표로 잰다.
+     * 키는 **요청 인자 전부**다 — 출발지 좌표 + 진입점 좌표 + 목표 거리 + 스팟 이름.
+     * 서버 캐시 키(§6-5)는 진입점 + 목표 거리뿐이지만, 서버는 그걸로 geometry 만 기억하고
+     * 출발지 기준 `distanceM` 과 요청의 `entryName` 은 매번 다시 조합한다. 앱은 응답 전체를
+     * 기억하므로 서버 키를 그대로 쓰면 출발지를 바꾼 뒤 같은 공원이 다시 나올 때 이전
+     * 출발지의 `distanceM` 이, 같은 좌표의 이름이 바뀌면 옛 `name` 이 그려진다(#356 리뷰).
+     * 목록이 재조회돼 `NearbyItem.Place` 인스턴스가 바뀌어도 값이 같으면 같은 답이므로 값으로 잰다.
      * 실패([SpotRouteState.Error])는 기억하지 않는다 — [다시 시도] 가 실제로 다시 불러야 한다.
      */
     private val spotRouteMemory = mutableMapOf<SpotRouteKey, SpotRouteState>()
 
-    private data class SpotRouteKey(val lat: Double, val lng: Double, val targetKm: Double)
+    private data class SpotRouteKey(
+        val originLat: Double,
+        val originLng: Double,
+        val entryLat: Double,
+        val entryLng: Double,
+        val targetKm: Double,
+        val entryName: String,
+    )
 
     /**
      * 출발지 주변 목록 세대. **조회할 때마다 올라간다.**
@@ -239,10 +250,17 @@ class CourseViewModel(
     private fun requestSpotRoute(spot: NearbyItem.Place) {
         val origin = _uiState.value.origin as? OriginState.Fixed ?: return
         val targetKm = _uiState.value.targetKm
-        val key = SpotRouteKey(spot.lat, spot.lng, targetKm)
+        val key = SpotRouteKey(
+            originLat = origin.lat,
+            originLng = origin.lng,
+            entryLat = spot.lat,
+            entryLng = spot.lng,
+            targetKm = targetKm,
+            entryName = spot.name,
+        )
 
-        // 세션 안에서 본 스팟이면 기억한 답을 그대로 쓴다 — GraphHopper 를 다시 돌리지 않는다.
-        // 기억은 좌표로 찾았지만 상태는 **지금 고른 항목**을 들어야 화면 대조가 맞는다
+        // 세션 안에서 같은 인자로 본 스팟이면 기억한 답을 그대로 쓴다 — GraphHopper 를 다시 돌리지 않는다.
+        // 기억은 값으로 찾았지만 상태는 **지금 고른 항목**을 들어야 화면 대조가 맞는다
         spotRouteMemory[key]?.let { remembered ->
             _uiState.update { it.copy(spotRoute = remembered.withSpot(spot)) }
             return
@@ -414,8 +432,8 @@ class CourseViewModel(
         // id 를 재사용하면 남의 결과가 통과한다(#166 리뷰).
         nearbyGeneration++
         nearbyJob?.cancel()
-        // 목록이 갈리면 스팟 경로도 지운다. 기억(`spotRouteMemory`)은 남긴다 — 같은 공원을
-        // 다시 고르면 다시 부르지 않는 것이 계약이다
+        // 목록이 갈리면 스팟 경로도 지운다. 기억(`spotRouteMemory`)은 남긴다 — 같은 출발지·거리로
+        // 같은 공원을 다시 고르면 다시 부르지 않는 것이 계약이다(출발지가 바뀌면 키가 달라 다시 부른다)
         spotRouteJob?.cancel()
         nearbyJob = viewModelScope.launch {
             _uiState.update { it.copy(nearby = NearbyState.Loading, spotRoute = SpotRouteState.Idle) }

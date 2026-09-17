@@ -169,7 +169,7 @@ private fun NearbyTab(state: CourseUiState, viewModel: CourseViewModel) {
                         onClick = { viewModel.onItemSelect(item) },
                     )
                 }
-                item { ActionRow(state = state, viewModel = viewModel, hasNoRoute = near.hasNoRoute) }
+                item { ActionRow(state = state, viewModel = viewModel) }
                 // 스팟 경로가 만들어지면 OSM 문구가 합류한다 (§6-5)
                 item { Attributions(state.displayedAttributions) }
             }
@@ -518,7 +518,7 @@ private fun LoginPromptDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
  * 어느 코스 이야기인지 알 수 없다.
  */
 @Composable
-private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRoute: Boolean) {
+private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         // 버튼은 [저장] 하나다 🔒확정(결정-56). [뛰기] 는 GPS 기록과 함께 제품에서 빠졌다
         OutlinedButton(
@@ -567,7 +567,8 @@ private fun ActionRow(state: CourseUiState, viewModel: CourseViewModel, hasNoRou
                 },
             )
         }
-        if (hasNoRoute) {
+        // 스팟 경로가 만들어졌으면 내리지 않는다 — 그 위 [저장] 이 켜져 있는데 "없어요" 는 모순이다
+        if (state.showsNoRouteNotice) {
             Spacer(Modifier.height(6.dp))
             Text(
                 // 뒷문장("자유롭게 뛰어도 기록은 남습니다")은 GPS 기록을 전제한 말이라 뺐다

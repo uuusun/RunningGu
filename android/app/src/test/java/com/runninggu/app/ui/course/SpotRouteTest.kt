@@ -39,6 +39,8 @@ import java.io.IOException
  * | `route: null` | 핀 유지 · "이 근처엔 자동 경로를 못 만들었어요" · [다시 시도] 없음 |
  * | `503`·네트워크 | 같은 문구 + [다시 시도] |
  * | 같은 스팟 재탭 | 다시 부르지 않는다 |
+ * | 출발지·이름이 바뀐 같은 좌표 | 다시 부른다 — 기억 키는 요청 인자 전부다 |
+ * | 스팟뿐인 목록에서 성공 | "따라갈 경로가 없어요" 를 내린다 |
  * | 다른 스팟 탭 | 이전 선을 지운다 · 늦게 온 답은 그리지 않는다 |
  * | 출발지 | 바뀌지 않는다 · 목록 재조회 없음 |
  */
@@ -212,6 +214,81 @@ class SpotRouteTest {
         vm.onItemSelect(park)
         assertEquals(loopRoute(park), vm.uiState.value.mappedRoute)
         assertEquals(2, repo.calls.size)
+    }
+
+    @Test
+    fun `출발지를 바꾸면 같은 스팟도 다시 부른다 - 기억한 distanceM 은 옛 출발지 것이다`() = runTest(dispatcher) {
+        val repo = LoopStub(items = listOf(park), answer = { call ->
+            // 서버는 출발지 기준 distanceM 을 매번 다시 잰다 — 기억이 그걸 가리면 안 된다
+            val distance = if (call.lat == origin.lat) 650 else 3_200
+            SpotLoop(loopRoute(park).copy(distanceM = distance), listOf(OSM))
+        })
+        val vm = ready(repo)
+        advanceUntilIdle()
+        vm.onItemSelect(park)
+        advanceUntilIdle()
+        assertEquals(650, vm.uiState.value.mappedRoute?.distanceM)
+
+        val moved = origin.copy(name = "여의도역", lat = 37.5216, lng = 126.9243)
+        vm.onOriginChange(moved)
+        advanceUntilIdle()
+        assertEquals(SpotRouteState.Idle, vm.uiState.value.spotRoute)
+
+        vm.onItemSelect(park)
+        advanceUntilIdle()
+        assertEquals(2, repo.calls.size)
+        assertEquals(moved.lat, repo.calls.last().lat, 0.0)
+        assertEquals(moved.lng, repo.calls.last().lng, 0.0)
+        assertEquals(3_200, vm.uiState.value.mappedRoute?.distanceM)
+
+        // 원래 출발지로 돌아오면 그 출발지의 기억을 쓴다 — 다시 부르지 않는다
+        vm.onOriginChange(origin)
+        advanceUntilIdle()
+        vm.onItemSelect(park)
+        assertEquals(650, vm.uiState.value.mappedRoute?.distanceM)
+        assertEquals(2, repo.calls.size)
+    }
+
+    @Test
+    fun `같은 좌표라도 이름이 바뀌면 다시 부른다 - entryName 은 응답 이름에 들어간다`() = runTest(dispatcher) {
+        val renamed = park.copy(name = "여의도한강공원")
+        val repo = LoopStub(items = listOf(park), answer = { call ->
+            SpotLoop(loopRoute(park).copy(name = "${call.entryName} 주변 5km 평지 러닝코스"), listOf(OSM))
+        })
+        val vm = ready(repo)
+        advanceUntilIdle()
+        vm.onItemSelect(park)
+        advanceUntilIdle()
+        assertEquals("여의도공원 주변 5km 평지 러닝코스", vm.uiState.value.mappedRoute?.name)
+
+        vm.onItemSelect(renamed)
+        advanceUntilIdle()
+        assertEquals(2, repo.calls.size)
+        assertEquals(renamed.name, repo.calls.last().entryName)
+        assertEquals("여의도한강공원 주변 5km 평지 러닝코스", vm.uiState.value.mappedRoute?.name)
+    }
+
+    @Test
+    fun `스팟뿐인 목록에서 경로가 만들어지면 따라갈 경로가 없다는 안내를 내린다`() = runTest(dispatcher) {
+        val repo = LoopStub(items = listOf(park, otherPark), answer = { call ->
+            if (call.entryLat == park.lat) SpotLoop(loopRoute(park), listOf(OSM)) else SpotLoop(route = null)
+        })
+        val vm = ready(repo)
+        advanceUntilIdle()
+        // 서울처럼 목록이 걷기 스팟뿐이면 처음엔 안내가 뜬다
+        assertTrue(vm.uiState.value.showsNoRouteNotice)
+
+        vm.onItemSelect(park)
+        advanceUntilIdle()
+        // 스팟 경로가 그려지고 [저장] 이 켜졌으니 "없어요" 는 내린다
+        assertTrue(vm.uiState.value.canSave)
+        assertFalse(vm.uiState.value.showsNoRouteNotice)
+
+        // 못 만든 스팟으로 옮기면 다시 뜬다 — 지금 화면에 그릴 경로가 없다
+        vm.onItemSelect(otherPark)
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.mappedRoute)
+        assertTrue(vm.uiState.value.showsNoRouteNotice)
     }
 
     @Test
