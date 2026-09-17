@@ -184,7 +184,10 @@ public class KtoPoiClient implements KtoPoiSource {
                         textOrEmpty(item.path("addr1")),
                         textOrEmpty(item.path("addr2")))
                 .strip();
-        String description = address;
+        // KorService2 위치기반 응답에는 별도 설명이 없다. 주소를 설명으로 복사하면
+        // 앱의 `{주소} · {설명}` 표기에서 같은 주소가 두 번 보인다. 원천 값이 없으면
+        // 빈 문자열을 반환한다는 API 계약을 따른다(명세 §4-2 · 이슈 #364).
+        String description = "";
         if (criteria.category() == PoiCategory.WELLNESS) {
             String theme = textOrNull(item.path("wellnessThemaCd"));
             if (theme != null) {

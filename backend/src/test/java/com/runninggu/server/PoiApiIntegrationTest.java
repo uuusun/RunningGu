@@ -97,6 +97,28 @@ class PoiApiIntegrationTest extends PostgreSqlContainerSupport {
     }
 
     @Test
+    void KTO의_빈_설명은_null이나_주소_복사본이_아닌_빈_문자열로_반환한다() throws Exception {
+        given(ktoSource.search(any(), eq(8))).willReturn(List.of(
+                ktoPoi("종로정원사마을", 100),
+                ktoPoi("서울역사박물관", 200),
+                ktoPoi("청계천박물관", 300)));
+        given(kakaoSource.search(any(), eq(8))).willReturn(List.of());
+
+        mockMvc.perform(get("/api/pois")
+                        .param("category", "TOUR")
+                        .param("lat", "37.5700")
+                        .param("lng", "126.9800"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.items[0].provider").value("KTO"))
+                .andExpect(jsonPath("$.items[0].address").value("서울특별시 종로구 종로 19"))
+                .andExpect(jsonPath("$.items[0].description").value(""));
+
+        verify(ktoSource, times(1)).search(any(), eq(8));
+        verify(kakaoSource, times(1)).search(any(), eq(8));
+    }
+
+    @Test
     void 필수값과_범위와_query를_검증한다() throws Exception {
         assertProblem(get("/api/pois"), 400, "VALIDATION_FAILED");
         assertProblem(get("/api/pois")
@@ -174,6 +196,20 @@ class PoiApiIntegrationTest extends PostgreSqlContainerSupport {
                 "세종특별자치시",
                 "https://place.map.kakao.com/1",
                 imageUrl);
+    }
+
+    private Poi ktoPoi(String name, int distance) {
+        return new Poi(
+                name,
+                PoiCategory.TOUR,
+                PoiProvider.KTO,
+                new BigDecimal("37.5700"),
+                new BigDecimal("126.9800"),
+                distance,
+                "",
+                "서울특별시 종로구 종로 19",
+                "",
+                null);
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request(
