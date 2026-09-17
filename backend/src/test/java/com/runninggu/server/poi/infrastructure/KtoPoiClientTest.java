@@ -95,6 +95,7 @@ class KtoPoiClientTest {
             assertThat(poi.lng()).isEqualByComparingTo("127.2714");
             assertThat(poi.distanceM()).isEqualTo(1200);
             assertThat(poi.address()).isEqualTo("세종특별자치시 어진동 123");
+            assertThat(poi.description()).isEmpty();
             assertThat(poi.url()).isEmpty();
             assertThat(poi.imageUrl()).isEqualTo("https://example.test/hotel.jpg");
         });
