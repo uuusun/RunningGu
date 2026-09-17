@@ -40,7 +40,7 @@ services:
       - server
       - /opt/graphhopper/graphhopper-server.yml
     restart: "no"
-    # 승인된 4GiB 값은 deploy/env/compose.env.example과 계약 §8.1을 따른다.
+    # 승인된 4GiB 값은 deploy/env/compose.production.env.example과 계약 §8.1을 따른다.
     # 누락·빈 값을 무제한으로 대체하지 않는다.
     mem_reservation: ${GRAPHHOPPER_MEMORY_RESERVATION:?GRAPHHOPPER_MEMORY_RESERVATION을 설정해야 합니다}
     mem_limit: ${GRAPHHOPPER_MEMORY_LIMIT:?GRAPHHOPPER_MEMORY_LIMIT를 설정해야 합니다}

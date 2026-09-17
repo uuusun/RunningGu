@@ -1,5 +1,10 @@
 # 앱 API 시험 준비 도구
 
+> **실행 폐기(2026-09-18):** 스테이징 서버와 DNS를 삭제했다(SPEC 결정-71). 이 폴더는 과거
+> 용량 검증의 fixture·판정 로직을 재현하기 위해 보존한다. 공개 probe와 `--execute` 부하 경로는
+> `staging_retired`로 거부하며 운영 API에 바꿔 실행하지 않는다. 운영에서는 저부하 스모크와
+> 변경 범위 E2E만 허용한다.
+
 2026-09-07 공공데이터·동선 생성 245건 보완 시험은
 [보완 검증 기준](../../docs/deploy/staging-4g-kto-supplement-plan.md)을 따른다.
 `run_api_kto_supplement.py`로 원래 슬롯 245건만 선택하고 서버 가드는 기본 v3를 쓴다.

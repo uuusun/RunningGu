@@ -302,24 +302,23 @@ GraphHopper 11은 같은 입력으로 import해도 `properties`와 `properties.t
 ### 4.2 release descriptor
 
 EC2 검증기가 S3 manifest의 자기 일관성만 확인해서는 승인되지 않은 artifact도 통과할 수 있다.
-환경별 exact commit에는 비밀값이 아닌 다음 descriptor를 둔다.
+스테이징 폐기 뒤 운영 exact commit에는 비밀값이 아닌 descriptor 하나만 둔다(결정-71).
 
 | 환경 | descriptor |
 |---|---|
-| staging | `backend/graphhopper/graph-release.json` |
 | production | `backend/graphhopper/graph-release.production.json` |
 
 ```json
 {
   "schemaVersion": 1,
-  "environment": "staging",
+  "environment": "production",
   "artifactId": "gh11-korea-20260901-0123456789ab-abcdef012345",
   "manifestSha256": "<64자리 lowercase hex>",
   "buildInputSha256": "<64자리 lowercase hex>"
 }
 ```
 
-install·verify 스크립트는 `GRAPHHOPPER_ENVIRONMENT`와 일치하는 checkout의 descriptor,
+install·verify 스크립트는 `GRAPHHOPPER_ENVIRONMENT=production`과 checkout의 descriptor,
 S3 manifest SHA-256, manifest 내부 artifact ID와
 build input hash가 모두 일치할 때만 활성화를 허용한다. graph artifact를 독립 갱신해도 descriptor
 변경은 PR로 리뷰하고 exact commit을 배포한다.
@@ -361,7 +360,7 @@ directory에 lock을 만들고 지울 수 있는지 검증한다. installer는 �
 
 ### 5.1 로컬 개발 환경
 
-artifact 계약은 EC2 staging·production 배포에 적용한다. 로컬 기능 개발과 PoC에서는
+artifact 계약은 EC2 production 배포에 적용한다. 로컬 기능 개발과 PoC에서는
 `backend/compose.yaml`의 PBF bind mount, SRTM·graph named volume, 최초 실행 import를 유지할 수
 있다. 이 경로는 빠른 개발 편의를 위한 것이며 다음 제한을 둔다.
 
@@ -768,37 +767,16 @@ JVM/cgroup 상한과 호스트 RAM 부족 중 원인을 분리한다.
 
 ## 11. PR 분리
 
-### 11.1 머지 전 staging 검증용 백엔드 묶음
+### 11.1 머지 전 검증과 운영 artifact
 
-PR 2의 8GiB 완료 조건을 머지 전에 검증하기 위해, 같은 저장소에서 `develop`을 대상으로 연 PR은
-GitHub Actions에 `pr-validation` 백엔드 묶음을 보관할 수 있다. 기존 PR synthetic merge 검사는
-유지하며, 그 검사와 SPEC 검사가 성공한 뒤 별도 job이 event에 고정된 PR head SHA를 checkout해
-동일한 공통 검사·테스트·빌드·Importer 스모크를 다시 수행한다. 두 job은
-`.github/actions/backend-verify/action.yml`의 공통 단계를 사용한다. fork PR은 묶음을 만들지 않는다.
+스테이징 폐기로 PR head용 `pr-validation` 배포 묶음은 만들지 않는다. PR은 synthetic merge 기준
+단위·통합 테스트, Compose·GraphHopper 계약, Importer 스모크를 통과해야 한다. 배포 가능한 서버
+묶음은 `develop` 또는 `main`에 머지된 **push commit**에서만 생성한다.
 
-이 묶음의 이름은 `runninggu-backend-pr<PR번호>-<head SHA>-<run ID>-<attempt>`다. 기존 서버 JAR,
-Importer JAR, 대회 snapshot, `SHA256SUMS`, `release-manifest.txt`만 포함하며 graph archive는 넣지 않는다.
-보관 기간은 기존 통합 묶음과 같은 30일이다. CI는 AWS 자격 증명이나 배포 권한을 갖지 않으며
-묶음 생성은 EC2 배포·PR 승인·머지·정식 릴리스가 아니다.
-
-`release-manifest.txt`는 UTF-8 `key=value` 행과 마지막 LF를 사용한다. 검증용 필드는 다음 순서다.
-
-1. `git_commit`: 실제 checkout HEAD이며 event의 PR head SHA와 같아야 함
-2. `workflow_run_id`, `workflow_run_attempt`: 양의 정수
-3. `artifact_kind=pr-validation`, `allowed_environment=staging`
-4. `pull_request_number`: 양의 정수
-5. `head_commit`: `git_commit`과 같은 40자리 lowercase SHA
-6. `base_commit`: 해당 event의 PR base SHA
-7. `integration_test_commit`: 앞선 통합 검사 job이 실제로 checkout한 synthetic merge SHA
-
-생성기는 checkout SHA 불일치, 잘못된 식별자, 필수 payload 누락·예상하지 않은 파일·symlink를 거부하고 세 payload와
-manifest의 실제 bytes에 대한 SHA-256을 기록한다. `github.sha`를 PR head로 간주해 라벨만 바꾸지 않는다.
-배포 담당자는 성공한 CI run·attempt·PR head를 확인하고 `SHA256SUMS`, manifest, 배포 요청 SHA,
-EC2 checkout HEAD가 일치할 때만 staging에 설치한다. PR head가 바뀌었다면 이전 묶음을 새 검증에 쓰지 않는다.
-
-production에는 `pr-validation` 묶음을 사용하지 않는다. 머지 후에는 통합된 commit의 기존 push CI
-묶음을 새로 생성한다. 검증용 묶음을 이름만 바꿔 승격하지 않으며, 테스트한 코드·설정·graph가 변경되면
-해당 운영 검증을 다시 수행한다. `main`은 기존 Git 컨벤션대로 정식 릴리스 때만 변경한다.
+운영 배포 담당자는 push CI의 `release-manifest.txt`, `SHA256SUMS`, workflow run, EC2 checkout
+HEAD가 모두 같은 commit을 가리키는지 확인한다. PR artifact나 로컬 빌드 파일을 운영에 승격하지
+않는다. 테스트한 코드·설정·graph가 변경되면 push artifact를 다시 만들고 운영 스모크를 반복한다.
+`main`은 기존 Git 컨벤션대로 정식 릴리스 때만 변경한다.
 
 ### 11.2 PR별 완료 조건
 

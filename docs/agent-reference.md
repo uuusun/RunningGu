@@ -147,8 +147,9 @@ cd android
 >
 > **디버그 빌드의 API 는 `http://10.0.2.2:8080/api/`(호스트 PC 의 로컬 백엔드) 로 고정**이다
 > (`app/build.gradle.kts` `buildTypes.debug`). `local.properties` 의 `API_BASE_URL` 은 릴리스에만
-> 들어간다. 백엔드 없이 에뮬레이터에서 실데이터를 보려면 호스트 8080 에서 스테이징으로 넘겨 주는
-> 릴레이(파이썬 `http.server` 30줄)를 띄우면 된다.
+> 들어간다. 스테이징은 2026-09-18 폐기했다(SPEC 결정-71). 디버그 검증은 로컬 백엔드를 띄우고,
+> 실서버·서명 APK E2E는 운영 URL을 넣은 릴리스 빌드에서만 수행한다. 로컬 릴레이로 운영 API를
+> 디버그 앱에 우회 연결하지 않는다.
 
 JDK 는 **21** (`android/gradle/gradle-daemon-jvm.properties` 의 `toolchainVersion`).
 

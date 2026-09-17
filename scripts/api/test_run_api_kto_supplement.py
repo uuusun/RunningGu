@@ -1,10 +1,12 @@
 """245건 선택·미인증 실행·오류/중단 통계 보존을 실제 내용 검증 경로로 확인한다."""
 import datetime as dt
+import io
 import json
 from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 import run_api_capacity as cap
 import run_api_kto_supplement as sub
@@ -105,6 +107,12 @@ class SupplementTest(unittest.TestCase):
             self.assertEqual(245, result["counts"]["notExecuted"])
             self.assertEqual(1, result["auxiliaryCounts"]["failed"])
             self.assertTrue((Path(d)/"load/api-load-summary.json").exists())
+
+    def test_execute_is_rejected_after_staging_retirement(self):
+        with mock.patch("sys.argv", ["run_api_kto_supplement.py", "--execute"]), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.assertEqual(2, sub.main())
+        self.assertEqual("staging_retired", json.loads(stdout.getvalue())["error"])
 
 if __name__ == "__main__":
     unittest.main()

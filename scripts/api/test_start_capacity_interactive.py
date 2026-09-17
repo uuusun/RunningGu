@@ -1,14 +1,24 @@
 """로그인 전 취소의 미실행 통계와 gate 사유를 네트워크 없이 검증한다."""
+import io
+import json
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import run_api_capacity as capacity
 import start_capacity_interactive as launcher
 
 
 class InteractiveGateTest(unittest.TestCase):
+    def test_interactive_launcher_is_rejected_after_staging_retirement(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch("sys.argv", ["start_capacity_interactive.py", "--run-id", "retired", "--output", directory]), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.assertEqual(2, launcher.main())
+        self.assertEqual("staging_retired", json.loads(stdout.getvalue())["error"])
+
     def test_cancel_does_not_report_elapsed_timeout(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)

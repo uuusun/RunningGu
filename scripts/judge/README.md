@@ -26,10 +26,13 @@
 `scripts/.env` 에 세 값을 넣는다. **`.env` 는 gitignore 대상이고 저장소에 올리지 않는다**(AGENTS 8장).
 
 ```bash
-RUNNINGGU_API_BASE_URL=https://staging-api.runninggu.store
+RUNNINGGU_API_BASE_URL=https://api.runninggu.store
 RUNNINGGU_JUDGE_EMAIL=
 RUNNINGGU_JUDGE_PASSWORD=
 ```
+
+스테이징은 2026-09-18 폐기했다(SPEC 결정-71). 이 스크립트는 운영 API 주소만 허용하며,
+실제 사용자 계정이 아니라 공모전 심사용 전용 계정에만 실행한다.
 
 ## 실행
 

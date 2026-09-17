@@ -44,7 +44,9 @@ def main():
     parser.add_argument("--output",type=Path,required=True)
     parser.add_argument("--exclude-kto",action="store_true")
     args=parser.parse_args()
-    runner.api.require(bool(runner.api.RUN_ID.fullmatch(args.run_id)),"run_id_contract")
+    print(json.dumps({"loadExecuted":False,"passed":False,
+                      "error":"staging_retired"},sort_keys=True))
+    return 2
     args.output.mkdir(parents=True,exist_ok=False)
     warnings.simplefilter("error",getpass.GetPassWarning)
     if sys.platform=="win32":

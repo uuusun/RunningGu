@@ -104,7 +104,7 @@ def main():
                 "-days",
                 "1",
                 "-subj",
-                "/CN=staging-api.runninggu.store",
+                "/CN=api.runninggu.store",
                 "-keyout",
                 str(key),
                 "-out",
@@ -117,34 +117,34 @@ def main():
         common = [
             ("listen 80;", f"listen 127.0.0.1:{http_port};"),
             ("listen 443 ssl;", f"listen 127.0.0.1:{https_port} ssl;"),
-            ("/etc/letsencrypt/live/staging-api.runninggu.store/fullchain.pem", str(cert)),
-            ("/etc/letsencrypt/live/staging-api.runninggu.store/privkey.pem", str(key)),
+            ("/etc/letsencrypt/live/api.runninggu.store/fullchain.pem", str(cert)),
+            ("/etc/letsencrypt/live/api.runninggu.store/privkey.pem", str(key)),
             ("/etc/nginx/snippets/runninggu-ssl-params.conf", str(ssl_params)),
-            ("/var/log/nginx/runninggu-staging.access.log", str(named_access)),
+            ("/var/log/nginx/runninggu-production.access.log", str(named_access)),
             ("proxy_pass http://127.0.0.1:8080;", "proxy_pass http://127.0.0.1:9;"),
         ]
-        staging = rewrite_server(ROOT / "staging-api.conf", common)
+        production = rewrite_server(ROOT / "production-api.conf", common)
         default = rewrite_server(
-            ROOT / "default-reject.conf",
+            ROOT / "default-reject.production.conf",
             [
                 ("listen 80 default_server;", f"listen 127.0.0.1:{http_port} default_server;"),
                 (
                     "listen 443 ssl default_server;",
                     f"listen 127.0.0.1:{https_port} ssl default_server;",
                 ),
-                ("/etc/letsencrypt/live/staging-api.runninggu.store/fullchain.pem", str(cert)),
-                ("/etc/letsencrypt/live/staging-api.runninggu.store/privkey.pem", str(key)),
+                ("/etc/letsencrypt/live/api.runninggu.store/fullchain.pem", str(cert)),
+                ("/etc/letsencrypt/live/api.runninggu.store/privkey.pem", str(key)),
                 ("/etc/nginx/snippets/runninggu-ssl-params.conf", str(ssl_params)),
                 ("/var/log/nginx/runninggu-rejected.access.log", str(rejected_access)),
             ],
         )
-        (work / "staging.conf").write_text(staging, encoding="utf-8")
+        (work / "production.conf").write_text(production, encoding="utf-8")
         (work / "default.conf").write_text(default, encoding="utf-8")
         bootstrap = rewrite_server(
-            ROOT / "staging-api.bootstrap.conf",
+            ROOT / "production-api.bootstrap.conf",
             [
                 ("listen 80;", f"listen 127.0.0.1:{bootstrap_port};"),
-                ("/var/log/nginx/runninggu-staging.access.log", str(named_access)),
+                ("/var/log/nginx/runninggu-production.access.log", str(named_access)),
             ],
         )
         (work / "bootstrap.conf").write_text(bootstrap, encoding="utf-8")
@@ -169,7 +169,7 @@ error_log {lifecycle} notice;
 events {{}}
 http {{
     include {ROOT / 'runninggu-log-privacy.conf'};
-    include {work / 'staging.conf'};
+    include {work / 'production.conf'};
     include {work / 'default.conf'};
 }}
 """,
@@ -224,14 +224,14 @@ http {{
             statuses = {
                 "httpRedirect": request(
                     http_port,
-                    "staging-api.runninggu.store",
+                    "api.runninggu.store",
                     "GET",
                     "/api/auth/email/exists?email=" + encoded_email,
                     headers,
                 ),
                 "coordinateProxyFailure": request(
                     https_port,
-                    "staging-api.runninggu.store",
+                    "api.runninggu.store",
                     "GET",
                     "/api/pois?lat=" + latitude + "&lng=" + longitude,
                     headers,
@@ -239,7 +239,7 @@ http {{
                 ),
                 "loginProxyFailure": request(
                     https_port,
-                    "staging-api.runninggu.store",
+                    "api.runninggu.store",
                     "POST",
                     "/api/auth/login",
                     {"Content-Type": "application/json", **headers},
@@ -263,14 +263,14 @@ http {{
                 ),
                 "otherMethod": request(
                     http_port,
-                    "staging-api.runninggu.store",
+                    "api.runninggu.store",
                     "TRACE",
                     "/" + marker,
                     headers,
                 ),
                 "oversizedHeader": request(
                     https_port,
-                    "staging-api.runninggu.store",
+                    "api.runninggu.store",
                     "GET",
                     "/",
                     {"X-Privacy-Test": marker * 700, **headers},

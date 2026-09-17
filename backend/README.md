@@ -169,7 +169,8 @@ cd backend
 ```
 
 산출물은 `backend/build/ec2-artifact/`에 생성된다. 실제 EC2 배포 순서와 롤백은
-[`docs/deploy/aws-ec2-staging-runbook.md`](../docs/deploy/aws-ec2-staging-runbook.md)를 따른다.
+[`docs/deploy/aws-ec2-production-runbook.md`](../docs/deploy/aws-ec2-production-runbook.md)를 따른다.
+스테이징은 2026-09-18 폐기했으며 PR artifact나 로컬 산출물을 운영에 직접 배포하지 않는다.
 
 ## 검증
 

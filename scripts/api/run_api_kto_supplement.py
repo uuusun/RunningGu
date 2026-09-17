@@ -105,6 +105,10 @@ def main():
     p.add_argument("--output", type=Path)
     p.add_argument("--guard-evidence", type=Path)
     args = p.parse_args()
+    if args.execute:
+        print(json.dumps({"loadExecuted": False, "passed": False,
+                          "error": "staging_retired"}, sort_keys=True))
+        return 2
     fixture, digest = api.load_fixture(args.fixture, require_approved=True)
     api.require(digest == cap.FIXTURE_HASH, "fixture_hash_mismatch")
     if not args.execute:

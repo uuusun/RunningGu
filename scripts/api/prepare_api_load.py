@@ -178,11 +178,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--year-month", required=True, type=validate_month)
     parser.add_argument("--probe-public", required=True, action="store_true",
-                        help="staging 고정 주소에 최대 7개 읽기 요청만 수행")
-    args = parser.parse_args()
-    result = probe_public(args.year_month)
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0 if result["passed"] else 1
+                        help="폐기된 staging 도구의 이전 호환 옵션")
+    parser.parse_args()
+    print(json.dumps({"passed": False, "loadExecuted": False,
+                      "error": "staging_retired"}, sort_keys=True))
+    return 2
 
 
 if __name__ == "__main__":

@@ -76,7 +76,7 @@ logging:
 
 runninggu:
   upstream-load-guard:
-    # staging 앱 API 부하 시험에서만 명시적으로 켠다. 기본 실행과 production은 비활성이다.
+    # 2026-09-18 staging 폐기로 실행 경로를 종료했다. production에서는 반드시 false다(결정-71).
     enabled: ${UPSTREAM_LOAD_GUARD_ENABLED:false}
     deployment-environment: ${RUNNINGGU_DEPLOYMENT_ENVIRONMENT:local}
     run-id: ${UPSTREAM_LOAD_GUARD_RUN_ID:}

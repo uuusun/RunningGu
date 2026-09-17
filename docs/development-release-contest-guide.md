@@ -394,18 +394,21 @@ cd ..\backend
 
 ### 7.2 환경 분리
 
-최소 `local`, `staging`, `production`을 분리한다.
+2026-09-18 스테이징 서버와 DNS를 폐기했다(SPEC 결정-71). 실행 환경은 `local`과
+`production` 두 가지다. **실서버·서명 APK E2E는 운영에서만** 수행한다.
 
-| 항목 | local | staging | production |
-|---|---|---|---|
-| DB | Docker PostgreSQL | 별도 DB | 별도 DB+백업 |
-| 앱 API URL | `10.0.2.2`/개발 IP | 스테이징 HTTPS | 운영 HTTPS |
-| 외부 API 키 | 개발 키 | 스테이징/개발 키 | 제출에 연결된 운영 키 |
-| 사용자 데이터 | 가짜 데이터 | 심사용 가짜 계정 | 실제 사용자 데이터 |
-| 로그 | 상세 가능, 시크릿 금지 | 제한 | 최소·구조화·보존기간 적용 |
-| Swagger | 개발 편의 | 기본 비활성, 필요할 때만 접근 통제 후 활성 | 비활성 또는 접근 통제 |
+| 항목 | local·CI | production |
+|---|---|---|
+| DB | Docker PostgreSQL·Testcontainers, 가짜 데이터 | 운영 DB+백업 |
+| 앱 API URL | debug `10.0.2.2`/개발 IP | release `https://api.runninggu.store/api/` |
+| 외부 API | mock·fixture 우선, 필요한 최소 수동 실호출 | 실제 운영 키·쿼터 |
+| 사용자 데이터 | 가짜 데이터 | 실제 사용자와 분리한 전용 QA 계정·가역 데이터 |
+| 로그 | 상세 가능, 시크릿 금지 | 최소·구조화·14일 보존 |
+| Swagger | 개발 편의 | 비활성 또는 접근 통제 |
 
-스테이징과 운영의 DB·JWT·SMTP·외부 API 키를 공유하지 않는다.
+운영에 올리기 전 단위·통합 테스트와 CI를 통과해야 한다. 운영에서는 저부하 스모크와 사용자
+여정 E2E만 수행하며 부하 시험, 장애 주입, 파괴적 DB 시험, 임의 데이터 정리는 금지한다.
+과거 스테이징 문서와 증거는 이력으로만 보존하고 현재 실행 절차로 사용하지 않는다.
 
 ### 7.3 운영 시크릿
 
@@ -422,7 +425,7 @@ cd ..\backend
 
 ### 7.4 프로덕션 배포 전 체크
 
-- [x] **EC2 4GiB 운영 기준 확정(2026-09-07):** [1,855건 부분 부하](deploy/evidence/api-load-ec2-4g-20260907-no-kto.md)와 [245건 보완 부하](deploy/evidence/api-load-ec2-4g-20260907-kto-supplement.md)를 각각 전건 성공으로 완료했다. 운영책임자는 현재 `c7i-flex.large` 4GiB 유지와 배포 설정·문서 반영을 확정했다. [메모리 계약 §8.1](deploy/graphhopper-artifact-contract.md#81-적용-순서)의 heap·프로세스 상한을 배포 예시·systemd·CI에 적용하고 [실행서 §10.1](deploy/aws-ec2-staging-runbook.md#101-4gib-운영-메모리-확인)에서 실효 값을 확인한다. 두 시험은 분리 실행이므로 2,100건 혼합 부하 합격이나 프로덕션 전체 출시 승인을 뜻하지 않는다
+- [x] **EC2 4GiB 운영 기준 확정(2026-09-07):** [1,855건 부분 부하](deploy/evidence/api-load-ec2-4g-20260907-no-kto.md)와 [245건 보완 부하](deploy/evidence/api-load-ec2-4g-20260907-kto-supplement.md)를 각각 전건 성공으로 완료했다. 운영책임자는 현재 `c7i-flex.large` 4GiB 유지와 배포 설정·문서 반영을 확정했다. [메모리 계약 §8.1](deploy/graphhopper-artifact-contract.md#81-적용-순서)의 heap·프로세스 상한을 배포 예시·systemd·CI에 적용하고 [운영 실행서](deploy/aws-ec2-production-runbook.md)에서 실효 값을 확인한다. 두 시험은 분리 실행이므로 2,100건 혼합 부하 합격이나 프로덕션 전체 출시 승인을 뜻하지 않는다
 - [ ] 호스팅은 AWS EC2, 리전은 서울 `ap-northeast-2`, 기본 도메인은 `runninggu.store`로 확정했다. AWS·결제·도메인·Google Play·인프라 운영책임자는 유선경이다(#230)
 - [ ] 월 총예산 100,000원과 **실제 비용 80,000원**, **예상 비용 100,000원** 알림을 `runninggu.play@gmail.com`으로 설정했다(#230)
 - [ ] GraphHopper graph import는 저장소에 고정한 Linux builder로 EC2 밖에서 수행하고, manifest·checksum을 갖춘 artifact만 서울 리전 KMS 암호화 비공개 S3로 전달한다. EC2에는 PBF·SRTM cache·import service를 두지 않는다
@@ -440,11 +443,9 @@ cd ..\backend
 - [ ] `contestImport`를 명시 실행하고 동일 입력 no-op·오류 전체 롤백 확인
 - [ ] GraphHopper version·PBF·SRTM·import 설정 hash, graph artifact checksum, 상대 symlink 활성화·2세대 롤백, 메모리·기동 시간을 확인했다
 - [ ] KTO·카카오 timeout·캐시·레이트리밋·429 정책 확인
-- [ ] 앱 API 혼합 부하 때만 `RUNNINGGU_DEPLOYMENT_ENVIRONMENT=staging`과 명시적 run ID로
-  upstream guard를 활성화하고, KTO operation별 100회·카카오 전체 5,000회/endpoint별 2,000회의
-  실제 시도 상한, allowlist 선차단, 첫 429·예상 밖 5xx·timeout·KTO 오류 즉시 중단과 안전 로그를
-  검증했다. 성공 증거를 남긴 뒤 다시 비활성화했으며 production에서는 활성화하지 않았다 —
-  [시험 계획](deploy/api-load-test-plan.md)
+- [x] **과거 스테이징 부하 시험 종료:** 당시 승인 상한·가드·실행 결과는
+  [시험 계획](deploy/api-load-test-plan.md)과 증거 문서에 이력으로 보존한다. 스테이징 폐기 뒤
+  운영에서는 해당 가드나 혼합 부하 실행기를 활성화하지 않는다(결정-71)
 - [ ] Resend 발신 `no-reply@runninggu.store`와 스팸함·인증 코드·재설정 링크의 운영 도메인을 확인했다. Resend는 거래성 메일만 보내며 P0 마케팅 메일은 보내지 않는다(#229·#230·#321)
   - 2026-09-04 staging 도메인/DKIM·SMTP 적용과 TLS 로그인 성공. 최초 발송의 IAM 수신 identity 권한 누락을 보완한 뒤 앱 인증 메일 2건 모두 204·두 메일함 도착을 확인했다. [설정 기록](deploy/evidence/ses-smtp-staging-20260904.md)을 따르며, 정상 가입·재설정 전체 흐름·프로덕션 준비 완료로 체크하지 않는다
   - 후속 [첫 계정 가입 확인](deploy/evidence/signup-success-20260904.md): 인증 200·가입 201과 별도 재로그인 200 확인. 다만 [마케팅 상태 복원 결함](deploy/evidence/marketing-relogin-diagnosis-20260904.md), 인증된 GET `/me`·두 번째 계정·재설정은 남아 있어 전체 체크는 유지한다
@@ -469,35 +470,29 @@ cd ..\backend
 
 ### 7.5 배포·롤백 절차
 
-머지 전 8GiB 검증에는 [GraphHopper artifact 계약 §11.1](deploy/graphhopper-artifact-contract.md#111-머지-전-staging-검증용-백엔드-묶음)의
-PR head 전용 CI 묶음을 staging에서만 사용한다. 정식 릴리스·`main` 변경·자동 배포를 뜻하지 않는다.
-머지 후에는 통합 commit의 CI 묶음을 다시 만들며 PR 검증용 묶음을 이름만 바꿔 승격하지 않는다.
+PR에서는 배포 가능한 묶음을 만들지 않는다. Android·백엔드 테스트와 계약 검사를 통과시킨 뒤
+`develop` 또는 `main`에 머지된 **push commit**의 CI artifact만 운영 후보가 된다.
 
-2026-09-04 PR #255 머지 후 `develop` CI 묶음의 staging 전환·스모크는
-[별도 배포 기록](deploy/evidence/staging-develop-1c3f2ef-20260904.md)에 남겼다.
-같은 날 #263 머지 후 연령 검증이 포함된 `b9e632d`의 staging 재배포·입력 거부 시험은
-[후속 배포 기록](deploy/evidence/staging-develop-b9e632d-20260904.md)에 남겼다.
-그 다음 [앱 API 부하 시험 계획](deploy/api-load-test-plan.md)은 **기준 승인·실행 준비 중**이며,
-기존 GraphHopper 직접 요청 검증이나 프로덕션 전체 체크리스트의 완료를 대신하지 않는다.
-그 계획의 upstream guard는 staging 부하 시험용 쿼터 보호 장치이며 SPEC·HTTP API·캐시·재시도·
-폴백 계약을 바꾸는 프로덕션 기능이 아니다.
+1. PR에서 Android·백엔드 단위·통합 테스트와 문서 계약 검사를 통과시킨다.
+2. 머지된 push CI artifact의 Git commit·workflow run·SHA-256을 확인한다.
+3. 운영 DB의 최신 full backup·WAL 상태와 호환되는 직전 서버 artifact를 확인한다.
+4. 운영 EC2 checkout을 artifact와 같은 exact commit으로 맞추고 checksum을 검증한다.
+5. Flyway·Importer·GraphHopper manifest를 검증한 뒤 서버를 배포한다.
+6. 내부 readiness 후 공개 HTTPS의 저부하 스모크를 실행한다.
+7. 전용 QA 계정으로 로그인·가입·저장·재조회 등 변경 범위의 앱 E2E를 수행한다.
+8. 치명 오류면 DB를 임의로 되돌리지 않고 호환되는 직전 서버 artifact로 복귀한다. 마이그레이션
+   역호환이 없으면 운영 복구 절차를 따른다.
+9. hotfix는 `main`에서 `hotfix/*`를 만들고 `main`과 `develop` 양쪽에 반영한다.
 
-1. 릴리스 후보 커밋에서 Android·백엔드 전체 테스트를 실행한다.
-2. 백엔드 JAR·데이터 snapshot·GraphHopper graph artifact의 SHA-256, Git commit 또는 builder
-   digest, 환경 이름을 릴리스 기록에 남긴다.
-3. 스테이징에 동일 artifact를 배포하고 GraphHopper manifest 검증·활성화와 전체 스모크 테스트를
-   실행한다.
-4. 운영 DB를 백업하고 새 서버 버전을 배포한다.
-5. Flyway 결과, 애플리케이션 기동, 외부 API, GraphHopper, SMTP를 확인한다.
-6. Android 운영 빌드가 실제 운영 URL에 연결되는지 확인한다.
-7. 치명 오류면 DB를 임의로 되돌리지 않고, 호환되는 직전 서버 artifact로 복귀한다. 마이그레이션 역호환이 없으면 정해진 복구 절차를 따른다.
-8. hotfix는 `main`에서 `hotfix/*`를 만들고 `main`과 `develop` 양쪽에 반영한다.
+운영에서 금지하는 것은 혼합 부하·장애 주입·의도적 OOM·대량 가입/메일·파괴적 DB 시험이다.
+실제 사용자 데이터는 시험 fixture로 사용하지 않고, QA 데이터 삭제가 필요하면 제품의 정상 삭제
+흐름과 보존 정책을 따른다.
 
 GraphHopper graph 생산·manifest·활성화 계약은
-[`deploy/graphhopper-artifact-contract.md`](deploy/graphhopper-artifact-contract.md), AWS EC2
-스테이징의 전체 파일 배치·실행 명령·검증·롤백은
-[`deploy/aws-ec2-staging-runbook.md`](deploy/aws-ec2-staging-runbook.md)를 따른다. 두 실행서는 이
-절의 구현판이며 정책이나 절차가 충돌하면 §7이 우선한다.
+[`deploy/graphhopper-artifact-contract.md`](deploy/graphhopper-artifact-contract.md), 운영 EC2의
+파일 배치·검증·롤백은 [`deploy/aws-ec2-production-runbook.md`](deploy/aws-ec2-production-runbook.md)를
+따른다. 폐기된 [`deploy/aws-ec2-staging-runbook.md`](deploy/aws-ec2-staging-runbook.md)는 과거
+검증 이력이며 실행하지 않는다. 정책이나 절차가 충돌하면 §7과 SPEC 결정-71이 우선한다.
 
 ---
 

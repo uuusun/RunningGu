@@ -1,9 +1,8 @@
 # AWS EC2 운영 배포 실행서
 
-> 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)과
-> [`aws-ec2-staging-runbook.md`](aws-ec2-staging-runbook.md)의 운영 환경 차이만 고정한다.
-> 공통 설치·검증 명령과 합격 기준은 스테이징 실행서를 따르며, 아래 값이 충돌하면 이 문서의
-> 운영 값이 우선한다.
+> 이 문서는 [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)의
+> 운영 구현 SSOT다. 스테이징은 2026-09-18 폐기했으며, 과거 스테이징 실행서를 현재 절차로
+> 사용하지 않는다(SPEC 결정-71). 배포는 머지된 push CI artifact와 이 문서의 운영 값만 따른다.
 
 ## 1. 운영 자원과 공개 주소
 
@@ -22,10 +21,10 @@
 | 공개 개인정보처리방침 | `https://runninggu.store/privacy/` (웹 버전 1.0, 2026-09-13 시행) |
 
 SSH key pair와 22번 포트는 사용하지 않는다. SSM Session Manager로 접속하며 IMDSv2를 강제한다.
-종료 방지는 활성화 상태를 유지한다. 스테이징 EC2·DB와 운영 비밀값은 분리한다. 단 KTO service
-key는 결정-63, 카카오 앱(`KAKAO_APP_ID`·`KAKAO_REST_KEY`)은 결정-66에 따라 같은 계정의 staging
-값과 공유하며 호출 쿼터도 합산 관리한다. 운영계정 승인 뒤 실제 쿼터와 별도 키 발급 가능
-여부를 확인해 필요하면 환경별 키로 분리한다.
+종료 방지는 활성화 상태를 유지한다. KTO service key와 카카오 앱
+(`KAKAO_APP_ID`·`KAKAO_REST_KEY`)은 운영에서 검증한 값을 사용한다. 폐기된 스테이징과의
+공유·합산 정책은 종료됐다(결정-63·66의 결정-71 개정). 운영계정 승인 뒤 실제 쿼터와 별도 키
+발급 필요성만 다시 확인한다.
 
 ## 2. 운영 환경 파일
 
@@ -54,10 +53,9 @@ sudo install -m 0640 -o root -g runninggu \
 | 부하 시험 가드 | 항상 비활성 |
 
 `DB_PASSWORD`, `JWT_SECRET`, Resend API key는 운영 전용으로 생성한다.
-KTO service key는 결정-63, 카카오 앱 `KAKAO_REST_KEY`·`KAKAO_APP_ID`는 결정-66에 따라 staging과
-같은 값을 쓴다. staging의 KTO 실호출은 기능 확인으로 제한한다.
-운영계정 승인 뒤 필요하면 환경별 키로 분리한다. 값은 명령 인자·shell history·Git·CI·문서에
-남기지 않는다. 두 env 파일의 `DB_PASSWORD`만 같은 값을 사용한다.
+KTO service key와 카카오 앱 `KAKAO_REST_KEY`·`KAKAO_APP_ID`는 운영에서 검증한 값을 쓴다.
+운영계정 승인 뒤 실제 쿼터와 별도 키 발급 필요성을 다시 확인한다. 값은 명령 인자·shell
+history·Git·CI·문서에 남기지 않는다. 두 env 파일의 `DB_PASSWORD`만 같은 값을 사용한다.
 
 운영 비밀값은 고객 관리형 KMS key로 암호화한 Parameter Store `SecureString`으로 보관한다.
 경로는 `/runninggu/production/<name>`으로 제한하며, EC2 role이 복호화해 접근 제한된 env 파일을
@@ -88,8 +86,6 @@ KTO service key는 결정-63, 카카오 앱 `KAKAO_REST_KEY`·`KAKAO_APP_ID`는 
 
 ## 4. 호스트 설치와 배포 순서
 
-공통 실행서 §4~§16의 순서를 유지한다.
-
 1. Ubuntu 보안 업데이트 후 Git, Java 21, Docker Engine·Compose 2.24.4 이상, Nginx, Certbot,
    AWS CLI를 설치한다.
 2. `runninggu` system user와 `/opt/runninggu`, `/opt/runninggu-data`, `/etc/runninggu`를 만들고
@@ -115,7 +111,7 @@ PostgreSQL 이미지에는 S3 TLS 인증서를 검증할 `ca-certificates`도 �
 
 복구 전용 `/etc/runninggu/recovery-compose.env`에도
 `PGBACKREST_REPO1_PATH=/runninggu/production`을 명시한다. 복구 Compose는 이 값을 필수로 받아
-staging 백업을 운영 복구 리허설에 잘못 사용하는 것을 막는다.
+다른 prefix의 백업을 운영 복구 리허설에 잘못 사용하는 것을 막는다.
 
 ## 5. DNS·Nginx·TLS
 
@@ -235,9 +231,9 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다. 리허설에
 - 외부에서 5432·8080·8989에 연결할 수 없는가
 - Swagger와 `/v3/api-docs`가 비활성인가
 - access log에 URI·query·Host·User-Agent가 남지 않고 method가 허용 목록 값으로 축약되는가
-- 운영 DB·JWT·SMTP·Kakao 값이 스테이징과 다르고, KTO만 승인된 공유값인가
-- 공유 KTO key의 staging·production 호출량과 쿼터를 합산해 관리하는가
-- 운영계정 승인 뒤 실제 쿼터·별도 키 발급 가능 여부를 확인하고 분리 필요성을 다시 판단했는가
+- 운영 DB·JWT·SMTP·KTO·Kakao 값이 Parameter Store의 운영 경로에서만 주입되는가
+- KTO·Kakao 운영 호출량과 쿼터를 모니터링하는가
+- 운영계정 승인 뒤 실제 쿼터·별도 키 발급 필요성을 다시 판단했는가
 - GraphHopper가 승인된 기존 graph를 불러오며 import·SRTM download를 시작하지 않는가
 - full backup·WAL archive·실패 알림·예산 알림 구독이 확인됐는가
 - 합성 사용자 탈퇴 전 백업과 탈퇴 후 최신 WAL 복원에서 삭제 상태가 유지되는가
@@ -245,6 +241,16 @@ volume을 사용하는 복구 리허설을 출시 전 수행한다. 리허설에
 
 각 항목의 명령·시각·결과를 배포 증거 문서에 남긴다. 로그와 증거에는 토큰·비밀번호·인증 코드·
 이메일 주소·사용자 좌표를 기록하지 않는다.
+
+### 7.1 운영 단일 QA 안전선
+
+- 머지 전 테스트와 CI가 성공한 커밋만 배포한다.
+- 공개 HTTPS 스모크는 변경 범위의 최소 요청만 실행하고 요청 수·시각·commit을 기록한다.
+- 쓰기 E2E는 전용 QA 계정과 식별 가능한 가역 데이터만 사용한다.
+- 실제 사용자 계정·데이터를 fixture로 사용하지 않는다.
+- 혼합 부하, 장애 주입, 의도적 OOM, 대량 메일·가입, 파괴적 DB·복구 시험은 운영에서 금지한다.
+- 데이터 정리가 필요하면 제품의 정상 삭제 흐름과 보존 정책을 사용한다. 운영 DB 직접 수정은
+  별도 장애 대응 승인 없이는 하지 않는다.
 
 ## 8. API 연결 거부 진단과 복구
 

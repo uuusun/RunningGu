@@ -49,8 +49,6 @@ jobs:
 
   test:
     name: Unit, integration, and bootJar
-    outputs:
-      integration_commit: ${{ steps.identity.outputs.commit }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -76,10 +74,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: 실제 검사 커밋 기록
-        id: identity
-        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: 백엔드 공통 검사와 빌드
         uses: ./.github/actions/backend-verify
@@ -114,72 +108,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-report
-          path: backend/build/reports/tests/test/
-          retention-days: 7
-
-  pr-candidate:
-    name: PR 검증용 백엔드 묶음
-    needs: [spec-drift, test]
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.base.ref == 'develop' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:17.10
-        env:
-          POSTGRES_DB: runninggu_import_smoke
-          POSTGRES_USER: runninggu
-          POSTGRES_PASSWORD: importer-smoke-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U runninggu -d runninggu_import_smoke"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      # 통합 검사와 별개로, 실제 EC2 checkout에 사용할 PR head 자체를 검사한다.
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: 백엔드 공통 검사와 빌드
-        uses: ./.github/actions/backend-verify
-
-      - name: staging 전용 출처와 checksum 기록
-        env:
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          INTEGRATION_COMMIT: ${{ needs.test.outputs.integration_commit }}
-        run: |
-          python3 deploy/ci/package-pr-artifact.py \
-            --repository .. --output build/ec2-artifact \
-            --expected-head "$PR_HEAD" --base-commit "$PR_BASE" \
-            --integration-commit "$INTEGRATION_COMMIT" \
-            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
-            --pr-number "$PR_NUMBER"
-
-      # AWS 권한·비밀값은 주입하지 않는다. 보관과 배포는 별도 절차다.
-      - name: PR 검증용 묶음 보관
-        uses: actions/upload-artifact@v4
-        with:
-          name: runninggu-backend-pr${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: backend/build/ec2-artifact/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: PR head 실패 리포트
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-pr-candidate-test-report
           path: backend/build/reports/tests/test/
           retention-days: 7

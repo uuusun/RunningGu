@@ -151,6 +151,12 @@ class TransportTests(unittest.TestCase):
         self.assertIsNone(prep.NoRedirect().redirect_request(None, None, 302, None, None,
                                                             "https://elsewhere.invalid"))
 
+    @patch("sys.stdout", new_callable=io.StringIO)
+    @patch("sys.argv", ["prepare_api_load.py", "--year-month", "2026-09", "--probe-public"])
+    def test_cli_probe_is_rejected_after_staging_retirement(self, stdout):
+        self.assertEqual(2, prep.main())
+        self.assertEqual("staging_retired", json.loads(stdout.getvalue())["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

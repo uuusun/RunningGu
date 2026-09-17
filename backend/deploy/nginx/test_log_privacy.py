@@ -9,9 +9,6 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent
 LOG_POLICY = (ROOT / "runninggu-log-privacy.conf").read_text(encoding="utf-8")
 SERVER_FILES = [
-    ROOT / "staging-api.bootstrap.conf",
-    ROOT / "staging-api.conf",
-    ROOT / "default-reject.conf",
     ROOT / "production-api.bootstrap.conf",
     ROOT / "production-root.bootstrap.conf",
     ROOT / "production-api.conf",

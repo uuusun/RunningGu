@@ -85,7 +85,7 @@ class ArtifactContractTest(unittest.TestCase):
             descriptor,
             {
                 "schemaVersion": 1,
-                "environment": "staging",
+                "environment": "production",
                 "artifactId": artifact_id,
                 "manifestSha256": contract.sha256_file(manifest_path),
                 "buildInputSha256": build_input,
@@ -121,7 +121,7 @@ class ArtifactContractTest(unittest.TestCase):
             self.graph,
             descriptor,
             artifact_id,
-            "staging",
+            "production",
         )
 
     def test_unexpected_active_file_fails(self) -> None:
@@ -136,7 +136,7 @@ class ArtifactContractTest(unittest.TestCase):
                 self.graph,
                 descriptor,
                 artifact_id,
-                "staging",
+                "production",
             )
 
     def test_archive_is_deterministic(self) -> None:
@@ -199,7 +199,7 @@ class ArtifactContractTest(unittest.TestCase):
                 None,
                 descriptor,
                 artifact_id,
-                "staging",
+                "production",
             )
 
     def test_normalized_import_config_requires_run_lm_and_srtm(self) -> None:

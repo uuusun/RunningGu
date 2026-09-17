@@ -112,13 +112,13 @@ def main():
     parser.add_argument("--https-port", type=int, default=443)
     parser.add_argument("--nginx-log-dir", default="/var/log/nginx")
     parser.add_argument(
-        "--named-access-log", default="runninggu-staging.access.log"
+        "--named-access-log", default="runninggu-production.access.log"
     )
     parser.add_argument(
         "--rejected-access-log", default="runninggu-rejected.access.log"
     )
     parser.add_argument(
-        "--legacy-error-log", default="runninggu-staging.error.log"
+        "--legacy-error-log", default="runninggu-production.error.log"
     )
     parser.add_argument("--backend-unit", default="runninggu-backend.service")
     parser.add_argument("--nginx-unit", default="nginx.service")
