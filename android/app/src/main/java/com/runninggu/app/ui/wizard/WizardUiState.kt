@@ -79,6 +79,11 @@ data class WizardUiState(
      */
     enum class Phase { LOADING, LOADED, ERROR, NOT_FOUND }
 
+    companion object {
+        /** 여행 기간 상한(일). 시작일·종료일 포함. (SPEC §4.7 🔒확정) */
+        const val MAX_TRIP_DAYS = 7
+    }
+
     /** 기간 일수. 당일치기는 1. */
     val dayCount: Int
         get() = if (start != null && end != null) {
@@ -91,9 +96,28 @@ data class WizardUiState(
     fun isInRange(date: LocalDate): Boolean =
         start != null && end != null && !date.isBefore(start) && !date.isAfter(end)
 
-    /** 다음 단계로 갈 수 있는가. 직접 선택에서 종료일을 안 골랐으면 막는다. */
+    /**
+     * 직접 선택한 기간이 규칙에 맞는가. (SPEC §4.7 🔒확정)
+     *
+     * 여행 기간은 시작일·종료일을 포함해 **최대 [MAX_TRIP_DAYS]일**이고 **대회일을 반드시
+     * 포함**한다. 패턴 칩은 [com.runninggu.app.domain.TripPattern.rangeOf] 가 대회일 기준으로
+     * 만들어 항상 맞지만, 직접 선택은 사용자가 아무 날이나 찍을 수 있어서 여기서 거른다.
+     *
+     * 2026-09-17 QA(G-04)에서 16일짜리도, 대회일이 빠진 범위도 [다음] 이 넘어가는 것을
+     * 찾았다 — 그전에는 종료일을 골랐는지만 봤다. 서버 `generate` 가 거부하더라도 사용자는
+     * S6 까지 갔다가 오류를 보게 되므로 CTA 에서 막는 것이 맞다.
+     */
+    val isRangeValid: Boolean
+        get() {
+            val start = start ?: return false
+            val end = end ?: return false
+            val raceDate = race?.date ?: return true // 대회를 아직 못 실었으면 기간만으로는 판단하지 않는다
+            return dayCount <= MAX_TRIP_DAYS && !raceDate.isBefore(start) && !raceDate.isAfter(end)
+        }
+
+    /** 다음 단계로 갈 수 있는가. 직접 선택에서 종료일을 안 골랐거나 기간 규칙에 어긋나면 막는다. (SPEC §4.7) */
     val canProceed: Boolean
-        get() = start != null && end != null && !awaitingEndDate
+        get() = start != null && end != null && !awaitingEndDate && isRangeValid
 
     // ── S5 종목·취향 (SPEC §4.8) ────────────────────────────────
 
