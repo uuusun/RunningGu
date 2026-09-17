@@ -474,6 +474,10 @@ def main():
     parser.add_argument("--guard-evidence",type=Path)
     parser.add_argument("--exclude-kto",action="store_true")
     args=parser.parse_args()
+    if args.execute:
+        print(json.dumps({"loadExecuted":False,"passed":False,
+                          "error":"staging_retired"},sort_keys=True))
+        return 2
     fixture,digest=api.load_fixture(args.fixture,require_approved=True)
     api.require(digest==FIXTURE_HASH,"fixture_hash_mismatch")
     api.require(api.arrivals.schedule_sha256(api.arrivals.build_schedule())==SCHEDULE_HASH,"schedule_hash_mismatch")

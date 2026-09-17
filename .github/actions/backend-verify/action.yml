@@ -31,7 +31,7 @@ runs:
       working-directory: backend
       run: |
         docker compose \
-          --env-file deploy/env/compose.env.example \
+          --env-file deploy/env/compose.production.env.example \
           --profile routing \
           -f compose.yaml \
           -f compose.ec2.yaml \
@@ -69,7 +69,6 @@ runs:
       run: |
         python3 deploy/ci/test_compose_memory_policy.py
         python3 deploy/ci/test_production_deploy_contract.py
-        python3 deploy/ci/test_package_pr_artifact.py
         python3 ../scripts/osm/import/test_artifact_contract.py
         python3 ../scripts/osm/import/test_normalize_graph_metadata.py
         python3 ../scripts/osm/test_operational_load.py

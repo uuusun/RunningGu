@@ -1,5 +1,6 @@
 """전체 부하의 부분 결과·중단·오류 계속 관측·정리 경로를 공급자 호출 없이 검증한다."""
 import datetime as dt
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -130,6 +131,12 @@ class CapacityTest(unittest.TestCase):
                     cap.execute(fixture_value(),"capacity-test",Path(directory)/"evidence",self.gate()|mutation,
                         secret_prompt=lambda _:"INPUT_SECRET",client_factory=lambda:client)
                 self.assertEqual([],client.calls)
+
+    def test_execute_is_rejected_after_staging_retirement(self):
+        with mock.patch("sys.argv", ["run_api_capacity.py", "--fixture", "missing.json", "--execute"]), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            self.assertEqual(2, cap.main())
+        self.assertEqual("staging_retired", json.loads(stdout.getvalue())["error"])
 
     def test_actual_entrypoint_routes_to_persistent_full_runner(self):
         with mock.patch.object(cap,"main",return_value=73) as main:

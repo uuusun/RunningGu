@@ -42,7 +42,7 @@ GRAPHHOPPER_S3_BUCKET=$("$env_reader" "$env_file" GRAPHHOPPER_S3_BUCKET)
 GRAPHHOPPER_S3_PREFIX=$("$env_reader" "$env_file" GRAPHHOPPER_S3_PREFIX)
 GRAPHHOPPER_ENVIRONMENT=$("$env_reader" "$env_file" GRAPHHOPPER_ENVIRONMENT)
 
-case "$GRAPHHOPPER_ENVIRONMENT" in staging|production) ;; *) echo "GraphHopper 배포 환경이 잘못됐습니다." >&2; exit 1 ;; esac
+[ "$GRAPHHOPPER_ENVIRONMENT" = production ] || { echo "GraphHopper 배포 환경은 production이어야 합니다." >&2; exit 1; }
 case "$GRAPHHOPPER_AWS_REGION" in ""|*[!a-z0-9-]*) echo "AWS region 형식이 잘못됐습니다." >&2; exit 1 ;; esac
 case "$GRAPHHOPPER_S3_BUCKET" in ""|*..*|*[!a-z0-9.-]*) echo "GraphHopper S3 bucket 형식이 잘못됐습니다." >&2; exit 1 ;; esac
 case "$GRAPHHOPPER_S3_PREFIX" in
@@ -53,10 +53,7 @@ mkdir -p -- "$graph_root"
 graph_root=$(readlink -f -- "$graph_root")
 case "$graph_root" in ""|/) echo "graph root가 안전하지 않습니다." >&2; exit 1 ;; esac
 
-case "$GRAPHHOPPER_ENVIRONMENT" in
-  staging) descriptor="$repository_root/backend/graphhopper/graph-release.json" ;;
-  production) descriptor="$repository_root/backend/graphhopper/graph-release.production.json" ;;
-esac
+descriptor="$repository_root/backend/graphhopper/graph-release.production.json"
 verifier="$repository_root/scripts/osm/import/verify-artifact.sh"
 [ -r "$descriptor" ] || { echo "release descriptor가 없습니다: $descriptor" >&2; exit 1; }
 [ -x "$verifier" ] || { echo "artifact 검증기를 실행할 수 없습니다: $verifier" >&2; exit 1; }
@@ -75,14 +72,14 @@ fi
 [ ! -e "$final_dir" ] || { echo "최종 artifact 경로가 directory가 아닙니다: $final_dir" >&2; exit 1; }
 
 download_dir=$(mktemp -d "$graph_root/.download-$artifact_id.XXXXXX")
-staging_dir="$graph_root/.staging-$artifact_id"
-[ ! -e "$staging_dir" ] || { echo "이전 staging directory가 남아 있습니다: $staging_dir" >&2; exit 1; }
-staging_created=0
+install_dir="$graph_root/.installing-$artifact_id"
+[ ! -e "$install_dir" ] || { echo "이전 설치 중간 directory가 남아 있습니다: $install_dir" >&2; exit 1; }
+install_dir_created=0
 
 cleanup() {
   rm -rf -- "$download_dir"
-  if [ "$staging_created" -eq 1 ] && [ -d "$staging_dir" ]; then
-    rm -rf -- "$staging_dir"
+  if [ "$install_dir_created" -eq 1 ] && [ -d "$install_dir" ]; then
+    rm -rf -- "$install_dir"
   fi
 }
 trap cleanup EXIT HUP INT TERM
@@ -104,30 +101,30 @@ done
   --expected-artifact-id "$artifact_id" \
   --expected-environment "$GRAPHHOPPER_ENVIRONMENT"
 
-mkdir -- "$staging_dir"
-staging_created=1
+mkdir -- "$install_dir"
+install_dir_created=1
 tar \
   --extract \
   --gzip \
   --file "$download_dir/graph.tar.gz" \
-  --directory "$staging_dir" \
+  --directory "$install_dir" \
   --no-same-owner \
   --no-same-permissions
 
 "$verifier" \
   --manifest "$download_dir/graph-manifest.json" \
-  --graph-dir "$staging_dir" \
+  --graph-dir "$install_dir" \
   --release-descriptor "$descriptor" \
   --expected-artifact-id "$artifact_id" \
   --expected-environment "$GRAPHHOPPER_ENVIRONMENT"
 
-chown -R 10001:10001 -- "$staging_dir"
-find "$staging_dir" -type d -exec chmod 0755 {} +
-find "$staging_dir" -type f -exec chmod 0444 {} +
+chown -R 10001:10001 -- "$install_dir"
+find "$install_dir" -type d -exec chmod 0755 {} +
+find "$install_dir" -type f -exec chmod 0444 {} +
 install -o root -g root -m 0444 \
   "$download_dir/graph-manifest.json" \
-  "$staging_dir/graph-manifest.json"
+  "$install_dir/graph-manifest.json"
 
-mv -- "$staging_dir" "$final_dir"
-staging_created=0
+mv -- "$install_dir" "$final_dir"
+install_dir_created=0
 echo "GraphHopper artifact 설치 완료(미활성): $artifact_id"

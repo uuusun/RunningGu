@@ -24,8 +24,8 @@ assert_failure() {
   }
 }
 
-printf 'GRAPHHOPPER_ENVIRONMENT=staging\r\nTOKEN=left=middle=right\r\n' >"$temporary/valid.env"
-[ "$("$parser" "$temporary/valid.env" GRAPHHOPPER_ENVIRONMENT)" = "staging" ]
+printf 'GRAPHHOPPER_ENVIRONMENT=production\r\nTOKEN=left=middle=right\r\n' >"$temporary/valid.env"
+[ "$("$parser" "$temporary/valid.env" GRAPHHOPPER_ENVIRONMENT)" = "production" ]
 [ "$("$parser" "$temporary/valid.env" TOKEN)" = "left=middle=right" ]
 
 printf 'KEY_EXTRA=value\n' >"$temporary/prefix.env"

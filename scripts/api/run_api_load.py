@@ -1026,6 +1026,10 @@ def legacy_main() -> int:
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--run-id")
     args = parser.parse_args()
+    if args.execute:
+        print(json.dumps({"loadExecuted": False, "passed": False,
+                          "error": "staging_retired"}, sort_keys=True))
+        return 2
     client = None
     try:
         fixture, fixture_hash = load_fixture(args.fixture, require_approved=args.execute)

@@ -10,7 +10,7 @@ env_reader="$repository_root/backend/deploy/common/read-required-env.sh"
 [ -x "$env_reader" ] || { echo "환경파일 parser를 실행할 수 없습니다: $env_reader" >&2; exit 1; }
 GRAPHHOPPER_ENVIRONMENT=$("$env_reader" "$env_file" GRAPHHOPPER_ENVIRONMENT)
 GRAPHHOPPER_SERVER_IMAGE=$("$env_reader" "$env_file" GRAPHHOPPER_SERVER_IMAGE)
-case "$GRAPHHOPPER_ENVIRONMENT" in staging|production) ;; *) echo "GraphHopper 배포 환경이 잘못됐습니다." >&2; exit 1 ;; esac
+[ "$GRAPHHOPPER_ENVIRONMENT" = production ] || { echo "GraphHopper 배포 환경은 production이어야 합니다." >&2; exit 1; }
 case "$GRAPHHOPPER_SERVER_IMAGE" in
   ""|*[!A-Za-z0-9._/@:+-]*) echo "GraphHopper server image 참조가 안전하지 않습니다." >&2; exit 1 ;;
 esac
@@ -32,10 +32,7 @@ active_dir=$(readlink -f -- "$current")
 [ "$active_dir" = "$graph_root/$artifact_id" ] || { echo "current가 graph root 밖을 가리킵니다." >&2; exit 1; }
 [ -d "$active_dir" ] || { echo "활성 graph directory가 없습니다." >&2; exit 1; }
 
-case "$GRAPHHOPPER_ENVIRONMENT" in
-  staging) descriptor="$repository_root/backend/graphhopper/graph-release.json" ;;
-  production) descriptor="$repository_root/backend/graphhopper/graph-release.production.json" ;;
-esac
+descriptor="$repository_root/backend/graphhopper/graph-release.production.json"
 verifier="$repository_root/scripts/osm/import/verify-artifact.sh"
 [ -r "$descriptor" ] || { echo "release descriptor가 없습니다: $descriptor" >&2; exit 1; }
 [ -x "$verifier" ] || { echo "artifact 검증기를 실행할 수 없습니다: $verifier" >&2; exit 1; }

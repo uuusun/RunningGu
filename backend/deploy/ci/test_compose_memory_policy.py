@@ -11,9 +11,7 @@ import unittest
 
 
 BACKEND = Path(__file__).resolve().parents[2]
-COMPOSE_ENV = BACKEND / "deploy/env/compose.env.example"
 PRODUCTION_COMPOSE_ENV = BACKEND / "deploy/env/compose.production.env.example"
-APPLICATION_ENV = BACKEND / "deploy/env/application.env.example"
 PRODUCTION_APPLICATION_ENV = BACKEND / "deploy/env/application.production.env.example"
 MEMORY_KEYS = (
     "GRAPHHOPPER_XMS", "GRAPHHOPPER_XMX",
@@ -21,7 +19,7 @@ MEMORY_KEYS = (
 )
 
 
-def compose_result(overrides=None, env_file=COMPOSE_ENV):
+def compose_result(overrides=None, env_file=PRODUCTION_COMPOSE_ENV):
     env = dict(os.environ)
     # PC·CI의 환경변수가 저장소 배포 예시의 결함을 가리지 않게 한다.
     for key in MEMORY_KEYS:
@@ -42,7 +40,7 @@ def compose_result(overrides=None, env_file=COMPOSE_ENV):
     )
 
 
-def compose_model(reservation=None, limit=None, env_file=COMPOSE_ENV):
+def compose_model(reservation=None, limit=None, env_file=PRODUCTION_COMPOSE_ENV):
     overrides = {}
     if reservation is not None:
         overrides["GRAPHHOPPER_MEMORY_RESERVATION"] = reservation
@@ -72,7 +70,7 @@ def read_env(path):
     return env
 
 
-def backend_profile(env_file=APPLICATION_ENV):
+def backend_profile(env_file=PRODUCTION_APPLICATION_ENV):
     env = read_env(env_file)
     unit = configparser.ConfigParser(interpolation=None)
     unit.optionxform = str
@@ -92,23 +90,14 @@ def assert_4g_profile(model, env, service):
 
 
 class ComposeMemoryPolicyTest(unittest.TestCase):
-    def test_repository_examples_render_approved_4g_profile(self):
+    def test_production_examples_render_approved_4g_profile(self):
         assert_4g_profile(compose_model(), *backend_profile())
 
-    def test_production_examples_render_approved_4g_profile(self):
-        assert_4g_profile(
-            compose_model(env_file=PRODUCTION_COMPOSE_ENV),
-            *backend_profile(PRODUCTION_APPLICATION_ENV),
-        )
-
-    def test_backup_paths_are_explicit_and_separated_by_environment(self):
-        staging_env = read_env(COMPOSE_ENV)
+    def test_backup_path_is_explicitly_production(self):
         production_env = read_env(PRODUCTION_COMPOSE_ENV)
-        self.assertEqual(staging_env["PGBACKREST_REPO1_PATH"], "/runninggu/staging")
         self.assertEqual(production_env["PGBACKREST_REPO1_PATH"], "/runninggu/production")
-        self.assertNotEqual(staging_env["PGBACKREST_REPO1_PATH"], production_env["PGBACKREST_REPO1_PATH"])
 
-        production = compose_result(env_file=PRODUCTION_COMPOSE_ENV)
+        production = compose_result()
         self.assertEqual(production.returncode, 0, f"운영 Compose 모델 생성 실패: exit={production.returncode}")
         postgres = json.loads(production.stdout)["services"]["postgres"]
         self.assertEqual(postgres["environment"]["PGBACKREST_REPO1_PATH"], "/runninggu/production")
@@ -131,7 +120,7 @@ class ComposeMemoryPolicyTest(unittest.TestCase):
                 self.assertIn(key, result.stderr)
 
     def test_missing_memory_values_fail_before_deployment(self):
-        lines = COMPOSE_ENV.read_text(encoding="utf-8").splitlines()
+        lines = PRODUCTION_COMPOSE_ENV.read_text(encoding="utf-8").splitlines()
         with tempfile.TemporaryDirectory() as directory:
             env_file = Path(directory) / "compose.env"
             for key in MEMORY_KEYS:

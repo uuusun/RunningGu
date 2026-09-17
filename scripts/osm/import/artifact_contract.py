@@ -509,8 +509,8 @@ def validate_release_descriptor(
     )
     if descriptor["schemaVersion"] != SCHEMA_VERSION:
         fail("release descriptor schemaVersion이 1이 아닙니다.")
-    if descriptor["environment"] not in {"staging", "production"}:
-        fail("release descriptor environment가 허용값이 아닙니다.")
+    if descriptor["environment"] != "production":
+        fail("release descriptor environment는 production이어야 합니다.")
     if expected_environment and descriptor["environment"] != expected_environment:
         fail("release descriptor environment와 배포 환경이 다릅니다.")
     if descriptor["artifactId"] != manifest["artifactId"]:
@@ -599,7 +599,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--graph-dir", type=Path)
     verify.add_argument("--release-descriptor", type=Path)
     verify.add_argument("--expected-artifact-id")
-    verify.add_argument("--expected-environment", choices=("staging", "production"))
+    verify.add_argument("--expected-environment", choices=("production",))
     verify.set_defaults(handler=verify_command)
     return parser
 

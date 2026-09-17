@@ -1,5 +1,11 @@
 # AWS EC2 스테이징 배포 실행서
 
+> **폐기됨 — 실행 금지(2026-09-18):** 스테이징 EC2와 DNS를 삭제했다(SPEC 결정-71).
+> 이 문서는 과거 용량·배포 검증의 재현 근거로만 보존하며 서버 생성, DNS 복구, 인증서 발급,
+> APK 연결에 사용하지 않는다. 현재 배포·검증은
+> [`aws-ec2-production-runbook.md`](aws-ec2-production-runbook.md)와
+> [`development-release-contest-guide.md` §7](../development-release-contest-guide.md#7-백엔드데이터베이스-배포-지침)을 따른다.
+
 > **2026-09-07 19:23 KST 미사용 중지:** 검증 후 계속 실행 중이던 4GiB EC2를 정상 중지했고,
 > 현재·이전 스테이징 두 인스턴스 모두 `Stopped`를 확인했다. 아래 **4GiB 유지**는 사양 결정이다.
 > 테스트 APK의 온라인 기능은 다음 기동까지 사용할 수 없다. EBS·Elastic IP 등 보유 비용은 남는다.

@@ -17,7 +17,7 @@
 (AGENTS 8장) — 이메일 주소는 요약에서 가린다.
 
 사용:
-    export RUNNINGGU_API_BASE_URL=https://staging-api.runninggu.store
+    export RUNNINGGU_API_BASE_URL=https://api.runninggu.store
     export RUNNINGGU_JUDGE_EMAIL=...        # 로그에 안 남는다
     export RUNNINGGU_JUDGE_PASSWORD=...
     python seed_judge_account.py --out seed-summary.json
@@ -481,6 +481,9 @@ def main() -> int:
     if not args.base_url or not email or not password:
         print("RUNNINGGU_API_BASE_URL · RUNNINGGU_JUDGE_EMAIL · RUNNINGGU_JUDGE_PASSWORD "
               "가 모두 필요하다 (scripts/.env)", file=sys.stderr)
+        return 2
+    if args.base_url.rstrip("/") != "https://api.runninggu.store":
+        print("스테이징 폐기 후 심사 계정 표본은 운영 API에서만 채운다", file=sys.stderr)
         return 2
 
     client = Client(args.base_url)

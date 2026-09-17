@@ -77,7 +77,7 @@ Google Play 는 계정 생성이 있는 앱에 앱 내 + 웹 삭제 요청 경�
 | 개인정보 보호·고충처리 담당 | `루트메이트 개인정보보호 담당` — #230 |
 | 문의 주소 | `runninggu.play@gmail.com` — #230 |
 | AWS 수탁 법인명 | `Amazon Web Services Korea LLC` — 2026-09-06 AWS Billing 확인 (#230) |
-| 메일 발송 수탁자 | `Plus Five Five, Inc. (Resend)` — Resend DPA·스테이징 전환 확인 (#321) |
+| 메일 발송 수탁자 | `Plus Five Five, Inc. (Resend)` — Resend DPA·운영 발송 확인, 과거 스테이징 전환 기록 보존 (#321·#338) |
 | Resend 국외 처리 | 이메일 데이터·기록은 미국에 저장, 일반 요금제 기준 30일 보유 |
 | 서버 접속 파일 로그 보관 | **14일 보관 후 정기 삭제** — SPEC 결정-61 · #313 |
 | 앱 API HTTP·HTTPS 접속 기록 | 두 연결 모두 질의 문자열 제외 — [2026-09-07 적용 기록](../docs/deploy/evidence/nginx-log-location-audit-20260907.md) |

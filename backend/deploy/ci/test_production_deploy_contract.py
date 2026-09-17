@@ -1,4 +1,4 @@
-"""운영 배포 파일이 스테이징과 분리된 계약을 유지하는지 검증한다."""
+"""폐기된 스테이징 경로 없이 운영 배포 계약만 유지하는지 검증한다."""
 
 import json
 from pathlib import Path
@@ -11,27 +11,35 @@ ARTIFACT_ID = "gh11-korea-20260901-2ff6731b181a-2b8515dd29fc"
 
 
 class ProductionDeployContractTest(unittest.TestCase):
-    def test_release_descriptors_pin_same_payload_for_separate_environments(self):
-        staging = json.loads((BACKEND / "graphhopper/graph-release.json").read_text(encoding="utf-8"))
+    def test_release_descriptor_is_production_only(self):
         production = json.loads((BACKEND / "graphhopper/graph-release.production.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(staging["environment"], "staging")
         self.assertEqual(production["environment"], "production")
-        self.assertEqual(staging["artifactId"], ARTIFACT_ID)
-        for key in ("artifactId", "manifestSha256", "buildInputSha256"):
-            self.assertEqual(staging[key], production[key], key)
+        self.assertEqual(production["artifactId"], ARTIFACT_ID)
+        self.assertFalse((BACKEND / "graphhopper/graph-release.json").exists())
 
-    def test_install_and_verify_select_environment_descriptor(self):
-        expected = {
-            "staging": 'descriptor="$repository_root/backend/graphhopper/graph-release.json"',
-            "production": 'descriptor="$repository_root/backend/graphhopper/graph-release.production.json"',
-        }
+    def test_install_and_verify_require_production_descriptor(self):
+        assignment = 'descriptor="$repository_root/backend/graphhopper/graph-release.production.json"'
         for script_name in ("install-graph-artifact.sh", "verify-active-graph.sh"):
             script = (BACKEND / "deploy/graphhopper" / script_name).read_text(encoding="utf-8")
             with self.subTest(script=script_name):
-                for environment, assignment in expected.items():
-                    self.assertIn(f"{environment}) {assignment}", script)
+                self.assertIn(assignment, script)
+                self.assertIn('"$GRAPHHOPPER_ENVIRONMENT" = production', script)
+                self.assertNotIn("staging)", script)
                 self.assertIn('--expected-environment "$GRAPHHOPPER_ENVIRONMENT"', script)
+
+    def test_retired_staging_deploy_files_are_absent(self):
+        retired = (
+            "deploy/env/application.env.example",
+            "deploy/env/compose.env.example",
+            "deploy/nginx/staging-api.bootstrap.conf",
+            "deploy/nginx/staging-api.conf",
+            "deploy/nginx/default-reject.conf",
+            "graphhopper/graph-release.json",
+        )
+        for name in retired:
+            with self.subTest(file=name):
+                self.assertFalse((BACKEND / name).exists())
 
     def test_production_nginx_files_only_name_public_host(self):
         for name in (
@@ -104,6 +112,7 @@ class ProductionDeployContractTest(unittest.TestCase):
 
         self.assertIn("DB_USERNAME=runninggu\n", compose_env)
         self.assertIn("pg1-user=runninggu\n", pgbackrest)
+        self.assertIn("repo1-path=/runninggu/production\n", pgbackrest)
         self.assertIn("        ca-certificates \\\n", postgres_image)
 
     def test_recovery_compose_requires_explicit_backup_repository_path(self):
