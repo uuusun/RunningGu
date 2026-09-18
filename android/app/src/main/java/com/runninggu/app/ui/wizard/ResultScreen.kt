@@ -713,6 +713,7 @@ internal fun LazyListScope.savedEditSection(
                 // 반응하면 "됐다" 로 읽힌다
                 EditList(
                     day = day,
+                    raceSubtitle = state.raceRowSubtitle,
                     openedId = openedBlockId,
                     onOpenedChange = onOpenedChange,
                     onRemove = { if (!state.editInFlight) onRemoveBlock(it) },
@@ -776,7 +777,9 @@ private fun EditNotice() {
  *   실제 목록을 한 칸씩 옮기므로 놓는 순간 이미 반영돼 있다.
  *   삭제는 두 길이다 — 휴지통 탭, 또는 행을 **왼쪽으로 스와이프**하면 나타나는
  *   빨간 [삭제] 버튼. 열린 행은 화면에 하나뿐이고([openedId]), 바깥을 건드리면 닫힌다.
- * - RACE: 잠금 아이콘과 "관리자 업데이트". **그립·교체·스와이프를 아예 주지 않는다.**
+ * - RACE: 잠금 아이콘과 [raceSubtitle]. **그립·교체·스와이프를 아예 주지 않는다.**
+ *   부제는 생성 직후("관리자 업데이트")와 저장 동선("저장 당시 대회 일정")이 다르므로
+ *   화면에서 정하지 않고 받는다(SPEC §4.10 · #372).
  *
  * 버튼을 숨기는 게 본 방어선이고, [ItineraryEdits]의 거부는 그래도 새어 들어온 경우를 막는
  * 안전망이다 — 목업은 이 방어가 없어 대회 블록이 삭제됐다(대조표 B4).
@@ -787,6 +790,7 @@ private fun EditNotice() {
 @Composable
 internal fun EditList(
     day: ItineraryDay,
+    raceSubtitle: String,
     openedId: String?,
     onOpenedChange: (String?) -> Unit,
     onRemove: (String) -> Unit,
@@ -943,7 +947,7 @@ internal fun EditList(
                                             .joinToString(" · ")
                                             .ifEmpty { block.catKey.label }
                                     } else {
-                                        "관리자 업데이트"
+                                        raceSubtitle
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

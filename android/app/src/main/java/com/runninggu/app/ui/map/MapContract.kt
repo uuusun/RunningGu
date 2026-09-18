@@ -34,6 +34,20 @@ data class MapScene(
             emptyList()
         }
 
+    /**
+     * 핀을 잇는 선이 회복일 색(주황)인가. (SPEC §3-8 범례 · #365 · QA H-04)
+     *
+     * **선과 핀의 색 기준이 같아야 한다.** 핀만 [MapMarker.recovery] 로 주황이 되고 선은
+     * 파랑으로 고정돼 있어서, S7 회복일 탭에서 주황 핀을 파란 선이 잇고 있었다 — 범례는
+     * "동선 파랑 · 회복일 주황" 한 쌍이라 색이 갈리면 둘 중 무엇이 회복일인지 읽을 수 없다.
+     *
+     * S7 은 **일자 단위**로 회복을 정하므로(`ResultUiState.mapPins`) 한 장면의 핀은 회복
+     * 여부가 전부 같다. 그래도 `all` 로 보는 것은, 섞인 장면이 들어왔을 때 일부만 회복인
+     * 선을 주황으로 칠해 "이 날 전체가 회복일" 이라고 잘못 말하지 않기 위해서다.
+     */
+    internal val pinPathRecovery: Boolean
+        get() = pins.isNotEmpty() && pins.all { it.recovery }
+
     /** 카메라가 담아야 할 좌표. 경로가 있으면 경로가 기준이다(§3-8 · 목업 MapView). */
     internal val cameraTargets: List<LatLng>
         get() = if (route.size >= MIN_ROUTE_POINTS) route else pins.map { LatLng(it.lat, it.lng) }

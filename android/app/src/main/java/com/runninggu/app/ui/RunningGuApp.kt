@@ -24,7 +24,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.ui.navigation.Routes
 import com.runninggu.app.ui.theme.Ink5
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -138,10 +137,19 @@ private fun RunningGuBottomBar(
 /**
  * 탭 전환 — 해당 탭 루트로 이동하고 중간 스택은 초기화한다 (SPEC §2.2).
  * 목업의 RESET_TO 계약을 승계하므로 상태를 저장·복원하지 않는다.
+ *
+ * **기준점은 홈이지 그래프의 시작 목적지가 아니다** (#357 · QA K-12). 루트 그래프의 시작은
+ * 로그인 그래프인데, 로그인·둘러보기를 마치면 그 그래프는 백스택에서 지워진다 —
+ * 없는 목적지로 `popUpTo` 하면 아무것도 안 걷히고 **홈도 스택에 안 남아서**, 홈이 아닌
+ * 탭에서 시스템 뒤로가기를 누르면 홈 대신 앱이 종료됐다.
+ *
+ * 홈까지만 걷어내면(`inclusive` 기본값 false) 홈이 스택 바닥에 남고 탭 화면 한 장만
+ * 그 위에 얹힌다. 그래서 다른 탭에서 뒤로가기는 홈, 홈에서 뒤로가기는 앱 종료다(SPEC §3-3).
+ * 탭을 여러 번 옮겨도 이전 탭은 매번 걷히므로 스택은 [홈, 지금 탭] 을 넘지 않는다.
  */
 private fun NavHostController.navigateToTab(tab: TopLevelDestination) {
     navigate(tab.route) {
-        popUpTo(graph.findStartDestination().id) { saveState = false }
+        popUpTo(Routes.HOME) { saveState = false }
         launchSingleTop = true
         restoreState = false
     }

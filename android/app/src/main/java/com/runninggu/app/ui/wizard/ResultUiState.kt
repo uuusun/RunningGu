@@ -105,6 +105,20 @@ data class ResultUiState(
      */
     val isSavedEditing: Boolean get() = restoredItineraryId != null
 
+    /**
+     * 편집 목록 RACE 행의 부제. (SPEC §4.10 · #372 · QA H-21)
+     *
+     * **같은 화면인데 문구가 갈린다.** 생성 직후 결과의 대회 일정은 지금 canonical 그대로라
+     * "관리자 업데이트" 지만, 저장 동선의 RACE 는 저장 시점 snapshot 이라 canonical 이 바뀌어도
+     * 따라오지 않는다(결정-45 · §5-2). 그 사실을 사용자에게 알리는 것이 "저장 당시 대회 일정"
+     * 이므로, 저장 동선에서 "관리자 업데이트" 라고 적으면 최신이라는 반대 뜻이 된다.
+     *
+     * [isSavedEditing] 과 같은 이유로 화면 리터럴이 아니라 상태에 둔다 — Composable 안의
+     * 조건은 단위 테스트가 못 본다.
+     */
+    val raceRowSubtitle: String
+        get() = if (isSavedEditing) "저장 당시 대회 일정" else "관리자 업데이트"
+
     enum class Phase { LOADING, CONTENT, EMPTY, ERROR }
 
     val days: List<ItineraryDay>

@@ -70,6 +70,7 @@ class EditListAccessibilityTest {
         compose.setContent {
             EditList(
                 day = day,
+                raceSubtitle = "관리자 업데이트",
                 openedId = null,
                 onOpenedChange = {},
                 onRemove = {},

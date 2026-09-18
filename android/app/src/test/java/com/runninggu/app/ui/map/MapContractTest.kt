@@ -2,6 +2,7 @@ package com.runninggu.app.ui.map
 
 import com.runninggu.app.domain.LatLng
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -191,5 +192,33 @@ class MapContractTest {
             cameraFitPaddingPx(2.75f, hasPins = false) <
                 cameraFitPaddingPx(2.75f, hasPins = true),
         )
+    }
+
+    @Test
+    fun `회복일 핀만 있으면 잇는 선도 회복 색이다`() {
+        // 핀은 주황인데 선만 파랑이었다 — 범례가 "동선 파랑 · 회복일 주황" 한 쌍이라
+        // 색이 갈리면 무엇이 회복일인지 읽을 수 없다(#365 · QA H-04).
+        val scene = MapScene(pins = threePins.map { it.copy(recovery = true) })
+
+        assertTrue(scene.pinPathRecovery)
+    }
+
+    @Test
+    fun `평소 동선은 선이 회복 색이 아니다`() {
+        assertFalse(MapScene(pins = threePins).pinPathRecovery)
+    }
+
+    @Test
+    fun `회복 핀이 섞여 있으면 선을 회복 색으로 칠하지 않는다`() {
+        // 일부만 회복인 선을 주황으로 칠하면 "이 날 전체가 회복일" 이라고 잘못 말한다.
+        val mixed = threePins.mapIndexed { index, pin -> pin.copy(recovery = index == 0) }
+
+        assertFalse(MapScene(pins = mixed).pinPathRecovery)
+    }
+
+    @Test
+    fun `핀이 없으면 회복 색을 따지지 않는다`() {
+        // 선 자체가 없는 장면이다 — `all` 은 빈 목록에서 true 라 따로 막는다.
+        assertFalse(MapScene(pins = emptyList()).pinPathRecovery)
     }
 }
