@@ -139,8 +139,9 @@ class ItineraryGenerationServiceTest {
         assertThat(generated.plan().hotel().name()).isEqualTo("호텔 세종 가온");
         assertThat(generated.days()).extracting(day -> day.dayIndex())
                 .containsExactly(-1, 0, 1);
+        // 회복일이라고 웰니스를 담지 않는다 — 고정 온천 블록이 없어졌다(결정-74)
         verify(poolLoader).load(
-                eq(List.of(PoiCategory.FOOD, PoiCategory.TOUR, PoiCategory.WELLNESS)),
+                eq(List.of(PoiCategory.FOOD, PoiCategory.TOUR)),
                 eq(LAT),
                 eq(LNG));
     }

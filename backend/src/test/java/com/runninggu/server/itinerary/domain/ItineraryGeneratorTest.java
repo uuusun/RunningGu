@@ -135,12 +135,12 @@ class ItineraryGeneratorTest {
                 true,
                 List.of(PoiCategory.HISTORY));
 
+        // 회복일에는 웰니스를 담지 않는다 — 고른 경우에만 themes 로 들어온다(결정-74)
         assertThat(generator.requiredCategories(half))
                 .containsExactly(
                         PoiCategory.FOOD,
                         PoiCategory.TOUR,
-                        PoiCategory.HISTORY,
-                        PoiCategory.WELLNESS);
+                        PoiCategory.HISTORY);
         assertThat(generator.requiredCategories(tenK))
                 .containsExactly(
                         PoiCategory.FOOD,
@@ -148,6 +148,13 @@ class ItineraryGeneratorTest {
                         PoiCategory.HISTORY,
                         PoiCategory.CAFE);
         assertThat(generator.requiredCategories(half)).doesNotContain(PoiCategory.NATURE);
+        // 웰니스를 고르면 그때는 담는다
+        assertThat(generator.requiredCategories(plan(
+                ContestEventType.HALF,
+                RACE_DATE,
+                RACE_DATE,
+                false,
+                List.of(PoiCategory.WELLNESS)))).contains(PoiCategory.WELLNESS);
     }
 
     @Test

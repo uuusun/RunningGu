@@ -617,7 +617,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - RACE 블록은 `placeName=CONTEST.place`, `address=CONTEST.road_address`(nullable), canonical 좌표를 사용한다. `start_time`이 없으면 `08:00`이다.
 - 순수 엔진은 카테고리별 POI 조회 원천을 내부 추적하지만 `sources`는 생성 HTTP 응답에 포함하지 않는다. `LIVE/SAMPLE/SYNTH` 배지는 POI 목록 응답에서 노출한다(결정-53, NFR-2).
 - 외부 POI 실패 시 해당 블록 `placeName/lat/lng=null` 강등, **생성은 실패하지 않음** 🔒(NFR-3).
-- 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (noHard면 WELLNESS, 아니면 CAFE) 🔒(§5.6-2).
+- 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (**회복✕면 CAFE**) 🔧(§5.6-2 · 결정-74). 회복○ 에는 더 담지 않는다 — 고정 온천 블록이 없어져 웰니스는 고른 경우에만 `themes` 로 들어온다.
 - 정상 처리됐지만 표시 가능한 블록이 없으면 `200`에서 `days: []`를 반환하고 앱은 S7 Empty로 표시한다. 네트워크·timeout·4xx/5xx는 Error이며 Empty로 강등하지 않는다.
 
 ### 5-2 `POST /api/itineraries` — 저장 (인증, 트리 1회 cascade) 🔒

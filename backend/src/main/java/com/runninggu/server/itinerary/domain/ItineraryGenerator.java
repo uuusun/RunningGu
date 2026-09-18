@@ -70,15 +70,24 @@ public class ItineraryGenerator {
             "음식점 > 간식",
             "음식점 > 패스트푸드");
 
-    /** 필요한 카테고리를 결정적 순서로 한 번씩만 반환한다. (SPEC §5.6-2) */
+    /**
+     * 필요한 카테고리를 결정적 순서로 한 번씩만 반환한다. (SPEC §5.6-2)
+     *
+     * **회복일이라고 웰니스를 넣지 않는다**(결정-74). 예전에는 `noHard` 면 웰니스를 무조건 담았는데,
+     * 고정 온천 블록이 사라진 지금은 고른 사람이 아니면 **불러다 놓고 한 번도 쓰지 않는다** —
+     * 웰니스는 KTO 페어 키로 반경 20km 를 따로 도는 조회라 특히 아깝다(API 명세 부록).
+     * 고른 경우에는 `plan.themes()` 로 이미 들어온다.
+     *
+     * 카페는 회복✕ 골격의 `15:30` 고정 슬롯이 쓰므로 그대로 담는다.
+     */
     public List<PoiCategory> requiredCategories(ItineraryPlan plan) {
         Set<PoiCategory> categories = new LinkedHashSet<>();
         categories.add(PoiCategory.FOOD);
         categories.add(PoiCategory.TOUR);
         categories.addAll(plan.themes());
-        categories.add(RecoveryPolicy.forEvent(plan.event()).noHard()
-                ? PoiCategory.WELLNESS
-                : PoiCategory.CAFE);
+        if (!RecoveryPolicy.forEvent(plan.event()).noHard()) {
+            categories.add(PoiCategory.CAFE);
+        }
         return List.copyOf(categories);
     }
 
