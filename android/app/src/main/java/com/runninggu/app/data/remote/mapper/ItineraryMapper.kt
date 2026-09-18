@@ -130,7 +130,11 @@ private fun categoryOf(raw: String): BlockCategory =
  */
 fun ItinerarySummaryDto.toSavedItinerary(): SavedItinerary = SavedItinerary(
     id = id.toString(),
-    title = title,
+    // 서버 `title` 은 **지역이 빠진** "당일치기"·"n박 n+1일" 이고, 지역은 따로 온다
+    // (API 명세 §5-1 · §5-4). 카드 제목은 "{지역} {기간}" 이라(§4.13) 여기서 합친다 —
+    // 안 합치면 같은 대회를 여러 기간으로 저장했을 때 카드끼리 구분이 안 된다(#371 · QA J-04).
+    // S7 헤더(`ResultUiState.title`)도 같은 규칙으로 조합한다.
+    title = listOf(region.orEmpty(), title).filter { it.isNotBlank() }.joinToString(" "),
     raceName = contestName,
     // 서버 enum(`HALF`·`K10`)을 그대로 두면 카드에 계약 값이 그대로 보인다(#181 리뷰).
     // 모르는 값은 **버리지 않고 그대로** 둔다 — 빈 칸보다 낯선 글자가 낫고, 서버가 종목을

@@ -23,7 +23,8 @@ class ItinerarySummaryMapperTest {
         event: String = "HALF",
     ) = ItinerarySummaryDto(
         id = 42L,
-        title = "부산 2박 3일",
+        // 계약상 서버 `title` 에는 지역이 없다(API 명세 §5-1)
+        title = "2박 3일",
         contestId = 7L,
         contestName = "부산 마라톤",
         event = event,
@@ -93,5 +94,19 @@ class ItinerarySummaryMapperTest {
 
         assertTrue(item.needsRegeneration)
         assertTrue(!item.active)
+    }
+
+    @Test
+    fun `카드 제목은 지역과 기간을 합친다`() {
+        // 서버 title 에는 지역이 없다 — 그대로 쓰면 카드가 "2박 3일" 뿐이라 같은 대회를
+        // 여러 기간으로 저장했을 때 구분이 안 된다(#371 · QA J-04)
+        assertEquals("부산 2박 3일", dto().toSavedItinerary().title)
+    }
+
+    @Test
+    fun `지역이 없으면 기간만 쓴다`() {
+        // 빈 지역을 붙이면 앞에 공백이 남는다
+        assertEquals("2박 3일", dto().copy(region = null).toSavedItinerary().title)
+        assertEquals("2박 3일", dto().copy(region = " ").toSavedItinerary().title)
     }
 }
