@@ -2,6 +2,8 @@ package com.runninggu.app.ui.wizard
 
 import com.runninggu.app.data.model.ItineraryResult
 import com.runninggu.app.data.remote.ApiErrorCode
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.remote.ApiException
 import com.runninggu.app.data.repository.FakeItineraryRepository
@@ -36,7 +38,12 @@ class ResultSaveTest {
     private val dispatcher = StandardTestDispatcher()
 
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        // 저장은 로그인 사용자의 일이다. 게스트는 서버를 부르기 전에 막히므로(#359)
+        // 서버 응답을 보는 케이스는 로그인해 두고, 게스트 케이스만 따로 로그아웃한다.
+        SessionStore.signIn(testProfile())
+    }
 
     @After
     fun tearDown() {
@@ -67,6 +74,13 @@ class ResultSaveTest {
     }
 
     private fun failing(error: Throwable) = SavingRepository { throw error }
+
+    private fun testProfile() = SessionProfile(
+        nickname = "테스터",
+        email = "tester@example.test",
+        loginProvider = LoginProvider.EMAIL,
+        marketingAgreed = false,
+    )
 
     /** canonical id 가 있어야 서버를 부른다 — 없으면 생성 단계에서 막힌다(#66). */
     private fun wizard(): WizardUiState {
@@ -111,15 +125,37 @@ class ResultSaveTest {
     @Test
     fun `게스트는 문구가 아니라 모달이다`() = runTest(dispatcher) {
         // 로그인은 화면을 옮겨야 끝나는 일이라 안내 한 줄로는 부족하다(매핑표 S7 게스트 modal).
-        val viewModel = loaded(
-            failing(ApiException.Http(status = 401, code = ApiErrorCode.UNKNOWN, problem = null)),
+        // **서버는 부르지 않는다** — 찜과 같은 로컬 가드다(매핑표 §8 · #359 A안). 401 을
+        // 기다리던 때는 게스트가 누를 때마다 헛요청이 하나씩 나갔다.
+        SessionStore.resetForTest()
+        val repository = failing(
+            ApiException.Http(status = 401, code = ApiErrorCode.UNKNOWN, problem = null),
         )
+        val viewModel = loaded(repository)
         advanceUntilIdle()
 
         viewModel.onSave()
         advanceUntilIdle()
 
         assertEquals(SaveItineraryState.NeedsLogin, viewModel.uiState.value.save)
+        assertEquals("게스트인데 저장 요청이 나갔다", 0, repository.saveCount)
+    }
+
+    @Test
+    fun `로그인했는데 세션이 만료돼 401 이 오면 같은 모달이다`() = runTest(dispatcher) {
+        // 로컬 가드는 게스트만 거른다. 토큰이 죽은 사용자는 서버가 401 로 알려 주고,
+        // 그 경로는 그대로 살아 있어야 한다.
+        val repository = failing(
+            ApiException.Http(status = 401, code = ApiErrorCode.UNKNOWN, problem = null),
+        )
+        val viewModel = loaded(repository)
+        advanceUntilIdle()
+
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        assertEquals(SaveItineraryState.NeedsLogin, viewModel.uiState.value.save)
+        assertEquals(1, repository.saveCount)
     }
 
     @Test

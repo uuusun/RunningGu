@@ -325,7 +325,8 @@ class CourseViewModel(
      *
      * ## 게스트는 로그인 유도 모달로 끝낸다
      *
-     * `401` 이면 [SaveCourseState.NeedsLogin] 으로 모달을 띄운다(매핑표 S8 "게스트 modal").
+     * 게스트면 **서버를 부르지 않고** [SaveCourseState.NeedsLogin] 으로 모달을 띄운다(매핑표 §8 · #359).
+     * 로그인했는데 세션이 만료돼 `401` 이 오면 같은 상태로 떨어진다.
      * 로그인하고 돌아와도 **저장을 예약하지 않는다**(D-27) — 누른 적 없는 저장이 저절로
      * 일어나면 사용자가 놀란다.
      */
@@ -333,6 +334,13 @@ class CourseViewModel(
         val state = _uiState.value
         if (state.save is SaveCourseState.Saving) return
         val route = state.selectedRoute ?: return
+
+        // **게스트는 서버를 부르기 전에 막는다** (매핑표 §8 · #359 A안). 찜과 같은 기준이고,
+        // 세션이 만료된 로그인 사용자는 아래 401 경로가 그대로 받는다.
+        if (!SessionStore.isLoggedIn) {
+            _uiState.update { it.copy(save = SaveCourseState.NeedsLogin) }
+            return
+        }
 
         val epoch = SessionStore.sessionEpoch
         val generation = nearbyGeneration

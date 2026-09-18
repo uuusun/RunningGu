@@ -228,6 +228,15 @@ class ResultViewModel(
         // 않지만, 두 번째 응답이 늦게 와서 이미 옮겨 간 화면을 다시 건드린다.
         if (state.save is SaveItineraryState.Saving) return
 
+        // **게스트는 서버를 부르기 전에 막는다** (매핑표 §8 "찜·동선·코스 저장을 API 전에 차단" ·
+        // #359 A안). 찜(`FavoriteStore.toggle`)과 같은 기준이다. 401 을 기다리면 게스트가
+        // 누를 때마다 헛요청이 하나씩 나가고, 셋 중 저장 둘만 다르게 움직였다.
+        // 로그인 사용자의 세션 만료는 아래 401 경로가 그대로 받는다.
+        if (!SessionStore.isLoggedIn) {
+            _uiState.update { it.copy(save = SaveItineraryState.NeedsLogin) }
+            return
+        }
+
         // 기다리는 사이 세션이 바뀌면 그 결과는 남의 것이다 (S8 `onSaveCourse` 와 같은
         // 장치 · #166 리뷰). 저장은 계정에 쌓는 일이라 여기가 특히 중요하다.
         val epoch = SessionStore.sessionEpoch
