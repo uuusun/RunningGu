@@ -228,7 +228,8 @@ private class ScenePainter {
         routeLine = drawLine(layer, scene.route)
 
         pinLine?.let { layer.remove(it) }
-        pinLine = drawLine(layer, scene.pinPath)
+        // 회복일은 핀과 선이 같이 주황이다(§3-8 범례 · #365).
+        pinLine = drawLine(layer, scene.pinPath, if (scene.pinPathRecovery) Orange else Blue)
     }
 
     /**
@@ -241,12 +242,18 @@ private class ScenePainter {
      *
      * 저장 코스만 점선으로 만들면 같은 지도에서 코스 종류에 따라 선 모양이 달라지는데,
      * 사용자가 그 차이를 읽을 근거가 목업에도 SPEC 에도 없다.
+     *
+     * @param color 선 색. 기본은 동선 파랑이고, 회복일 핀을 잇는 선만 주황이다(§3-8 · #365).
      */
-    private fun drawLine(layer: RouteLineLayer, points: List<LatLng>): RouteLine? {
+    private fun drawLine(
+        layer: RouteLineLayer,
+        points: List<LatLng>,
+        color: Color = Blue,
+    ): RouteLine? {
         if (points.size < MIN_ROUTE_POINTS) return null
 
         val stylesSet = RouteLineStylesSet.from(
-            RouteLineStyles.from(RouteLineStyle.from(ROUTE_WIDTH_DP, Blue.toArgb())),
+            RouteLineStyles.from(RouteLineStyle.from(ROUTE_WIDTH_DP, color.toArgb())),
         )
         val segment = RouteLineSegment.from(points.map { it.toKakao() }, stylesSet.getStyles(0))
         return layer.addRouteLine(RouteLineOptions.from(segment))
