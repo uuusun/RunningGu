@@ -345,7 +345,7 @@
 | 6 | 2026-09-18 | develop `6bd7f57`(#360·#363·#366 머지 후) · debug | runninggu_qa_arm · 운영 API · 게스트 | 민지(Claude 보조) | 스팟 순환 경로 성공 경로: ✅ 3 · ⚠ 1 | — |
 | 7 | 2026-09-18 | develop `6bd7f57` + #370 · debug | runninggu_qa_arm · 운영 릴레이(전부 개방) · **QA 계정 `q***+qa@gmail.com` 가입→탈퇴** | 민지(코드·링크 전달) + Claude | 이메일 가입·재설정·탈퇴: ✅ 17 · ❌ 0 | — |
 | 8 | 2026-09-18 | **릴리스 서명 APK 1.0.1**(`6bd7f57` · versionCode 2 · 원스토어 인증서) | runninggu_qa_arm(`--abi arm64-v8a`) · **운영 API 직결**(릴레이 없음 · 결정-71) · 게스트 | 민지(코드 전달) + Claude | 릴리스 빌드 게스트 항목: ✅ 13 · ❌ 1(#357 재현) · ⚠ 4 | K-12 → #357(기존) |
-| 9 | 2026-09-18 | 릴리스 APK(운영 로그인·카카오) + **로컬 Docker 백엔드 debug APK**(서버 조작·500 주입) | runninggu_qa_arm + `runninggu_api30_arm` 2대(B-21) · 운영(로그인·재설정·카카오) · 로컬 8081+릴레이 8080 | 민지(코드·메일·카카오 전달) + Claude | 이메일·카카오 전 구간 + 서버 조작/500: ✅ 33 · ❌ 1(신규) · ⚠ 3 | **동선 복원 null description 파싱 실패 → 이슈 예정** |
+| 9 | 2026-09-18 | 릴리스 APK(운영 로그인·카카오) + **로컬 Docker 백엔드 debug APK**(서버 조작·500 주입) | runninggu_qa_arm + `runninggu_api30_arm` 2대(B-21) · 운영(로그인·재설정·카카오) · 로컬 8081+릴레이 8080 | 민지(코드·메일·카카오 전달) + Claude | 이메일·카카오 전 구간 + 서버 조작/500: ✅ 33 · ❌ 1(신규) · ⚠ 3 | **동선 복원 null description 파싱 실패 → #375 · #376** |
 
 
 
@@ -510,7 +510,7 @@
 ```
 빌드      로그인·재설정·카카오: 운영 직결 릴리스 APK(8회차와 같은 c2). 서버 조작·500: 로컬 Docker PostgreSQL(대회 153건)+bootRun(8081)+QA 릴레이(8080→8081)
 릴레이    scratchpad relay.py — fail.txt 정규식 경로 → 500 problem+json, empty.txt → 200 {"items":[]}
-계정      이메일: q***+qa20260918@gmail.com/qa0918(회차 끝에 J-11 탈퇴 · 운영 exists=false 확인) · 카카오: m***@gmail.com(4회차 minji 계정 탈퇴→같은 카카오 재가입) · 로컬: 로컬 전용 계정(회차 끝 삭제 · 로컬 DB 원복)
+계정      이메일: q***+qa20260918@gmail.com(비밀번호는 팀 비밀 저장소 · 회차 끝에 J-11 탈퇴 · 운영 exists=false 확인) · 카카오: m***@gmail.com(4회차 minji 계정 탈퇴→같은 카카오 재가입) · 로컬: 로컬 전용 계정(회차 끝 삭제 · 로컬 DB 원복)
 기기      운영 로그인 runninggu_qa_arm + B-21 은 runninggu_api30_arm 2대째 같은 계정 로그인
 ```
 
@@ -518,7 +518,7 @@
 
 | ID | 본 것 | 어디 |
 |---|---|---|
-| (저장 동선 복원) | 저장 동선 상세(`GET /api/itineraries/{id}`) 응답에 `description:null` 블록이 **하나라도** 있으면 앱이 파싱에 실패해 화면 전체가 **"정보를 불러오지 못했어요."** + [다시 시도] 로 뜬다. `BlockDto.description` 만 non-nullable(`String=""`)이고 `placeName`·`address` 는 `String?` 다. `ApiJson` 은 `explicitNulls=false`·`coerceInputValues` 미사용이라 리터럴 `null` 에서 `JsonDecodingException`. **명세 661줄·SPEC §5 는 서버가 빈 `placeName`·`address`·`description` 을 `null` 로 저장한다고 못박음** → 운영에서도 터질 수 있다. 로컬에서 `description` 을 임시로 채운 뒤에야 H-20 진행됨 | 앱 코어(민지) · `ItineraryDto.BlockDto.description` 을 `String? = null` 로 |
+| (저장 동선 복원) | 저장 동선 상세(`GET /api/itineraries/{id}`) 응답에 `description:null` 블록이 **하나라도** 있으면 앱이 파싱에 실패해 화면 전체가 **"정보를 불러오지 못했어요."** + [다시 시도] 로 뜬다. `BlockDto.description` 만 non-nullable(`String=""`)이고 `placeName`·`address` 는 `String?` 다. `ApiJson` 은 `explicitNulls=false`·`coerceInputValues` 미사용이라 리터럴 `null` 에서 `JsonDecodingException`. **명세 661줄·SPEC §5 는 서버가 빈 `placeName`·`address`·`description` 을 `null` 로 저장한다고 못박음** → 운영에서도 터질 수 있다. 로컬에서 `description` 을 임시로 채운 뒤에야 H-20 진행됨 | 앱 코어(민지) · #375 → #376 에서 `ItineraryDto.BlockDto.description` 을 `String? = null` 로 |
 
 **⚠**
 - E-14 — 목록(`/contests`)만 500 → 리스트 뷰 오류+재시도(정상), **캘린더 뷰로 바꿔도 달력(점)까지 사라지고** 오류만 남는다. `daily-counts` 는 200 이라 점은 살릴 수 있다. 5회차 E-14 관찰이 릴리스/로컬에서도 그대로 — 건모·선경
