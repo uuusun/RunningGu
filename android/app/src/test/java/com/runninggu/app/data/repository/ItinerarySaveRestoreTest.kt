@@ -244,6 +244,23 @@ class ItinerarySaveRestoreTest {
     }
 
     @Test
+    fun `description 이 null 인 블록이 있어도 상세를 복원한다`() = runBlocking {
+        // 서버는 공백만 있는 description 을 null 로 저장한다(명세 §5 · 661줄). 리터럴 null 에서
+        // 파싱이 터지면 저장 동선 복원이 통째로 실패한다(#375). placeName·address 처럼 nullable 로
+        // 받아 "" 로 흡수해야 한다. 생략이 아니라 **명시적 null** 이 문제였다 — DETAIL_JSON 의
+        // 기존 블록은 description 을 생략만 해서 이 경우를 못 잡았다.
+        val json = DETAIL_JSON.replace(
+            "\"placeName\": \"골목 손칼국수\", \"lat\": 36.48, \"lng\": 127.25",
+            "\"placeName\": \"골목 손칼국수\", \"lat\": 36.48, \"lng\": 127.25, \"description\": null",
+        )
+        val api = FakeApi(detailJson = json)
+
+        val detail = RemoteItineraryRepository(api).detail(42)
+
+        assertEquals("", detail.result.days.first().blocks[1].desc)
+    }
+
+    @Test
     fun `최신 대회가 빠진 상세는 거부한다`() {
         // §5-5 는 `contest` 를 항상 준다. 기본값 null 을 두면 빠진 응답이 정상 상세처럼
         // 통과하고, 화면은 "대회 변경" 안내를 못 그리면서 이유도 모른다 (#202 리뷰)

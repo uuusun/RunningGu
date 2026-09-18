@@ -70,7 +70,7 @@ private fun BlockDto.toDomain(dayIndex: Int, blockIndex: Int): ItineraryBlock {
         place = placeName?.let {
             Poi(name = it, lat = lat ?: 0.0, lng = lng ?: 0.0, addr = address.orEmpty())
         },
-        desc = description,
+        desc = description.orEmpty(),
         blockType = type,
         // 서버 값을 그대로 믿지 않고 종류로 다시 계산한다 — 둘이 어긋나면 잠금이 풀린다.
         systemManaged = type == BlockType.RACE,
@@ -100,7 +100,7 @@ fun BlockDto.toEditedBlock(): ItineraryBlock {
         place = placeName?.let {
             Poi(name = it, lat = lat ?: 0.0, lng = lng ?: 0.0, addr = address.orEmpty())
         },
-        desc = description,
+        desc = description.orEmpty(),
         blockType = type,
         // 생성 매퍼와 같은 이유로 종류에서 다시 계산한다 — 둘이 어긋나면 잠금이 풀린다
         systemManaged = type == BlockType.RACE,
