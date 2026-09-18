@@ -87,7 +87,10 @@ data class BlockDto(
     val address: String? = null,
     val lat: Double? = null,
     val lng: Double? = null,
-    val description: String = "",
+    // 서버는 공백만 있는 description 을 null 로 저장한다(명세 §5 · 661줄). placeName·address 와
+    // 같은 nullable 계약이다. non-nullable 로 두면 리터럴 null 응답이 파싱에서 터져 저장 동선
+    // 복원이 통째로 실패한다(#375). 매퍼가 null 을 "" 로 흡수한다 — 기존 기본값과 같은 뜻이다.
+    val description: String? = null,
     val blockType: String = "USER",
     val systemManaged: Boolean = false,
     /**
