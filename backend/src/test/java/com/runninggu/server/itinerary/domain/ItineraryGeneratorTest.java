@@ -37,9 +37,10 @@ class ItineraryGeneratorTest {
         assertThat(day(half, 0).blocks())
                 .extracting(GeneratedBlock::title)
                 .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
+        // 풀도 회복 골격에 취향 자리를 받는다 — 예전에는 하프만 열려 있었다(#377 리뷰 · 결정-72)
         assertThat(day(full, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
         assertThat(day(tenK, 0).blocks())
                 .extracting(GeneratedBlock::title)
                 .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "카페 한 잔", "맛집 저녁");
@@ -389,6 +390,72 @@ class ItineraryGeneratorTest {
         assertThat(day(generated, 1).blocks())
                 .extracting(GeneratedBlock::title)
                 .doesNotContain("로컬 저녁");
+    }
+
+
+    /**
+     * **풀 당일치기에도 취향 자리가 있다.** (#377 리뷰 · 결정-72)
+     *
+     * 하프에만 열었을 때는 풀 당일치기가 `스타트 → 온천 → 회복 저녁` 뿐이라, 맛집·카페를 골라도
+     * 카페가 사라졌다 — 고른 것이 하나도 안 보이는 문제가 풀에서 가장 심했다.
+     */
+    @Test
+    void 풀_당일치기도_고른_취향을_취향_자리에_넣는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.FULL,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                pools(8));
+
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+    }
+
+    /**
+     * **회복 안내는 POI 설명이 있어도 사라지지 않는다.** (#377 리뷰)
+     *
+     * 카카오 POI 는 `category_name` 이 설명으로 들어와 거의 항상 non-empty 라, "설명이 비면 안내"
+     * 로 두면 회복일인데도 안내가 한 번도 안 보인다.
+     */
+    @Test
+    void 회복일_취향_블록은_POI_설명이_있어도_회복_안내를_남긴다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.CAFE)),
+                pools(8));
+
+        GeneratedBlock themeBlock = day(generated, 0).blocks().stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(14, 30)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(themeBlock.place().description()).isNotEmpty();
+        assertThat(themeBlock.description()).startsWith("완주 후 가볍게");
+        assertThat(themeBlock.description()).contains(themeBlock.place().description());
+    }
+
+    /**
+     * **취향 블록 설명을 비우지 않는다.** 서버가 빈 값을 `null` 로 정규화해 저장하는데(API 명세 §5),
+     * 그 `null` 에서 저장 동선 복원이 깨지는 앱이 아직 기기에 남아 있다(#375 · #376).
+     */
+    @Test
+    void 생성한_블록_설명은_비어_있지_않다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE.minusDays(1), RACE_DATE.plusDays(2), true),
+                pools(8));
+
+        assertThat(generated.days())
+                .flatExtracting(GeneratedDay::blocks)
+                .extracting(GeneratedBlock::description)
+                .allSatisfy(description -> assertThat(description).isNotEmpty());
     }
 
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────

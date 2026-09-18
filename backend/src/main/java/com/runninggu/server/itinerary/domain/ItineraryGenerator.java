@@ -54,6 +54,15 @@ public class ItineraryGenerator {
      */
     private static final String RECOVERY_THEME_DESCRIPTION = "완주 후 가볍게";
 
+    /**
+     * 회복일이 아닌 취향 블록의 설명 기본값.
+     *
+     * **빈 문자열로 두지 않는다.** 서버가 빈 값을 `null` 로 정규화해 저장하는데(API 명세 §5),
+     * 그 `null` 에서 저장 동선 복원이 깨지는 앱이 아직 사용자 기기에 남아 있다(#375 · #376).
+     * 취향 자리가 늘어난 만큼 빈 설명도 늘어나므로 여기서 막는다.
+     */
+    private static final String THEME_DESCRIPTION = "둘러보기";
+
     private static final List<String> NON_MEAL_CATEGORIES = List.of(
             "음식점 > 간식",
             "음식점 > 패스트푸드");
@@ -121,18 +130,18 @@ public class ItineraryGenerator {
                             BlockCategory.WELLNESS,
                             picker.pick(PoiCategory.WELLNESS),
                             "완주 근육 회복"));
-                    if (plan.event() == ContestEventType.HALF) {
-                        // 회복 골격에도 취향 자리를 연다 (SPEC §5.6-4·5 · 결정-72).
-                        // 예전에는 관광지 고정이라 **당일치기 하프는 고른 것이 하나도 안 보였다**(#377).
-                        // 같은 날 11:00 온천이 이미 웰니스를 쓰므로 그것만 뒤로 미룬다.
-                        PickedPlace theme = picker.pickTheme(PoiCategory.WELLNESS);
-                        blocks.add(block(
-                                "14:30",
-                                themeTitle(theme.category()),
-                                blockCategory(theme.category()),
-                                theme.place(),
-                                descriptionOr(theme.place(), RECOVERY_THEME_DESCRIPTION)));
-                    }
+                    // 회복 골격에도 취향 자리를 연다 (SPEC §5.6-4·5 · 결정-72).
+                    // 예전에는 하프만 관광지 고정 블록을 받았고 **풀은 그 자리조차 없어서**,
+                    // 맛집·카페를 골라도 스타트→온천→회복 저녁 뿐이었다 — 고른 것이 하나도
+                    // 안 보이는 문제가 풀에서 가장 심했다(#377 리뷰). 종목으로 가르지 않는다.
+                    // 같은 날 11:00 온천이 이미 웰니스를 쓰므로 그것만 뒤로 미룬다.
+                    PickedPlace theme = picker.pickTheme(PoiCategory.WELLNESS);
+                    blocks.add(block(
+                            "14:30",
+                            themeTitle(theme.category()),
+                            blockCategory(theme.category()),
+                            theme.place(),
+                            recoveryDescription(theme.place())));
                     blocks.add(block(
                             "18:00",
                             "회복 저녁",
@@ -147,7 +156,7 @@ public class ItineraryGenerator {
                             themeTitle(theme.category()),
                             blockCategory(theme.category()),
                             theme.place(),
-                            ""));
+                            descriptionOr(theme.place(), THEME_DESCRIPTION)));
                     blocks.add(block(
                             "15:30",
                             "카페 한 잔",
@@ -171,12 +180,13 @@ public class ItineraryGenerator {
                             picker.pick(PoiCategory.WELLNESS),
                             "고강도 제외 · 회복 위주"));
                 } else {
+                    ItineraryPlace morning = picker.pick(PoiCategory.TOUR);
                     blocks.add(block(
                             "10:00",
                             "오전 관광",
                             BlockCategory.TOUR,
-                            picker.pick(PoiCategory.TOUR),
-                            ""));
+                            morning,
+                            descriptionOr(morning, THEME_DESCRIPTION)));
                 }
                 // **체크아웃은 11시다** — 숙소 대부분이 그 시각이라 그때 짐을 뺀다.
                 // 마지막 블록으로 두면 `17:00 체크아웃` 이 되어 실제 일정과 어긋난다(#319).
@@ -203,8 +213,8 @@ public class ItineraryGenerator {
                         blockCategory(theme.category()),
                         theme.place(),
                         rule.noHard()
-                                ? descriptionOr(theme.place(), RECOVERY_THEME_DESCRIPTION)
-                                : ""));
+                                ? recoveryDescription(theme.place())
+                                : descriptionOr(theme.place(), THEME_DESCRIPTION)));
                 // **중간 날에는 저녁을 넣는다** (결정-73). 저녁 블록이 D-1·D-day 에만 있어서
                 // 3박4일처럼 D+ 가 여러 날인 일정은 중간 날 저녁이 비어 있었다 — 묵는 날인데
                 // 14:30 이 마지막이라 일정이 끊긴 것처럼 보인다.
@@ -288,6 +298,22 @@ public class ItineraryGenerator {
             case HALF -> "하프";
             case FULL -> "풀";
         };
+    }
+
+    /**
+     * 회복일 취향 블록의 설명. **안내가 사라지지 않게 원천 설명과 결합한다.** (#377 리뷰)
+     *
+     * 예전에는 `descriptionOr` 로 "POI 설명이 비면 안내" 였는데, 카카오 POI 는 `category_name`
+     * 이 설명으로 들어와 **거의 항상 non-empty** 다. 그래서 회복일인데도 안내가 한 번도 안 보였다.
+     *
+     * 안내를 앞에 두고 원천 설명을 뒤에 붙인다. 이 문구가 일정 강도를 낮추지는 못하지만
+     * (§5.6-5), 왜 이 블록이 회복일에 들어갔는지는 알려 준다.
+     */
+    private String recoveryDescription(ItineraryPlace place) {
+        if (place == null || place.description().isEmpty()) {
+            return RECOVERY_THEME_DESCRIPTION;
+        }
+        return RECOVERY_THEME_DESCRIPTION + " · " + place.description();
     }
 
     private String descriptionOr(ItineraryPlace place, String fallback) {
