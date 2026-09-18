@@ -34,6 +34,38 @@ public class ItineraryGenerator {
      * `음식점 > 간식 > 제과,베이커리 > 파리바게뜨` · `음식점 > 패스트푸드 > 맥도날드` 처럼
      * 온다. 저녁·점심 블록에 빵집이나 패스트푸드가 오는 것을 막는다.
      */
+    /**
+     * 고른 취향으로 취향 자리를 못 채울 때 쓰는 기본 후보. (SPEC §5.6-5)
+     *
+     * 고른 것을 다 돌고도 자리가 남을 때만 여기까지 온다 — 이 순서가 앞에 오면 안 고른
+     * 카테고리가 고른 것보다 먼저 나온다.
+     */
+    private static final List<PoiCategory> FALLBACK_THEMES = List.of(
+            PoiCategory.TOUR,
+            PoiCategory.NATURE,
+            PoiCategory.CAFE,
+            PoiCategory.HISTORY);
+
+    /**
+     * 회복일 취향 블록의 설명에 앞세우는 안내. (SPEC §5.6-5 · §5.1)
+     *
+     * **이 문구가 일정 강도를 낮추지는 못한다.** 실제 부담은 방문 수와 장소 사이 이동으로
+     * 정해지는데 지금 생성기는 둘 다 다루지 않는다(#377 리뷰). 회복일이라고 취향 카테고리를
+     * 막지 않는 이유도 "분류를 보면 가벼운지 알 수 있어서" 가 아니라, 고른 취향을 임의로 막으면
+     * "고른 게 안 나온다" 가 되풀이되기 때문이다. 이 문구는 **왜 이 블록이 회복일에 들어갔는지를
+     * 알리는 안내**일 뿐이다.
+     */
+    private static final String RECOVERY_THEME_DESCRIPTION = "완주 후 가볍게";
+
+    /**
+     * 회복일이 아닌 취향 블록의 설명 기본값.
+     *
+     * **빈 문자열로 두지 않는다.** 서버가 빈 값을 `null` 로 정규화해 저장하는데(API 명세 §5),
+     * 그 `null` 에서 저장 동선 복원이 깨지는 앱이 아직 사용자 기기에 남아 있다(#375 · #376).
+     * 취향 자리가 늘어난 만큼 빈 설명도 늘어나므로 여기서 막는다.
+     */
+    private static final String THEME_DESCRIPTION = "둘러보기";
+
     private static final List<String> NON_MEAL_CATEGORIES = List.of(
             "음식점 > 간식",
             "음식점 > 패스트푸드");
@@ -101,15 +133,18 @@ public class ItineraryGenerator {
                             BlockCategory.WELLNESS,
                             picker.pick(PoiCategory.WELLNESS),
                             "완주 근육 회복"));
-                    if (plan.event() == ContestEventType.HALF) {
-                        ItineraryPlace tour = picker.pick(PoiCategory.TOUR);
-                        blocks.add(block(
-                                "14:30",
-                                "가벼운 관광",
-                                BlockCategory.TOUR,
-                                tour,
-                                descriptionOr(tour, "평지 위주 가벼운 코스")));
-                    }
+                    // 회복 골격에도 취향 자리를 연다 (SPEC §5.6-4·5 · 결정-72).
+                    // 예전에는 하프만 관광지 고정 블록을 받았고 **풀은 그 자리조차 없어서**,
+                    // 맛집·카페를 골라도 스타트→온천→회복 저녁 뿐이었다 — 고른 것이 하나도
+                    // 안 보이는 문제가 풀에서 가장 심했다(#377 리뷰). 종목으로 가르지 않는다.
+                    // 같은 날 11:00 온천이 이미 웰니스를 쓰므로 그것만 뒤로 미룬다.
+                    PickedPlace theme = picker.pickTheme(PoiCategory.WELLNESS);
+                    blocks.add(block(
+                            "14:30",
+                            themeTitle(theme.category()),
+                            blockCategory(theme.category()),
+                            theme.place(),
+                            recoveryDescription(theme.place())));
                     blocks.add(block(
                             "18:00",
                             "회복 저녁",
@@ -117,13 +152,14 @@ public class ItineraryGenerator {
                             picker.pickMeal(),
                             "소화 잘 되는 회복식"));
                 } else {
-                    PickedPlace theme = picker.pickTheme();
+                    // 같은 날 15:30 이 카페 고정이라 취향 자리는 카페를 뒤로 미룬다(§5.6-5).
+                    PickedPlace theme = picker.pickTheme(PoiCategory.CAFE);
                     blocks.add(block(
                             "13:00",
-                            "오후 자유 관광",
+                            themeTitle(theme.category()),
                             blockCategory(theme.category()),
                             theme.place(),
-                            ""));
+                            descriptionOr(theme.place(), THEME_DESCRIPTION)));
                     blocks.add(block(
                             "15:30",
                             "카페 한 잔",
@@ -147,12 +183,13 @@ public class ItineraryGenerator {
                             picker.pick(PoiCategory.WELLNESS),
                             "고강도 제외 · 회복 위주"));
                 } else {
+                    ItineraryPlace morning = picker.pick(PoiCategory.TOUR);
                     blocks.add(block(
                             "10:00",
                             "오전 관광",
                             BlockCategory.TOUR,
-                            picker.pick(PoiCategory.TOUR),
-                            ""));
+                            morning,
+                            descriptionOr(morning, THEME_DESCRIPTION)));
                 }
                 // **체크아웃은 11시다** — 숙소 대부분이 그 시각이라 그때 짐을 뺀다.
                 // 마지막 블록으로 두면 `17:00 체크아웃` 이 되어 실제 일정과 어긋난다(#319).
@@ -170,13 +207,29 @@ public class ItineraryGenerator {
                         BlockCategory.FOOD,
                         picker.pickMeal(),
                         "그 지역 별미"));
-                PickedPlace theme = picker.pickTheme();
+                // 그 날 오전이 이미 쓴 카테고리는 뒤로 미룬다 — 회복일은 온천, 아니면 오전 관광(§5.6-5).
+                PickedPlace theme = picker.pickTheme(
+                        rule.noHard() ? PoiCategory.WELLNESS : PoiCategory.TOUR);
                 blocks.add(block(
                         "14:30",
-                        "오후 관광",
+                        themeTitle(theme.category()),
                         blockCategory(theme.category()),
                         theme.place(),
-                        ""));
+                        rule.noHard()
+                                ? recoveryDescription(theme.place())
+                                : descriptionOr(theme.place(), THEME_DESCRIPTION)));
+                // **중간 날에는 저녁을 넣는다** (결정-73). 저녁 블록이 D-1·D-day 에만 있어서
+                // 3박4일처럼 D+ 가 여러 날인 일정은 중간 날 저녁이 비어 있었다 — 묵는 날인데
+                // 14:30 이 마지막이라 일정이 끊긴 것처럼 보인다.
+                // 마지막 날은 11:00 체크아웃 뒤 오후에 이동하므로 넣지 않는다.
+                if (!date.equals(plan.endDate())) {
+                    blocks.add(block(
+                            "18:30",
+                            "로컬 저녁",
+                            BlockCategory.FOOD,
+                            picker.pickMeal(),
+                            rule.noHard() ? "소화 잘 되는 회복식" : "그 지역 별미"));
+                }
                 note = rule.dplus();
             }
 
@@ -250,6 +303,22 @@ public class ItineraryGenerator {
         };
     }
 
+    /**
+     * 회복일 취향 블록의 설명. **안내가 사라지지 않게 원천 설명과 결합한다.** (#377 리뷰)
+     *
+     * 예전에는 `descriptionOr` 로 "POI 설명이 비면 안내" 였는데, 카카오 POI 는 `category_name`
+     * 이 설명으로 들어와 **거의 항상 non-empty** 다. 그래서 회복일인데도 안내가 한 번도 안 보였다.
+     *
+     * 안내를 앞에 두고 원천 설명을 뒤에 붙인다. 이 문구가 일정 강도를 낮추지는 못하지만
+     * (§5.6-5), 왜 이 블록이 회복일에 들어갔는지는 알려 준다.
+     */
+    private String recoveryDescription(ItineraryPlace place) {
+        if (place == null || place.description().isEmpty()) {
+            return RECOVERY_THEME_DESCRIPTION;
+        }
+        return RECOVERY_THEME_DESCRIPTION + " · " + place.description();
+    }
+
     private String descriptionOr(ItineraryPlace place, String fallback) {
         return place == null || place.description().isEmpty()
                 ? fallback
@@ -260,11 +329,35 @@ public class ItineraryGenerator {
         return BlockCategory.valueOf(category.name());
     }
 
+    /**
+     * 취향 블록의 제목. **뽑힌 카테고리를 따른다** (SPEC §5.6-5 · 결정-72).
+     *
+     * 예전에는 `오후 관광`·`가벼운 관광` 처럼 관광지를 전제한 이름이 박혀 있었다. 취향 자리를
+     * 열고 나면 그 자리에 카페·산책로가 올 수 있어서, 제목이 내용과 어긋난다.
+     *
+     * 맛집은 취향 후보에서 빠지고(식사 블록과 겹친다) 숙소는 취향 칩에 없지만, `switch` 가
+     * 모든 값을 덮어야 해서 둘도 관광지 이름으로 떨어뜨린다.
+     *
+     * **제목에 "산책" 을 쓰지 않는다.** 원본에 있던 산책 블록 3개는 §5.6 에서 뺐는데(대조표 A3),
+     * 취향 블록에 그 이름을 붙이면 되살아난 것처럼 보이고 회귀 테스트도 구분하지 못한다.
+     */
+    private String themeTitle(PoiCategory category) {
+        return switch (category) {
+            case CAFE -> "카페 한 잔";
+            case WELLNESS -> "온천·힐링";
+            case NATURE -> "공원·둘레길";
+            case HISTORY -> "역사·문화 탐방";
+            case TOUR, FOOD, LODGING -> "가벼운 관광";
+        };
+    }
+
     private static final class Picker {
 
         private final PoiPools pools;
         private final List<PoiCategory> themes;
         private final Set<String> usedNames = new LinkedHashSet<>();
+        /** 이번 일정에서 취향 자리로 이미 쓴 카테고리. 같은 종류가 날마다 반복되는 것을 막는다. */
+        private final Set<PoiCategory> usedThemeCategories = new LinkedHashSet<>();
         private final Random random;
 
         private Picker(PoiPools pools, List<PoiCategory> themes, Random random) {
@@ -347,20 +440,84 @@ public class ItineraryGenerator {
                     <= NEARBY_SPREAD_M;
         }
 
-        private PickedPlace pickTheme() {
-            LinkedHashSet<PoiCategory> order = new LinkedHashSet<>(themes);
-            order.add(PoiCategory.TOUR);
-            order.add(PoiCategory.NATURE);
-            order.add(PoiCategory.CAFE);
-            order.add(PoiCategory.HISTORY);
+        /**
+         * 취향 자리에 넣을 카테고리와 장소를 고른다. (SPEC §5.6-5 · 결정-72)
+         *
+         * 후보 순서는 `[...themes, tour, nature, cafe, history]` 이고 **맛집은 뺀다** — 식사
+         * 블록이 이미 맛집을 쓰므로 취향 자리에 또 식당이 오면 하루에 식당만 셋이 된다.
+         *
+         * **같은 카테고리가 반복되지 않게 미룬다.** 예전에는 "미사용 POI 가 남은 첫 카테고리"
+         * 만 보았는데, 카테고리마다 POI 를 8건씩 담아 두니 첫 후보가 마르지 않아 며칠이 지나도
+         * 같은 종류만 나왔다("이틀 다 온천"·"이틀 다 카페" · #377). 그래서 이번 일정에서 취향
+         * 자리로 쓴 카테고리와, 그 날 골격이 이미 쓰는 고정 카테고리를 뒤로 미룬다.
+         *
+         * 고른 취향을 한 바퀴 돌고 나면 다시 처음부터 돈다 — 미루는 것이지 막는 것이 아니다.
+         *
+         * @param sameDayFixed 그 날 골격이 이미 쓰는 카테고리(회복일 온천 · 카페 슬롯 · 오전 관광)
+         */
+        private PickedPlace pickTheme(PoiCategory... sameDayFixed) {
+            Set<PoiCategory> sameDay = Set.of(sameDayFixed);
+            Set<PoiCategory> avoid = new LinkedHashSet<>(usedThemeCategories);
+            avoid.addAll(sameDay);
+            List<PoiCategory> picked = pickedThemes();
 
-            for (PoiCategory category : order) {
+            // ① 고른 취향 중 이번 라운드에 아직 안 쓴 것
+            PickedPlace fresh = pickFirstAvailable(without(picked, avoid));
+            if (fresh != null) {
+                return fresh;
+            }
+            // ② 고른 것을 한 바퀴 다 돌았다 — 라운드를 비우고 처음부터 다시 돈다.
+            //    **기본 후보로 넘어가기 전에 이걸 먼저 한다.** 고른 것이 관광지뿐인데 카페가
+            //    나오면 "안 골랐는데 나온다" 는 #377 의 불만을 그대로 되풀이한다.
+            usedThemeCategories.clear();
+            PickedPlace again = pickFirstAvailable(without(picked, sameDay));
+            if (again != null) {
+                return again;
+            }
+            // ③ 고른 것으로 못 채운다(POI 가 없거나 그 날 고정 카테고리와 겹친다)
+            PickedPlace base = pickFirstAvailable(without(FALLBACK_THEMES, avoid));
+            if (base != null) {
+                return base;
+            }
+            // ④ 기본 후보도 한 바퀴 돌았다. **그래도 그 날 고정 카테고리는 계속 피한다** —
+            //    여기서 제외를 풀면 희소한 풀에서 13:00 취향과 15:30 카페 슬롯이 둘 다 카페가
+            //    되어 §5.6-5 의 "어느 단계에서든 그 날 고정 카테고리를 피한다" 와 어긋난다(#377 리뷰).
+            PickedPlace last = pickFirstAvailable(without(FALLBACK_THEMES, sameDay));
+            if (last != null) {
+                return last;
+            }
+            // ⑤ 전부 소진됐다 — §5.6-5 대로 관광지로 떨어진다. 그마저 비면 장소 없는 블록이
+            //    되는데, 그건 외부 조회 실패와 같은 강등 처리다(NFR-3).
+            return new PickedPlace(PoiCategory.TOUR, pick(PoiCategory.TOUR));
+        }
+
+        /**
+         * 취향 자리에 쓸 수 있는 **고른 취향**. 순서는 §5.3 선언 순서 그대로다.
+         *
+         * 맛집은 뺀다 — 식사 블록이 이미 쓰므로 취향 자리에 또 식당이 오면 하루에 식당만 셋이 된다.
+         */
+        private List<PoiCategory> pickedThemes() {
+            return themes.stream()
+                    .filter(category -> category != PoiCategory.FOOD)
+                    .toList();
+        }
+
+        private List<PoiCategory> without(List<PoiCategory> categories, Set<PoiCategory> excluded) {
+            return categories.stream()
+                    .filter(category -> !excluded.contains(category))
+                    .toList();
+        }
+
+        /** 미사용 POI 가 남아 있는 첫 카테고리를 쓴다. 없으면 null 이라 호출부가 다음 수를 고른다. */
+        private PickedPlace pickFirstAvailable(List<PoiCategory> categories) {
+            for (PoiCategory category : categories) {
                 if (pools.get(category).stream()
                         .anyMatch(place -> !usedNames.contains(place.name()))) {
+                    usedThemeCategories.add(category);
                     return new PickedPlace(category, pick(category));
                 }
             }
-            return new PickedPlace(PoiCategory.TOUR, pick(PoiCategory.TOUR));
+            return null;
         }
     }
 

@@ -37,12 +37,13 @@ class ItineraryGeneratorTest {
         assertThat(day(half, 0).blocks())
                 .extracting(GeneratedBlock::title)
                 .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
+        // 풀도 회복 골격에 취향 자리를 받는다 — 예전에는 하프만 열려 있었다(#377 리뷰 · 결정-72)
         assertThat(day(full, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
         assertThat(day(tenK, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "오후 자유 관광", "카페 한 잔", "맛집 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "카페 한 잔", "맛집 저녁");
         assertThat(day(half, 1).blocks())
                 .extracting(GeneratedBlock::title)
                 .doesNotContain("숙소 체크아웃");
@@ -50,7 +51,7 @@ class ItineraryGeneratorTest {
         // 숙소 대부분이 그 시각이고, 짐을 뺀 뒤에도 그날 일정은 이어진다.
         assertThat(day(half, 2).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "오후 관광");
+                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "가벼운 관광");
         assertThat(day(half, 2).blocks())
                 .filteredOn(block -> block.title().equals("숙소 체크아웃"))
                 .extracting(block -> block.startTime().toString())
@@ -252,6 +253,243 @@ class ItineraryGeneratorTest {
                         new BigDecimal("127.7200000"))
                 : null;
         return new ItineraryPlan(race, hotel, event, themes, start, end);
+    }
+
+
+    // ── 취향 블록 (#377 · 결정-72) ──────────────────────────────────────────
+
+    /**
+     * **당일치기 하프에서도 고른 취향이 나온다.** (SPEC §5.6-4·5 · 결정-72)
+     *
+     * 예전 골격은 D-day 회복일에 온천(웰니스)·가벼운 관광(관광지)을 고정으로 박아서, 맛집·카페를
+     * 골라도 저녁 식사 말고는 고른 것이 하나도 안 보였다(윤진 제보 · #377).
+     */
+    @Test
+    void 당일치기_하프도_고른_취향을_취향_자리에_넣는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                pools(8));
+
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+        assertThat(day(generated, 0).blocks())
+                .filteredOn(block -> block.title().equals("카페 한 잔"))
+                .extracting(GeneratedBlock::category)
+                .containsExactly(BlockCategory.CAFE);
+    }
+
+    /**
+     * **취향 카테고리는 날마다 돌아간다.** 예전에는 "미사용 POI 가 남은 첫 카테고리" 만 보아서
+     * 카테고리마다 8건씩 있는 풀이 마르지 않아 며칠이든 같은 종류가 나왔다("이틀 다 온천").
+     */
+    @Test
+    void 취향_카테고리는_날마다_돌아간다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE.plusDays(2),
+                        true,
+                        List.of(PoiCategory.CAFE, PoiCategory.HISTORY)),
+                pools(8));
+
+        List<BlockCategory> themeCategories = generated.days().stream()
+                .flatMap(day -> day.blocks().stream())
+                .filter(block -> block.startTime().equals(LocalTime.of(14, 30)))
+                .map(GeneratedBlock::category)
+                .toList();
+
+        assertThat(themeCategories).hasSize(3);
+        assertThat(themeCategories).containsExactly(
+                BlockCategory.CAFE, BlockCategory.HISTORY, BlockCategory.CAFE);
+    }
+
+    /** 그 날 골격이 이미 쓰는 카테고리는 취향 자리에서 피한다 — 하루에 카페가 둘이 되지 않게. */
+    @Test
+    void 취향_자리는_그_날_고정_카테고리를_피한다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.K10,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.CAFE, PoiCategory.HISTORY)),
+                pools(8));
+
+        // 15:30 이 카페 고정이므로 13:00 취향 자리는 카페를 뒤로 미루고 역사·문화를 쓴다
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "역사·문화 탐방", "카페 한 잔", "맛집 저녁");
+    }
+
+    /** 맛집은 취향 후보가 아니다 — 식사 블록이 이미 쓴다. 맛집만 골라도 취향 자리엔 다른 것이 온다. */
+    @Test
+    void 맛집만_골라도_취향_자리에는_식당이_오지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.K10,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD)),
+                pools(8));
+
+        GeneratedBlock themeBlock = day(generated, 0).blocks().stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(13, 0)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(themeBlock.category()).isNotEqualTo(BlockCategory.FOOD);
+        assertThat(day(generated, 0).blocks())
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .hasSize(1);
+    }
+
+
+    /**
+     * **중간 날에는 저녁이 있고 마지막 날에는 없다.** (SPEC §5.6-4 · 결정-73)
+     *
+     * 저녁 블록이 D-1·D-day 에만 있어서 3박4일의 D+1 은 14:30 이 마지막이었다 — 묵는 날인데
+     * 일정이 끊긴 것처럼 보인다. 마지막 날은 11:00 체크아웃 뒤 이동하므로 그대로 둔다.
+     */
+    @Test
+    void 중간_날에는_저녁을_넣고_마지막_날에는_넣지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE.minusDays(1), RACE_DATE.plusDays(2), true),
+                pools(8));
+
+        assertThat(day(generated, 1).blocks())
+                .extracting(GeneratedBlock::title)
+                .contains("로컬 저녁");
+        assertThat(day(generated, 1).blocks())
+                .filteredOn(block -> block.title().equals("로컬 저녁"))
+                .extracting(block -> block.startTime().toString())
+                .containsExactly("18:30");
+        assertThat(day(generated, 2).blocks())
+                .extracting(GeneratedBlock::title)
+                .doesNotContain("로컬 저녁");
+        // 마지막 날에만 체크아웃이 있다는 기존 계약도 그대로다
+        assertThat(day(generated, 2).blocks())
+                .extracting(GeneratedBlock::title)
+                .contains("숙소 체크아웃");
+    }
+
+    /** 하루 뒤로 끝나는 일정은 그날이 곧 마지막이라 저녁이 붙지 않는다. */
+    @Test
+    void D플러스가_하루뿐이면_저녁을_넣지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.HALF, RACE_DATE, RACE_DATE.plusDays(1), true),
+                pools(8));
+
+        assertThat(day(generated, 1).blocks())
+                .extracting(GeneratedBlock::title)
+                .doesNotContain("로컬 저녁");
+    }
+
+
+    /**
+     * **풀 당일치기에도 취향 자리가 있다.** (#377 리뷰 · 결정-72)
+     *
+     * 하프에만 열었을 때는 풀 당일치기가 `스타트 → 온천 → 회복 저녁` 뿐이라, 맛집·카페를 골라도
+     * 카페가 사라졌다 — 고른 것이 하나도 안 보이는 문제가 풀에서 가장 심했다.
+     */
+    @Test
+    void 풀_당일치기도_고른_취향을_취향_자리에_넣는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.FULL,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                pools(8));
+
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+    }
+
+    /**
+     * **회복 안내는 POI 설명이 있어도 사라지지 않는다.** (#377 리뷰)
+     *
+     * 카카오 POI 는 `category_name` 이 설명으로 들어와 거의 항상 non-empty 라, "설명이 비면 안내"
+     * 로 두면 회복일인데도 안내가 한 번도 안 보인다.
+     */
+    @Test
+    void 회복일_취향_블록은_POI_설명이_있어도_회복_안내를_남긴다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.CAFE)),
+                pools(8));
+
+        GeneratedBlock themeBlock = day(generated, 0).blocks().stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(14, 30)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(themeBlock.place().description()).isNotEmpty();
+        assertThat(themeBlock.description()).startsWith("완주 후 가볍게");
+        assertThat(themeBlock.description()).contains(themeBlock.place().description());
+    }
+
+    /**
+     * **취향 블록 설명을 비우지 않는다.** 서버가 빈 값을 `null` 로 정규화해 저장하는데(API 명세 §5),
+     * 그 `null` 에서 저장 동선 복원이 깨지는 앱이 아직 기기에 남아 있다(#375 · #376).
+     */
+    @Test
+    void 생성한_블록_설명은_비어_있지_않다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE.minusDays(1), RACE_DATE.plusDays(2), true),
+                pools(8));
+
+        assertThat(generated.days())
+                .flatExtracting(GeneratedDay::blocks)
+                .extracting(GeneratedBlock::description)
+                .allSatisfy(description -> assertThat(description).isNotEmpty());
+    }
+
+
+    /**
+     * **희소한 풀에서도 그 날 고정 카테고리를 피한다.** (SPEC §5.6-5 · #377 리뷰)
+     *
+     * 최종 폴백이 제외를 풀어 버리면, 고른 취향과 관광지 풀이 비고 카페만 남았을 때 13:00 취향
+     * 블록과 15:30 고정 슬롯이 **둘 다 카페**가 된다.
+     */
+    @Test
+    void 후보가_희소해도_그_날_고정_카테고리를_취향_자리에_쓰지_않는다() {
+        // 맛집만 고른 10K 당일치기 — 취향 후보에서 맛집이 빠지고, TOUR·NATURE·HISTORY 풀도 비어
+        // 남은 것이 그 날 고정 슬롯인 카페뿐인 상황
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>();
+        places.put(PoiCategory.FOOD, List.of(place("식당", "음식점 > 한식")));
+        places.put(PoiCategory.CAFE, List.of(place("카페", "카페")));
+        places.put(PoiCategory.TOUR, List.of());
+        places.put(PoiCategory.NATURE, List.of());
+        places.put(PoiCategory.HISTORY, List.of());
+
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE, RACE_DATE, false, List.of(PoiCategory.FOOD)),
+                new PoiPools(places, sourcesOf(places)));
+
+        List<GeneratedBlock> blocks = day(generated, 0).blocks();
+        assertThat(blocks)
+                .filteredOn(block -> block.category() == BlockCategory.CAFE)
+                .hasSize(1);
+        // 취향 자리는 관광지로 떨어지고, 풀이 비었으니 장소 없는 블록이 된다(NFR-3 과 같은 강등)
+        GeneratedBlock themeBlock = blocks.stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(13, 0)))
+                .findFirst()
+                .orElseThrow();
+        assertThat(themeBlock.category()).isEqualTo(BlockCategory.TOUR);
     }
 
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────
