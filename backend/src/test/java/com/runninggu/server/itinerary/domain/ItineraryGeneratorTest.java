@@ -350,6 +350,47 @@ class ItineraryGeneratorTest {
                 .hasSize(1);
     }
 
+
+    /**
+     * **중간 날에는 저녁이 있고 마지막 날에는 없다.** (SPEC §5.6-4 · 결정-73)
+     *
+     * 저녁 블록이 D-1·D-day 에만 있어서 3박4일의 D+1 은 14:30 이 마지막이었다 — 묵는 날인데
+     * 일정이 끊긴 것처럼 보인다. 마지막 날은 11:00 체크아웃 뒤 이동하므로 그대로 둔다.
+     */
+    @Test
+    void 중간_날에는_저녁을_넣고_마지막_날에는_넣지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE.minusDays(1), RACE_DATE.plusDays(2), true),
+                pools(8));
+
+        assertThat(day(generated, 1).blocks())
+                .extracting(GeneratedBlock::title)
+                .contains("로컬 저녁");
+        assertThat(day(generated, 1).blocks())
+                .filteredOn(block -> block.title().equals("로컬 저녁"))
+                .extracting(block -> block.startTime().toString())
+                .containsExactly("18:30");
+        assertThat(day(generated, 2).blocks())
+                .extracting(GeneratedBlock::title)
+                .doesNotContain("로컬 저녁");
+        // 마지막 날에만 체크아웃이 있다는 기존 계약도 그대로다
+        assertThat(day(generated, 2).blocks())
+                .extracting(GeneratedBlock::title)
+                .contains("숙소 체크아웃");
+    }
+
+    /** 하루 뒤로 끝나는 일정은 그날이 곧 마지막이라 저녁이 붙지 않는다. */
+    @Test
+    void D플러스가_하루뿐이면_저녁을_넣지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.HALF, RACE_DATE, RACE_DATE.plusDays(1), true),
+                pools(8));
+
+        assertThat(day(generated, 1).blocks())
+                .extracting(GeneratedBlock::title)
+                .doesNotContain("로컬 저녁");
+    }
+
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────
 
     /**

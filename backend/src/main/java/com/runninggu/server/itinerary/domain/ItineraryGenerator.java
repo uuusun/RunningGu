@@ -205,6 +205,18 @@ public class ItineraryGenerator {
                         rule.noHard()
                                 ? descriptionOr(theme.place(), RECOVERY_THEME_DESCRIPTION)
                                 : ""));
+                // **중간 날에는 저녁을 넣는다** (결정-73). 저녁 블록이 D-1·D-day 에만 있어서
+                // 3박4일처럼 D+ 가 여러 날인 일정은 중간 날 저녁이 비어 있었다 — 묵는 날인데
+                // 14:30 이 마지막이라 일정이 끊긴 것처럼 보인다.
+                // 마지막 날은 11:00 체크아웃 뒤 오후에 이동하므로 넣지 않는다.
+                if (!date.equals(plan.endDate())) {
+                    blocks.add(block(
+                            "18:30",
+                            "로컬 저녁",
+                            BlockCategory.FOOD,
+                            picker.pickMeal(),
+                            rule.noHard() ? "소화 잘 되는 회복식" : "그 지역 별미"));
+                }
                 note = rule.dplus();
             }
 
