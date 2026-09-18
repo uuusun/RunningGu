@@ -1018,7 +1018,7 @@ DB·화면·route 를 그 전제로 짠다. 보관함 코스는 7-A 저장 코�
 | TOUR | 관광지 | KTO `locationBasedList2` contentTypeId=12 | 카카오 AT4/키워드 | 공모전 필수요건 축, 공식 이미지 |
 | FOOD | 맛집 | 카카오 category FD6 | KTO 39 | 커버리지 우선(실측 856곳) |
 | CAFE | 카페 | 카카오 category CE7 | — | |
-| WELLNESS | 힐링·웰니스 | KTO 웰니스 `wellnessThemaCd`(EX050100~) | 카카오 키워드 "온천 스파 사우나 찜질방" | noHard 핵심 · 희소해 기본 반경 20km · **페어 키 전용, 좌표 대문자 mapX/mapY** |
+| WELLNESS | 힐링·웰니스 | KTO 웰니스 `wellnessThemaCd`(EX050100~) | 카카오 키워드 "온천 스파 사우나 찜질방" | **사용자가 고른 경우에만 조회한다**(결정-74 — 회복일 고정 블록이 없어졌다) · 희소해 기본 반경 20km · **페어 키 전용, 좌표 대문자 mapX/mapY** |
 | NATURE | 자연·트레킹 | 카카오 키워드 "둘레길 공원 산책로 수목원" | KTO 12 | 걷기 스팟(4-3)과 공유 |
 | HISTORY | 역사·문화 | KTO 12 | 카카오 키워드 "박물관 유적지 문화재" | |
 | LODGING | 숙소 | **카카오 category AD5** | KTO 32 | 회의 결정 7 · KTO 숙박 희소(실측 4건) |

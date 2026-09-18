@@ -458,7 +458,9 @@ public class ItineraryGenerator {
          *
          * 고른 취향을 한 바퀴 돌고 나면 다시 처음부터 돈다 — 미루는 것이지 막는 것이 아니다.
          *
-         * @param sameDayFixed 그 날 골격이 이미 쓰는 카테고리(회복일 온천 · 카페 슬롯 · 오전 관광)
+         * @param sameDayFixed 그 날 골격이 이미 쓰는 카테고리 — 회복✕ D-day 의 카페 슬롯과
+         *                     회복✕ D+N 의 오전 관광이다. **회복일에는 넘길 것이 없다** —
+         *                     결정-74 로 고정 온천 블록이 없어졌다
          */
         private PickedPlace pickTheme(PoiCategory... sameDayFixed) {
             Set<PoiCategory> sameDay = Set.of(sameDayFixed);
