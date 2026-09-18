@@ -9,6 +9,8 @@ import com.runninggu.app.data.model.SpotLoop
 import com.runninggu.app.data.model.SaveCourseResult
 import com.runninggu.app.data.model.SavedCourseDetail
 import com.runninggu.app.data.repository.CoursePage
+import com.runninggu.app.data.local.LoginProvider
+import com.runninggu.app.data.local.SessionProfile
 import com.runninggu.app.data.local.SessionStore
 import com.runninggu.app.data.repository.CourseRepository
 import com.runninggu.app.data.repository.FakeGeocodeRepository
@@ -46,10 +48,25 @@ class SaveCourseTest {
     private val dispatcher = StandardTestDispatcher()
 
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        // 저장은 로그인 사용자의 일이다. 게스트는 서버를 부르기 전에 막히므로(#359)
+        // 서버 응답을 보는 케이스는 로그인해 두고, 게스트 케이스만 따로 로그아웃한다.
+        SessionStore.signIn(
+            SessionProfile(
+                nickname = "테스터",
+                email = "tester@example.test",
+                loginProvider = LoginProvider.EMAIL,
+                marketingAgreed = false,
+            ),
+        )
+    }
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        Dispatchers.resetMain()
+        SessionStore.resetForTest()
+    }
 
     private val origin = OriginState.Fixed(
         name = "서울시청",
@@ -172,19 +189,38 @@ class SaveCourseTest {
 
     @Test
     fun `게스트에게는 로그인 모달을 띄운다`() = runTest(dispatcher) {
-        // 문구 한 줄이면 어디로 가야 하는지 모른 채 버튼만 다시 누른다 (매핑표 S8 "게스트 modal")
-        val viewModel = loaded(viewModel(saved = guest()))
+        // 문구 한 줄이면 어디로 가야 하는지 모른 채 버튼만 다시 누른다 (매핑표 S8 "게스트 modal").
+        // **서버는 부르지 않는다** — 찜과 같은 로컬 가드다(매핑표 §8 · #359 A안).
+        SessionStore.resetForTest()
+        val saved = guest()
+        val viewModel = loaded(viewModel(saved = saved))
 
         viewModel.onItemSelect(route("r-1"))
         viewModel.onSaveCourse()
         advanceUntilIdle()
 
         assertEquals(SaveCourseState.NeedsLogin, viewModel.uiState.value.save)
+        assertTrue("게스트인데 저장 요청이 나갔다", saved.savedRoutes.isEmpty())
+    }
+
+    @Test
+    fun `로그인했는데 세션이 만료돼 401 이 오면 같은 모달이다`() = runTest(dispatcher) {
+        // 로컬 가드는 게스트만 거른다. 토큰이 죽은 사용자는 서버 401 경로가 그대로 받는다.
+        val saved = guest()
+        val viewModel = loaded(viewModel(saved = saved))
+
+        viewModel.onItemSelect(route("r-1"))
+        viewModel.onSaveCourse()
+        advanceUntilIdle()
+
+        assertEquals(SaveCourseState.NeedsLogin, viewModel.uiState.value.save)
+        assertEquals(1, saved.savedRoutes.size)
     }
 
     @Test
     fun `모달을 닫아도 고른 코스는 그대로다`() = runTest(dispatcher) {
         // 로그인하고 돌아와 다시 누를 수 있어야 한다 — 저장을 예약하지는 않는다 (D-27)
+        SessionStore.resetForTest()
         val viewModel = loaded(viewModel(saved = guest()))
         viewModel.onItemSelect(route("r-1"))
         viewModel.onSaveCourse()
