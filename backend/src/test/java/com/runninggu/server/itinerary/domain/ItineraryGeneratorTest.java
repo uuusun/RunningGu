@@ -42,7 +42,7 @@ class ItineraryGeneratorTest {
                 .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "회복 저녁");
         assertThat(day(tenK, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "오후 자유 관광", "카페 한 잔", "맛집 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "카페 한 잔", "맛집 저녁");
         assertThat(day(half, 1).blocks())
                 .extracting(GeneratedBlock::title)
                 .doesNotContain("숙소 체크아웃");
@@ -50,7 +50,7 @@ class ItineraryGeneratorTest {
         // 숙소 대부분이 그 시각이고, 짐을 뺀 뒤에도 그날 일정은 이어진다.
         assertThat(day(half, 2).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "오후 관광");
+                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "가벼운 관광");
         assertThat(day(half, 2).blocks())
                 .filteredOn(block -> block.title().equals("숙소 체크아웃"))
                 .extracting(block -> block.startTime().toString())
@@ -252,6 +252,102 @@ class ItineraryGeneratorTest {
                         new BigDecimal("127.7200000"))
                 : null;
         return new ItineraryPlan(race, hotel, event, themes, start, end);
+    }
+
+
+    // ── 취향 블록 (#377 · 결정-72) ──────────────────────────────────────────
+
+    /**
+     * **당일치기 하프에서도 고른 취향이 나온다.** (SPEC §5.6-4·5 · 결정-72)
+     *
+     * 예전 골격은 D-day 회복일에 온천(웰니스)·가벼운 관광(관광지)을 고정으로 박아서, 맛집·카페를
+     * 골라도 저녁 식사 말고는 고른 것이 하나도 안 보였다(윤진 제보 · #377).
+     */
+    @Test
+    void 당일치기_하프도_고른_취향을_취향_자리에_넣는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                pools(8));
+
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+        assertThat(day(generated, 0).blocks())
+                .filteredOn(block -> block.title().equals("카페 한 잔"))
+                .extracting(GeneratedBlock::category)
+                .containsExactly(BlockCategory.CAFE);
+    }
+
+    /**
+     * **취향 카테고리는 날마다 돌아간다.** 예전에는 "미사용 POI 가 남은 첫 카테고리" 만 보아서
+     * 카테고리마다 8건씩 있는 풀이 마르지 않아 며칠이든 같은 종류가 나왔다("이틀 다 온천").
+     */
+    @Test
+    void 취향_카테고리는_날마다_돌아간다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE.plusDays(2),
+                        true,
+                        List.of(PoiCategory.CAFE, PoiCategory.HISTORY)),
+                pools(8));
+
+        List<BlockCategory> themeCategories = generated.days().stream()
+                .flatMap(day -> day.blocks().stream())
+                .filter(block -> block.startTime().equals(LocalTime.of(14, 30)))
+                .map(GeneratedBlock::category)
+                .toList();
+
+        assertThat(themeCategories).hasSize(3);
+        assertThat(themeCategories).containsExactly(
+                BlockCategory.CAFE, BlockCategory.HISTORY, BlockCategory.CAFE);
+    }
+
+    /** 그 날 골격이 이미 쓰는 카테고리는 취향 자리에서 피한다 — 하루에 카페가 둘이 되지 않게. */
+    @Test
+    void 취향_자리는_그_날_고정_카테고리를_피한다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.K10,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.CAFE, PoiCategory.HISTORY)),
+                pools(8));
+
+        // 15:30 이 카페 고정이므로 13:00 취향 자리는 카페를 뒤로 미루고 역사·문화를 쓴다
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "역사·문화 탐방", "카페 한 잔", "맛집 저녁");
+    }
+
+    /** 맛집은 취향 후보가 아니다 — 식사 블록이 이미 쓴다. 맛집만 골라도 취향 자리엔 다른 것이 온다. */
+    @Test
+    void 맛집만_골라도_취향_자리에는_식당이_오지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.K10,
+                        RACE_DATE,
+                        RACE_DATE,
+                        false,
+                        List.of(PoiCategory.FOOD)),
+                pools(8));
+
+        GeneratedBlock themeBlock = day(generated, 0).blocks().stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(13, 0)))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(themeBlock.category()).isNotEqualTo(BlockCategory.FOOD);
+        assertThat(day(generated, 0).blocks())
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .hasSize(1);
     }
 
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────
