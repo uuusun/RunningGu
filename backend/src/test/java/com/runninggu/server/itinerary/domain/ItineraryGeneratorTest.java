@@ -458,6 +458,40 @@ class ItineraryGeneratorTest {
                 .allSatisfy(description -> assertThat(description).isNotEmpty());
     }
 
+
+    /**
+     * **희소한 풀에서도 그 날 고정 카테고리를 피한다.** (SPEC §5.6-5 · #377 리뷰)
+     *
+     * 최종 폴백이 제외를 풀어 버리면, 고른 취향과 관광지 풀이 비고 카페만 남았을 때 13:00 취향
+     * 블록과 15:30 고정 슬롯이 **둘 다 카페**가 된다.
+     */
+    @Test
+    void 후보가_희소해도_그_날_고정_카테고리를_취향_자리에_쓰지_않는다() {
+        // 맛집만 고른 10K 당일치기 — 취향 후보에서 맛집이 빠지고, TOUR·NATURE·HISTORY 풀도 비어
+        // 남은 것이 그 날 고정 슬롯인 카페뿐인 상황
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>();
+        places.put(PoiCategory.FOOD, List.of(place("식당", "음식점 > 한식")));
+        places.put(PoiCategory.CAFE, List.of(place("카페", "카페")));
+        places.put(PoiCategory.TOUR, List.of());
+        places.put(PoiCategory.NATURE, List.of());
+        places.put(PoiCategory.HISTORY, List.of());
+
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.K10, RACE_DATE, RACE_DATE, false, List.of(PoiCategory.FOOD)),
+                new PoiPools(places, sourcesOf(places)));
+
+        List<GeneratedBlock> blocks = day(generated, 0).blocks();
+        assertThat(blocks)
+                .filteredOn(block -> block.category() == BlockCategory.CAFE)
+                .hasSize(1);
+        // 취향 자리는 관광지로 떨어지고, 풀이 비었으니 장소 없는 블록이 된다(NFR-3 과 같은 강등)
+        GeneratedBlock themeBlock = blocks.stream()
+                .filter(block -> block.startTime().equals(LocalTime.of(13, 0)))
+                .findFirst()
+                .orElseThrow();
+        assertThat(themeBlock.category()).isEqualTo(BlockCategory.TOUR);
+    }
+
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────
 
     /**

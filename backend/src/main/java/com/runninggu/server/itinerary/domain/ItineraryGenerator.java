@@ -47,10 +47,13 @@ public class ItineraryGenerator {
             PoiCategory.HISTORY);
 
     /**
-     * 회복일 취향 블록의 설명 기본값. (SPEC §5.6-5 · §5.1)
+     * 회복일 취향 블록의 설명에 앞세우는 안내. (SPEC §5.6-5 · §5.1)
      *
-     * 회복일이라고 취향 카테고리를 막지는 않는다 — POI 원천이 평지·실내 위주다. 대신 강도를
-     * 문구로 낮춘다.
+     * **이 문구가 일정 강도를 낮추지는 못한다.** 실제 부담은 방문 수와 장소 사이 이동으로
+     * 정해지는데 지금 생성기는 둘 다 다루지 않는다(#377 리뷰). 회복일이라고 취향 카테고리를
+     * 막지 않는 이유도 "분류를 보면 가벼운지 알 수 있어서" 가 아니라, 고른 취향을 임의로 막으면
+     * "고른 게 안 나온다" 가 되풀이되기 때문이다. 이 문구는 **왜 이 블록이 회복일에 들어갔는지를
+     * 알리는 안내**일 뿐이다.
      */
     private static final String RECOVERY_THEME_DESCRIPTION = "완주 후 가볍게";
 
@@ -476,10 +479,15 @@ public class ItineraryGenerator {
             if (base != null) {
                 return base;
             }
-            PickedPlace last = pickFirstAvailable(FALLBACK_THEMES);
+            // ④ 기본 후보도 한 바퀴 돌았다. **그래도 그 날 고정 카테고리는 계속 피한다** —
+            //    여기서 제외를 풀면 희소한 풀에서 13:00 취향과 15:30 카페 슬롯이 둘 다 카페가
+            //    되어 §5.6-5 의 "어느 단계에서든 그 날 고정 카테고리를 피한다" 와 어긋난다(#377 리뷰).
+            PickedPlace last = pickFirstAvailable(without(FALLBACK_THEMES, sameDay));
             if (last != null) {
                 return last;
             }
+            // ⑤ 전부 소진됐다 — §5.6-5 대로 관광지로 떨어진다. 그마저 비면 장소 없는 블록이
+            //    되는데, 그건 외부 조회 실패와 같은 강등 처리다(NFR-3).
             return new PickedPlace(PoiCategory.TOUR, pick(PoiCategory.TOUR));
         }
 
