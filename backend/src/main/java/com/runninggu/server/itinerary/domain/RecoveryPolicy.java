@@ -66,13 +66,13 @@ public final class RecoveryPolicy {
         rules.put(ContestEventType.HALF, new RecoveryRule(
                 true,
                 "중등도 피로",
-                "완주 후 온천·휴식 권장",
-                "온천+짧은 산책(고강도 제외)"));
+                "완주 후에는 일정을 가볍게",
+                "다음 날도 여유 있게 · 고강도 제외"));
         rules.put(ContestEventType.FULL, new RecoveryRule(
                 true,
                 "고강도 회복 필요",
-                "완주 후 회복 집중, 도보 최소",
-                "스파·온천 중심, 도보 최소"));
+                "완주 후 회복 집중 · 이동 최소",
+                "일정과 이동을 가장 적게"));
         return Map.copyOf(rules);
     }
 }

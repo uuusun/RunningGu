@@ -36,11 +36,11 @@ class ItineraryGeneratorTest {
                 .containsExactly("15:00", "18:30");
         assertThat(day(half, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "회복 저녁");
         // 풀도 회복 골격에 취향 자리를 받는다 — 예전에는 하프만 열려 있었다(#377 리뷰 · 결정-72)
         assertThat(day(full, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "가벼운 관광", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "회복 저녁");
         assertThat(day(tenK, 0).blocks())
                 .extracting(GeneratedBlock::title)
                 .containsExactly("🏁 춘천마라톤 스타트", "가벼운 관광", "카페 한 잔", "맛집 저녁");
@@ -51,7 +51,7 @@ class ItineraryGeneratorTest {
         // 숙소 대부분이 그 시각이고, 짐을 뺀 뒤에도 그날 일정은 이어진다.
         assertThat(day(half, 2).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("온천·족욕", "숙소 체크아웃", "로컬 점심", "가벼운 관광");
+                .containsExactly("숙소 체크아웃", "로컬 점심", "가벼운 관광");
         assertThat(day(half, 2).blocks())
                 .filteredOn(block -> block.title().equals("숙소 체크아웃"))
                 .extracting(block -> block.startTime().toString())
@@ -135,12 +135,12 @@ class ItineraryGeneratorTest {
                 true,
                 List.of(PoiCategory.HISTORY));
 
+        // 회복일에는 웰니스를 담지 않는다 — 고른 경우에만 themes 로 들어온다(결정-74)
         assertThat(generator.requiredCategories(half))
                 .containsExactly(
                         PoiCategory.FOOD,
                         PoiCategory.TOUR,
-                        PoiCategory.HISTORY,
-                        PoiCategory.WELLNESS);
+                        PoiCategory.HISTORY);
         assertThat(generator.requiredCategories(tenK))
                 .containsExactly(
                         PoiCategory.FOOD,
@@ -148,6 +148,13 @@ class ItineraryGeneratorTest {
                         PoiCategory.HISTORY,
                         PoiCategory.CAFE);
         assertThat(generator.requiredCategories(half)).doesNotContain(PoiCategory.NATURE);
+        // 웰니스를 고르면 그때는 담는다
+        assertThat(generator.requiredCategories(plan(
+                ContestEventType.HALF,
+                RACE_DATE,
+                RACE_DATE,
+                false,
+                List.of(PoiCategory.WELLNESS)))).contains(PoiCategory.WELLNESS);
     }
 
     @Test
@@ -277,7 +284,7 @@ class ItineraryGeneratorTest {
 
         assertThat(day(generated, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "카페 한 잔", "회복 저녁");
         assertThat(day(generated, 0).blocks())
                 .filteredOn(block -> block.title().equals("카페 한 잔"))
                 .extracting(GeneratedBlock::category)
@@ -412,7 +419,7 @@ class ItineraryGeneratorTest {
 
         assertThat(day(generated, 0).blocks())
                 .extracting(GeneratedBlock::title)
-                .containsExactly("🏁 춘천마라톤 스타트", "온천·회복", "카페 한 잔", "회복 저녁");
+                .containsExactly("🏁 춘천마라톤 스타트", "카페 한 잔", "회복 저녁");
     }
 
     /**
@@ -490,6 +497,80 @@ class ItineraryGeneratorTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(themeBlock.category()).isEqualTo(BlockCategory.TOUR);
+    }
+
+
+    // ── 회복 = 부담 축소 (#377 · 결정-74) ──────────────────────────────────
+
+    /**
+     * **웰니스를 고르지 않았으면 온천이 들어가지 않는다.** (SPEC §5.6-4 · 결정-74)
+     *
+     * 예전에는 하프·풀이면 `11:00 온천·회복` 이 무조건 들어갔다. 웰니스는 실측상 가장 희소한
+     * 카테고리라(대회장 아홉 곳에서 0~6건) 없는 지역에서는 장소 없는 빈 블록이 떴다.
+     */
+    @Test
+    void 웰니스를_고르지_않으면_회복일에도_온천을_넣지_않는다() {
+        GeneratedItinerary generated = generate(
+                plan(
+                        ContestEventType.HALF,
+                        RACE_DATE,
+                        RACE_DATE.plusDays(1),
+                        true,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                pools(8));
+
+        assertThat(generated.days())
+                .flatExtracting(GeneratedDay::blocks)
+                .extracting(GeneratedBlock::category)
+                .doesNotContain(BlockCategory.WELLNESS);
+    }
+
+    /** 웰니스를 고르면 다른 취향과 같은 자격으로 취향 자리에 온다. */
+    @Test
+    void 웰니스를_고르면_취향_자리에_온천이_온다() {
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.HALF, RACE_DATE, RACE_DATE, false,
+                        List.of(PoiCategory.WELLNESS)),
+                pools(8));
+
+        assertThat(day(generated, 0).blocks())
+                .extracting(GeneratedBlock::title)
+                .containsExactly("🏁 춘천마라톤 스타트", "온천·힐링", "회복 저녁");
+    }
+
+    /**
+     * **회복일은 비회복일보다 선택 방문이 하나 적다.** 이것이 결정-74 가 말하는 "부담 축소" 다 —
+     * 설명 문구가 아니라 일정의 양으로 드러난다.
+     */
+    @Test
+    void 회복일은_비회복일보다_블록이_하나_적다() {
+        List<PoiCategory> themes = List.of(PoiCategory.FOOD, PoiCategory.CAFE);
+        GeneratedItinerary half = generate(
+                plan(ContestEventType.HALF, RACE_DATE, RACE_DATE.plusDays(1), true, themes),
+                pools(8));
+        GeneratedItinerary tenK = generate(
+                plan(ContestEventType.K10, RACE_DATE, RACE_DATE.plusDays(1), true, themes),
+                pools(8));
+
+        assertThat(day(half, 0).blocks()).hasSize(day(tenK, 0).blocks().size() - 1);
+        assertThat(day(half, 1).blocks()).hasSize(day(tenK, 1).blocks().size() - 1);
+    }
+
+    /** 웰니스 후보가 0건인 지역에서도 장소 없는 블록이 생기지 않는다. */
+    @Test
+    void 웰니스_후보가_없어도_빈_블록을_만들지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.WELLNESS, List.of());
+
+        GeneratedItinerary generated = generate(
+                plan(ContestEventType.HALF, RACE_DATE, RACE_DATE, false,
+                        List.of(PoiCategory.FOOD, PoiCategory.CAFE)),
+                new PoiPools(places, sourcesOf(places)));
+
+        assertThat(day(generated, 0).blocks())
+                .filteredOn(block -> block.blockType() == BlockType.USER)
+                .extracting(GeneratedBlock::place)
+                .doesNotContainNull();
     }
 
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────

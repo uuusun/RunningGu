@@ -152,8 +152,11 @@ private fun RecoveryNotice(event: EventType) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
+            // 온천을 약속하지 않는다 — 고정 온천 블록을 없앴으므로 온천은 힐링·웰니스를 고른
+            // 사람에게만 나온다. 회복은 "무엇을 넣는가" 가 아니라 "얼마나 덜 넣는가" 다
+            // (SPEC §4 S5 · 결정-74).
             text = "${event.label}는 완주 다음날 회복이 중요해요. " +
-                "D+1은 고강도 일정을 빼고 온천·가벼운 산책 위주로 동선을 짭니다.",
+                "D+1은 방문을 하나 덜 넣어 여유 있게 동선을 짭니다.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

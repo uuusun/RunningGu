@@ -50,7 +50,8 @@ public class ItineraryGenerator {
      * 회복일 취향 블록의 설명에 앞세우는 안내. (SPEC §5.6-5 · §5.1)
      *
      * **이 문구가 일정 강도를 낮추지는 못한다.** 실제 부담은 방문 수와 장소 사이 이동으로
-     * 정해지는데 지금 생성기는 둘 다 다루지 않는다(#377 리뷰). 회복일이라고 취향 카테고리를
+     * 정해진다. **방문 수는 결정-74 로 줄였고(회복일은 블록이 하나 적다) 이동 부담은 아직 다루지
+     * 않는다**(#377 리뷰). 회복일이라고 취향 카테고리를
      * 막지 않는 이유도 "분류를 보면 가벼운지 알 수 있어서" 가 아니라, 고른 취향을 임의로 막으면
      * "고른 게 안 나온다" 가 되풀이되기 때문이다. 이 문구는 **왜 이 블록이 회복일에 들어갔는지를
      * 알리는 안내**일 뿐이다.
@@ -70,15 +71,24 @@ public class ItineraryGenerator {
             "음식점 > 간식",
             "음식점 > 패스트푸드");
 
-    /** 필요한 카테고리를 결정적 순서로 한 번씩만 반환한다. (SPEC §5.6-2) */
+    /**
+     * 필요한 카테고리를 결정적 순서로 한 번씩만 반환한다. (SPEC §5.6-2)
+     *
+     * **회복일이라고 웰니스를 넣지 않는다**(결정-74). 예전에는 `noHard` 면 웰니스를 무조건 담았는데,
+     * 고정 온천 블록이 사라진 지금은 고른 사람이 아니면 **불러다 놓고 한 번도 쓰지 않는다** —
+     * 웰니스는 KTO 페어 키로 반경 20km 를 따로 도는 조회라 특히 아깝다(API 명세 부록).
+     * 고른 경우에는 `plan.themes()` 로 이미 들어온다.
+     *
+     * 카페는 회복✕ 골격의 `15:30` 고정 슬롯이 쓰므로 그대로 담는다.
+     */
     public List<PoiCategory> requiredCategories(ItineraryPlan plan) {
         Set<PoiCategory> categories = new LinkedHashSet<>();
         categories.add(PoiCategory.FOOD);
         categories.add(PoiCategory.TOUR);
         categories.addAll(plan.themes());
-        categories.add(RecoveryPolicy.forEvent(plan.event()).noHard()
-                ? PoiCategory.WELLNESS
-                : PoiCategory.CAFE);
+        if (!RecoveryPolicy.forEvent(plan.event()).noHard()) {
+            categories.add(PoiCategory.CAFE);
+        }
         return List.copyOf(categories);
     }
 
@@ -127,18 +137,17 @@ public class ItineraryGenerator {
                         eventLabel(plan.event()) + " 완주 · 결승 후 샤워",
                         BlockType.RACE));
                 if (rule.noHard()) {
-                    blocks.add(block(
-                            "11:00",
-                            "온천·회복",
-                            BlockCategory.WELLNESS,
-                            picker.pick(PoiCategory.WELLNESS),
-                            "완주 근육 회복"));
-                    // 회복 골격에도 취향 자리를 연다 (SPEC §5.6-4·5 · 결정-72).
-                    // 예전에는 하프만 관광지 고정 블록을 받았고 **풀은 그 자리조차 없어서**,
-                    // 맛집·카페를 골라도 스타트→온천→회복 저녁 뿐이었다 — 고른 것이 하나도
-                    // 안 보이는 문제가 풀에서 가장 심했다(#377 리뷰). 종목으로 가르지 않는다.
-                    // 같은 날 11:00 온천이 이미 웰니스를 쓰므로 그것만 뒤로 미룬다.
-                    PickedPlace theme = picker.pickTheme(PoiCategory.WELLNESS);
+                    // **온천을 고정으로 넣지 않는다** (SPEC §5.6-4 · 결정-74).
+                    //
+                    // 예전에는 하프·풀이면 `11:00 온천·회복` 이 무조건 들어갔다. 그런데 웰니스는
+                    // 실측상 가장 희소한 카테고리다 — 대회장 아홉 곳에서 다른 카테고리가 모두 상한
+                    // 8건일 때 웰니스만 0~6건이었고, 무주·청송에서는 **장소 없는 빈 블록**이 떴다
+                    // (`docs/itinerary-reference-cases.md` §3). 고르지도 않은 취향을 모든 완주자에게
+                    // 배정하면서 정작 그 자리를 못 채운 것이다.
+                    //
+                    // 회복은 이제 "온천을 넣는 규칙" 이 아니라 **"선택 방문을 하나 덜 넣는 규칙"**
+                    // 이다. 온천은 웰니스를 고른 사람의 취향 자리에 다른 취향과 같은 자격으로 온다.
+                    PickedPlace theme = picker.pickTheme();
                     blocks.add(block(
                             "14:30",
                             themeTitle(theme.category()),
@@ -175,14 +184,9 @@ public class ItineraryGenerator {
                 }
                 note = rule.dday();
             } else {
-                if (rule.noHard()) {
-                    blocks.add(block(
-                            "10:00",
-                            "온천·족욕",
-                            BlockCategory.WELLNESS,
-                            picker.pick(PoiCategory.WELLNESS),
-                            "고강도 제외 · 회복 위주"));
-                } else {
+                // 회복일에는 오전 블록을 두지 않는다 — 선택 방문이 하나 적어지는 것이 곧
+                // 일정 부담 축소다(결정-74). 예전에는 여기가 `10:00 온천·족욕` 고정이었다.
+                if (!rule.noHard()) {
                     ItineraryPlace morning = picker.pick(PoiCategory.TOUR);
                     blocks.add(block(
                             "10:00",
@@ -207,9 +211,11 @@ public class ItineraryGenerator {
                         BlockCategory.FOOD,
                         picker.pickMeal(),
                         "그 지역 별미"));
-                // 그 날 오전이 이미 쓴 카테고리는 뒤로 미룬다 — 회복일은 온천, 아니면 오전 관광(§5.6-5).
-                PickedPlace theme = picker.pickTheme(
-                        rule.noHard() ? PoiCategory.WELLNESS : PoiCategory.TOUR);
+                // 그 날 오전이 이미 쓴 카테고리는 뒤로 미룬다(§5.6-5). 회복일은 오전 블록이
+                // 없으므로 피할 고정 카테고리도 없다(결정-74).
+                PickedPlace theme = rule.noHard()
+                        ? picker.pickTheme()
+                        : picker.pickTheme(PoiCategory.TOUR);
                 blocks.add(block(
                         "14:30",
                         themeTitle(theme.category()),
@@ -453,7 +459,9 @@ public class ItineraryGenerator {
          *
          * 고른 취향을 한 바퀴 돌고 나면 다시 처음부터 돈다 — 미루는 것이지 막는 것이 아니다.
          *
-         * @param sameDayFixed 그 날 골격이 이미 쓰는 카테고리(회복일 온천 · 카페 슬롯 · 오전 관광)
+         * @param sameDayFixed 그 날 골격이 이미 쓰는 카테고리 — 회복✕ D-day 의 카페 슬롯과
+         *                     회복✕ D+N 의 오전 관광이다. **회복일에는 넘길 것이 없다** —
+         *                     결정-74 로 고정 온천 블록이 없어졌다
          */
         private PickedPlace pickTheme(PoiCategory... sameDayFixed) {
             Set<PoiCategory> sameDay = Set.of(sameDayFixed);

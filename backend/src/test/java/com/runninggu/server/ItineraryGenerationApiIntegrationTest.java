@@ -66,7 +66,7 @@ class ItineraryGenerationApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.endDate").value("2026-08-23"))
                 .andExpect(jsonPath("$.hotel.name").value("호텔 세종 가온"))
                 .andExpect(jsonPath("$.recovery.label").value("D+1 회복 모드"))
-                .andExpect(jsonPath("$.recovery.note").value("온천+짧은 산책(고강도 제외)"))
+                .andExpect(jsonPath("$.recovery.note").value("다음 날도 여유 있게 · 고강도 제외"))
                 .andExpect(jsonPath("$.days.length()").value(3))
                 .andExpect(jsonPath("$.days[0].dayIndex").value(-1))
                 .andExpect(jsonPath("$.days[0].dayLabel").value("D-1"))
