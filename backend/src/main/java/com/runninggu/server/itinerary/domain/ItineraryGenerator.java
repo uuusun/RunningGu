@@ -62,7 +62,9 @@ public class ItineraryGenerator {
     private static final String THEME_DESCRIPTION = "둘러보기";
 
     private static final String NO_ELIGIBLE_MEAL_DESCRIPTION =
-            "추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요.";
+            "추천할 식당을 찾지 못했어요. 편집에서 장소를 추가해 보세요.";
+    private static final String MEAL_DESCRIPTION =
+            "방문 전 메뉴와 영업시간을 확인해 주세요.";
     private static final String MEAL_SOURCE_FAILURE_DESCRIPTION =
             "식당 정보를 불러오지 못했어요.";
 
@@ -122,7 +124,7 @@ public class ItineraryGenerator {
                         "18:30",
                         "대회 전날 저녁",
                         picker,
-                        "대회 전날 저녁 식사"));
+                        MEAL_DESCRIPTION));
                 note = "내일 완주 · 가볍게 먹고 푹 쉬기";
             } else if (offset == 0) {
                 blocks.add(new GeneratedBlock(
@@ -156,7 +158,7 @@ public class ItineraryGenerator {
                             "18:00",
                             "회복 저녁",
                             picker,
-                            "대회 후 저녁 식사"));
+                            MEAL_DESCRIPTION));
                 } else {
                     // 같은 날 15:30 이 카페 고정이라 취향 자리는 카페를 뒤로 미룬다(§5.6-5).
                     PickedPlace theme = picker.pickTheme(PoiCategory.CAFE);
@@ -176,7 +178,7 @@ public class ItineraryGenerator {
                             "18:30",
                             "맛집 저녁",
                             picker,
-                            "대회 후 저녁 식사"));
+                            MEAL_DESCRIPTION));
                 }
                 note = rule.dday();
             } else {
@@ -205,7 +207,7 @@ public class ItineraryGenerator {
                         "12:30",
                         "로컬 점심",
                         picker,
-                        "점심 식사"));
+                        MEAL_DESCRIPTION));
                 // 그 날 오전이 이미 쓴 카테고리는 뒤로 미룬다(§5.6-5). 회복일은 오전 블록이
                 // 없으므로 피할 고정 카테고리도 없다(결정-74).
                 PickedPlace theme = rule.noHard()
@@ -228,7 +230,7 @@ public class ItineraryGenerator {
                             "18:30",
                             "로컬 저녁",
                             picker,
-                            "저녁 식사"));
+                            MEAL_DESCRIPTION));
                 }
                 note = rule.dplus();
             }
@@ -418,6 +420,8 @@ public class ItineraryGenerator {
         }
 
         private String unavailableMealDescription() {
+            // 다른 원천 결과를 받은 부분 성공도 LIVE다. 전체 원천의 정상 응답 표시는 아니다.
+            // 적격 0건과 조회 예외 종료를 구분한다. (SPEC §5.6 · 결정-49·75)
             return pools.sources().containsKey(PoiCategory.FOOD)
                     ? NO_ELIGIBLE_MEAL_DESCRIPTION
                     : MEAL_SOURCE_FAILURE_DESCRIPTION;

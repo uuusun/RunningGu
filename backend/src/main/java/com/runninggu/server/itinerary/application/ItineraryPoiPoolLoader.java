@@ -3,11 +3,13 @@ package com.runninggu.server.itinerary.application;
 import com.runninggu.server.common.error.ApiException;
 import com.runninggu.server.common.error.ErrorCode;
 import com.runninggu.server.itinerary.domain.ItineraryPlace;
+import com.runninggu.server.itinerary.domain.MealSuitability;
 import com.runninggu.server.itinerary.domain.PoiPools;
 import com.runninggu.server.poi.application.PoiService;
 import com.runninggu.server.poi.domain.Poi;
 import com.runninggu.server.poi.domain.PoiCategory;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,8 @@ public class ItineraryPoiPoolLoader {
 
     static final int SEARCH_RADIUS_M = 8_000;
     static final int SEARCH_SIZE = 8;
+    // 가까운 8건이 제외 후보로 차도 일반 식당을 검토하도록 한 페이지를 분류한다. (SPEC §5.6)
+    static final int FOOD_SEARCH_SIZE = 15;
     private static final Logger log = LoggerFactory.getLogger(ItineraryPoiPoolLoader.class);
 
     private final PoiService poiService;
@@ -71,11 +75,22 @@ public class ItineraryPoiPoolLoader {
                             lng,
                             SEARCH_RADIUS_M,
                             null,
-                            SEARCH_SIZE)
+                            category == PoiCategory.FOOD ? FOOD_SEARCH_SIZE : SEARCH_SIZE)
                     .items()
                     .stream()
                     .map(this::toPlace)
                     .toList();
+            if (category == PoiCategory.FOOD) {
+                // 분류 전에 8건으로 자르면 뒤쪽 일반 식당이 사라진다. 등급 내 거리순은 유지한다.
+                // 주류·미확인은 풀에서 제외하고 생성기도 같은 제외 규칙을 방어한다. (SPEC §5.6)
+                places = places.stream()
+                        .filter(place -> place.mealSuitability() == MealSuitability.PREFERRED
+                                || place.mealSuitability() == MealSuitability.SECONDARY)
+                        .sorted(Comparator.comparingInt(place ->
+                                place.mealSuitability() == MealSuitability.PREFERRED ? 0 : 1))
+                        .limit(SEARCH_SIZE)
+                        .toList();
+            }
             return new LoadedCategory(places, true);
         } catch (ApiException exception) {
             if (exception.errorCode() != ErrorCode.EXTERNAL_API_ERROR
