@@ -99,7 +99,7 @@ class ItineraryGenerationApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.days[0].blocks[1].placeName").value(nullValue()))
                 .andExpect(jsonPath("$.days[0].blocks[1].lat").value(nullValue()))
                 .andExpect(jsonPath("$.days[0].blocks[1].description")
-                        .value("추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요."))
+                        .value("추천할 식당을 찾지 못했어요. 편집에서 장소를 추가해 보세요."))
                 .andExpect(jsonPath("$.days[1].blocks[0].placeName").value("세종호수공원"));
     }
 

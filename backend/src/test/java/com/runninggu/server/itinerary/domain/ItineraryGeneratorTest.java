@@ -636,7 +636,7 @@ class ItineraryGeneratorTest {
                 .satisfies(block -> {
                     assertThat(block.place()).isNull();
                     assertThat(block.description()).isEqualTo(
-                            "추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요.");
+                            "추천할 식당을 찾지 못했어요. 편집에서 장소를 추가해 보세요.");
                 });
     }
 
@@ -658,18 +658,23 @@ class ItineraryGeneratorTest {
     }
 
     @Test
-    void 식사_설명은_확인하지_않은_메뉴_효능을_단정하지_않는다() {
-        GeneratedItinerary result = generate(
-                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
-                pools(8));
+    void 모든_식사_설명은_제목이나_메뉴_효능_대신_방문_전_확인을_안내한다() {
+        for (ContestEventType event : List.of(ContestEventType.HALF, ContestEventType.K10)) {
+            GeneratedItinerary result = generate(
+                    plan(event, RACE_DATE.minusDays(1), RACE_DATE.plusDays(2), true),
+                    pools(8));
 
-        assertThat(result.days())
-                .flatExtracting(GeneratedDay::blocks)
-                .filteredOn(block -> block.category() == BlockCategory.FOOD)
-                .extracting(GeneratedBlock::description)
-                .noneMatch(description -> description.contains("소화")
-                        || description.contains("회복식")
-                        || description.contains("별미"));
+            assertThat(result.days())
+                    .flatExtracting(GeneratedDay::blocks)
+                    .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                    .hasSize(5)
+                    .allSatisfy(block -> {
+                        assertThat(block.place()).isNotNull();
+                        assertThat(block.description())
+                                .isEqualTo("방문 전 메뉴와 영업시간을 확인해 주세요.")
+                                .doesNotContain(block.title());
+                    });
+        }
     }
 
     /**
