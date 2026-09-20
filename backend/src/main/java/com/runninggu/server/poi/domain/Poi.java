@@ -13,7 +13,33 @@ public record Poi(
         String description,
         String address,
         String url,
-        String imageUrl) {
+        String imageUrl,
+        String sourceCategory) {
+
+    public Poi(
+            String name,
+            PoiCategory category,
+            PoiProvider provider,
+            BigDecimal lat,
+            BigDecimal lng,
+            int distanceM,
+            String description,
+            String address,
+            String url,
+            String imageUrl) {
+        this(
+                name,
+                category,
+                provider,
+                lat,
+                lng,
+                distanceM,
+                description,
+                address,
+                url,
+                imageUrl,
+                "");
+    }
 
     public Poi {
         name = Objects.requireNonNull(name);
@@ -28,5 +54,6 @@ public record Poi(
         address = Objects.requireNonNullElse(address, "");
         url = Objects.requireNonNullElse(url, "");
         imageUrl = imageUrl == null || imageUrl.isBlank() ? null : imageUrl.strip();
+        sourceCategory = Objects.requireNonNullElse(sourceCategory, "").strip();
     }
 }

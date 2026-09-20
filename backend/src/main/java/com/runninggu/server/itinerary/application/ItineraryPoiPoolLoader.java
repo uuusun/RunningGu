@@ -97,7 +97,8 @@ public class ItineraryPoiPoolLoader {
                 poi.address(),
                 poi.lat(),
                 poi.lng(),
-                poi.description());
+                poi.description(),
+                MealCandidateClassifier.classify(poi));
     }
 
     private LoadedCategory join(CompletableFuture<LoadedCategory> future) {

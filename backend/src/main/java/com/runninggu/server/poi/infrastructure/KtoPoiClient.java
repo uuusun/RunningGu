@@ -204,7 +204,8 @@ public class KtoPoiClient implements KtoPoiSource {
                 description,
                 address,
                 "",
-                firstTextOrNull(item, "firstimage", "firstImage")));
+                firstTextOrNull(item, "firstimage", "firstImage"),
+                textOrEmpty(item.path("lclsSystm2"))));
     }
 
     private Coordinates coordinatesOf(JsonNode item) {

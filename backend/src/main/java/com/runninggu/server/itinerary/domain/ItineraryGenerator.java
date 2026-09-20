@@ -29,12 +29,6 @@ public class ItineraryGenerator {
     private static final double NEARBY_SPREAD_M = 2_000;
 
     /**
-     * 식사 자리에서 뺄 카카오 카테고리. `category_name` 둘째 칸을 본다.
-     *
-     * `음식점 > 간식 > 제과,베이커리 > 파리바게뜨` · `음식점 > 패스트푸드 > 맥도날드` 처럼
-     * 온다. 저녁·점심 블록에 빵집이나 패스트푸드가 오는 것을 막는다.
-     */
-    /**
      * 고른 취향으로 취향 자리를 못 채울 때 쓰는 기본 후보. (SPEC §5.6-5)
      *
      * 고른 것을 다 돌고도 자리가 남을 때만 여기까지 온다 — 이 순서가 앞에 오면 안 고른
@@ -67,9 +61,10 @@ public class ItineraryGenerator {
      */
     private static final String THEME_DESCRIPTION = "둘러보기";
 
-    private static final List<String> NON_MEAL_CATEGORIES = List.of(
-            "음식점 > 간식",
-            "음식점 > 패스트푸드");
+    private static final String NO_ELIGIBLE_MEAL_DESCRIPTION =
+            "추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요.";
+    private static final String MEAL_SOURCE_FAILURE_DESCRIPTION =
+            "식당 정보를 불러오지 못했어요.";
 
     /**
      * 필요한 카테고리를 결정적 순서로 한 번씩만 반환한다. (SPEC §5.6-2)
@@ -113,18 +108,21 @@ public class ItineraryGenerator {
             String note;
 
             if (offset < 0) {
-                blocks.add(block(
-                        "15:00",
-                        "숙소 체크인",
-                        BlockCategory.LODGING,
-                        hotel,
-                        "여장 풀기"));
-                blocks.add(block(
+                // 숙소 미선택은 체크인·체크아웃이 없는 일정이다. 장소만 빈 숙소 블록을 만들지
+                // 않는다. 빠진 자리를 다른 방문으로 채우지도 않는다. (SPEC §5.6 · 결정-75)
+                if (hotel != null) {
+                    blocks.add(block(
+                            "15:00",
+                            "숙소 체크인",
+                            BlockCategory.LODGING,
+                            hotel,
+                            "여장 풀기"));
+                }
+                blocks.add(mealBlock(
                         "18:30",
                         "대회 전날 저녁",
-                        BlockCategory.FOOD,
-                        picker.pickMeal(),
-                        "속 편한 메뉴로 가볍게"));
+                        picker,
+                        "대회 전날 저녁 식사"));
                 note = "내일 완주 · 가볍게 먹고 푹 쉬기";
             } else if (offset == 0) {
                 blocks.add(new GeneratedBlock(
@@ -154,12 +152,11 @@ public class ItineraryGenerator {
                             blockCategory(theme.category()),
                             theme.place(),
                             recoveryDescription(theme.place())));
-                    blocks.add(block(
+                    blocks.add(mealBlock(
                             "18:00",
                             "회복 저녁",
-                            BlockCategory.FOOD,
-                            picker.pickMeal(),
-                            "소화 잘 되는 회복식"));
+                            picker,
+                            "대회 후 저녁 식사"));
                 } else {
                     // 같은 날 15:30 이 카페 고정이라 취향 자리는 카페를 뒤로 미룬다(§5.6-5).
                     PickedPlace theme = picker.pickTheme(PoiCategory.CAFE);
@@ -175,12 +172,11 @@ public class ItineraryGenerator {
                             BlockCategory.CAFE,
                             picker.pick(PoiCategory.CAFE),
                             "완주 후 휴식"));
-                    blocks.add(block(
+                    blocks.add(mealBlock(
                             "18:30",
                             "맛집 저녁",
-                            BlockCategory.FOOD,
-                            picker.pickMeal(),
-                            "오늘은 잘 먹는 날"));
+                            picker,
+                            "대회 후 저녁 식사"));
                 }
                 note = rule.dday();
             } else {
@@ -197,7 +193,7 @@ public class ItineraryGenerator {
                 }
                 // **체크아웃은 11시다** — 숙소 대부분이 그 시각이라 그때 짐을 뺀다.
                 // 마지막 블록으로 두면 `17:00 체크아웃` 이 되어 실제 일정과 어긋난다(#319).
-                if (date.equals(plan.endDate())) {
+                if (date.equals(plan.endDate()) && hotel != null) {
                     blocks.add(block(
                             "11:00",
                             "숙소 체크아웃",
@@ -205,12 +201,11 @@ public class ItineraryGenerator {
                             hotel,
                             "짐 정리하고 나서기"));
                 }
-                blocks.add(block(
+                blocks.add(mealBlock(
                         "12:30",
                         "로컬 점심",
-                        BlockCategory.FOOD,
-                        picker.pickMeal(),
-                        "그 지역 별미"));
+                        picker,
+                        "점심 식사"));
                 // 그 날 오전이 이미 쓴 카테고리는 뒤로 미룬다(§5.6-5). 회복일은 오전 블록이
                 // 없으므로 피할 고정 카테고리도 없다(결정-74).
                 PickedPlace theme = rule.noHard()
@@ -229,12 +224,11 @@ public class ItineraryGenerator {
                 // 14:30 이 마지막이라 일정이 끊긴 것처럼 보인다.
                 // 마지막 날은 11:00 체크아웃 뒤 오후에 이동하므로 넣지 않는다.
                 if (!date.equals(plan.endDate())) {
-                    blocks.add(block(
+                    blocks.add(mealBlock(
                             "18:30",
                             "로컬 저녁",
-                            BlockCategory.FOOD,
-                            picker.pickMeal(),
-                            rule.noHard() ? "소화 잘 되는 회복식" : "그 지역 별미"));
+                            picker,
+                            "저녁 식사"));
                 }
                 note = rule.dplus();
             }
@@ -273,6 +267,21 @@ public class ItineraryGenerator {
                 place,
                 resolvedDescription,
                 BlockType.USER);
+    }
+
+    /** 자동 식사 후보가 없더라도 블록을 유지하고 조회 결과에 맞는 안내를 붙인다. (결정-75) */
+    private GeneratedBlock mealBlock(
+            String startTime,
+            String title,
+            Picker picker,
+            String description) {
+        ItineraryPlace place = picker.pickMeal();
+        return block(
+                startTime,
+                title,
+                BlockCategory.FOOD,
+                place,
+                place == null ? picker.unavailableMealDescription() : description);
     }
 
     private ItineraryPlace hotelPlace(ItineraryHotel hotel) {
@@ -388,39 +397,30 @@ public class ItineraryGenerator {
         }
 
         /**
-         * **식사 자리 전용.** 프랜차이즈 빵집·패스트푸드를 뺀다.
+         * 일반 식당을 먼저 고르고, 없을 때만 간식·패스트푸드 계열을 고른다. (결정-75)
          *
-         * 카카오 `category_name` 이 계층으로 온다 — `음식점 > 간식 > 제과,베이커리 > 파리바게뜨`
-         * 처럼 넷째 칸에 브랜드가 붙는다. 저녁 자리에 `파리바게뜨` 가 오던 것이 이 때문이다
-         * (`FD6` 는 빵집·패스트푸드를 다 담는다).
-         *
-         * **카페는 거르지 않는다.** 카페 블록은 `CE7` 로 따로 불러오고, 거기서는 프랜차이즈가
-         * 문제가 되지 않는다.
-         *
-         * 걸러서 아무것도 안 남으면 **거르지 않은 목록**으로 돌아간다 — 시골 대회장 주변에
-         * 프랜차이즈뿐일 수 있고, 그때는 빈 블록보다 낫다.
+         * 주류 중심과 분류 미확인 후보는 어느 폴백에서도 되살리지 않는다. 분류는 원천
+         * 카테고리를 표시 설명과 분리해 적재할 때 확정한다.
          */
         private ItineraryPlace pickMeal() {
             List<ItineraryPlace> all = pools.get(PoiCategory.FOOD);
-            List<ItineraryPlace> meals = all.stream()
-                    .filter(Picker::isMeal)
+            List<ItineraryPlace> preferred = all.stream()
+                    .filter(place -> place.mealSuitability() == MealSuitability.PREFERRED)
                     .toList();
-            ItineraryPlace picked = pickFrom(meals);
-            return picked != null ? picked : pickFrom(all);
+            ItineraryPlace picked = pickFrom(preferred);
+            if (picked != null) {
+                return picked;
+            }
+            List<ItineraryPlace> secondary = all.stream()
+                    .filter(place -> place.mealSuitability() == MealSuitability.SECONDARY)
+                    .toList();
+            return pickFrom(secondary);
         }
 
-        /** 식사로 볼 수 있는 곳인가. `description` 에 카카오 `category_name` 이 들어 있다. */
-        private static boolean isMeal(ItineraryPlace place) {
-            String category = place.description();
-            if (category == null || category.isBlank()) {
-                return true;
-            }
-            for (String excluded : NON_MEAL_CATEGORIES) {
-                if (category.contains(excluded)) {
-                    return false;
-                }
-            }
-            return true;
+        private String unavailableMealDescription() {
+            return pools.sources().containsKey(PoiCategory.FOOD)
+                    ? NO_ELIGIBLE_MEAL_DESCRIPTION
+                    : MEAL_SOURCE_FAILURE_DESCRIPTION;
         }
 
         private ItineraryPlace pickFrom(List<ItineraryPlace> places) {

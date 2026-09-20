@@ -192,7 +192,8 @@ public class KakaoPoiClient implements KakaoPoiSource {
                     textOrEmpty(document.categoryName()),
                     address == null ? "" : address,
                     textOrEmpty(document.placeUrl()),
-                    null));
+                    null,
+                    textOrEmpty(document.categoryName())));
         } catch (NumberFormatException exception) {
             return Optional.empty();
         }
