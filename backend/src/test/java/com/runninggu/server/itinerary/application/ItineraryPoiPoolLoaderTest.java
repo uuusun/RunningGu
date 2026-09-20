@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import com.runninggu.server.common.error.ApiException;
 import com.runninggu.server.common.error.ErrorCode;
 import com.runninggu.server.itinerary.domain.PoiPools;
+import com.runninggu.server.itinerary.domain.MealSuitability;
 import com.runninggu.server.poi.application.PoiSearchResult;
 import com.runninggu.server.poi.application.PoiService;
 import com.runninggu.server.poi.domain.Poi;
@@ -93,6 +94,30 @@ class ItineraryPoiPoolLoaderTest {
                         ApiException.class,
                         exception -> assertThat(exception.errorCode())
                                 .isEqualTo(ErrorCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void 식사_후보는_표시_설명과_분리된_원천_업종으로_분류한다() {
+        Poi alcohol = new Poi(
+                "달빛맥주",
+                PoiCategory.FOOD,
+                PoiProvider.KAKAO,
+                LAT,
+                LNG,
+                500,
+                "사용자에게 보여 줄 설명",
+                "세종특별자치시",
+                "https://place.map.kakao.com/2",
+                null,
+                "음식점 > 술집 > 호프,요리주점");
+        givenSearch(PoiCategory.FOOD, new PoiSearchResult(List.of(alcohol)));
+
+        PoiPools pools = loader.load(List.of(PoiCategory.FOOD), LAT, LNG);
+
+        assertThat(pools.get(PoiCategory.FOOD)).singleElement().satisfies(place -> {
+            assertThat(place.description()).isEqualTo("사용자에게 보여 줄 설명");
+            assertThat(place.mealSuitability()).isEqualTo(MealSuitability.EXCLUDED);
+        });
     }
 
     private void givenSearch(PoiCategory category, PoiSearchResult result) {

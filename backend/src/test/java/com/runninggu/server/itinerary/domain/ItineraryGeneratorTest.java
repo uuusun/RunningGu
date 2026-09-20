@@ -179,16 +179,24 @@ class ItineraryGeneratorTest {
     }
 
     @Test
-    void 숙소와_POI가_없어도_일정_골격과_대회_블록을_유지한다() {
+    void 숙소가_없으면_체크인과_체크아웃을_만들지_않고_나머지_골격을_유지한다() {
         GeneratedItinerary generated = generate(
-                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, false),
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE.plusDays(1), false),
                 emptyPools());
 
-        GeneratedBlock checkIn = day(generated, -1).blocks().getFirst();
-        assertThat(checkIn.place()).isNull();
-        assertThat(checkIn.description()).isEqualTo("여장 풀기");
+        assertThat(generated.days())
+                .flatExtracting(GeneratedDay::blocks)
+                .extracting(GeneratedBlock::category)
+                .doesNotContain(BlockCategory.LODGING);
         assertThat(day(generated, 0).blocks()).filteredOn(GeneratedBlock::systemManaged)
                 .hasSize(1);
+        assertThat(day(generated, -1).blocks())
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .singleElement()
+                .satisfies(block -> {
+                    assertThat(block.place()).isNull();
+                    assertThat(block.description()).isEqualTo("식당 정보를 불러오지 못했어요.");
+                });
         assertThat(generated.days()).isNotEmpty();
     }
 
@@ -575,19 +583,14 @@ class ItineraryGeneratorTest {
 
     // ── 추천 품질 (#319) ────────────────────────────────────────────────────
 
-    /**
-     * **식사 자리에 프랜차이즈 빵집·패스트푸드를 넣지 않는다.**
-     *
-     * 카카오 `FD6` 는 음식점을 통째로 담아서 파리바게뜨·맘스터치가 함께 온다. `sort=distance`
-     * 로 받아 첫 항목을 집던 예전 방식에서는 그것이 저녁으로 뽑혔다.
-     */
+    /** 일반 식당이 있으면 간식·패스트푸드보다 먼저 쓴다. (SPEC §5.6 · 결정-75) */
     @Test
-    void 식사_자리에는_프랜차이즈_빵집과_패스트푸드를_넣지_않는다() {
+    void 식사_자리에는_일반_식당을_후순위_후보보다_먼저_넣는다() {
         Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
         places.put(PoiCategory.FOOD, List.of(
-                place("파리바게뜨 거제서정점", "음식점 > 간식 > 제과,베이커리 > 파리바게뜨"),
-                place("맘스터치 거제서정점", "음식점 > 패스트푸드 > 맘스터치"),
-                place("각산애식당", "음식점 > 한식")));
+                mealPlace("파리바게뜨 거제서정점", MealSuitability.SECONDARY),
+                mealPlace("맘스터치 거제서정점", MealSuitability.SECONDARY),
+                mealPlace("각산애식당", MealSuitability.PREFERRED)));
 
         GeneratedItinerary result = generate(
                 plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
@@ -599,12 +602,12 @@ class ItineraryGeneratorTest {
                 .containsExactly("각산애식당");
     }
 
-    /** 거를 것만 남으면 **빈 블록보다 낫다** — 거르지 않은 목록으로 돌아간다. */
+    /** 일반 식당이 없을 때만 간식·패스트푸드 계열을 후순위로 쓴다. */
     @Test
-    void 식사로_쓸_곳이_하나도_없으면_거르지_않는다() {
+    void 일반_식당이_없으면_후순위_식사_후보를_사용한다() {
         Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
         places.put(PoiCategory.FOOD, List.of(
-                place("파리바게뜨 거제서정점", "음식점 > 간식 > 제과,베이커리 > 파리바게뜨")));
+                mealPlace("파리바게뜨 거제서정점", MealSuitability.SECONDARY)));
 
         GeneratedItinerary result = generate(
                 plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
@@ -614,6 +617,59 @@ class ItineraryGeneratorTest {
                 .filteredOn(block -> block.title().contains("저녁"))
                 .extracting(block -> block.place().name())
                 .containsExactly("파리바게뜨 거제서정점");
+    }
+
+    @Test
+    void 주류_중심과_미확인_후보만_있으면_장소_없는_식사_블록을_유지한다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.FOOD, List.of(
+                mealPlace("달빛맥주", MealSuitability.EXCLUDED),
+                mealPlace("분류 없는 장소", MealSuitability.UNKNOWN)));
+
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                new PoiPools(places, sourcesOf(places)));
+
+        assertThat(day(result, -1).blocks())
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .singleElement()
+                .satisfies(block -> {
+                    assertThat(block.place()).isNull();
+                    assertThat(block.description()).isEqualTo(
+                            "추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요.");
+                });
+    }
+
+    @Test
+    void 주류_중심_후보는_후순위_후보가_있으면_폴백에서도_되살아나지_않는다() {
+        Map<PoiCategory, List<ItineraryPlace>> places = new LinkedHashMap<>(mealPools());
+        places.put(PoiCategory.FOOD, List.of(
+                mealPlace("달빛맥주", MealSuitability.EXCLUDED),
+                mealPlace("동네분식", MealSuitability.SECONDARY)));
+
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                new PoiPools(places, sourcesOf(places)));
+
+        assertThat(day(result, -1).blocks())
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .extracting(block -> block.place().name())
+                .containsExactly("동네분식");
+    }
+
+    @Test
+    void 식사_설명은_확인하지_않은_메뉴_효능을_단정하지_않는다() {
+        GeneratedItinerary result = generate(
+                plan(ContestEventType.HALF, RACE_DATE.minusDays(1), RACE_DATE, true),
+                pools(8));
+
+        assertThat(result.days())
+                .flatExtracting(GeneratedDay::blocks)
+                .filteredOn(block -> block.category() == BlockCategory.FOOD)
+                .extracting(GeneratedBlock::description)
+                .noneMatch(description -> description.contains("소화")
+                        || description.contains("회복식")
+                        || description.contains("별미"));
     }
 
     /**
@@ -691,6 +747,16 @@ class ItineraryGeneratorTest {
                 new BigDecimal("34.8545247800561"),
                 new BigDecimal("128.576145697347"),
                 categoryName);
+    }
+
+    private ItineraryPlace mealPlace(String name, MealSuitability suitability) {
+        return new ItineraryPlace(
+                name,
+                "경남 거제시",
+                new BigDecimal("34.8545247800561"),
+                new BigDecimal("128.576145697347"),
+                "표시용 설명",
+                suitability);
     }
 
     /** FOOD 를 뺀 나머지 카테고리는 기본 풀을 쓴다. */

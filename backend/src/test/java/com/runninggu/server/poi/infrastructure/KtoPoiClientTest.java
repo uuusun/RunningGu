@@ -129,6 +129,25 @@ class KtoPoiClientTest {
     }
 
     @Test
+    void KorService2_음식점_중분류를_내부_원천_업종으로_보존한다() {
+        korServer.expect(request -> {})
+                .andRespond(withSuccess(
+                        successBody("""
+                                {"title":"세종 호프","mapx":"127.27","mapy":"36.49",
+                                "dist":"100","lclsSystm2":"FD04","addr1":"세종"}
+                                """, 1),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.search(criteria(PoiCategory.FOOD, ""), 8))
+                .singleElement()
+                .satisfies(poi -> {
+                    assertThat(poi.description()).isEmpty();
+                    assertThat(poi.sourceCategory()).isEqualTo("FD04");
+                });
+        korServer.verify();
+    }
+
+    @Test
     void query는_KTO_위치결과의_이름을_공백_무시해_필터한다() {
         korServer.expect(request -> {})
                 .andRespond(withSuccess(

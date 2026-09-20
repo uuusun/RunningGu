@@ -85,6 +85,7 @@ class KakaoPoiClientTest {
             assertThat(poi.lng()).isEqualByComparingTo("127.2714");
             assertThat(poi.distanceM()).isEqualTo(1200);
             assertThat(poi.description()).isEqualTo("여행 > 숙박 > 호텔");
+            assertThat(poi.sourceCategory()).isEqualTo("여행 > 숙박 > 호텔");
             assertThat(poi.address()).isEqualTo("세종특별자치시 한누리대로 1");
             assertThat(poi.url()).isEqualTo("https://place.map.kakao.com/1");
             assertThat(poi.imageUrl()).isNull();
