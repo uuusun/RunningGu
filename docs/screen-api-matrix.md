@@ -271,13 +271,13 @@ Compose 화면
 |---|---|---|---|---|
 | 숙소 최초 조회 | `GET /api/pois` | category=LODGING, 대회 lat/lng, radius, size=8 | POI items(`provider=KAKAO|KTO`, `(name,lat,lng)` 조합 유일), 카카오 AD5 우선·KTO 32 폴백 | Loading/Empty/502/504 |
 | 숙소 검색 | 같은 API query | 2자 이상 query + 기준 좌표 | 같은 POI item 계약 | Android 500ms debounce, 2자 미만은 호출 안 함 |
-| 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태 |
+| 숙소 선택/해제 | 로컬 | hotel DTO/null | WizardUiState | picked 상태. null이면 생성 결과의 자동 LODGING 블록 0개 |
 | 동선 생성(서버 단일 주체) | `POST /api/itineraries/generate` | contestId, start/end(대회일 포함·최대 7일), event, themes, hotel? | 지역 없는 기간 `title`, recovery, days[](dayIndex=대회일 상대 오프셋), blocks[] | 비활성은 `409 CONTEST_INACTIVE`. HALF/FULL 회복일은 D+, D+가 없으면 D-day. 200 `days=[]`은 S7 Empty, 네트워크·timeout·4xx/5xx는 Error |
 
 S6의 POI 목록 `key`는 서버가 응답 안에서 유일성을 보장하는 `(name, lat, lng)` 조합을 사용한다.
 주소는 원천에 없으면 빈 문자열일 수 있으므로 `key`에 사용하지 않는다.
 
-`generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다. 앱은 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않으며, 서버 응답 표시와 저장 전 USER 블록 편집만 담당한다(SPEC 결정-41).
+`generate` 응답은 DB에 저장하지 않는 임시 DTO다. KTO·카카오 POI 실패는 해당 place를 null로 낮추되 전체 동선 생성은 성공시키는 것이 SPEC 계약이다. 식사 조회 성공 후 적격 후보 0건과 외부 조회 실패는 장소가 null인 블록의 `description`으로 구분하며, 주류 중심·분류 미확인 후보는 폴백에서도 자동 추천하지 않는다(SPEC 결정-75). 앱은 카테고리별 POI를 모아 자체 엔진으로 새 동선을 조립하지 않으며, 서버 응답 표시와 저장 전 USER 블록 편집만 담당한다(SPEC 결정-41).
 
 ### S7 결과·편집·저장
 
@@ -503,6 +503,7 @@ R1 기록·R2 요약·`ran` 상세와 `/api/runs/**` 를 두지 않는다. 화�
 | SPEC 결정-53 | 비활성 대회 생성은 `409 CONTEST_INACTIVE`. 생성 `title`은 지역 없는 기간, `dayIndex`는 대회일 상대 오프셋. HALF/FULL 회복일은 D+이고 D+가 없으면 D-day. 생성 엔진 `sources`는 내부 추적값 |
 | SPEC 결정-55 | 이메일 로그인은 IP별 모든 요청 30회/고정 1분과 정규화 이메일별 실패 5회/고정 1분을 함께 제한한다. 초과는 `429 RATE_LIMITED`, 성공은 이메일 창만 초기화한다. 존재하지 않는 이메일도 dummy BCrypt 비교 후 동일한 `401 LOGIN_FAILED`를 반환한다 |
 | SPEC 결정-56 | 자동 위치 추정을 제품에서 전부 없앤다. 위치 권한·`FusedLocationProvider`·`play-services-location` 을 두지 않고 Wi-Fi AP·기지국 Cell-ID·BLE·IP GeoIP 로 위치를 추정하지 않는다. 출발지는 검색·프리셋·S7 숙소 좌표뿐이며 `/api/courses/near` 의 `lat/lng` 에 기기 유래 좌표를 넣는 경로를 두지 않는다. R1·R2·`ran`·`/api/runs/**` 는 구현하지 않는다. 서버 요청 IP 기반 횟수 제한은 위치 추정이 아니므로 유지하되 지역 변환·저장·추천 사용은 하지 않는다 (D-25 대체 · 이슈 #215) |
+| D-38 / SPEC 결정-75 | `hotel=null`이면 자동 LODGING 블록은 0개다. 자동 식사는 원천 업종을 내부 등급으로 분류해 일반 식당을 우선하고 간식·패스트푸드는 후순위로만 쓰며, 주류 중심·분류 미확인은 모든 폴백에서 제외한다. 적격 0건과 외부 실패는 장소 null 블록의 설명으로 구분한다 |
 
 ### 미정 계약 — **없다**
 
@@ -538,6 +539,7 @@ P0 화면·기능과 물리 DB 계약은 모두 닫혔다. 저장 코스 DB-01�
 - `GET /api/me`의 단일 `loginProvider`와 로그인 수단 연결·해제 API 제거
 - `GET /api/pois`의 항목별 `provider(KAKAO|KTO)`, `placeId`·추적 timestamp 제외, 8→20km 확대·원천 보충·부분 실패·5분 캐시 계약
 - `GET /api/courses/loop` — 걷기 스팟을 **진입점**으로 하는 OSM 순환 경로 1건 · 경로 모양만 5분 캐시 · `503` 단일 오류 (결정-68 · D-37 닫힘)
+- `POST /api/itineraries/generate`의 숙소 null 시 LODGING 블록 0개, 식사 원천 분류·주류 강제 제외·후순위 폴백·적격 0건/조회 실패 안내 계약(결정-75 · D-38)
 
 ### 남은 springdoc 상세화 항목
 

@@ -575,7 +575,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
   "hotel": { "name": "호텔 세종 가온", "lat": 36.4901, "lng": 127.2688 }
 }
 ```
-- `hotel`은 `null` 허용("숙소 없이 추천받기" → 대회장 중심으로 슬롯 채움 🔒 §4.9).
+- `hotel`은 `null` 허용("숙소 없이 추천받기" → 대회장 중심으로 나머지 슬롯 채움 🔒 §4.9). null이면 체크인·체크아웃을 포함한 자동 `LODGING` 블록은 0개이며, 빠진 자리를 다른 방문으로 채우지 않는다(결정-75).
 - `themes`는 1개 이상(§4.8 — 0개면 클라 CTA 비활성) · `event`는 대회 종목에 없어도 선택 가능(§4.8).
 - **`themes` 배열의 순서는 SPEC §5.3 선언 순서다**(앱이 그 순서로 정렬해 보낸다 · 결정-72).
   탭한 차례가 아니라서 같은 취향을 고르면 언제나 같은 우선순위가 된다. 서버는 그 순서를 앞에서부터
@@ -584,7 +584,7 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - canonical 대회의 `lat/lng`가 없으면 생성하지 않고 `409 CONTEST_LOCATION_UNAVAILABLE`.
 - 비활성 대회는 새 동선을 생성하지 않고 `409 CONTEST_INACTIVE`를 반환한다(결정-53).
 
-응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
+응답 `200` — **DB 저장 없는 DTO** (규칙 엔진 §5.6 서버 이식: 날짜 골격 → 고정 블록(대회·숙소가 있을 때만 체크인/아웃) → 종목→피로도 → 회복일 → 슬롯 채우기):
 
 ```json
 {
@@ -602,9 +602,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
           "placeName": "호텔 세종 가온", "address": "세종특별자치시 어진동 123",
           "lat": 36.4901, "lng": 127.2688, "description": "짐 풀고 휴식",
           "blockType": "USER", "systemManaged": false },
-        { "startTime": "18:30", "title": "카보로딩 저녁", "category": "FOOD",
+        { "startTime": "18:30", "title": "대회 전날 저녁", "category": "FOOD",
           "placeName": "도담동 파스타집", "address": "...", "lat": 36.5, "lng": 127.26,
-          "description": "탄수화물 보충", "blockType": "USER", "systemManaged": false }
+          "description": "대회 전날 저녁 식사", "blockType": "USER", "systemManaged": false }
       ]
     }
   ]
@@ -616,7 +616,9 @@ P0 동선은 POI를 별도 마스터로 참조하지 않고 장소 snapshot을 �
 - HALF/FULL은 D+ 일자를 `recovery=true`로 표시한다. 일정에 D+가 하나도 없으면 D-day가 `true`다. 5K/10K는 모두 `false`다.
 - RACE 블록은 `placeName=CONTEST.place`, `address=CONTEST.road_address`(nullable), canonical 좌표를 사용한다. `start_time`이 없으면 `08:00`이다.
 - 순수 엔진은 카테고리별 POI 조회 원천을 내부 추적하지만 `sources`는 생성 HTTP 응답에 포함하지 않는다. `LIVE/SAMPLE/SYNTH` 배지는 POI 목록 응답에서 노출한다(결정-53, NFR-2).
-- 외부 POI 실패 시 해당 블록 `placeName/lat/lng=null` 강등, **생성은 실패하지 않음** 🔒(NFR-3).
+- 자동 식사 후보는 카카오 `category_name`과 KTO `lclsSystm2`를 표시용 `description`과 분리해 내부 분류한다. 일반 식당을 우선하고 간식·패스트푸드는 일반 식당이 없을 때만 후순위로 사용한다. 주점·호프·바·펍 등 주류 중심 업종과 KTO `FD04`, 분류 미확인 후보는 자동 식사 블록과 폴백에서 사용하지 않는다(결정-75).
+- 식사 조회는 성공했지만 적격 후보가 없으면 블록의 `placeName/address/lat/lng=null`, `description="추천할 식당을 찾지 못했어요. 식사 장소를 직접 선택해 주세요."`다. 외부 식사 조회가 실패했으면 같은 장소 null 형식에 `description="식당 정보를 불러오지 못했어요."`를 사용한다. 어느 경우에도 전체 생성은 실패하지 않는다(NFR-3·결정-75).
+- 식당이 선택된 식사 블록의 `description`은 확인하지 않은 메뉴·소화·회복 효능을 단정하지 않고 일정 목적을 중립적으로 안내한다.
 - 슬롯 채우기 카테고리 풀: `{FOOD, TOUR} ∪ themes` + (**회복✕면 CAFE**) 🔧(§5.6-2 · 결정-74). 회복○ 에는 더 담지 않는다 — 고정 온천 블록이 없어져 웰니스는 고른 경우에만 `themes` 로 들어온다.
 - 정상 처리됐지만 표시 가능한 블록이 없으면 `200`에서 `days: []`를 반환하고 앱은 S7 Empty로 표시한다. 네트워크·timeout·4xx/5xx는 Error이며 Empty로 강등하지 않는다.
 
