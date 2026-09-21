@@ -50,8 +50,8 @@ class FakeItineraryRepositoryTest {
 
     /**
      * 회복 픽스처는 결정-74·75 골격을 흉내내야 한다 — 온천은 고정 블록이 아니라 취향 자리에만 오고,
-     * 회복일(D+1)은 D-day 보다 블록이 하나 적다(SPEC §5.6-4). 옛 골격(`11:00 온천·회복` 고정)으로
-     * 되돌리면 이 테스트가 잡는다.
+     * 회복 골격은 **같은 일자의 비회복 골격보다** 선택 방문이 하나 적다(D-day 는 카페 슬롯이, D+N 은
+     * 오전 관광이 없다 · SPEC §5.6-4). 옛 골격(`11:00 온천·회복` 고정)으로 되돌리면 이 테스트가 잡는다.
      */
     @Test
     fun `회복 픽스처는 온천을 고정 블록으로 두지 않는다`() = runTest {
@@ -64,7 +64,11 @@ class FakeItineraryRepositoryTest {
         assertEquals("회복 D-day 는 카페 고정 슬롯 없이 스타트·취향·회복 저녁 셋이다 (SPEC §5.6-4)", listOf("09:00", "14:30", "18:00"), dday.blocks.map { it.time })
         assertEquals("숙소를 골랐으니 마지막 날은 체크아웃 → 점심 → 취향이다", listOf("11:00", "12:30", "14:30"), dplus.blocks.map { it.time })
         assertEquals("웰니스를 고른 예시라 온천은 D+1 취향 자리에 온다", BlockCategory.WELLNESS, dplus.blocks.last().catKey)
-        assertEquals("체크아웃은 요청한 숙소로 한다", "하와이장", dplus.blocks.first { it.catKey == BlockCategory.LODGING }.place?.name)
+        val checkout = dplus.blocks.first { it.catKey == BlockCategory.LODGING }.place
+        assertEquals("체크아웃은 요청한 숙소로 한다", "하와이장", checkout?.name)
+        assertEquals(37.90, checkout?.lat)
+        assertEquals(127.06, checkout?.lng)
+        assertEquals("요청 숙소에는 주소가 없으니 픽스처 주소를 남기지 않는다", "", checkout?.addr)
     }
 
     /**

@@ -453,7 +453,8 @@ object FakeItineraryRepository : ItineraryRepository {
                     when {
                         block.catKey != BlockCategory.LODGING -> block
                         hotel == null -> null
-                        else -> block.copy(place = block.place?.copy(name = hotel.name, lat = hotel.lat, lng = hotel.lng))
+                        // 요청 `HotelInput` 에는 주소가 없고 서버 hotelPlace() 도 address=null 이라 주소는 비운다.
+                        else -> block.copy(place = block.place?.copy(name = hotel.name, lat = hotel.lat, lng = hotel.lng, addr = ""))
                     }
                 },
             )
@@ -544,6 +545,8 @@ object FakeItineraryRepository : ItineraryRepository {
      *
      * 결정-72·75 골격 — D-day `스타트 → 13:00 취향 → 15:30 카페 → 18:30 맛집 저녁`,
      * 마지막 D+1 `오전 관광 → 11:00 체크아웃 → 로컬 점심 → 취향`. 제목·설명은 서버 생성기와 같다.
+     * themes 가 `[TOUR, FOOD]` 라 서버는 FOOD·TOUR·CAFE 풀만 적재한다 — D+1 취향 자리는 오전 관광(TOUR)을
+     * 피해 기본 후보 중 적재된 CAFE 로 떨어진다(SPEC §5.6-5). 적재되지 않는 카테고리를 픽스처에 넣지 않는다.
      */
     private val NORMAL_FIXTURE = """
         {
@@ -599,8 +602,8 @@ object FakeItineraryRepository : ItineraryRepository {
                 { "startTime": "12:30", "title": "로컬 점심", "category": "FOOD",
                   "placeName": "골목 손칼국수", "address": "마포구 5", "lat": 37.54, "lng": 126.95,
                   "description": "방문 전 메뉴와 영업시간을 확인해 주세요." },
-                { "startTime": "14:30", "title": "역사·문화 탐방", "category": "HISTORY",
-                  "placeName": "역사문화거리", "address": "종로구 1", "lat": 37.57, "lng": 126.98,
+                { "startTime": "14:30", "title": "카페 한 잔", "category": "CAFE",
+                  "placeName": "로스터리 1호점", "address": "영등포구 11", "lat": 37.52, "lng": 126.92,
                   "description": "둘러보기" }
               ]
             }
