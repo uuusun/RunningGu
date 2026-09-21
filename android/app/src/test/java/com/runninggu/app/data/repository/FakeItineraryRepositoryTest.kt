@@ -55,14 +55,30 @@ class FakeItineraryRepositoryTest {
      */
     @Test
     fun `회복 픽스처는 온천을 고정 블록으로 두지 않는다`() = runTest {
-        val result = FakeItineraryRepository.generate(request(event = EventType.HALF))
+        val hotel = HotelInput("하와이장", 37.90, 127.06)
+        val result = FakeItineraryRepository.generate(request(event = EventType.HALF, hotel = hotel))
 
         val dday = result.days.first { it.off == 0 }
         val dplus = result.days.first { it.off == 1 }
         assertTrue("D-day 에 고정 온천 블록이 없어야 한다 (결정-74)", dday.blocks.none { it.catKey == BlockCategory.WELLNESS })
-        assertEquals("웰니스를 고른 예시라 온천은 D+1 취향 자리에 온다", listOf("11:00", "12:30", "14:30"), dplus.blocks.map { it.time })
-        assertEquals(BlockCategory.WELLNESS, dplus.blocks.last().catKey)
         assertEquals("회복 D-day 는 카페 고정 슬롯 없이 스타트·취향·회복 저녁 셋이다 (SPEC §5.6-4)", listOf("09:00", "14:30", "18:00"), dday.blocks.map { it.time })
+        assertEquals("숙소를 골랐으니 마지막 날은 체크아웃 → 점심 → 취향이다", listOf("11:00", "12:30", "14:30"), dplus.blocks.map { it.time })
+        assertEquals("웰니스를 고른 예시라 온천은 D+1 취향 자리에 온다", BlockCategory.WELLNESS, dplus.blocks.last().catKey)
+        assertEquals("체크아웃은 요청한 숙소로 한다", "하와이장", dplus.blocks.first { it.catKey == BlockCategory.LODGING }.place?.name)
+    }
+
+    /**
+     * 결정-75: `hotel=null` 이면 서버는 체크인·체크아웃을 포함한 자동 LODGING 블록을 하나도 만들지 않는다.
+     * 가짜 저장소도 같은 계약을 지켜야 화면이 진짜 서버와 다른 모양을 보지 않는다.
+     */
+    @Test
+    fun `숙소 없이 추천받으면 LODGING 블록이 하나도 없다`() = runTest {
+        for (event in listOf(EventType.TEN_K, EventType.HALF)) {
+            val result = FakeItineraryRepository.generate(request(event = event, hotel = null))
+
+            val lodging = result.days.flatMap { it.blocks }.filter { it.catKey == BlockCategory.LODGING }
+            assertTrue("$event · hotel=null 인데 LODGING 블록이 있다: ${lodging.map { it.title }}", lodging.isEmpty())
+        }
     }
 
     /**
