@@ -465,7 +465,13 @@ object FakeItineraryRepository : ItineraryRepository {
 
     private const val NETWORK_DELAY_MS = 600L
 
-    /** 하프·풀 — 회복 배지와 온천 블록이 있다. (API 명세 §5-1 예시) */
+    /**
+     * 하프·풀 — 회복 배지가 있고 회복일은 비회복일보다 블록이 하나 적다. (API 명세 §5-1 예시)
+     *
+     * 결정-74(#381)·결정-75(#382) 이후 골격이다 — 고정 온천 블록이 없고, 웰니스를 고른 이 예시에서는
+     * 온천이 취향 자리(D+1 14:30)에 다른 취향과 같은 자격으로 온다(SPEC §5.6-4·5). 식사 블록 설명은
+     * 서버와 같은 `방문 전 메뉴와 영업시간을 확인해 주세요.`, 회복일 취향 블록은 `완주 후 가볍게 · …` 다.
+     */
     private val RECOVERY_FIXTURE = """
         {
           "title": "2박 3일",
@@ -474,7 +480,7 @@ object FakeItineraryRepository : ItineraryRepository {
           "themes": ["TOUR", "WELLNESS"],
           "startDate": "2026-09-03",
           "endDate": "2026-09-05",
-          "recovery": { "label": "D+1 회복 모드", "note": "온천+짧은 산책(고강도 제외)" },
+          "recovery": { "label": "D+1 회복 모드", "note": "다음 날도 여유 있게 · 고강도 제외" },
           "days": [
             {
               "dayIndex": -1, "date": "2026-09-03", "dayLabel": "D-1",
@@ -483,46 +489,40 @@ object FakeItineraryRepository : ItineraryRepository {
                 { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
                   "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
                   "description": "여장 풀기" },
-                { "startTime": "18:30", "title": "카보로딩 저녁", "category": "FOOD",
+                { "startTime": "18:30", "title": "대회 전날 저녁", "category": "FOOD",
                   "placeName": "한밭식당", "address": "여의도동 12", "lat": 37.52, "lng": 126.93,
-                  "description": "탄수화물 보충 · 무리 없는 메뉴" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
               "dayIndex": 0, "date": "2026-09-04", "dayLabel": "D-day",
-              "recovery": false, "note": "완주 후 온천·휴식 권장",
+              "recovery": false, "note": "완주 후에는 일정을 가볍게",
               "blocks": [
                 { "startTime": "09:00", "title": "🏁 스타트", "category": "RACE",
                   "placeName": "여의도한강공원", "address": "여의도동", "lat": 37.52, "lng": 126.93,
                   "description": "완주 · 결승 후 샤워",
                   "blockType": "RACE", "systemManaged": true },
-                { "startTime": "11:00", "title": "온천·회복", "category": "WELLNESS",
-                  "placeName": "시티 온천", "address": "영등포구 3", "lat": 37.51, "lng": 126.90,
-                  "description": "완주 근육 회복" },
                 { "startTime": "14:30", "title": "가벼운 관광", "category": "TOUR",
                   "placeName": "중앙공원 전망대", "address": "영등포구 7", "lat": 37.53, "lng": 126.92,
-                  "description": "평지 위주 가벼운 코스" },
+                  "description": "완주 후 가볍게 · 평지 위주 가벼운 코스" },
                 { "startTime": "18:00", "title": "회복 저녁", "category": "FOOD",
                   "placeName": "소문난 국밥", "address": "영등포구 9", "lat": 37.51, "lng": 126.91,
-                  "description": "소화 잘 되는 회복식" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
               "dayIndex": 1, "date": "2026-09-05", "dayLabel": "D+1",
-              "recovery": true, "note": "온천+짧은 산책(고강도 제외)",
+              "recovery": true, "note": "다음 날도 여유 있게 · 고강도 제외",
               "blocks": [
-                { "startTime": "10:00", "title": "온천·족욕", "category": "WELLNESS",
-                  "placeName": "스파랜드", "address": "마포구 2", "lat": 37.54, "lng": 126.94,
-                  "description": "고강도 제외 · 회복 위주" },
+                { "startTime": "11:00", "title": "숙소 체크아웃", "category": "LODGING",
+                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
+                  "description": "짐 정리하고 나서기" },
                 { "startTime": "12:30", "title": "로컬 점심", "category": "FOOD",
                   "placeName": "골목 손칼국수", "address": "마포구 5", "lat": 37.54, "lng": 126.95,
-                  "description": "그 지역 별미" },
-                { "startTime": "14:30", "title": "오후 관광", "category": "TOUR",
-                  "placeName": "역사문화거리", "address": "종로구 1", "lat": 37.57, "lng": 126.98,
-                  "description": "관광지" },
-                { "startTime": "17:00", "title": "체크아웃·귀가", "category": "LODGING",
-                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
-                  "description": "여행 마무리" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." },
+                { "startTime": "14:30", "title": "온천·힐링", "category": "WELLNESS",
+                  "placeName": "스파랜드", "address": "마포구 2", "lat": 37.54, "lng": 126.94,
+                  "description": "완주 후 가볍게 · 고강도 제외 · 회복 위주" }
               ]
             }
           ]

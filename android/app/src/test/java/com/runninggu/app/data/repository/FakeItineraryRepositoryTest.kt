@@ -1,5 +1,6 @@
 package com.runninggu.app.data.repository
 
+import com.runninggu.app.domain.BlockCategory
 import com.runninggu.app.domain.EventType
 import com.runninggu.app.domain.PoiCategory
 import kotlinx.coroutines.test.runTest
@@ -45,6 +46,23 @@ class FakeItineraryRepositoryTest {
         val result = FakeItineraryRepository.generate(request(event = EventType.HALF))
 
         assertTrue("하프는 회복 안내가 있어야 한다 (SPEC §5.5)", result.recovery != null)
+    }
+
+    /**
+     * 회복 픽스처는 결정-74·75 골격을 흉내내야 한다 — 온천은 고정 블록이 아니라 취향 자리에만 오고,
+     * 회복일(D+1)은 D-day 보다 블록이 하나 적다(SPEC §5.6-4). 옛 골격(`11:00 온천·회복` 고정)으로
+     * 되돌리면 이 테스트가 잡는다.
+     */
+    @Test
+    fun `회복 픽스처는 온천을 고정 블록으로 두지 않는다`() = runTest {
+        val result = FakeItineraryRepository.generate(request(event = EventType.HALF))
+
+        val dday = result.days.first { it.off == 0 }
+        val dplus = result.days.first { it.off == 1 }
+        assertTrue("D-day 에 고정 온천 블록이 없어야 한다 (결정-74)", dday.blocks.none { it.catKey == BlockCategory.WELLNESS })
+        assertEquals("웰니스를 고른 예시라 온천은 D+1 취향 자리에 온다", listOf("11:00", "12:30", "14:30"), dplus.blocks.map { it.time })
+        assertEquals(BlockCategory.WELLNESS, dplus.blocks.last().catKey)
+        assertEquals("회복 D-day 는 카페 고정 슬롯 없이 스타트·취향·회복 저녁 셋이다 (SPEC §5.6-4)", listOf("09:00", "14:30", "18:00"), dday.blocks.map { it.time })
     }
 
     /**
