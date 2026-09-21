@@ -86,7 +86,7 @@ class ItineraryEngineTest {
 
         assertEquals(listOf("09:00", "11:00", "18:00"), dday.times())
         assertEquals("온천·회복", dday.titles()[1])
-        assertEquals("완주 후 회복 집중, 도보 최소", dday.note) // §5.1 풀 dday
+        assertEquals("완주 후 회복 집중 · 이동 최소", dday.note) // §5.1 풀 dday (결정-74)
     }
 
     @Test

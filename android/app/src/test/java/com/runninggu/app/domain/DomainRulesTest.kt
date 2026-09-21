@@ -42,8 +42,8 @@ class DomainRulesTest {
     fun `회복 룰 값이 SPEC 표와 같다`() {
         assertEquals(RecoveryRule(8, false, "거의 정상", "완주 후 오후부터 자유 관광", "일반 관광 자유"), Recovery[EventType.FIVE_K])
         assertEquals(RecoveryRule(8, false, "낮은 피로", "완주 후 가벼운 관광·축제", "일반 관광"), Recovery[EventType.TEN_K])
-        assertEquals(RecoveryRule(5, true, "중등도 피로", "완주 후 온천·휴식 권장", "온천+짧은 산책(고강도 제외)"), Recovery[EventType.HALF])
-        assertEquals(RecoveryRule(3, true, "고강도 회복 필요", "완주 후 회복 집중, 도보 최소", "스파·온천 중심, 도보 최소"), Recovery[EventType.FULL])
+        assertEquals(RecoveryRule(5, true, "중등도 피로", "완주 후에는 일정을 가볍게", "다음 날도 여유 있게 · 고강도 제외"), Recovery[EventType.HALF])
+        assertEquals(RecoveryRule(3, true, "고강도 회복 필요", "완주 후 회복 집중 · 이동 최소", "일정과 이동을 가장 적게"), Recovery[EventType.FULL])
     }
 
     @Test
@@ -76,11 +76,11 @@ class DomainRulesTest {
     fun `D플러스 일자가 있으면 그 라벨을 없으면 D-day 를 쓴다`() {
         val withPlus = recoveryBadgeOf(EventType.HALF, listOf(-1, 0, 1))!!
         assertEquals("D+1 회복 모드", withPlus.label)
-        assertEquals("온천+짧은 산책(고강도 제외)", withPlus.text)
+        assertEquals("다음 날도 여유 있게 · 고강도 제외", withPlus.text)
 
         val onlyDday = recoveryBadgeOf(EventType.HALF, listOf(-1, 0))!!
         assertEquals("D-day 회복 모드", onlyDday.label)
-        assertEquals("완주 후 온천·휴식 권장", onlyDday.text)
+        assertEquals("완주 후에는 일정을 가볍게", onlyDday.text)
     }
 
     // ── §5.2 일정 패턴 ─────────────────────────────────────────

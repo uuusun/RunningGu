@@ -17,7 +17,13 @@ data class RecoveryRule(
     val dplus: String,
 )
 
-/** 회복 룰 표. (SPEC §5.1) */
+/**
+ * 회복 룰 표. (SPEC §5.1)
+ *
+ * 하프·풀의 `dday`·`dplus` 문구는 결정-74(2026-09-18)로 온천 언급을 뺀 값이다 — 회복을
+ * "온천을 넣는 규칙" 이 아니라 "일정 부담을 줄이는 규칙" 으로 바꿨기 때문이다. 이전 값
+ * (`완주 후 온천·휴식 권장` 등)으로 되돌리지 않는다.
+ */
 object Recovery {
 
     private val RULES: Map<EventType, RecoveryRule> = mapOf(
@@ -31,11 +37,11 @@ object Recovery {
         ),
         EventType.HALF to RecoveryRule(
             walkKm = 5, noHard = true, intensity = "중등도 피로",
-            dday = "완주 후 온천·휴식 권장", dplus = "온천+짧은 산책(고강도 제외)",
+            dday = "완주 후에는 일정을 가볍게", dplus = "다음 날도 여유 있게 · 고강도 제외",
         ),
         EventType.FULL to RecoveryRule(
             walkKm = 3, noHard = true, intensity = "고강도 회복 필요",
-            dday = "완주 후 회복 집중, 도보 최소", dplus = "스파·온천 중심, 도보 최소",
+            dday = "완주 후 회복 집중 · 이동 최소", dplus = "일정과 이동을 가장 적게",
         ),
     )
 
