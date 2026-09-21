@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import com.runninggu.server.common.error.ApiException;
 import com.runninggu.server.common.error.ErrorCode;
 import com.runninggu.server.itinerary.domain.PoiPools;
+import com.runninggu.server.itinerary.domain.MealSuitability;
 import com.runninggu.server.poi.application.PoiSearchResult;
 import com.runninggu.server.poi.application.PoiService;
 import com.runninggu.server.poi.domain.Poi;
@@ -36,7 +37,7 @@ class ItineraryPoiPoolLoaderTest {
     }
 
     @Test
-    void 카테고리마다_반경_8km에서_여덟_건을_조회해_내부_LIVE_원천을_기록한다() {
+    void 반경_8km에서_식사는_15건_다른_카테고리는_8건을_조회해_LIVE를_기록한다() {
         givenSearch(PoiCategory.FOOD, new PoiSearchResult(List.of(poi("식당", PoiCategory.FOOD))));
         givenSearch(PoiCategory.TOUR, new PoiSearchResult(List.of(poi("공원", PoiCategory.TOUR))));
 
@@ -83,7 +84,7 @@ class ItineraryPoiPoolLoaderTest {
                         eq(LNG),
                         eq(8_000),
                         isNull(),
-                        eq(8)))
+                        eq(15)))
                 .willThrow(new ApiException(
                         ErrorCode.VALIDATION_FAILED,
                         "내부 호출 계약 오류"));
@@ -95,6 +96,30 @@ class ItineraryPoiPoolLoaderTest {
                                 .isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
+    @Test
+    void 식사_후보는_표시_설명과_분리된_원천_업종으로_분류한다() {
+        Poi restaurant = new Poi(
+                "동네식당",
+                PoiCategory.FOOD,
+                PoiProvider.KAKAO,
+                LAT,
+                LNG,
+                500,
+                "사용자에게 보여 줄 설명",
+                "세종특별자치시",
+                "https://place.map.kakao.com/2",
+                null,
+                "음식점 > 한식");
+        givenSearch(PoiCategory.FOOD, new PoiSearchResult(List.of(restaurant)));
+
+        PoiPools pools = loader.load(List.of(PoiCategory.FOOD), LAT, LNG);
+
+        assertThat(pools.get(PoiCategory.FOOD)).singleElement().satisfies(place -> {
+            assertThat(place.description()).isEqualTo("사용자에게 보여 줄 설명");
+            assertThat(place.mealSuitability()).isEqualTo(MealSuitability.PREFERRED);
+        });
+    }
+
     private void givenSearch(PoiCategory category, PoiSearchResult result) {
         given(poiService.search(
                         eq(category),
@@ -102,7 +127,7 @@ class ItineraryPoiPoolLoaderTest {
                         eq(LNG),
                         eq(8_000),
                         isNull(),
-                        eq(8)))
+                        eq(category == PoiCategory.FOOD ? 15 : 8)))
                 .willReturn(result);
     }
 
@@ -113,7 +138,7 @@ class ItineraryPoiPoolLoaderTest {
                 eq(LNG),
                 eq(8_000),
                 isNull(),
-                eq(8));
+                eq(category == PoiCategory.FOOD ? 15 : 8));
     }
 
     private Poi poi(String name, PoiCategory category) {
@@ -127,6 +152,7 @@ class ItineraryPoiPoolLoaderTest {
                 "설명",
                 "세종특별자치시",
                 "https://place.map.kakao.com/1",
-                null);
+                null,
+                category == PoiCategory.FOOD ? "음식점 > 한식" : "");
     }
 }

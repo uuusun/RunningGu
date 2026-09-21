@@ -89,7 +89,7 @@ class ItineraryGenerationApiIntegrationTest extends PostgreSqlContainerSupport {
     void 정상_빈_POI_풀은_장소만_null로_낮추고_생성은_성공한다() throws Exception {
         long contestId = insertContest(true, new BigDecimal("36.4912000"), new BigDecimal("127.2714000"));
         given(poolLoader.load(anyList(), any(), any()))
-                .willReturn(new PoiPools(Map.of(), Map.of()));
+                .willReturn(new PoiPools(Map.of(), Map.of(PoiCategory.FOOD, "LIVE")));
 
         mockMvc.perform(post("/api/itineraries/generate")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +98,33 @@ class ItineraryGenerationApiIntegrationTest extends PostgreSqlContainerSupport {
                 .andExpect(jsonPath("$.days.length()").value(3))
                 .andExpect(jsonPath("$.days[0].blocks[1].placeName").value(nullValue()))
                 .andExpect(jsonPath("$.days[0].blocks[1].lat").value(nullValue()))
+                .andExpect(jsonPath("$.days[0].blocks[1].description")
+                        .value("추천할 식당을 찾지 못했어요. 편집에서 장소를 추가해 보세요."))
                 .andExpect(jsonPath("$.days[1].blocks[0].placeName").value("세종호수공원"));
+    }
+
+    @Test
+    void 숙소_null이면_응답_전체에_체크인과_체크아웃이_없다() throws Exception {
+        long contestId = insertContest(true, new BigDecimal("36.4912000"), new BigDecimal("127.2714000"));
+        String withoutHotel = requestBody(contestId).replace(
+                """
+                        {
+                            "name": "호텔 세종 가온",
+                            "lat": 36.4901,
+                            "lng": 127.2688
+                          }
+                        """.strip(),
+                "null");
+
+        mockMvc.perform(post("/api/itineraries/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(withoutHotel))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hotel").value(nullValue()))
+                .andExpect(jsonPath("$.days[0].blocks.length()").value(1))
+                .andExpect(jsonPath("$.days[0].blocks[0].category").value("FOOD"))
+                .andExpect(jsonPath("$.days[2].blocks.length()").value(2))
+                .andExpect(jsonPath("$.days[2].blocks[0].category").value("FOOD"));
     }
 
     @Test

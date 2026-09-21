@@ -9,7 +9,17 @@ public record ItineraryPlace(
         String address,
         BigDecimal lat,
         BigDecimal lng,
-        String description) {
+        String description,
+        MealSuitability mealSuitability) {
+
+    public ItineraryPlace(
+            String name,
+            String address,
+            BigDecimal lat,
+            BigDecimal lng,
+            String description) {
+        this(name, address, lat, lng, description, MealSuitability.PREFERRED);
+    }
 
     public ItineraryPlace {
         name = Objects.requireNonNull(name);
@@ -17,6 +27,7 @@ public record ItineraryPlace(
         lng = Objects.requireNonNull(lng);
         address = normalizeNullable(address);
         description = Objects.requireNonNullElse(description, "");
+        mealSuitability = Objects.requireNonNull(mealSuitability);
     }
 
     private static String normalizeNullable(String value) {
