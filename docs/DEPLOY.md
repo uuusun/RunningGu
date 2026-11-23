@@ -8,10 +8,19 @@
 
 - AWS 서울 리전의 운영 EC2(`i-0c9f040b65d41d6c1`)·EBS·스냅샷·AMI는 삭제됐다. 서버를 다시
   띄우려면 아래 4장 순서로 새로 만들어야 한다.
-- 운영 DB의 로컬 사본은 없다. 로컬 개발 DB(`backend-postgres-1` 컨테이너)의 덤프만 저장소 밖에
-  보관한다. 로컬 DB에는 대회 snapshot 데이터(contest 153건 등)만 있고 사용자 데이터는 0건이다.
-- 운영 DB는 pgBackRest로 S3 bucket `runninggu-production-backup-987622176638-seoul`의
-  `runninggu/production/` 아래에 백업했다(보존 7일). bucket을 지우면 이 백업도 사라진다.
+- 운영 DB는 2026-11-02 EC2에서 받은 **논리 백업(custom dump) 한 벌**만 남아 있다. 백엔드 담당자 PC의
+  저장소 밖에 보관하며(묶음 `runninggu-backup-20261102.tar`, DB 객체 목록 읽기만 확인, 실제 복원 미실행),
+  자세한 내용은 그 PC의 Git 제외 기록 `docs/local/aws-recovery-20261102.md`에 있다.
+- pgBackRest 전체 백업·연속 WAL(S3 bucket `runninggu-production-backup-987622176638-seoul`),
+  graph bucket `runninggu-staging-artifacts-987622176638`, 고객 관리형 KMS key `b18b8374-…`는
+  2026-11-04 정리에서 삭제됐다. 2026-11-02 이후 시점이나 과거 시점으로는 복원할 수 없다.
+- 승인된 GraphHopper graph artifact(`gh11-korea-20260901-2ff6731b181a-2b8515dd29fc`)는 같은 PC의
+  저장소 밖에 SHA256SUMS와 함께 보관한다.
+- 로컬 개발 DB(`backend-postgres-1` 컨테이너)의 2026-11-23 덤프도 저장소 밖에 보관한다. 이 DB에는
+  대회 snapshot 데이터(contest 153건 등)만 있고 사용자 데이터는 0건이다.
+- 같은 점검에서 과금 리소스는 0개였다(활성 리전 17개 전체 조회). 남겨 둔 무료 항목은 서울 리전의
+  SSM `SecureString` 6개(`/runninggu/production/*`, KMS key가 없어 복호화 불가), SNS topic 3개,
+  SES 인증 ID(`runninggu.store` 등), 월 예산 3개다. 다시 배포할 때 SSM 비밀값은 새로 만들어야 한다.
 - 스키마의 원본은 Flyway 마이그레이션 `backend/src/main/resources/db/migration/V1~V8`이다.
   [`db/schema.sql`](../db/schema.sql)은 2026-11-23 로컬 DB에서 뽑은 참고용 스냅샷이며 실행 기준이 아니다.
 
@@ -86,7 +95,10 @@ docker exec backend-postgres-1 sh -c 'pg_restore -U "$POSTGRES_USER" -d runningg
 운영은 `pg_dump`가 아니라 pgBackRest 전체 백업(매일 03:20 KST)과 연속 WAL을 S3에 보관했다.
 복원은 `backend/compose.recovery.yaml`과 `/etc/runninggu/recovery-compose.env`
 (`PGBACKREST_REPO1_PATH=/runninggu/production`)로 별도 volume에서 진행한다.
-절차는 운영 런북 §4·§6을 따른다. S3 bucket과 KMS key가 둘 다 남아 있어야 복원할 수 있다.
+절차는 운영 런북 §4·§6을 따른다. S3 bucket과 KMS key가 둘 다 남아 있어야 복원할 수 있는데,
+2026-11-04에 둘 다 삭제됐다. 지금 운영 데이터를 되살리는 방법은 2026-11-02 논리 백업을 4.1의
+`pg_restore`로 빈 DB에 복원하는 것뿐이다. 이때 Flyway·Importer를 신규 설치처럼 바로 돌리지 말고
+복원한 스키마 버전(`flyway_schema_history`)과 현재 마이그레이션이 맞는지 먼저 확인한다.
 
 ## 5. EC2에 다시 배포하는 순서
 
@@ -113,8 +125,10 @@ PostgreSQL과 GraphHopper는 Docker Compose로, Spring Boot는 호스트 Java 21
    `compose.ec2.yaml`을 빼고 WAL 아카이빙 없이 운영한다(추정).
 7. **빌드 산출물 실행** — CI artifact checksum을 확인하고 `/opt/runninggu/current/runninggu-server.jar`에
    둔다. 빈 DB면 Flyway가 V1~V8을 적용한다. 대회 데이터는 Importer(`runninggu-contest-import.service`)로 적재한다.
-8. **GraphHopper** — `runninggu-staging-artifacts-987622176638/graphhopper/production/`의 승인된
-   graph artifact를 설치한다. 이 bucket을 지웠다면 OSM PBF로 graph를 다시 import해야 한다(추정, 6GB 메모리 필요).
+8. **GraphHopper** — 원래는 `runninggu-staging-artifacts-987622176638/graphhopper/production/`에서
+   설치했지만 이 bucket은 삭제됐다. 로컬에 보관한 승인 artifact를 새 S3 경로나 EC2로 옮기고
+   SHA256SUMS와 `graph-release.production.json`의 manifest 해시를 대조한 뒤 설치한다(추정).
+   설치 스크립트가 S3 경로를 전제하므로 경로 조정이 필요할 수 있다.
 9. **프로세스 유지** — `backend/deploy/systemd/*.service`·`*.timer`를 설치하고
    `runninggu-graphhopper` → `runninggu-backend` 순서로 시작한다. systemd가 재시작과 재부팅 복구를 맡는다.
 10. **Nginx·TLS** — 운영 런북 §5 순서로 HTTP challenge → Certbot → 최종 설정. 완료 기준은 런북 §7.
@@ -132,6 +146,6 @@ PostgreSQL과 GraphHopper는 Docker Compose로, Spring Boot는 호스트 Java 21
 | Secrets Manager | 시크릿당 $0.40/월 |
 | Parameter Store | Standard 파라미터는 무료. Advanced는 파라미터당 $0.05/월 |
 | CloudWatch Logs | 저장 GB당 약 $0.03/월 |
-| AWS Budgets | 예산 2개까지 무료 |
+| AWS Budgets | 예산과 알림은 개수와 관계없이 무료. 액션을 건 예산은 2개까지 무료이고 그 뒤로 예산당 하루 $0.10, 정기 보고서는 1건에 $0.01 |
 
 다시 배포할 때는 처음부터 월 예산 알림을 만들고, 내릴 때는 위 항목이 남지 않았는지 모든 리전에서 확인한다.
