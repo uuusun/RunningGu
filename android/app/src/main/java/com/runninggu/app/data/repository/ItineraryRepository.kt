@@ -441,11 +441,22 @@ object FakeItineraryRepository : ItineraryRepository {
      */
     private fun ItineraryResult.alignTo(request: GenerateItineraryRequest): ItineraryResult {
         val dayCount = (request.startDate.datesUntil(request.endDate.plusDays(1)).count()).toInt()
+        val hotel = request.hotel
         val aligned = days.take(dayCount).mapIndexed { index, day ->
             val date = request.startDate.plusDays(index.toLong())
             day.copy(
                 date = date,
                 dateLabel = "%02d.%02d".format(date.monthValue, date.dayOfMonth),
+                // 결정-75: `hotel=null` 이면 자동 LODGING 블록을 하나도 만들지 않는다. 숙소를 골랐으면
+                // fixture 의 숙소 장소를 요청값으로 바꿔 서버가 하듯 그 숙소로 체크인·체크아웃한다.
+                blocks = day.blocks.mapNotNull { block ->
+                    when {
+                        block.catKey != BlockCategory.LODGING -> block
+                        hotel == null -> null
+                        // 요청 `HotelInput` 에는 주소가 없고 서버 hotelPlace() 도 address=null 이라 주소는 비운다.
+                        else -> block.copy(place = block.place?.copy(name = hotel.name, lat = hotel.lat, lng = hotel.lng, addr = ""))
+                    }
+                },
             )
         }
         // 스냅샷은 **요청을 그대로 되비춘다.** fixture 의 리터럴을 두면 §5-2 저장 요청이
@@ -465,7 +476,13 @@ object FakeItineraryRepository : ItineraryRepository {
 
     private const val NETWORK_DELAY_MS = 600L
 
-    /** 하프·풀 — 회복 배지와 온천 블록이 있다. (API 명세 §5-1 예시) */
+    /**
+     * 하프·풀 — 회복 배지가 있고 회복일은 비회복일보다 블록이 하나 적다. (API 명세 §5-1 예시)
+     *
+     * 결정-74(#381)·결정-75(#382) 이후 골격이다 — 고정 온천 블록이 없고, 웰니스를 고른 이 예시에서는
+     * 온천이 취향 자리(D+1 14:30)에 다른 취향과 같은 자격으로 온다(SPEC §5.6-4·5). 식사 블록 설명은
+     * 서버와 같은 `방문 전 메뉴와 영업시간을 확인해 주세요.`, 회복일 취향 블록은 `완주 후 가볍게 · …` 다.
+     */
     private val RECOVERY_FIXTURE = """
         {
           "title": "2박 3일",
@@ -474,7 +491,7 @@ object FakeItineraryRepository : ItineraryRepository {
           "themes": ["TOUR", "WELLNESS"],
           "startDate": "2026-09-03",
           "endDate": "2026-09-05",
-          "recovery": { "label": "D+1 회복 모드", "note": "온천+짧은 산책(고강도 제외)" },
+          "recovery": { "label": "D+1 회복 모드", "note": "다음 날도 여유 있게 · 고강도 제외" },
           "days": [
             {
               "dayIndex": -1, "date": "2026-09-03", "dayLabel": "D-1",
@@ -483,53 +500,54 @@ object FakeItineraryRepository : ItineraryRepository {
                 { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
                   "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
                   "description": "여장 풀기" },
-                { "startTime": "18:30", "title": "카보로딩 저녁", "category": "FOOD",
+                { "startTime": "18:30", "title": "대회 전날 저녁", "category": "FOOD",
                   "placeName": "한밭식당", "address": "여의도동 12", "lat": 37.52, "lng": 126.93,
-                  "description": "탄수화물 보충 · 무리 없는 메뉴" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
               "dayIndex": 0, "date": "2026-09-04", "dayLabel": "D-day",
-              "recovery": false, "note": "완주 후 온천·휴식 권장",
+              "recovery": false, "note": "완주 후에는 일정을 가볍게",
               "blocks": [
                 { "startTime": "09:00", "title": "🏁 스타트", "category": "RACE",
                   "placeName": "여의도한강공원", "address": "여의도동", "lat": 37.52, "lng": 126.93,
                   "description": "완주 · 결승 후 샤워",
                   "blockType": "RACE", "systemManaged": true },
-                { "startTime": "11:00", "title": "온천·회복", "category": "WELLNESS",
-                  "placeName": "시티 온천", "address": "영등포구 3", "lat": 37.51, "lng": 126.90,
-                  "description": "완주 근육 회복" },
                 { "startTime": "14:30", "title": "가벼운 관광", "category": "TOUR",
                   "placeName": "중앙공원 전망대", "address": "영등포구 7", "lat": 37.53, "lng": 126.92,
-                  "description": "평지 위주 가벼운 코스" },
+                  "description": "완주 후 가볍게 · 평지 위주 가벼운 코스" },
                 { "startTime": "18:00", "title": "회복 저녁", "category": "FOOD",
                   "placeName": "소문난 국밥", "address": "영등포구 9", "lat": 37.51, "lng": 126.91,
-                  "description": "소화 잘 되는 회복식" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
               "dayIndex": 1, "date": "2026-09-05", "dayLabel": "D+1",
-              "recovery": true, "note": "온천+짧은 산책(고강도 제외)",
+              "recovery": true, "note": "다음 날도 여유 있게 · 고강도 제외",
               "blocks": [
-                { "startTime": "10:00", "title": "온천·족욕", "category": "WELLNESS",
-                  "placeName": "스파랜드", "address": "마포구 2", "lat": 37.54, "lng": 126.94,
-                  "description": "고강도 제외 · 회복 위주" },
+                { "startTime": "11:00", "title": "숙소 체크아웃", "category": "LODGING",
+                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
+                  "description": "짐 정리하고 나서기" },
                 { "startTime": "12:30", "title": "로컬 점심", "category": "FOOD",
                   "placeName": "골목 손칼국수", "address": "마포구 5", "lat": 37.54, "lng": 126.95,
-                  "description": "그 지역 별미" },
-                { "startTime": "14:30", "title": "오후 관광", "category": "TOUR",
-                  "placeName": "역사문화거리", "address": "종로구 1", "lat": 37.57, "lng": 126.98,
-                  "description": "관광지" },
-                { "startTime": "17:00", "title": "체크아웃·귀가", "category": "LODGING",
-                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
-                  "description": "여행 마무리" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." },
+                { "startTime": "14:30", "title": "온천·힐링", "category": "WELLNESS",
+                  "placeName": "스파랜드", "address": "마포구 2", "lat": 37.54, "lng": 126.94,
+                  "description": "완주 후 가볍게 · 고강도 제외 · 회복 위주" }
               ]
             }
           ]
         }
     """.trimIndent()
 
-    /** 5K·10K — 회복 배지가 없고 오후가 자유 관광이다. */
+    /**
+     * 5K·10K — 회복 배지가 없고 D-day 오후가 취향·카페·맛집이다. (API 명세 §5-1 예시)
+     *
+     * 결정-72·75 골격 — D-day `스타트 → 13:00 취향 → 15:30 카페 → 18:30 맛집 저녁`,
+     * 마지막 D+1 `오전 관광 → 11:00 체크아웃 → 로컬 점심 → 취향`. 제목·설명은 서버 생성기와 같다.
+     * themes 가 `[TOUR, FOOD]` 라 서버는 FOOD·TOUR·CAFE 풀만 적재한다 — D+1 취향 자리는 오전 관광(TOUR)을
+     * 피해 기본 후보 중 적재된 CAFE 로 떨어진다(SPEC §5.6-5). 적재되지 않는 카테고리를 픽스처에 넣지 않는다.
+     */
     private val NORMAL_FIXTURE = """
         {
           "title": "2박 3일",
@@ -547,9 +565,9 @@ object FakeItineraryRepository : ItineraryRepository {
                 { "startTime": "15:00", "title": "숙소 체크인", "category": "LODGING",
                   "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
                   "description": "여장 풀기" },
-                { "startTime": "18:30", "title": "카보로딩 저녁", "category": "FOOD",
+                { "startTime": "18:30", "title": "대회 전날 저녁", "category": "FOOD",
                   "placeName": "한밭식당", "address": "여의도동 12", "lat": 37.52, "lng": 126.93,
-                  "description": "탄수화물 보충 · 무리 없는 메뉴" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
@@ -560,15 +578,15 @@ object FakeItineraryRepository : ItineraryRepository {
                   "placeName": "여의도한강공원", "address": "여의도동", "lat": 37.52, "lng": 126.93,
                   "description": "완주 · 결승 후 샤워",
                   "blockType": "RACE", "systemManaged": true },
-                { "startTime": "13:00", "title": "오후 자유 관광", "category": "TOUR",
+                { "startTime": "13:00", "title": "가벼운 관광", "category": "TOUR",
                   "placeName": "중앙공원 전망대", "address": "영등포구 7", "lat": 37.53, "lng": 126.92,
-                  "description": "관광지" },
+                  "description": "둘러보기" },
                 { "startTime": "15:30", "title": "카페 한 잔", "category": "CAFE",
                   "placeName": "로스터리 1호점", "address": "영등포구 11", "lat": 37.52, "lng": 126.92,
                   "description": "완주 후 휴식" },
                 { "startTime": "18:30", "title": "맛집 저녁", "category": "FOOD",
                   "placeName": "소문난 국밥", "address": "영등포구 9", "lat": 37.51, "lng": 126.91,
-                  "description": "오늘은 잘 먹는 날" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." }
               ]
             },
             {
@@ -577,16 +595,16 @@ object FakeItineraryRepository : ItineraryRepository {
               "blocks": [
                 { "startTime": "10:00", "title": "오전 관광", "category": "TOUR",
                   "placeName": "호수 산책로", "address": "송파구 1", "lat": 37.51, "lng": 127.10,
-                  "description": "관광지" },
+                  "description": "둘러보기" },
+                { "startTime": "11:00", "title": "숙소 체크아웃", "category": "LODGING",
+                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
+                  "description": "짐 정리하고 나서기" },
                 { "startTime": "12:30", "title": "로컬 점심", "category": "FOOD",
                   "placeName": "골목 손칼국수", "address": "마포구 5", "lat": 37.54, "lng": 126.95,
-                  "description": "그 지역 별미" },
-                { "startTime": "14:30", "title": "오후 관광", "category": "TOUR",
-                  "placeName": "역사문화거리", "address": "종로구 1", "lat": 37.57, "lng": 126.98,
-                  "description": "관광지" },
-                { "startTime": "17:00", "title": "체크아웃·귀가", "category": "LODGING",
-                  "placeName": "시티 호텔", "address": "여의도동 1", "lat": 37.52, "lng": 126.93,
-                  "description": "여행 마무리" }
+                  "description": "방문 전 메뉴와 영업시간을 확인해 주세요." },
+                { "startTime": "14:30", "title": "카페 한 잔", "category": "CAFE",
+                  "placeName": "로스터리 1호점", "address": "영등포구 11", "lat": 37.52, "lng": 126.92,
+                  "description": "둘러보기" }
               ]
             }
           ]
